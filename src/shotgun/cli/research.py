@@ -7,7 +7,7 @@ import typer
 app = typer.Typer(name="research", help="Perform research with agentic loops")
 
 
-@app.callback(invoke_without_command=True)
+@app.callback(invoke_without_command=True)  # type: ignore[misc]
 def research(
     ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="Research query or topic")],

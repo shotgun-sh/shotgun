@@ -7,7 +7,7 @@ import typer
 app = typer.Typer(name="tasks", help="Generate task lists with agentic approach")
 
 
-@app.callback(invoke_without_command=True)
+@app.callback(invoke_without_command=True)  # type: ignore[misc]
 def tasks(
     ctx: typer.Context,
     project: Annotated[str, typer.Argument(help="Project description or requirements")],
