@@ -13,11 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        
-      - name: Set up Python 3.10
-        run: uv python install 3.10
         
       - name: Install dependencies
         run: uv sync --all-extras
@@ -30,3 +32,58 @@ jobs:
         
       - name: Run mypy
         run: uv run mypy src/
+
+  basic-cli-smoke-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        
+      - name: Create virtual environment
+        run: uv venv
+        
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv sync --all-extras
+        
+      - name: Test shotgun version
+        run: |
+          source .venv/bin/activate
+          shotgun --version
+        
+      - name: Test shotgun help
+        run: |
+          source .venv/bin/activate
+          shotgun --help
+        
+      - name: Test plan command
+        run: |
+          source .venv/bin/activate
+          shotgun plan "Build a test application"
+        
+      - name: Test research command
+        run: |
+          source .venv/bin/activate
+          shotgun research "What is testing?"
+        
+      - name: Test tasks command
+        run: |
+          source .venv/bin/activate
+          shotgun tasks "Create a test project"
+
+  all-checks-passed:
+    runs-on: ubuntu-latest
+    needs: [basic-pr-check, basic-cli-smoke-tests]
+    
+    steps:
+      - name: All checks passed
+        run: echo "All checks have passed successfully!"

@@ -16,10 +16,48 @@ A Python CLI tool for research, planning, and task management powered by AI agen
 git clone https://github.com/shotgun-sh/shotgun.git
 cd shotgun
 uv sync --all-extras
+```
+
+After installation, you can use either method:
+
+**Method 1: Direct command (after uv sync)**
+```bash
+shotgun --help
+```
+
+**Method 2: Via uv run**
+```bash
 uv run shotgun --help
 ```
 
+### Virtual Environment Setup (Optional)
+
+If you prefer using a local virtual environment:
+
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv sync --all-extras
+shotgun --help
+```
+
 ## Usage
+
+### Using Direct Commands (after uv sync)
+
+```bash
+# Research a topic
+shotgun research "What is quantum computing?"
+
+# Generate a plan
+shotgun plan "Build a web application"
+shotgun plan "build me a house"
+
+# Generate tasks for a project
+shotgun tasks "Create a machine learning model"
+```
+
+### Using uv run
 
 ```bash
 # Research a topic

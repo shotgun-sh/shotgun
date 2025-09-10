@@ -7,7 +7,7 @@ import typer
 app = typer.Typer(name="plan", help="Generate structured plans")
 
 
-@app.callback(invoke_without_command=True)  # type: ignore[misc]
+@app.callback(invoke_without_command=True)
 def plan(
     ctx: typer.Context,
     goal: Annotated[str, typer.Argument(help="Goal or objective to plan for")],
