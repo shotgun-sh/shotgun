@@ -4,7 +4,7 @@ from typing import Annotated
 
 import typer
 
-from .commands import plan, research, tasks
+from shotgun.cli import plan, research, tasks
 
 app = typer.Typer(
     name="shotgun",

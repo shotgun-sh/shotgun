@@ -26,8 +26,8 @@ shotgun = "shotgun.main:app"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatchling.build.targets.wheel]
-packages = ["src/shotgun"]
+[tool.hatchling.build]
+sources = ["src"]
 
 [tool.ruff]
 line-length = 88
