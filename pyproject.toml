@@ -1,0 +1,38 @@
+[project]
+name = "shotgun"
+version = "0.1.0"
+description = "Shotgun - A Python CLI tool"
+readme = "README.md"
+authors = [
+    { name = "Scott Frasso", email = "scottfrasso@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+    "pre-commit>=3.8.0",
+]
+
+[project.scripts]
+shotgun = "shotgun:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "S", "C4", "PIE", "T20"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
