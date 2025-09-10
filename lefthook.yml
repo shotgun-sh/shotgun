@@ -14,3 +14,8 @@ pre-commit:
       run: actionlint {staged_files}
       glob: ".github/workflows/*.yml"
       skip: true
+
+commit-msg:
+  commands:
+    commitizen:
+      run: uv run cz check --commit-msg-file {1}

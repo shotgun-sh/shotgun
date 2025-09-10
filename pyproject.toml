@@ -17,6 +17,7 @@ dev = [
     "ruff>=0.6.0",
     "mypy>=1.11.0",
     "lefthook>=1.12.0",
+    "commitizen>=3.13.0",
 ]
 
 [project.scripts]
@@ -42,3 +43,12 @@ python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.commitizen]
+# NOTE: Keep allowed types in sync with .github/workflows/pr.yml
+# Using cz_conventional_commits with standard types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "pep621"
+update_changelog_on_bump = true

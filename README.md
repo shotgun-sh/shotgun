@@ -137,8 +137,9 @@ uv run lefthook run pre-commit
 This project uses [lefthook](https://github.com/evilmartians/lefthook) for git hooks. The hooks automatically run:
 
 - **ruff** - Python linting with auto-fix
-- **ruff-format** - Code formatting
+- **ruff-format** - Code formatting  
 - **mypy** - Type checking
+- **commitizen** - Commit message validation
 - **actionlint** - GitHub Actions workflow validation (if installed)
 
 #### Installing actionlint (recommended)
@@ -170,15 +171,49 @@ uv python install 3.10
 uv sync --python 3.10
 ```
 
+### Commit Message Convention
+
+This project enforces **Conventional Commits** specification. All commit messages must follow this format:
+
+```
+<type>[optional scope]: <description>
+```
+
+**Required commit types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code formatting changes
+- `refactor`: Code restructuring without feature changes
+- `perf`: Performance improvements
+- `test`: Adding or updating tests
+- `build`: Build system changes
+- `ci`: CI/CD changes
+- `chore`: Maintenance tasks
+- `revert`: Reverting previous commits
+
+**Examples:**
+```bash
+feat: add user authentication system
+fix: resolve memory leak in data processing
+docs: update API documentation
+refactor: simplify user validation logic
+```
+
+**For interactive commit creation:**
+```bash
+uv run cz commit
+```
+
 ### Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
+2. Create a feature branch: `git checkout -b feat/feature-name`
 3. Make your changes
 4. Run the pre-commit hooks: `uv run lefthook run pre-commit`
-5. Commit your changes: `git commit -m "Description"`
-6. Push to your fork: `git push origin feature-name`
-7. Create a Pull Request
+5. Commit with conventional format: `git commit -m "feat: add new feature"`
+6. Push to your fork: `git push origin feat/feature-name`
+7. Create a Pull Request with conventional title format
 
 ### CI/CD
 
