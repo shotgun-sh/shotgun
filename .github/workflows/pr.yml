@@ -1,0 +1,32 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  basic-pr-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        
+      - name: Set up Python 3.10
+        run: uv python install 3.10
+        
+      - name: Install dependencies
+        run: uv sync --all-extras
+        
+      - name: Run ruff
+        run: uv run ruff check .
+        
+      - name: Run ruff format check
+        run: uv run ruff format --check .
+        
+      - name: Run mypy
+        run: uv run mypy src/

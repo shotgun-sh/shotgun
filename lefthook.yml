@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    ruff:
+      run: uv run ruff check --fix {staged_files}
+      glob: "*.py"
+    ruff-format:
+      run: uv run ruff format {staged_files}
+      glob: "*.py"
+    mypy:
+      run: uv run mypy {staged_files}
+      glob: "*.py"
+    actionlint:
+      run: actionlint {staged_files}
+      glob: ".github/workflows/*.yml"

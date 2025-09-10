@@ -7,8 +7,9 @@ import typer
 app = typer.Typer(name="research", help="Perform research with agentic loops")
 
 
-@app.command()  # type: ignore[misc]
-def run(
+@app.callback(invoke_without_command=True)
+def research(
+    ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="Research query or topic")],
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Verbose output")

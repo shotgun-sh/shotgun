@@ -26,7 +26,7 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()  # type: ignore[misc]
+@app.callback()
 def main(
     version: Annotated[
         bool,
