@@ -4,16 +4,17 @@ from typing import Annotated
 
 import typer
 
-app = typer.Typer(name="plan", help="Generate structured plans")
+from shotgun.agents.plan import PlanAgent
+from shotgun.logging_config import set_global_log_level, setup_logger
+
+app = typer.Typer(name="plan", help="Generate structured plans", no_args_is_help=True)
+logger = setup_logger(__name__)
 
 
 @app.callback(invoke_without_command=True)
 def plan(
     ctx: typer.Context,
     goal: Annotated[str, typer.Argument(help="Goal or objective to plan for")],
-    format: Annotated[
-        str, typer.Option("--format", "-f", help="Output format (text, json, markdown)")
-    ] = "text",
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Verbose output")
     ] = False,
@@ -21,11 +22,37 @@ def plan(
     """Generate a structured plan for achieving the given goal.
 
     This command will create detailed, actionable plans broken down into steps
-    and milestones to help achieve your specified objective.
+    and milestones to help achieve your specified objective. It can also update
+    existing plans based on new requirements or refinements.
     """
-    typer.echo(f"📋 Plan command called with goal: {goal}")
+    # Set log level based on verbose flag
     if verbose:
-        typer.echo(f"Output format: {format}")
-        typer.echo("Verbose mode enabled")
-    typer.echo("⚠️  Planning functionality not yet implemented")
-    typer.echo("🚧 Coming soon: AI-powered structured planning")
+        set_global_log_level("DEBUG")
+        logger.debug("📊 Verbose mode enabled - DEBUG level logging active")
+
+    logger.info("📋 Planning Goal: %s", goal)
+
+    try:
+        # Initialize the plan agent
+        agent = PlanAgent()
+
+        # Start planning process
+        logger.info("🎯 Starting planning...")
+        results = agent.plan_sync(goal)
+
+        # Display results
+        logger.info("✅ Planning Complete!")
+        logger.info("📋 Results:")
+        logger.info("%s", results)
+        logger.info("📄 Plan saved to: .shotgun/plan.md")
+
+        if verbose:
+            logger.debug("📚 Current plan:")
+            logger.debug("%s", agent.get_plan_history())
+
+    except Exception as e:
+        logger.error("❌ Error during planning: %s", str(e))
+        if verbose:
+            import traceback
+
+            logger.debug("Full traceback:\n%s", traceback.format_exc())
