@@ -15,13 +15,34 @@ logger = setup_logger(__name__)
 class PlanAgent:
     """Plan agent that creates and updates plans based on research and user goals."""
 
-    def __init__(self) -> None:
-        """Initialize the plan agent with file-based memory."""
-        logger.debug("Initializing plan agent")
+    def __init__(self, non_interactive: bool = False) -> None:
+        """Initialize the plan agent with file-based memory.
+
+        Args:
+            non_interactive: If True, disables user interaction tools (for CI/CD)
+        """
+        logger.debug("Initializing plan agent (non_interactive=%s)", non_interactive)
         ensure_shotgun_directory_exists()
+        self._non_interactive = non_interactive
 
         # Create agent with ChatGPT-5 and file management capabilities
-        system_prompt = """You are a planning assistant with access to research data and existing plans.
+        interactive_note = (
+            ""
+            if not non_interactive
+            else """
+IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).
+- You cannot ask clarifying questions using ask_user tool
+- Make reasonable assumptions based on best practices
+- Use sensible defaults when information is missing
+- Focus on creating minimal but functional plans
+"""
+        )
+
+        system_prompt = (
+            """You are a planning assistant with access to research data and existing plans.
+"""
+            + interactive_note
+            + """
 
 Your job is to:
 1. FIRST: Load previous research from research.md using read_file("research.md")
@@ -76,8 +97,16 @@ FILE MANAGEMENT:
 - Be explicit about whether you're creating new or updating existing content
 - Preserve valuable information from existing plans unless specifically asked to remove it
 
-USER INTERACTION - REDUCE UNCERTAINTY:
-- ALWAYS ask clarifying questions when the goal is vague or ambiguous
+"""
+            + (
+                "USER INTERACTION - REDUCE UNCERTAINTY:"
+                if not non_interactive
+                else "NON-INTERACTIVE MODE - MAKE REASONABLE ASSUMPTIONS:"
+            )
+            + """
+"""
+            + (
+                """- ALWAYS ask clarifying questions when the goal is vague or ambiguous
 - Use ask_user tool frequently to gather specific details about:
   - Project scope and boundaries
   - Target timeline and deadlines
@@ -90,7 +119,15 @@ USER INTERACTION - REDUCE UNCERTAINTY:
 - Ask follow-up questions to drill down into specifics
 - Don't assume - ask for confirmation of your understanding
 - Better to ask 2-3 targeted questions than create a generic plan
-- Confirm major changes to existing plans before proceeding
+- Confirm major changes to existing plans before proceeding"""
+                if not non_interactive
+                else """- Make reasonable assumptions based on industry best practices
+- Use sensible defaults when specific details are not provided
+- Focus on creating a practical, actionable plan
+- Include common project phases and considerations
+- Assume standard timelines and resource allocations"""
+            )
+            + """
 
 IMPORTANT RULES:
 - Make at most 1 plan file write per request
@@ -98,8 +135,13 @@ IMPORTANT RULES:
 - Create actionable, specific steps rather than vague suggestions
 - Consider feasibility and prioritize high-impact actions
 - Be concise but comprehensive
-- When in doubt about any aspect of the goal, ASK before proceeding
 """
+            + (
+                "- When in doubt about any aspect of the goal, ASK before proceeding"
+                if not non_interactive
+                else "- When in doubt, make reasonable assumptions and proceed with best practices"
+            )
+        )
 
         logger.debug("🤖 Creating plan agent with OpenAI GPT-5")
         logger.debug("📝 System prompt length: %d characters", len(system_prompt))
@@ -112,7 +154,11 @@ IMPORTANT RULES:
 
         # Register tools
         logger.debug("📌 Registering tools with plan agent")
-        self._agent.tool_plain(ask_user)
+        if not non_interactive:
+            self._agent.tool_plain(ask_user)
+            logger.debug("📞 User interaction tool registered")
+        else:
+            logger.debug("🚫 User interaction disabled (non-interactive mode)")
         self._agent.tool_plain(read_file)
         self._agent.tool_plain(write_file)
         self._agent.tool_plain(append_file)
@@ -147,9 +193,49 @@ IMPORTANT RULES:
         """
         logger.debug("📋 Starting planning for goal: %s", goal)
 
+        # Ensure plan.md exists and initialize if empty
+        from pathlib import Path
+
+        shotgun_dir = Path.cwd() / ".shotgun"
+        plan_file = shotgun_dir / "plan.md"
+
+        try:
+            if plan_file.exists():
+                current_plan = plan_file.read_text(encoding="utf-8")
+                if not current_plan.strip():
+                    # File exists but is empty, add header
+                    plan_file.write_text("# Plan\n\n", encoding="utf-8")
+                    current_plan = "# Plan\n\n"
+            else:
+                # File doesn't exist, create it with header
+                shotgun_dir.mkdir(exist_ok=True)
+                plan_file.write_text("# Plan\n\n", encoding="utf-8")
+                current_plan = "# Plan\n\n"
+        except Exception as e:
+            logger.error("Failed to initialize plan.md: %s", str(e))
+            current_plan = "# Plan\n\n"
+
+        # Try to load research.md for context (optional)
+        research_file = shotgun_dir / "research.md"
+        try:
+            if research_file.exists():
+                current_research = research_file.read_text(encoding="utf-8")
+            else:
+                current_research = "No research available."
+        except Exception:
+            current_research = "No research available."
+
+        logger.debug("📄 Current plan.md content loaded (%d chars)", len(current_plan))
+        logger.debug("📄 Research context loaded (%d chars)", len(current_research))
+
         # Prepare the full prompt for the agent
-        full_prompt = f"Create or update a plan based on this goal/instruction: {goal}"
-        logger.debug("📝 Agent prompt: %s", full_prompt)
+        full_prompt = f"""
+Based on the plan.md and research.md file contents, create or update the plan for the Users Input.
+Determine if you need to create a new plan or update the existing one.
+Remember to write the updated plan to plan.md using the write_file tool.
+
+The Users Input: {goal}"""
+        logger.debug("📝 Agent prompt prepared with plan and research context")
         logger.debug(
             "🚀 Executing agent with available tools: file management, user interaction"
         )

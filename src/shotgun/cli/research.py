@@ -7,16 +7,23 @@ import typer
 from shotgun.agents.research import ResearchAgent
 from shotgun.logging_config import set_global_log_level, setup_logger
 
-app = typer.Typer(name="research", help="Perform research with agentic loops")
+app = typer.Typer(
+    name="research", help="Perform research with agentic loops", no_args_is_help=True
+)
 logger = setup_logger(__name__)
 
 
 @app.callback(invoke_without_command=True)
 def research(
-    ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="Research query or topic")],
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Verbose output")
+    ] = False,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive", "-n", help="Disable user interaction (for CI/CD)"
+        ),
     ] = False,
 ) -> None:
     """Perform research on a given query using agentic loops.
@@ -33,7 +40,7 @@ def research(
 
     try:
         # Initialize the research agent
-        agent = ResearchAgent()
+        agent = ResearchAgent(non_interactive=non_interactive)
 
         # Start research process
         logger.info("🔬 Starting research...")

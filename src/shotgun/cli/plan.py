@@ -13,10 +13,15 @@ logger = setup_logger(__name__)
 
 @app.callback(invoke_without_command=True)
 def plan(
-    ctx: typer.Context,
     goal: Annotated[str, typer.Argument(help="Goal or objective to plan for")],
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Verbose output")
+    ] = False,
+    non_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--non-interactive", "-n", help="Disable user interaction (for CI/CD)"
+        ),
     ] = False,
 ) -> None:
     """Generate a structured plan for achieving the given goal.
@@ -34,7 +39,7 @@ def plan(
 
     try:
         # Initialize the plan agent
-        agent = PlanAgent()
+        agent = PlanAgent(non_interactive=non_interactive)
 
         # Start planning process
         logger.info("🎯 Starting planning...")

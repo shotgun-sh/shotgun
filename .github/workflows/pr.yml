@@ -109,17 +109,17 @@ jobs:
       - name: Test plan command
         run: |
           source .venv/bin/activate
-          shotgun plan "Build a test application"
+          shotgun plan --non-interactive --verbose "Build a test application"
         
       - name: Test research command
         run: |
           source .venv/bin/activate
-          shotgun research "What is testing?"
+          shotgun research --non-interactive --verbose "What is testing?"
         
       - name: Test tasks command
         run: |
           source .venv/bin/activate
-          shotgun tasks "Create a test project"
+          shotgun tasks --non-interactive --verbose "Create a test project"
 
   all-checks-passed:
     runs-on: ubuntu-latest
