@@ -1,0 +1,15 @@
+{
+    "python.defaultInterpreter": "${workspaceFolder}/.venv/bin/python",
+    "python.pythonPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/src"
+    ],
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": false,
+    "python.linting.enabled": true,
+    "python.linting.ruffEnabled": true,
+    "python.formatting.provider": "ruff",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic"
+}

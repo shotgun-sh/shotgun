@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: read
@@ -69,6 +73,9 @@ jobs:
 
   basic-cli-smoke-tests:
     runs-on: ubuntu-latest
+    needs: [basic-pr-check]
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     
     steps:
       - uses: actions/checkout@v4

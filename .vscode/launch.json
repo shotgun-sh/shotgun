@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Shotgun Research",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "shotgun.main",
+            "args": [
+                "research",
+                "How can I use OpenAI's new open source models with Ollama?"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "subProcess": true
+        },
+        {
+            "name": "Debug Shotgun Plan",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "shotgun.main",
+            "args": [
+                "plan",
+                "Build a web application with FastAPI and React"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "subProcess": true
+        },
+        {
+            "name": "Debug Web Search Tool",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_web_search.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false
+        }
+    ]
+}

@@ -3,8 +3,22 @@
 from typing import Annotated
 
 import typer
+from dotenv import load_dotenv
 
 from shotgun.cli import plan, research, tasks
+from shotgun.logging_config import configure_root_logger, get_logger
+from shotgun.telemetry import setup_phoenix_observability
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize logging
+configure_root_logger()
+logger = get_logger(__name__)
+
+# Initialize telemetry
+_telemetry_enabled = setup_phoenix_observability()
+logger.debug("Phoenix observability enabled: %s", _telemetry_enabled)
 
 app = typer.Typer(
     name="shotgun",
@@ -22,7 +36,7 @@ app.add_typer(tasks.app, name="tasks", help="Generate task lists with agentic ap
 def version_callback(value: bool) -> None:
     """Show version and exit."""
     if value:
-        typer.echo("shotgun 0.1.0")
+        logger.info("shotgun 0.1.0")
         raise typer.Exit()
 
 
@@ -40,6 +54,7 @@ def main(
     ] = False,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
+    logger.debug("Starting shotgun CLI application")
 
 
 if __name__ == "__main__":
