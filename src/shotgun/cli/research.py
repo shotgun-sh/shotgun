@@ -1,10 +1,16 @@
 """Research command for shotgun CLI."""
 
+import asyncio
 from typing import Annotated
 
 import typer
 
-from shotgun.agents.research import ResearchAgent
+from shotgun.agents.models import AgentDeps
+from shotgun.agents.research import (
+    create_research_agent,
+    get_research_history,
+    run_research_agent,
+)
 from shotgun.logging_config import set_global_log_level, setup_logger
 
 app = typer.Typer(
@@ -39,12 +45,15 @@ def research(
     logger.info("🔍 Research Query: %s", query)
 
     try:
-        # Initialize the research agent
-        agent = ResearchAgent(non_interactive=non_interactive)
+        # Create agent dependencies
+        deps = AgentDeps(interactive_mode=not non_interactive)
+
+        # Create the research agent with deps
+        agent = create_research_agent(deps)
 
         # Start research process
         logger.info("🔬 Starting research...")
-        findings = agent.research_sync(query)
+        findings = asyncio.run(run_research_agent(agent, query, deps))
 
         # Display results
         logger.info("✅ Research Complete!")
@@ -54,7 +63,7 @@ def research(
 
         if verbose:
             logger.debug("📚 Research history:")
-            logger.debug("%s", agent.get_research_history())
+            logger.debug("%s", get_research_history())
 
     except Exception as e:
         logger.error("❌ Error during research: %s", str(e))

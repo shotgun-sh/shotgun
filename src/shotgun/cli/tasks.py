@@ -1,10 +1,16 @@
 """Tasks command for shotgun CLI."""
 
+import asyncio
 from typing import Annotated
 
 import typer
 
-from shotgun.agents.tasks import TasksAgent
+from shotgun.agents.models import AgentDeps
+from shotgun.agents.tasks import (
+    create_tasks_agent,
+    get_tasks_history,
+    run_tasks_agent,
+)
 from shotgun.logging_config import set_global_log_level, setup_logger
 
 app = typer.Typer(name="tasks", help="Generate task lists with agentic approach")
@@ -40,12 +46,15 @@ def tasks(
     logger.info("📋 Task Creation Instruction: %s", instruction)
 
     try:
-        # Initialize the tasks agent
-        agent = TasksAgent(non_interactive=non_interactive)
+        # Create agent dependencies
+        deps = AgentDeps(interactive_mode=not non_interactive)
+
+        # Create the tasks agent with deps
+        agent = create_tasks_agent(deps)
 
         # Start task creation process
         logger.info("🎯 Starting task creation...")
-        results = agent.create_tasks_sync(instruction)
+        results = asyncio.run(run_tasks_agent(agent, instruction, deps))
 
         # Display results
         logger.info("✅ Task Creation Complete!")
@@ -55,7 +64,7 @@ def tasks(
 
         if verbose:
             logger.debug("📚 Current tasks:")
-            logger.debug("%s", agent.get_tasks_history())
+            logger.debug("%s", get_tasks_history())
 
     except Exception as e:
         logger.error("❌ Error during task creation: %s", str(e))

@@ -1,10 +1,12 @@
 """Plan command for shotgun CLI."""
 
+import asyncio
 from typing import Annotated
 
 import typer
 
-from shotgun.agents.plan import PlanAgent
+from shotgun.agents.models import AgentDeps
+from shotgun.agents.plan import create_plan_agent, get_plan_history, run_plan_agent
 from shotgun.logging_config import set_global_log_level, setup_logger
 
 app = typer.Typer(name="plan", help="Generate structured plans", no_args_is_help=True)
@@ -38,12 +40,15 @@ def plan(
     logger.info("📋 Planning Goal: %s", goal)
 
     try:
-        # Initialize the plan agent
-        agent = PlanAgent(non_interactive=non_interactive)
+        # Create agent dependencies
+        deps = AgentDeps(interactive_mode=not non_interactive)
+
+        # Create the plan agent with deps
+        agent = create_plan_agent(deps)
 
         # Start planning process
         logger.info("🎯 Starting planning...")
-        results = agent.plan_sync(goal)
+        results = asyncio.run(run_plan_agent(agent, goal, deps))
 
         # Display results
         logger.info("✅ Planning Complete!")
@@ -53,7 +58,7 @@ def plan(
 
         if verbose:
             logger.debug("📚 Current plan:")
-            logger.debug("%s", agent.get_plan_history())
+            logger.debug("%s", get_plan_history())
 
     except Exception as e:
         logger.error("❌ Error during planning: %s", str(e))
