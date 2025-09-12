@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.tasks import (
     create_tasks_agent,
@@ -31,6 +32,10 @@ def tasks(
             "--non-interactive", "-n", help="Disable user interaction (for CI/CD)"
         ),
     ] = False,
+    provider: Annotated[
+        ProviderType | None,
+        typer.Option("--provider", "-p", help="AI provider to use (overrides default)"),
+    ] = None,
 ) -> None:
     """Generate actionable task lists based on existing research and plans.
 
@@ -49,8 +54,8 @@ def tasks(
         # Create agent dependencies
         deps = AgentDeps(interactive_mode=not non_interactive)
 
-        # Create the tasks agent with deps
-        agent = create_tasks_agent(deps)
+        # Create the tasks agent with deps and provider
+        agent = create_tasks_agent(deps, provider)
 
         # Start task creation process
         logger.info("🎯 Starting task creation...")

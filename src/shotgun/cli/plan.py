@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.plan import create_plan_agent, get_plan_history, run_plan_agent
 from shotgun.logging_config import set_global_log_level, setup_logger
@@ -25,6 +26,10 @@ def plan(
             "--non-interactive", "-n", help="Disable user interaction (for CI/CD)"
         ),
     ] = False,
+    provider: Annotated[
+        ProviderType | None,
+        typer.Option("--provider", "-p", help="AI provider to use (overrides default)"),
+    ] = None,
 ) -> None:
     """Generate a structured plan for achieving the given goal.
 
@@ -43,8 +48,8 @@ def plan(
         # Create agent dependencies
         deps = AgentDeps(interactive_mode=not non_interactive)
 
-        # Create the plan agent with deps
-        agent = create_plan_agent(deps)
+        # Create the plan agent with deps and provider
+        agent = create_plan_agent(deps, provider)
 
         # Start planning process
         logger.info("🎯 Starting planning...")

@@ -76,6 +76,10 @@ docs: add contributing guidelines
 refactor: restructure project components
 ```
 
+### Tests
+
+- Tests must use pytest and must be seperate functions, not a pytest class.
+
 ## Commands for Development
 
 - **Install dependencies**: `uv sync --all-extras`

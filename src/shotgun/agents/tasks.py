@@ -2,6 +2,7 @@
 
 from pydantic_ai import Agent, RunContext
 
+from shotgun.agents.config import ProviderType
 from shotgun.logging_config import setup_logger
 
 from .common import (
@@ -108,17 +109,20 @@ IMPORTANT RULES:
     )
 
 
-def create_tasks_agent(deps: AgentDeps | None = None) -> Agent[AgentDeps, str]:
+def create_tasks_agent(
+    deps: AgentDeps | None = None, provider: ProviderType | None = None
+) -> Agent[AgentDeps, str]:
     """Create a tasks agent with file management capabilities.
 
     Args:
         deps: Optional agent dependencies for conditional tool registration
+        provider: Optional provider override. If None, uses configured default
 
     Returns:
         Configured Pydantic AI agent for task management
     """
     logger.debug("Initializing tasks agent")
-    return create_base_agent(_build_tasks_agent_system_prompt, None, deps)
+    return create_base_agent(_build_tasks_agent_system_prompt, None, deps, provider)
 
 
 async def run_tasks_agent(

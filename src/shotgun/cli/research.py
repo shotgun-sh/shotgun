@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.research import (
     create_research_agent,
@@ -31,6 +32,10 @@ def research(
             "--non-interactive", "-n", help="Disable user interaction (for CI/CD)"
         ),
     ] = False,
+    provider: Annotated[
+        ProviderType | None,
+        typer.Option("--provider", "-p", help="AI provider to use (overrides default)"),
+    ] = None,
 ) -> None:
     """Perform research on a given query using agentic loops.
 
@@ -48,8 +53,8 @@ def research(
         # Create agent dependencies
         deps = AgentDeps(interactive_mode=not non_interactive)
 
-        # Create the research agent with deps
-        agent = create_research_agent(deps)
+        # Create the research agent with deps and provider
+        agent = create_research_agent(deps, provider)
 
         # Start research process
         logger.info("🔬 Starting research...")

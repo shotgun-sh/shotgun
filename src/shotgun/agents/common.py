@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic_ai import Agent, RunContext, UsageLimits
 
+from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
 from shotgun.logging_config import setup_logger
 from shotgun.utils import ensure_shotgun_directory_exists
 
@@ -105,6 +106,7 @@ def create_base_agent(
     system_prompt_fn: Callable[[RunContext[AgentDeps]], str],
     additional_tools: list[Any] | None = None,
     deps: AgentDeps | None = None,
+    provider: ProviderType | None = None,
 ) -> Agent[AgentDeps, str]:
     """Create a base agent with common configuration.
 
@@ -112,16 +114,28 @@ def create_base_agent(
         system_prompt_fn: Function that will be decorated as system_prompt
         additional_tools: Optional list of additional tools
         deps: Optional agent dependencies for conditional tool registration
+        provider: Optional provider override. If None, uses configured default
 
     Returns:
         Configured Pydantic AI agent
     """
     ensure_shotgun_directory_exists()
 
-    logger.debug("🤖 Creating agent with OpenAI GPT-5")
+    # Get configured model or fall back to hardcoded default
+    try:
+        model = get_provider_model(provider)
+        config_manager = get_config_manager()
+        provider_name = provider or config_manager.load().default_provider
+        logger.debug(
+            "🤖 Creating agent with configured %s model", provider_name.upper()
+        )
+    except Exception as e:
+        logger.warning("Failed to load configured model, using fallback: %s", e)
+        logger.debug("🤖 Creating agent with fallback OpenAI GPT-4o")
+        model = "openai:gpt-4o"  # More conservative fallback than gpt-5
 
     agent = Agent(
-        "openai:gpt-5",
+        model,
         deps_type=AgentDeps,
         instrument=True,
     )

@@ -2,6 +2,7 @@
 
 from pydantic_ai import Agent, RunContext
 
+from shotgun.agents.config import ProviderType
 from shotgun.logging_config import setup_logger
 
 from .common import (
@@ -73,18 +74,21 @@ Always ensure research.md contains well-structured, comprehensive information th
     )
 
 
-def create_research_agent(deps: AgentDeps | None = None) -> Agent[AgentDeps, str]:
+def create_research_agent(
+    deps: AgentDeps | None = None, provider: ProviderType | None = None
+) -> Agent[AgentDeps, str]:
     """Create a research agent with web search capabilities.
 
     Args:
         deps: Optional agent dependencies for conditional tool registration
+        provider: Optional provider override. If None, uses configured default
 
     Returns:
         Configured Pydantic AI agent for research tasks
     """
     logger.debug("Initializing research agent")
     return create_base_agent(
-        _build_research_agent_system_prompt, [web_search_tool], deps
+        _build_research_agent_system_prompt, [web_search_tool], deps, provider
     )
 
 
