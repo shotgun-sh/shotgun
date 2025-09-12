@@ -1,0 +1,24 @@
+ChatHistory {
+  height: auto;
+}
+
+PromptInput {
+  min-height: 3;
+  max-height: 7;
+  height: auto;
+}
+
+StatusBar {
+  margin: 1;
+  height: auto;
+}
+
+#footer {
+  dock: bottom;
+  height: auto;
+  max-height: 12;
+}
+
+#window {
+  align: left bottom;
+}

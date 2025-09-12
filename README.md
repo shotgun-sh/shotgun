@@ -116,6 +116,9 @@ uv run shotgun tasks "Create a machine learning model"
 # Run the CLI
 uv run shotgun --help
 
+# Run the TUI
+uv run tui
+
 # Run tests (when available)
 uv run pytest
 
