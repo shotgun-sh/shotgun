@@ -6,6 +6,7 @@ from shotgun.logging_config import setup_logger
 
 from .common import (
     create_base_agent,
+    create_usage_limits,
     ensure_file_exists,
     get_file_history,
     get_interactive_note,
@@ -142,8 +143,11 @@ async def run_tasks_agent(
     full_prompt = f"Create or update tasks based on: {instruction}"
 
     try:
-        # Run the agent asynchronously with deps
-        result = await agent.run(full_prompt, deps=deps)
+        # Create usage limits for responsible API usage
+        usage_limits = create_usage_limits()
+
+        # Run the agent asynchronously with deps and usage limits
+        result = await agent.run(full_prompt, deps=deps, usage_limits=usage_limits)
         summary = str(result.output)
 
         logger.debug("✅ Task creation completed successfully")

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, UsageLimits
 
 from shotgun.logging_config import setup_logger
 from shotgun.utils import ensure_shotgun_directory_exists
@@ -145,6 +145,18 @@ def create_base_agent(
 
     logger.debug("✅ Agent creation complete")
     return agent
+
+
+def create_usage_limits() -> UsageLimits:
+    """Create reasonable usage limits for agent runs.
+
+    Returns:
+        UsageLimits configured for responsible API usage
+    """
+    return UsageLimits(
+        request_limit=15,  # Maximum number of model requests per run
+        tool_calls_limit=12,  # Maximum number of successful tool calls
+    )
 
 
 def get_file_history(filename: str) -> str:

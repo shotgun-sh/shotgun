@@ -106,20 +106,20 @@ jobs:
           source .venv/bin/activate
           shotgun --help
         
-      - name: Test plan command
-        run: |
-          source .venv/bin/activate
-          shotgun plan --non-interactive --verbose "Build a test application"
-        
       - name: Test research command
         run: |
           source .venv/bin/activate
-          shotgun research --non-interactive --verbose "What is testing?"
+          shotgun research --non-interactive --verbose "How can I make a simple Agent using Pydantic AI?"
+
+      - name: Test plan command
+        run: |
+          source .venv/bin/activate
+          shotgun plan --non-interactive --verbose "Build a simple Agent using Pydantic AI"
         
       - name: Test tasks command
         run: |
           source .venv/bin/activate
-          shotgun tasks --non-interactive --verbose "Create a test project"
+          shotgun tasks --non-interactive --verbose "Create the tasks for building a simple Agent using Pydantic AI"
 
   all-checks-passed:
     runs-on: ubuntu-latest

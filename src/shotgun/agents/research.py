@@ -6,6 +6,7 @@ from shotgun.logging_config import setup_logger
 
 from .common import (
     create_base_agent,
+    create_usage_limits,
     ensure_file_exists,
     get_file_history,
     get_interactive_note,
@@ -60,6 +61,13 @@ RESEARCH METHODOLOGY:
 - Validate information from multiple sources
 - Document assumptions and limitations
 
+WEB SEARCH LIMITS - AVOID ANALYSIS PARALYSIS:
+- Perform at most 3 web searches per research session
+- Be decisive and move forward with the information gathered
+- Focus on finding the most relevant sources rather than exhaustive searching
+- If uncertain after 3 searches, document what you found and any remaining questions
+- Prioritize action over perfect information
+
 Always ensure research.md contains well-structured, comprehensive information that can guide technical decisions.
 """
     )
@@ -104,8 +112,11 @@ async def run_research_agent(
     )
 
     try:
-        # Run the agent asynchronously with deps
-        result = await agent.run(full_prompt, deps=deps)
+        # Create usage limits for responsible API usage
+        usage_limits = create_usage_limits()
+
+        # Run the agent asynchronously with deps and usage limits
+        result = await agent.run(full_prompt, deps=deps, usage_limits=usage_limits)
         findings = str(result.output)
 
         logger.debug("✅ Research completed successfully")
