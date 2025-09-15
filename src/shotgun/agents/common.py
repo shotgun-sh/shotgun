@@ -10,7 +10,8 @@ from shotgun.agents.config import ProviderType, get_config_manager, get_provider
 from shotgun.logging_config import setup_logger
 from shotgun.utils import ensure_shotgun_directory_exists
 
-from .models import AgentDeps
+from .history import token_limit_compactor
+from .models import AgentDeps, UIOptions
 from .tools import append_file, ask_user, read_file, write_file
 
 logger = setup_logger(__name__)
@@ -104,40 +105,48 @@ def register_common_tools(
 
 def create_base_agent(
     system_prompt_fn: Callable[[RunContext[AgentDeps]], str],
+    ui_options: UIOptions,
     additional_tools: list[Any] | None = None,
-    deps: AgentDeps | None = None,
     provider: ProviderType | None = None,
-) -> Agent[AgentDeps, str]:
+) -> tuple[Agent[AgentDeps, str], AgentDeps]:
     """Create a base agent with common configuration.
 
     Args:
         system_prompt_fn: Function that will be decorated as system_prompt
+        ui_options: UI options for the agent
         additional_tools: Optional list of additional tools
-        deps: Optional agent dependencies for conditional tool registration
         provider: Optional provider override. If None, uses configured default
 
     Returns:
-        Configured Pydantic AI agent
+        Tuple of (Configured Pydantic AI agent, Agent dependencies)
     """
     ensure_shotgun_directory_exists()
 
     # Get configured model or fall back to hardcoded default
     try:
-        model = get_provider_model(provider)
+        model_config = get_provider_model(provider)
         config_manager = get_config_manager()
         provider_name = provider or config_manager.load().default_provider
         logger.debug(
-            "🤖 Creating agent with configured %s model", provider_name.upper()
+            "🤖 Creating agent with configured %s model: %s",
+            provider_name.upper(),
+            model_config.name,
         )
+        model = model_config.pydantic_model_name
+
+        # Create deps with model config
+        deps = AgentDeps(**ui_options.model_dump(), llm_model=model_config)
+
     except Exception as e:
         logger.warning("Failed to load configured model, using fallback: %s", e)
         logger.debug("🤖 Creating agent with fallback OpenAI GPT-4o")
-        model = "openai:gpt-4o"  # More conservative fallback than gpt-5
+        raise ValueError("Configured model is required") from e
 
     agent = Agent(
         model,
         deps_type=AgentDeps,
         instrument=True,
+        history_processors=[token_limit_compactor],
     )
 
     # Decorate the system prompt function
@@ -148,7 +157,7 @@ def create_base_agent(
         agent.tool_plain(tool)
 
     # Register interactive tool conditionally based on deps
-    if deps and deps.interactive_mode:
+    if deps.interactive_mode:
         agent.tool_plain(ask_user)
         logger.debug("📞 Interactive mode enabled - ask_user tool registered")
 
@@ -158,7 +167,7 @@ def create_base_agent(
     agent.tool_plain(append_file)
 
     logger.debug("✅ Agent creation complete")
-    return agent
+    return agent, deps
 
 
 def create_usage_limits() -> UsageLimits:

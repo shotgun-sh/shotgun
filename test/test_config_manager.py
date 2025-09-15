@@ -13,6 +13,7 @@ from shotgun.agents.config.manager import ConfigManager, get_config_manager
 from shotgun.agents.config.models import (
     AnthropicConfig,
     GoogleConfig,
+    ModelConfig,
     OpenAIConfig,
     ProviderType,
     ShotgunConfig,
@@ -221,7 +222,8 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
 
         model = get_provider_model(ProviderType.OPENAI)
 
-        assert model == "openai:gpt-5"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "openai:gpt-5"
         assert os.environ.get("OPENAI_API_KEY") == "test-openai-key"
 
 
@@ -236,7 +238,8 @@ def test_get_provider_model_openai_with_env_key(mock_get_config_manager):
 
         model = get_provider_model(ProviderType.OPENAI)
 
-        assert model == "openai:gpt-5"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "openai:gpt-5"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -269,7 +272,8 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
 
         model = get_provider_model(ProviderType.ANTHROPIC)
 
-        assert model == "anthropic:claude-opus-4-1"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
         assert os.environ.get("ANTHROPIC_API_KEY") == "test-anthropic-key"
 
 
@@ -284,7 +288,8 @@ def test_get_provider_model_anthropic_with_env_key(mock_get_config_manager):
 
         model = get_provider_model(ProviderType.ANTHROPIC)
 
-        assert model == "anthropic:claude-opus-4-1"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -317,7 +322,8 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
 
         model = get_provider_model(ProviderType.GOOGLE)
 
-        assert model == "google-gla:gemini-2.5-pro"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "google-gla:gemini-2.5-pro"
         assert os.environ.get("GOOGLE_API_KEY") == "test-google-key"
 
 
@@ -332,7 +338,8 @@ def test_get_provider_model_google_with_env_key(mock_get_config_manager):
 
         model = get_provider_model(ProviderType.GOOGLE)
 
-        assert model == "google-gla:gemini-2.5-pro"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "google-gla:gemini-2.5-pro"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -362,7 +369,8 @@ def test_get_provider_model_string_provider(mock_get_config_manager):
 
         model = get_provider_model("openai")
 
-        assert model == "openai:gpt-5"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "openai:gpt-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -382,7 +390,8 @@ def test_get_provider_model_none_uses_default(mock_get_config_manager):
 
         model = get_provider_model(None)
 
-        assert model == "anthropic:claude-opus-4-1"
+        assert isinstance(model, ModelConfig)
+        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")

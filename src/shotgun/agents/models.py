@@ -4,9 +4,11 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from .config.models import ModelConfig
 
-class AgentDeps(BaseModel):
-    """Dependencies passed to all agents for configuration and runtime behavior."""
+
+class UIOptions(BaseModel):
+    """User interface options for agents."""
 
     interactive_mode: bool = Field(
         default=True,
@@ -23,4 +25,12 @@ class AgentDeps(BaseModel):
         ge=1,
         le=100,
         description="Maximum number of iterations for agent loops",
+    )
+
+
+class AgentDeps(UIOptions):
+    """Dependencies passed to all agents for configuration and runtime behavior."""
+
+    llm_model: ModelConfig = Field(
+        description="Model configuration with token limits and provider info",
     )

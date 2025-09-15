@@ -12,7 +12,7 @@ from .common import (
     get_file_history,
     get_interactive_note,
 )
-from .models import AgentDeps
+from .models import AgentDeps, UIOptions
 
 logger = setup_logger(__name__)
 
@@ -110,19 +110,22 @@ IMPORTANT RULES:
 
 
 def create_tasks_agent(
-    deps: AgentDeps | None = None, provider: ProviderType | None = None
-) -> Agent[AgentDeps, str]:
+    ui_options: UIOptions, provider: ProviderType | None = None
+) -> tuple[Agent[AgentDeps, str], AgentDeps]:
     """Create a tasks agent with file management capabilities.
 
     Args:
-        deps: Optional agent dependencies for conditional tool registration
+        ui_options: UI options for the agent
         provider: Optional provider override. If None, uses configured default
 
     Returns:
-        Configured Pydantic AI agent for task management
+        Tuple of (Configured Pydantic AI agent for task management, Agent dependencies)
     """
     logger.debug("Initializing tasks agent")
-    return create_base_agent(_build_tasks_agent_system_prompt, None, deps, provider)
+    agent, deps = create_base_agent(
+        _build_tasks_agent_system_prompt, ui_options, None, provider
+    )
+    return agent, deps
 
 
 async def run_tasks_agent(

@@ -7,22 +7,22 @@ from pydantic import SecretStr
 from shotgun.logging_config import setup_logger
 
 from .manager import get_config_manager
-from .models import ProviderType
+from .models import ModelConfig, ProviderType, get_model_by_name
 
 logger = setup_logger(__name__)
 
 
-def get_provider_model(provider: ProviderType | None = None) -> str:
-    """Get configured Pydantic AI model string for the specified provider.
+def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
+    """Get model configuration for the specified provider.
 
     Args:
         provider: Provider to get model for. If None, uses default provider
 
     Returns:
-        Model string identifier (e.g., "openai:gpt-4o", "anthropic:claude-3-5-sonnet-latest")
+        ModelConfig with pydantic_model_name and token limits
 
     Raises:
-        ValueError: If provider is not configured properly
+        ValueError: If provider is not configured properly or model not found
     """
     config_manager = get_config_manager()
     config = config_manager.load()
@@ -45,7 +45,7 @@ def get_provider_model(provider: ProviderType | None = None) -> str:
         if "OPENAI_API_KEY" not in os.environ:
             os.environ["OPENAI_API_KEY"] = api_key
 
-        return "openai:gpt-5"
+        return get_model_by_name(config.openai.model_name)
 
     elif provider_enum == ProviderType.ANTHROPIC:
         api_key = _get_api_key(config.anthropic.api_key, "ANTHROPIC_API_KEY")
@@ -57,7 +57,7 @@ def get_provider_model(provider: ProviderType | None = None) -> str:
         if "ANTHROPIC_API_KEY" not in os.environ:
             os.environ["ANTHROPIC_API_KEY"] = api_key
 
-        return "anthropic:claude-opus-4-1"
+        return get_model_by_name(config.anthropic.model_name)
 
     elif provider_enum == ProviderType.GOOGLE:
         api_key = _get_api_key(config.google.api_key, "GOOGLE_API_KEY")
@@ -69,7 +69,7 @@ def get_provider_model(provider: ProviderType | None = None) -> str:
         if "GOOGLE_API_KEY" not in os.environ:
             os.environ["GOOGLE_API_KEY"] = api_key
 
-        return "google-gla:gemini-2.5-pro"
+        return get_model_by_name(config.google.model_name)
 
     else:
         raise ValueError(f"Unsupported provider: {provider_enum}")

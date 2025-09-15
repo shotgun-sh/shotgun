@@ -12,7 +12,7 @@ from .common import (
     get_file_history,
     get_interactive_note,
 )
-from .models import AgentDeps
+from .models import AgentDeps, UIOptions
 from .tools import web_search_tool
 
 logger = setup_logger(__name__)
@@ -75,21 +75,22 @@ Always ensure research.md contains well-structured, comprehensive information th
 
 
 def create_research_agent(
-    deps: AgentDeps | None = None, provider: ProviderType | None = None
-) -> Agent[AgentDeps, str]:
+    ui_options: UIOptions, provider: ProviderType | None = None
+) -> tuple[Agent[AgentDeps, str], AgentDeps]:
     """Create a research agent with web search capabilities.
 
     Args:
-        deps: Optional agent dependencies for conditional tool registration
+        ui_options: UI options for the agent
         provider: Optional provider override. If None, uses configured default
 
     Returns:
-        Configured Pydantic AI agent for research tasks
+        Tuple of (Configured Pydantic AI agent for research tasks, Agent dependencies)
     """
     logger.debug("Initializing research agent")
-    return create_base_agent(
-        _build_research_agent_system_prompt, [web_search_tool], deps, provider
+    agent, deps = create_base_agent(
+        _build_research_agent_system_prompt, ui_options, [web_search_tool], provider
     )
+    return agent, deps
 
 
 async def run_research_agent(

@@ -98,3 +98,4 @@ refactor: restructure project components
 5. Keep commit messages under 100 characters for the first line
 6. Use imperative mood: "add feature" not "added feature"
 7. **Claude Code must NEVER bypass validation checks**
+8. Code coverage for a PR MUST be 70%+ excluding the cli/tui folders.

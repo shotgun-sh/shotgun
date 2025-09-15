@@ -119,8 +119,11 @@ uv run shotgun --help
 # Run the TUI
 uv run tui
 
-# Run tests (when available)
+# Run tests
 uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html
 
 # Run linting
 uv run ruff check .
@@ -134,6 +137,28 @@ uv run mypy src/
 # Run all pre-commit hooks manually
 uv run lefthook run pre-commit
 ```
+
+### Code Coverage
+
+To analyze test coverage and identify areas that need testing:
+
+```bash
+# Run tests with coverage analysis
+uv run pytest --cov=src --cov-report=term-missing --cov-report=html
+```
+
+This will:
+- Display coverage summary in the terminal
+- Generate a detailed HTML coverage report
+
+**Viewing the coverage report:**
+Open `htmlcov/index.html` in your browser to see:
+- Overall coverage percentage
+- File-by-file coverage breakdown  
+- Line-by-line coverage highlighting
+- Missing coverage areas
+
+The coverage configuration is in `pyproject.toml` and will automatically run when you use `uv run pytest`.
 
 ### Git Hooks (Lefthook)
 

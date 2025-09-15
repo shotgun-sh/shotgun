@@ -1,3 +1,6 @@
+# Temp directory
+tmp/
+
 # Output directory
 .shotgun/
 

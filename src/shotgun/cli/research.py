@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import AgentDeps
+from shotgun.agents.models import UIOptions
 from shotgun.agents.research import (
     create_research_agent,
     get_research_history,
@@ -51,20 +51,17 @@ def research(
 
     try:
         # Create agent dependencies
-        deps = AgentDeps(interactive_mode=not non_interactive)
+        ui_options = UIOptions(interactive_mode=not non_interactive)
 
         # Create the research agent with deps and provider
-        agent = create_research_agent(deps, provider)
+        agent, deps = create_research_agent(ui_options, provider)
 
         # Start research process
         logger.info("🔬 Starting research...")
-        findings = asyncio.run(run_research_agent(agent, query, deps))
+        asyncio.run(run_research_agent(agent, query, deps))
 
         # Display results
         logger.info("✅ Research Complete!")
-        logger.info("📋 Findings:")
-        logger.info("%s", findings)
-        logger.info("📄 Full research saved to: .shotgun/research.md")
 
         if verbose:
             logger.debug("📚 Research history:")

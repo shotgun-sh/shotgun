@@ -8,7 +8,7 @@
             "module": "shotgun.main",
             "args": [
                 "research",
-                "How can I use OpenAI's new open source models with Ollama?"
+                "How can I use OpenAI's new open source models with Ollama and use Pydantic AI?"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
@@ -55,6 +55,22 @@
             "envFile": "${workspaceFolder}/.env",
             "justMyCode": false,
             "stopOnEntry": false
+        },
+        {
+            "name": "Debug Current File as Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "${fileBasenameNoExtension}",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "subProcess": true
         }
     ]
 }

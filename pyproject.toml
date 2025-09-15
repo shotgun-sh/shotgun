@@ -68,6 +68,29 @@ update_changelog_on_bump = true
 
 [dependency-groups]
 dev = [
+    "coverage>=7.10.6",
     "debugpy>=1.8.16",
     "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--cov=src --cov-report=term-missing --cov-report=html --cov-branch"
+testpaths = ["test"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+precision = 2
+skip_covered = false
+show_missing = true
