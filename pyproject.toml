@@ -18,6 +18,15 @@ dependencies = [
     "opentelemetry-api",
     "textual>=6.1.0",
     "textual-dev>=1.7.0",
+    "kuzu>=0.7.0",
+    "tree-sitter>=0.21.0",
+    "tree-sitter-python>=0.23.0",
+    "tree-sitter-javascript>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",
+    "tree-sitter-go>=0.23.0",
+    "tree-sitter-rust>=0.23.0",
+    "tree-sitter-languages>=1.10.0",
+    "watchdog>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -70,9 +79,11 @@ update_changelog_on_bump = true
 dev = [
     "coverage>=7.10.6",
     "debugpy>=1.8.16",
+    "mypy>=1.17.1",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=7.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.pytest.ini_options]

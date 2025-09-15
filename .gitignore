@@ -1,6 +1,9 @@
 # Temp directory
 tmp/
 
+# Playground
+playground/
+
 # Output directory
 .shotgun/
 

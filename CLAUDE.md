@@ -99,3 +99,4 @@ refactor: restructure project components
 6. Use imperative mood: "add feature" not "added feature"
 7. **Claude Code must NEVER bypass validation checks**
 8. Code coverage for a PR MUST be 70%+ excluding the cli/tui folders.
+9. Don't write tests that assert the logger, thats not useful.

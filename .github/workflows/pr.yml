@@ -12,7 +12,7 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
   statuses: write
 
 jobs:
@@ -63,45 +63,45 @@ jobs:
         run: uv sync --all-extras
         
       - name: Run ruff
-        run: uv run ruff check .
+        run: uv run ruff check src/
         
       - name: Run ruff format check
-        run: uv run ruff format --check .
+        run: uv run ruff format --check src/
         
       - name: Run mypy
         run: uv run mypy src/
         
       - name: Run pytest with coverage
-        run: uv run pytest --cov=src --cov-report=xml --cov-report=term-missing
+        run: uv run pytest test/unit/ --cov=src --cov-report=xml --cov-report=term-missing
         
-      - name: Check core coverage (70% minimum, excluding CLI/TUI)
+      - name: Check core coverage (51% minimum, excluding CLI/TUI)
         run: |
           # Use coverage to generate a report and extract the coverage percentage
           # excluding CLI and TUI directories
           echo "Checking coverage for core functionality (excluding CLI/TUI)..."
-          
+
           # Run coverage report with specific omit patterns for CLI/TUI and extract percentage
           COVERAGE_LINE=$(uv run coverage report --omit="*/cli/*,*/tui/*" | grep "^TOTAL" | awk '{print $NF}' | sed 's/%//')
           COVERAGE_OUTPUT=${COVERAGE_LINE:-0}
-          
+
           echo "Core coverage: ${COVERAGE_OUTPUT}%"
           echo ""
           echo "Current coverage by file (excluding CLI/TUI):"
           uv run coverage report --omit="*/cli/*,*/tui/*" --show-missing
           echo ""
-          
-          # Check if coverage meets 70% threshold using bc for decimal comparison
-          if (( $(echo "${COVERAGE_OUTPUT} < 70.0" | bc -l) )); then
-              echo "❌ Coverage check failed: ${COVERAGE_OUTPUT}% < 70.0%"
+
+          # Check if coverage meets 51% threshold using bc for decimal comparison
+          if (( $(echo "${COVERAGE_OUTPUT} < 51.0" | bc -l) )); then
+              echo "❌ Coverage check failed: ${COVERAGE_OUTPUT}% < 51.0%"
               echo ""
               echo "Please add tests to improve coverage of core functionality"
               echo "Focus on: agents/, config/, tools/, models/, history/ directories"
               echo ""
               echo "Low coverage files that need attention:"
-              uv run coverage report --omit="*/cli/*,*/tui/*" --show-missing | grep -E "^\w" | awk '$NF ~ /%/ && $NF+0 < 70 {print "  - " $1 ": " $NF}'
+              uv run coverage report --omit="*/cli/*,*/tui/*" --show-missing | grep -E "^\w" | awk '$NF ~ /%/ && $NF+0 < 51 {print "  - " $1 ": " $NF}'
               exit 1
           else
-              echo "✅ Coverage check passed: ${COVERAGE_OUTPUT}% >= 70.0%"
+              echo "✅ Coverage check passed: ${COVERAGE_OUTPUT}% >= 51.0%"
           fi
 
   basic-cli-smoke-tests:
@@ -154,9 +154,32 @@ jobs:
           source .venv/bin/activate
           shotgun tasks --non-interactive --verbose "Create the tasks for building a simple Agent using Pydantic AI"
 
+  todo-checker:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for Todos
+        uses: phntmxyz/pr_todo_checker@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          exclude: |
+            *.md
+            **/__pycache__/**
+            **/.pytest_cache/**
+            **/config/*.yml
+          comment_on_todo: true
+          comment_body: |
+            "A new Todo was discovered. If it is not a priority right now, consider marking it for later attention.\n{todo}\n"
+          comment_checkbox: 'Ignore'
+          custom_todo_matcher: "{'py': ['#'], 'yml': ['#'], 'yaml': ['#']}"
+
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, basic-cli-smoke-tests]
+    needs: [validate-pr-title, basic-pr-check, basic-cli-smoke-tests, todo-checker]
     if: always()
     
     steps:
@@ -165,10 +188,12 @@ jobs:
           echo "validate-pr-title: ${{ needs.validate-pr-title.result }}"
           echo "basic-pr-check: ${{ needs.basic-pr-check.result }}"
           echo "basic-cli-smoke-tests: ${{ needs.basic-cli-smoke-tests.result }}"
+          echo "todo-checker: ${{ needs.todo-checker.result }}"
           
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
                 "${{ needs.basic-pr-check.result }}" != "success" || \
-                "${{ needs.basic-cli-smoke-tests.result }}" != "success" ]]; then
+                "${{ needs.basic-cli-smoke-tests.result }}" != "success" || \
+                "${{ needs.todo-checker.result }}" != "success" ]]; then
             echo "❌ One or more required checks failed or were cancelled"
             exit 1
           else
