@@ -1,6 +1,12 @@
 """Tasks agent factory and functions using Pydantic AI with file-based memory."""
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    RunContext,
+)
+from pydantic_ai.agent import AgentRunResult
+from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config import ProviderType
 from shotgun.logging_config import setup_logger
@@ -11,6 +17,7 @@ from .common import (
     ensure_file_exists,
     get_file_history,
     get_interactive_note,
+    run_agent,
 )
 from .models import AgentDeps, UIOptions
 
@@ -111,7 +118,7 @@ IMPORTANT RULES:
 
 def create_tasks_agent(
     ui_options: UIOptions, provider: ProviderType | None = None
-) -> tuple[Agent[AgentDeps, str], AgentDeps]:
+) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
     """Create a tasks agent with file management capabilities.
 
     Args:
@@ -129,17 +136,21 @@ def create_tasks_agent(
 
 
 async def run_tasks_agent(
-    agent: Agent[AgentDeps, str], instruction: str, deps: AgentDeps
-) -> str:
+    agent: Agent[AgentDeps, str | DeferredToolRequests],
+    instruction: str,
+    deps: AgentDeps,
+    message_history: list[ModelMessage] | None = None,
+) -> AgentRunResult[str | DeferredToolRequests]:
     """Create or update tasks based on the given instruction.
 
     Args:
         agent: The configured tasks agent
         instruction: The task creation/update instruction
         deps: Agent dependencies
+        message_history: Optional message history for conversation continuity
 
     Returns:
-        Summary of the task creation process and results
+        AgentRunResult containing the task creation process output
     """
     logger.debug("📋 Starting task creation for instruction: %s", instruction)
 
@@ -153,16 +164,23 @@ async def run_tasks_agent(
         # Create usage limits for responsible API usage
         usage_limits = create_usage_limits()
 
-        # Run the agent asynchronously with deps and usage limits
-        result = await agent.run(full_prompt, deps=deps, usage_limits=usage_limits)
-        summary = str(result.output)
+        result = await run_agent(
+            agent=agent,
+            prompt=full_prompt,
+            deps=deps,
+            message_history=message_history,
+            usage_limits=usage_limits,
+        )
 
         logger.debug("✅ Task creation completed successfully")
-        return summary
+        return result
 
     except Exception as e:
+        import traceback
+
+        logger.error("Full traceback:\n%s", traceback.format_exc())
         logger.error("❌ Task creation failed: %s", str(e))
-        return f"Task creation failed: {str(e)}"
+        raise
 
 
 def get_tasks_history() -> str:

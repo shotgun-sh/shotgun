@@ -1,12 +1,32 @@
-from textual import on
+from collections.abc import AsyncGenerator
+from typing import cast
+
+from pydantic_ai import DeferredToolResults
+from pydantic_ai.messages import (
+    BuiltinToolCallPart,
+    BuiltinToolReturnPart,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ThinkingPart,
+    ToolCallPart,
+)
+from textual import on, work
 from textual.app import ComposeResult
+from textual.command import DiscoveryHit, Hit, Provider
 from textual.containers import Container
 from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Markdown
 
+from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
+from shotgun.agents.config import get_provider_model
+from shotgun.agents.models import AgentDeps, UserAnswer, UserQuestion
+
 from ..components.prompt_input import PromptInput
+from ..components.spinner import Spinner
 from ..components.vertical_tail import VerticalTail
 
 
@@ -40,19 +60,81 @@ class ChatHistory(Widget):
     DEFAULT_CSS = """
         VerticalTail {
             align: left bottom;
+
+        }
+        VerticalTail > * {
+            height: auto;
+        }
+
+        Horizontal {
+            height: auto;
+            background: $secondary-muted;
+        }
+
+        Markdown {
+            height: auto;
         }
     """
 
-    def __init__(self, items: list[str]) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.items = items
-
-    def render_history(self) -> ComposeResult:
-        for item in self.items:
-            yield Markdown(markdown=item)
+        self.items: list[ModelMessage] = []
+        self.vertical_tail: VerticalTail | None = None
 
     def compose(self) -> ComposeResult:
-        yield VerticalTail(*self.render_history())
+        self.vertical_tail = VerticalTail()
+        yield self.vertical_tail
+
+    def update_messages(self, messages: list[ModelMessage]) -> None:
+        """Update the displayed messages without recomposing."""
+        if not self.vertical_tail:
+            return
+
+        # Clear existing widgets
+        self.vertical_tail.remove_children()
+
+        # Add new message widgets
+        for item in messages:
+            if isinstance(item, ModelRequest):
+                self.vertical_tail.mount(UserQuestionWidget(item))
+            elif isinstance(item, ModelResponse):
+                self.vertical_tail.mount(AgentResponseWidget(item))
+
+        self.items = messages
+
+
+class UserQuestionWidget(Widget):
+    def __init__(self, item: ModelRequest) -> None:
+        super().__init__()
+        self.item = item
+
+    def compose(self) -> ComposeResult:
+        prompt = "".join(str(part.content) for part in self.item.parts if part.content)
+        yield Markdown(markdown=f"**>** {prompt}")
+
+
+class AgentResponseWidget(Widget):
+    def __init__(self, item: ModelResponse) -> None:
+        super().__init__()
+        self.item = item
+
+    def compose(self) -> ComposeResult:
+        yield Markdown(markdown=f"**⏺** {self.compute_output()}")
+
+    def compute_output(self) -> str:
+        acc = ""
+        for part in self.item.parts:  # TextPart | ToolCallPart | BuiltinToolCallPart | BuiltinToolReturnPart | ThinkingPart
+            if isinstance(part, TextPart):
+                acc += part.content
+            elif isinstance(part, ToolCallPart):
+                acc += f"{part.tool_name}({part.args})\n"
+            elif isinstance(part, BuiltinToolCallPart):
+                acc += f"{part.tool_name}({part.args})\n"
+            elif isinstance(part, BuiltinToolReturnPart):
+                acc += f"{part.tool_name}()\n"
+            elif isinstance(part, ThinkingPart):
+                acc += f"Thinking: {part.content}\n"
+        return acc
 
 
 class StatusBar(Widget):
@@ -63,28 +145,180 @@ class StatusBar(Widget):
     """
 
     def render(self) -> str:
-        return """[$foreground-muted]Press [bold $text]Enter[/] to send • Ctrl+T to view artifacts • Ctrl+O for web preview • /help for commands[/]"""
+        return """[$foreground-muted]Press [bold $text]Enter[/] to send • [bold $text]Ctrl+P[/] for command palette • /help for commands[/]"""
+
+
+class ModeIndicator(Widget):
+    """Widget to display the current agent mode."""
+
+    DEFAULT_CSS = """
+        ModeIndicator {
+            text-wrap: wrap;
+        }
+    """
+
+    def __init__(self, mode: AgentType) -> None:
+        """Initialize the mode indicator.
+
+        Args:
+            mode: The current agent type/mode.
+        """
+        super().__init__()
+        self.mode = mode
+
+    def render(self) -> str:
+        """Render the mode indicator."""
+        mode_display = {
+            AgentType.RESEARCH: "Research",
+            AgentType.PLAN: "Planning",
+            AgentType.TASKS: "Tasks",
+        }
+        mode_description = {
+            AgentType.RESEARCH: "Research topics with web search and synthesize findings",
+            AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
+            AgentType.TASKS: "Generate specific, actionable tasks from research and plans",
+        }
+
+        mode_title = mode_display.get(self.mode, self.mode.value.title())
+        description = mode_description.get(self.mode, "")
+
+        return f"[bold $text-accent]{mode_title} mode[/][$foreground-muted] ({description})[/]"
+
+
+class AgentModeProvider(Provider):
+    """Command provider for agent mode switching."""
+
+    @property
+    def chat_screen(self) -> "ChatScreen":
+        return cast(ChatScreen, self.screen)
+
+    def set_mode(self, mode: AgentType) -> None:
+        """Switch to research mode."""
+        self.chat_screen.mode = mode
+
+    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        """Provide default mode switching commands when palette opens."""
+        yield DiscoveryHit(
+            "Switch to Research Mode",
+            lambda: self.set_mode(AgentType.RESEARCH),
+            help="🔬 Research topics with web search and synthesize findings",
+        )
+        yield DiscoveryHit(
+            "Switch to Plan Mode",
+            lambda: self.set_mode(AgentType.PLAN),
+            help="📋 Create comprehensive, actionable plans with milestones",
+        )
+        yield DiscoveryHit(
+            "Switch to Tasks Mode",
+            lambda: self.set_mode(AgentType.TASKS),
+            help="✅ Generate specific, actionable tasks from research and plans",
+        )
+
+    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        """Search for mode commands."""
+        matcher = self.matcher(query)
+
+        commands = [
+            (
+                "Switch to Research Mode",
+                "🔬 Research topics with web search and synthesize findings",
+                lambda: self.set_mode(AgentType.RESEARCH),
+                AgentType.RESEARCH,
+            ),
+            (
+                "Switch to Plan Mode",
+                "📋 Create comprehensive, actionable plans with milestones",
+                lambda: self.set_mode(AgentType.PLAN),
+                AgentType.PLAN,
+            ),
+            (
+                "Switch to Tasks Mode",
+                "✅ Generate specific, actionable tasks from research and plans",
+                lambda: self.set_mode(AgentType.TASKS),
+                AgentType.TASKS,
+            ),
+        ]
+
+        for title, help_text, callback, mode in commands:
+            if self.chat_screen.mode == mode:
+                continue
+            score = matcher.match(title)
+            if score > 0:
+                yield Hit(score, matcher.highlight(title), callback, help=help_text)
 
 
 class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
 
+    BINDINGS = [
+        ("ctrl+p", "command_palette", "Command Palette"),
+    ]
+
+    COMMANDS = {AgentModeProvider}
+
     value = reactive("")
+    mode = reactive(AgentType.RESEARCH, recompose=True)
     history: PromptHistory = PromptHistory()
-    prompts = reactive(list[str](), recompose=True)
+    messages = reactive(list[ModelMessage]())
+    working = reactive(False)
+    question: reactive[UserQuestion | None] = reactive(None)
 
     def __init__(self) -> None:
         super().__init__()
-        self.prompts = self.history.prompts.copy()
+        # Get the model configuration
+        model_config = get_provider_model()
+        self.deps = AgentDeps(interactive_mode=True, llm_model=model_config)
+        self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
 
     def on_mount(self) -> None:
         self.query_one(PromptInput).focus(scroll_visible=True)
+        # Hide spinner initially
+        self.query_one("#spinner").display = False
+
+    def watch_mode(self, new_mode: AgentType) -> None:
+        """React to mode changes by updating the agent manager."""
+        if hasattr(self, "agent_manager"):
+            self.agent_manager.set_agent(new_mode)
+
+    def watch_working(self, is_working: bool) -> None:
+        """Show or hide the spinner based on working state."""
+        if self.is_mounted:
+            spinner = self.query_one("#spinner")
+            spinner.display = is_working
+
+    def watch_messages(self, messages: list[ModelMessage]) -> None:
+        """Update the chat history when messages change."""
+        if self.is_mounted:
+            chat_history = self.query_one(ChatHistory)
+            chat_history.update_messages(messages)
+
+    def watch_question(self, question: UserQuestion | None) -> None:
+        """Update the question display."""
+        if self.is_mounted:
+            question_display = self.query_one("#question-display", Markdown)
+            if question:
+                question_display.update(f"Question:\n\n{question.question}")
+                question_display.display = True
+            else:
+                question_display.update("")
+                question_display.display = False
+
+    @work
+    async def add_question_listener(self) -> None:
+        while True:
+            question = await self.deps.queue.get()
+            self.question = question
+            await question.result
+            self.deps.queue.task_done()
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
-            yield ChatHistory(self.prompts)
+            yield ChatHistory()
+            yield Markdown(markdown="", id="question-display")
+            yield self.agent_manager
             with Container(id="footer"):
+                yield Spinner(text="Processing...", id="spinner")
                 yield StatusBar()
                 yield PromptInput(
                     text=self.value,
@@ -92,14 +326,53 @@ class ChatScreen(Screen[None]):
                     id="prompt-input",
                     placeholder="Type your message",
                 )
+                yield ModeIndicator(mode=self.mode)
+
+    @on(MessageHistoryUpdated)
+    def handle_message_history_updated(self, event: MessageHistoryUpdated) -> None:
+        """Handle message history updates from the agent manager."""
+        self.messages = event.messages
 
     @on(PromptInput.Submitted)
-    def handle_submit(self, message: PromptInput.Submitted) -> None:
+    async def handle_submit(self, message: PromptInput.Submitted) -> None:
         self.history.append(message.text)
-        self.prompts = self.history.prompts.copy()
 
         # Clear the input
         self.value = ""
+        self.run_agent(message.text)
+
         prompt_input = self.query_one(PromptInput)
         prompt_input.clear()
+        prompt_input.focus()
+
+    @work
+    async def run_agent(self, message: str) -> None:
+        deferred_tool_results = None
+        prompt = None
+        self.working = True
+
+        if self.question:
+            # This is a response to a question from the agent
+            self.question.result.set_result(
+                UserAnswer(answer=message, tool_call_id=self.question.tool_call_id)
+            )
+
+            deferred_tool_results = DeferredToolResults()
+
+            deferred_tool_results.calls[self.question.tool_call_id] = UserAnswer(
+                answer=message, tool_call_id=self.question.tool_call_id
+            )
+
+            self.question = None
+        else:
+            # This is a new user prompt
+            prompt = message
+
+        await self.agent_manager.run(
+            prompt=prompt,
+            deferred_tool_results=deferred_tool_results,
+        )
+        self.working = False
+
+        prompt_input = self.query_one(PromptInput)
         prompt_input.focus()

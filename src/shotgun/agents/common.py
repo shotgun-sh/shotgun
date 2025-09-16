@@ -1,10 +1,19 @@
 """Common utilities for agent creation and management."""
 
+import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai import Agent, RunContext, UsageLimits
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    DeferredToolResults,
+    RunContext,
+    UsageLimits,
+)
+from pydantic_ai.agent import AgentRunResult
+from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
 from shotgun.logging_config import setup_logger
@@ -73,7 +82,7 @@ IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).
 
 
 def register_common_tools(
-    agent: Agent, additional_tools: list[Any], interactive_mode: bool
+    agent: Agent[AgentDeps], additional_tools: list[Any], interactive_mode: bool
 ) -> None:
     """Register common tools with an agent.
 
@@ -90,7 +99,7 @@ def register_common_tools(
 
     # Register interactive tool if enabled
     if interactive_mode:
-        agent.tool_plain(ask_user)
+        agent.tool(ask_user)
         logger.debug("📞 User interaction tool registered")
     else:
         logger.debug("🚫 User interaction disabled (non-interactive mode)")
@@ -108,7 +117,7 @@ def create_base_agent(
     ui_options: UIOptions,
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
-) -> tuple[Agent[AgentDeps, str], AgentDeps]:
+) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
     """Create a base agent with common configuration.
 
     Args:
@@ -144,6 +153,7 @@ def create_base_agent(
 
     agent = Agent(
         model,
+        output_type=[str, DeferredToolRequests],
         deps_type=AgentDeps,
         instrument=True,
         history_processors=[token_limit_compactor],
@@ -158,7 +168,7 @@ def create_base_agent(
 
     # Register interactive tool conditionally based on deps
     if deps.interactive_mode:
-        agent.tool_plain(ask_user)
+        agent.tool(ask_user)
         logger.debug("📞 Interactive mode enabled - ask_user tool registered")
 
     # Register common file management tools (always available)
@@ -196,3 +206,45 @@ def get_file_history(filename: str) -> str:
     except Exception as e:
         logger.debug("Could not load %s history: %s", filename, str(e))
         return f"No {filename.replace('.md', '')} history available."
+
+
+async def run_agent(
+    agent: Agent[AgentDeps, str | DeferredToolRequests],
+    prompt: str,
+    deps: AgentDeps,
+    message_history: list[ModelMessage] | None = None,
+    usage_limits: UsageLimits | None = None,
+) -> AgentRunResult[str | DeferredToolRequests]:
+    result = await agent.run(
+        prompt,
+        deps=deps,
+        usage_limits=usage_limits,
+        message_history=message_history,
+    )
+
+    messages = result.all_messages()
+    while isinstance(result.output, DeferredToolRequests):
+        logger.info("got deferred tool requests")
+        await deps.queue.join()
+        requests = result.output
+        done, _ = await asyncio.wait(deps.tasks)
+
+        task_results = [task.result() for task in done]
+        task_results_by_tool_call_id = {
+            result.tool_call_id: result.answer for result in task_results
+        }
+        logger.info("got task results", task_results_by_tool_call_id)
+        results = DeferredToolResults()
+        for call in requests.calls:
+            results.calls[call.tool_call_id] = task_results_by_tool_call_id[
+                call.tool_call_id
+            ]
+        result = await agent.run(
+            deps=deps,
+            usage_limits=usage_limits,
+            message_history=messages,
+            deferred_tool_results=results,
+        )
+        messages = result.all_messages()
+
+    return result

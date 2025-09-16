@@ -55,12 +55,12 @@ def plan(
 
         # Start planning process
         logger.info("🎯 Starting planning...")
-        results = asyncio.run(run_plan_agent(agent, goal, deps))
+        result = asyncio.run(run_plan_agent(agent, goal, deps))
 
         # Display results
         logger.info("✅ Planning Complete!")
         logger.info("📋 Results:")
-        logger.info("%s", results)
+        logger.info("%s", result.output)
         logger.info("📄 Plan saved to: .shotgun/plan.md")
 
         if verbose:

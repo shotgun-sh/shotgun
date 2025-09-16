@@ -236,7 +236,10 @@ async def test_retrieve_code_entity_not_found():
 
     assert snippet.found is False
     assert snippet.qualified_name == "nonexistent.module.function"
-    assert snippet.error_message == "Entity 'nonexistent.module.function' not found in graph."
+    assert (
+        snippet.error_message
+        == "Entity 'nonexistent.module.function' not found in graph."
+    )
     assert snippet.source_code == ""
 
 
@@ -337,8 +340,12 @@ async def test_retrieve_code_invalid_line_numbers():
             mock_manager, "test-graph", "test.module.function"
         )
 
-    assert snippet.found is True  # Function successfully extracts, but returns empty content
-    assert snippet.source_code == ""  # Line numbers beyond file length result in empty content
+    assert (
+        snippet.found is True
+    )  # Function successfully extracts, but returns empty content
+    assert (
+        snippet.source_code == ""
+    )  # Line numbers beyond file length result in empty content
 
 
 @pytest.mark.asyncio
@@ -355,7 +362,9 @@ async def test_retrieve_code_database_error():
     )
 
     assert snippet.found is False
-    assert snippet.error_message and "Database connection failed" in snippet.error_message
+    assert (
+        snippet.error_message and "Database connection failed" in snippet.error_message
+    )
 
 
 @pytest.mark.asyncio
@@ -543,7 +552,9 @@ async def test_retrieve_code_query_structure():
 
     assert call_args[0][0] == "test-graph-id"  # graph_id is first positional arg
     assert "MATCH" in call_args[0][1]  # query is second positional arg
-    assert call_args[0][2]["qualified_name"] == "test.module.function"  # parameters is third positional arg
+    assert (
+        call_args[0][2]["qualified_name"] == "test.module.function"
+    )  # parameters is third positional arg
 
 
 @pytest.mark.asyncio

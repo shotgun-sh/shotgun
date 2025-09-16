@@ -1,6 +1,12 @@
 """Research agent factory and functions using Pydantic AI with file-based memory."""
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    RunContext,
+)
+from pydantic_ai.agent import AgentRunResult
+from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config import ProviderType
 from shotgun.logging_config import setup_logger
@@ -11,6 +17,7 @@ from .common import (
     ensure_file_exists,
     get_file_history,
     get_interactive_note,
+    run_agent,
 )
 from .models import AgentDeps, UIOptions
 from .tools import web_search_tool
@@ -76,7 +83,7 @@ Always ensure research.md contains well-structured, comprehensive information th
 
 def create_research_agent(
     ui_options: UIOptions, provider: ProviderType | None = None
-) -> tuple[Agent[AgentDeps, str], AgentDeps]:
+) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
     """Create a research agent with web search capabilities.
 
     Args:
@@ -94,8 +101,11 @@ def create_research_agent(
 
 
 async def run_research_agent(
-    agent: Agent[AgentDeps, str], query: str, deps: AgentDeps
-) -> str:
+    agent: Agent[AgentDeps, str | DeferredToolRequests],
+    query: str,
+    deps: AgentDeps,
+    message_history: list[ModelMessage] | None = None,
+) -> AgentRunResult[str | DeferredToolRequests]:
     """Perform research on the given query and update the research file.
 
     Args:
@@ -120,16 +130,23 @@ async def run_research_agent(
         # Create usage limits for responsible API usage
         usage_limits = create_usage_limits()
 
-        # Run the agent asynchronously with deps and usage limits
-        result = await agent.run(full_prompt, deps=deps, usage_limits=usage_limits)
-        findings = str(result.output)
+        result = await run_agent(
+            agent=agent,
+            prompt=full_prompt,
+            deps=deps,
+            message_history=message_history,
+            usage_limits=usage_limits,
+        )
 
         logger.debug("✅ Research completed successfully")
-        return findings
+        return result
 
     except Exception as e:
+        import traceback
+
+        logger.error("Full traceback:\n%s", traceback.format_exc())
         logger.error("❌ Research failed: %s", str(e))
-        return f"Research failed: {str(e)}"
+        raise
 
 
 def get_research_history() -> str:

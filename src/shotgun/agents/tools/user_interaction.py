@@ -1,13 +1,16 @@
 """User interaction tools for Pydantic AI agents."""
 
-import sys
+from asyncio import get_running_loop
 
+from pydantic_ai import CallDeferred, RunContext
+
+from shotgun.agents.models import AgentDeps, UserQuestion
 from shotgun.logging_config import setup_logger
 
 logger = setup_logger(__name__)
 
 
-def ask_user(question: str) -> str:
+async def ask_user(ctx: RunContext[AgentDeps], question: str) -> str:
     """Ask the human a question and return the answer.
 
     Args:
@@ -16,12 +19,18 @@ def ask_user(question: str) -> str:
     Returns:
         The user's response as a string
     """
+    tool_call_id = ctx.tool_call_id
+    assert tool_call_id is not None  # noqa: S101
+
     try:
-        logger.info("\n👉 %s\n", question)
-        response = sys.stdin.readline().strip()
-        logger.info(" Thanks!\n")
-        logger.debug("User response received: %s", response)
-        return response
+        logger.debug("\n👉 %s\n", question)
+        future = get_running_loop().create_future()
+        await ctx.deps.queue.put(
+            UserQuestion(question=question, tool_call_id=tool_call_id, result=future)
+        )
+        ctx.deps.tasks.append(future)
+        raise CallDeferred(question)
+
     except (EOFError, KeyboardInterrupt):
         logger.warning("User input interrupted or unavailable")
         return "User input not available or interrupted"

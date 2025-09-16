@@ -156,7 +156,7 @@ class TestRegisterCommonTools:
 
         with patch("shotgun.agents.common.ask_user") as mock_ask_user:
             register_common_tools(mock_agent, [], True)
-            mock_agent.tool_plain.assert_any_call(mock_ask_user)
+            mock_agent.tool.assert_any_call(mock_ask_user)
 
     def test_skips_interactive_tool_when_disabled(self):
         """Test that ask_user tool is not registered when interactive mode disabled."""
@@ -164,9 +164,12 @@ class TestRegisterCommonTools:
 
         with patch("shotgun.agents.common.ask_user") as mock_ask_user:
             register_common_tools(mock_agent, [], False)
-            # ask_user should not be in the calls
-            calls = [call.args[0] for call in mock_agent.tool_plain.call_args_list]
-            assert mock_ask_user not in calls
+            # ask_user should not be registered with either tool or tool_plain
+            if mock_agent.tool.call_args_list:
+                calls = [call.args[0] for call in mock_agent.tool.call_args_list]
+                assert mock_ask_user not in calls
+            # Also verify it wasn't called at all
+            mock_agent.tool.assert_not_called()
 
     def test_always_registers_file_management_tools(self):
         """Test that file management tools are always registered."""
@@ -323,7 +326,7 @@ class TestCreateBaseAgent:
             )
 
             # Verify ask_user was registered
-            mock_agent_instance.tool_plain.assert_any_call(mock_ask_user)
+            mock_agent_instance.tool.assert_any_call(mock_ask_user)
             assert deps.interactive_mode is True
 
 

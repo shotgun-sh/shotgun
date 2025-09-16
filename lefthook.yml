@@ -4,9 +4,11 @@ pre-commit:
     ruff:
       run: uv run ruff check --fix {staged_files}
       glob: "*.py"
+      stage_fixed: true
     ruff-format:
       run: uv run ruff format {staged_files}
       glob: "*.py"
+      stage_fixed: true
     mypy:
       run: uv run mypy {staged_files}
       glob: "*.py"

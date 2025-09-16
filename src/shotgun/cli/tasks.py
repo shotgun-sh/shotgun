@@ -61,12 +61,12 @@ def tasks(
 
         # Start task creation process
         logger.info("🎯 Starting task creation...")
-        results = asyncio.run(run_tasks_agent(agent, instruction, deps))
+        result = asyncio.run(run_tasks_agent(agent, instruction, deps))
 
         # Display results
         logger.info("✅ Task Creation Complete!")
         logger.info("📋 Results:")
-        logger.info("%s", results)
+        logger.info("%s", result.output)
         logger.info("📄 Tasks saved to: .shotgun/tasks.md")
 
         if verbose:

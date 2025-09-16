@@ -51,6 +51,7 @@ async def test_generate_cypher_simple_query():
 
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = expected_cypher
 
@@ -86,6 +87,7 @@ async def test_generate_cypher_complex_query():
 
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = expected_cypher.strip()
 
@@ -123,6 +125,7 @@ async def test_generate_cypher_with_file_extension_query():
     mock_response.usage.total_tokens = 120
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = expected_cypher.strip()
     mock_response.parts = [mock_text_part]
@@ -181,6 +184,7 @@ async def test_generate_cypher_request_structure():
     mock_response.usage.total_tokens = 50
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = "MATCH (n) RETURN n"
     mock_response.parts = [mock_text_part]
@@ -211,8 +215,11 @@ async def test_generate_cypher_with_datetime():
     mock_response.usage.total_tokens = 80
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = "MATCH (f:Function) WHERE f.created_at > timestamp() - 86400000 RETURN f"
+    mock_text_part.content = (
+        "MATCH (f:Function) WHERE f.created_at > timestamp() - 86400000 RETURN f"
+    )
     mock_response.parts = [mock_text_part]
 
     with (
@@ -255,6 +262,7 @@ async def test_generate_cypher_empty_query():
     mock_response.usage.total_tokens = 10
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = "MATCH (n) RETURN n LIMIT 10"
     mock_response.parts = [mock_text_part]
@@ -284,6 +292,7 @@ async def test_generate_cypher_whitespace_query():
     mock_response.usage.total_tokens = 15
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = "MATCH (n) RETURN count(n)"
     mock_response.parts = [mock_text_part]
@@ -312,6 +321,7 @@ async def test_generate_cypher_unicode_query():
     mock_response.usage.total_tokens = 90
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = "MATCH (f:Function) WHERE f.name CONTAINS 'café' OR f.name CONTAINS 'naïve' RETURN f"
     mock_response.parts = [mock_text_part]
@@ -341,6 +351,7 @@ async def test_generate_cypher_long_query():
     mock_response.usage.total_tokens = 200
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = """
     MATCH (base:Class {name: 'BaseException'})<-[:INHERITS*]-(cls:Class)-[:DEFINES_METHOD]->(func:Function)
@@ -377,6 +388,7 @@ async def test_generate_cypher_aggregation_query():
     mock_response.usage.total_tokens = 70
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = "MATCH (m:Module)-[:DEFINES]->(f:Function) RETURN m.name, count(f) ORDER BY count(f) DESC"
     mock_response.parts = [mock_text_part]
@@ -406,6 +418,7 @@ async def test_generate_cypher_relationship_query():
     mock_response.usage.total_tokens = 110
     # Mock the response structure that pydantic_ai returns
     from pydantic_ai.messages import TextPart
+
     mock_text_part = Mock(spec=TextPart)
     mock_text_part.content = """
     MATCH (caller:Function)-[:CALLS]->(callee:Function)
