@@ -71,6 +71,29 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "subProcess": true
+        },
+        {
+            "name": "Debug Current Test File (uv pytest)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-c", "pyproject.toml",
+                "-v",
+                "-s",
+                "--no-cov"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "subProcess": true
         }
     ]
 }

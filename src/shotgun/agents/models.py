@@ -2,10 +2,14 @@
 
 from asyncio import Future, Queue
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config.models import ModelConfig
+
+if TYPE_CHECKING:
+    from shotgun.codebase.service import CodebaseService
 
 
 class UserAnswer(BaseModel):
@@ -74,3 +78,18 @@ class AgentDeps(AgentRuntimeOptions):
     llm_model: ModelConfig = Field(
         description="Model configuration with token limits and provider info",
     )
+
+    codebase_service: "CodebaseService | None" = Field(
+        default=None,
+        description="Optional codebase service for code analysis tools",
+    )
+
+
+# Rebuild model to resolve forward references after imports are available
+try:
+    from shotgun.codebase.service import CodebaseService
+
+    AgentDeps.model_rebuild()
+except ImportError:
+    # CodebaseService may not be available in all contexts
+    pass
