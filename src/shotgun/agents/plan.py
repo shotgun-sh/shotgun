@@ -19,7 +19,7 @@ from .common import (
     get_interactive_note,
     run_agent,
 )
-from .models import AgentDeps, UIOptions
+from .models import AgentDeps, AgentRuntimeOptions
 
 logger = setup_logger(__name__)
 
@@ -105,12 +105,12 @@ IMPORTANT RULES:
 
 
 def create_plan_agent(
-    ui_options: UIOptions, provider: ProviderType | None = None
+    agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
 ) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
     """Create a plan agent with file management capabilities.
 
     Args:
-        ui_options: UI options for the agent
+        agent_runtime_options: Agent runtime options for the agent
         provider: Optional provider override. If None, uses configured default
 
     Returns:
@@ -118,7 +118,7 @@ def create_plan_agent(
     """
     logger.debug("Initializing plan agent")
     agent, deps = create_base_agent(
-        _build_plan_agent_system_prompt, ui_options, None, provider
+        _build_plan_agent_system_prompt, agent_runtime_options, None, provider
     )
     return agent, deps
 

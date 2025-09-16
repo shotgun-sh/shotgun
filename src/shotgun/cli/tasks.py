@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import UIOptions
+from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.tasks import (
     create_tasks_agent,
     get_tasks_history,
@@ -54,10 +54,12 @@ def tasks(
 
     try:
         # Create agent dependencies
-        ui_options = UIOptions(interactive_mode=not non_interactive)
+        agent_runtime_options = AgentRuntimeOptions(
+            interactive_mode=not non_interactive
+        )
 
         # Create the tasks agent with deps and provider
-        agent, deps = create_tasks_agent(ui_options, provider)
+        agent, deps = create_tasks_agent(agent_runtime_options, provider)
 
         # Start task creation process
         logger.info("🎯 Starting task creation...")

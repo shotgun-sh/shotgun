@@ -20,7 +20,7 @@ from shotgun.logging_config import setup_logger
 from shotgun.utils import ensure_shotgun_directory_exists
 
 from .history import token_limit_compactor
-from .models import AgentDeps, UIOptions
+from .models import AgentDeps, AgentRuntimeOptions
 from .tools import append_file, ask_user, read_file, write_file
 
 logger = setup_logger(__name__)
@@ -114,7 +114,7 @@ def register_common_tools(
 
 def create_base_agent(
     system_prompt_fn: Callable[[RunContext[AgentDeps]], str],
-    ui_options: UIOptions,
+    agent_runtime_options: AgentRuntimeOptions,
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
 ) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
@@ -122,7 +122,7 @@ def create_base_agent(
 
     Args:
         system_prompt_fn: Function that will be decorated as system_prompt
-        ui_options: UI options for the agent
+        agent_runtime_options: Agent runtime options for the agent
         additional_tools: Optional list of additional tools
         provider: Optional provider override. If None, uses configured default
 
@@ -144,7 +144,7 @@ def create_base_agent(
         model = model_config.pydantic_model_name
 
         # Create deps with model config
-        deps = AgentDeps(**ui_options.model_dump(), llm_model=model_config)
+        deps = AgentDeps(**agent_runtime_options.model_dump(), llm_model=model_config)
 
     except Exception as e:
         logger.warning("Failed to load configured model, using fallback: %s", e)

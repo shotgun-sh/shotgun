@@ -18,7 +18,7 @@ from shotgun.agents.common import (
     register_common_tools,
 )
 from shotgun.agents.config.models import ModelConfig, ProviderType
-from shotgun.agents.models import AgentDeps, UIOptions
+from shotgun.agents.models import AgentDeps, AgentRuntimeOptions
 
 
 class TestEnsureFileExists:
@@ -201,9 +201,9 @@ class TestCreateBaseAgent:
         )
 
     @pytest.fixture
-    def mock_ui_options(self):
-        """Create mock UIOptions for testing."""
-        return UIOptions(interactive_mode=False)
+    def mock_agent_runtime_options(self):
+        """Create mock AgentRuntimeOptions for testing."""
+        return AgentRuntimeOptions(interactive_mode=False)
 
     @pytest.fixture
     def mock_system_prompt_fn(self):
@@ -215,7 +215,7 @@ class TestCreateBaseAgent:
         return system_prompt_fn
 
     def test_creates_agent_with_model_config(
-        self, mock_model_config, mock_ui_options, mock_system_prompt_fn
+        self, mock_model_config, mock_agent_runtime_options, mock_system_prompt_fn
     ):
         """Test successful agent creation with model configuration."""
         with (
@@ -236,7 +236,9 @@ class TestCreateBaseAgent:
             mock_agent_instance = MagicMock()
             mock_agent_class.return_value = mock_agent_instance
 
-            agent, deps = create_base_agent(mock_system_prompt_fn, mock_ui_options)
+            agent, deps = create_base_agent(
+                mock_system_prompt_fn, mock_agent_runtime_options
+            )
 
             # Verify agent was created with correct model
             mock_agent_class.assert_called_once()
@@ -254,7 +256,9 @@ class TestCreateBaseAgent:
             assert isinstance(deps, AgentDeps)
             assert deps.llm_model == mock_model_config
 
-    def test_handles_provider_model_error(self, mock_ui_options, mock_system_prompt_fn):
+    def test_handles_provider_model_error(
+        self, mock_agent_runtime_options, mock_system_prompt_fn
+    ):
         """Test handling of provider model configuration errors."""
         with (
             patch("shotgun.agents.common.ensure_shotgun_directory_exists"),
@@ -264,10 +268,10 @@ class TestCreateBaseAgent:
             ),
         ):
             with pytest.raises(ValueError, match="Configured model is required"):
-                create_base_agent(mock_system_prompt_fn, mock_ui_options)
+                create_base_agent(mock_system_prompt_fn, mock_agent_runtime_options)
 
     def test_registers_additional_tools(
-        self, mock_model_config, mock_ui_options, mock_system_prompt_fn
+        self, mock_model_config, mock_agent_runtime_options, mock_system_prompt_fn
     ):
         """Test registration of additional tools."""
         mock_tool = MagicMock()
@@ -291,7 +295,7 @@ class TestCreateBaseAgent:
 
             agent, deps = create_base_agent(
                 mock_system_prompt_fn,
-                mock_ui_options,
+                mock_agent_runtime_options,
                 additional_tools=additional_tools,
             )
 
@@ -302,7 +306,7 @@ class TestCreateBaseAgent:
         self, mock_model_config, mock_system_prompt_fn
     ):
         """Test that interactive mode registers ask_user tool."""
-        interactive_ui_options = UIOptions(interactive_mode=True)
+        interactive_agent_runtime_options = AgentRuntimeOptions(interactive_mode=True)
 
         with (
             patch("shotgun.agents.common.ensure_shotgun_directory_exists"),
@@ -322,7 +326,7 @@ class TestCreateBaseAgent:
             mock_agent_class.return_value = mock_agent_instance
 
             agent, deps = create_base_agent(
-                mock_system_prompt_fn, interactive_ui_options
+                mock_system_prompt_fn, interactive_agent_runtime_options
             )
 
             # Verify ask_user was registered

@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import UIOptions, UserAnswer, UserQuestion
+from shotgun.agents.models import AgentRuntimeOptions, UserAnswer, UserQuestion
 from shotgun.agents.research import (
     create_research_agent,
     get_research_history,
@@ -72,10 +72,10 @@ async def async_research(
 ) -> None:
     """Async wrapper for research process."""
     # Create agent dependencies
-    ui_options = UIOptions(interactive_mode=not non_interactive)
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
 
     # Create the research agent with deps and provider
-    agent, deps = create_research_agent(ui_options, provider)
+    agent, deps = create_research_agent(agent_runtime_options, provider)
 
     # Create the worker task
     worker_task = asyncio.create_task(worker("research", deps.queue))

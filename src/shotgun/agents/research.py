@@ -19,7 +19,7 @@ from .common import (
     get_interactive_note,
     run_agent,
 )
-from .models import AgentDeps, UIOptions
+from .models import AgentDeps, AgentRuntimeOptions
 from .tools import web_search_tool
 
 logger = setup_logger(__name__)
@@ -82,12 +82,12 @@ Always ensure research.md contains well-structured, comprehensive information th
 
 
 def create_research_agent(
-    ui_options: UIOptions, provider: ProviderType | None = None
+    agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
 ) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
     """Create a research agent with web search capabilities.
 
     Args:
-        ui_options: UI options for the agent
+        agent_runtime_options: Agent runtime options for the agent
         provider: Optional provider override. If None, uses configured default
 
     Returns:
@@ -95,7 +95,10 @@ def create_research_agent(
     """
     logger.debug("Initializing research agent")
     agent, deps = create_base_agent(
-        _build_research_agent_system_prompt, ui_options, [web_search_tool], provider
+        _build_research_agent_system_prompt,
+        agent_runtime_options,
+        [web_search_tool],
+        provider,
     )
     return agent, deps
 

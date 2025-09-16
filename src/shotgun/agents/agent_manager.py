@@ -9,7 +9,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest
 from textual.message import Message
 from textual.widget import Widget
 
-from .models import AgentDeps, UIOptions
+from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .tasks import create_tasks_agent
@@ -58,8 +58,8 @@ class AgentManager(Widget):
         if self.deps is None:
             raise ValueError("AgentDeps must be provided to AgentManager")
 
-        # Create UIOptions from deps for agent creation
-        ui_options = UIOptions(
+        # Create AgentRuntimeOptions from deps for agent creation
+        agent_runtime_options = AgentRuntimeOptions(
             interactive_mode=self.deps.interactive_mode,
             working_directory=self.deps.working_directory,
             max_iterations=self.deps.max_iterations,
@@ -68,9 +68,15 @@ class AgentManager(Widget):
         )
 
         # Initialize all agents with the same deps
-        self.research_agent, _ = create_research_agent(ui_options=ui_options)
-        self.plan_agent, _ = create_plan_agent(ui_options=ui_options)
-        self.tasks_agent, _ = create_tasks_agent(ui_options=ui_options)
+        self.research_agent, _ = create_research_agent(
+            agent_runtime_options=agent_runtime_options
+        )
+        self.plan_agent, _ = create_plan_agent(
+            agent_runtime_options=agent_runtime_options
+        )
+        self.tasks_agent, _ = create_tasks_agent(
+            agent_runtime_options=agent_runtime_options
+        )
 
         # Track current active agent
         self._current_agent_type: AgentType = initial_type

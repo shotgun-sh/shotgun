@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import UIOptions
+from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.plan import create_plan_agent, get_plan_history, run_plan_agent
 from shotgun.logging_config import setup_logger
 
@@ -48,10 +48,12 @@ def plan(
 
     try:
         # Create agent dependencies
-        ui_options = UIOptions(interactive_mode=not non_interactive)
+        agent_runtime_options = AgentRuntimeOptions(
+            interactive_mode=not non_interactive
+        )
 
         # Create the plan agent with deps and provider
-        agent, deps = create_plan_agent(ui_options, provider)
+        agent, deps = create_plan_agent(agent_runtime_options, provider)
 
         # Start planning process
         logger.info("🎯 Starting planning...")

@@ -35,7 +35,7 @@ class UserQuestion(BaseModel):
     )
 
 
-class UIOptions(BaseModel):
+class AgentRuntimeOptions(BaseModel):
     """User interface options for agents."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -68,7 +68,7 @@ class UIOptions(BaseModel):
     )
 
 
-class AgentDeps(UIOptions):
+class AgentDeps(AgentRuntimeOptions):
     """Dependencies passed to all agents for configuration and runtime behavior."""
 
     llm_model: ModelConfig = Field(
