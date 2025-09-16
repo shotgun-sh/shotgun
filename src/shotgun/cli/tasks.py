@@ -12,7 +12,9 @@ from shotgun.agents.tasks import (
     get_tasks_history,
     run_tasks_agent,
 )
-from shotgun.logging_config import set_global_log_level, setup_logger
+from shotgun.logging_config import setup_logger
+
+from .utils import set_logging_level
 
 app = typer.Typer(name="tasks", help="Generate task lists with agentic approach")
 logger = setup_logger(__name__)
@@ -44,8 +46,8 @@ def tasks(
     acceptance criteria and effort estimates.
     """
     # Set log level based on verbose flag
+    set_logging_level(verbose)
     if verbose:
-        set_global_log_level("DEBUG")
         logger.debug("📊 Verbose mode enabled - DEBUG level logging active")
 
     logger.info("📋 Task Creation Instruction: %s", instruction)

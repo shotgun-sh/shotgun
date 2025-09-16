@@ -6,7 +6,7 @@ import typer
 from dotenv import load_dotenv
 
 from shotgun.agents.config import get_config_manager
-from shotgun.cli import config, plan, research, tasks
+from shotgun.cli import codebase, config, plan, research, tasks
 from shotgun.logging_config import configure_root_logger, get_logger
 from shotgun.telemetry import setup_phoenix_observability
 
@@ -37,6 +37,9 @@ app = typer.Typer(
 
 # Add commands
 app.add_typer(config.app, name="config", help="Manage Shotgun configuration")
+app.add_typer(
+    codebase.app, name="codebase", help="Manage and query code knowledge graphs"
+)
 app.add_typer(research.app, name="research", help="Perform research with agentic loops")
 app.add_typer(plan.app, name="plan", help="Generate structured plans")
 app.add_typer(tasks.app, name="tasks", help="Generate task lists with agentic approach")

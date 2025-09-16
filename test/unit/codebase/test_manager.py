@@ -384,9 +384,9 @@ async def test_delete_graph():
 
 
 @pytest.mark.asyncio
-async def test_build_graph(temp_storage_path, unique_graph_id):
+async def test_build_graph(temp_storage_dir, unique_graph_id):
     """Test building a new graph."""
-    storage_dir = temp_storage_path
+    storage_dir = temp_storage_dir
     with (
         patch("shotgun.codebase.core.manager.Path.mkdir"),
         patch("shotgun.codebase.core.ingestor.CodebaseIngestor") as mock_ingestor_class,
@@ -429,9 +429,9 @@ async def test_build_graph(temp_storage_path, unique_graph_id):
 
 
 @pytest.mark.asyncio
-async def test_build_graph_invalid_path(temp_storage_path, unique_graph_id):
+async def test_build_graph_invalid_path(temp_storage_dir, unique_graph_id):
     """Test building graph with invalid repository path."""
-    storage_dir = temp_storage_path
+    storage_dir = temp_storage_dir
     with (
         patch("shotgun.codebase.core.manager.Path.mkdir"),
         patch("shotgun.codebase.core.manager.logger"),

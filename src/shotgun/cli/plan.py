@@ -8,7 +8,9 @@ import typer
 from shotgun.agents.config import ProviderType
 from shotgun.agents.models import UIOptions
 from shotgun.agents.plan import create_plan_agent, get_plan_history, run_plan_agent
-from shotgun.logging_config import set_global_log_level, setup_logger
+from shotgun.logging_config import setup_logger
+
+from .utils import set_logging_level
 
 app = typer.Typer(name="plan", help="Generate structured plans", no_args_is_help=True)
 logger = setup_logger(__name__)
@@ -38,8 +40,8 @@ def plan(
     existing plans based on new requirements or refinements.
     """
     # Set log level based on verbose flag
+    set_logging_level(verbose)
     if verbose:
-        set_global_log_level("DEBUG")
         logger.debug("📊 Verbose mode enabled - DEBUG level logging active")
 
     logger.info("📋 Planning Goal: %s", goal)

@@ -13,6 +13,23 @@ from .models import ProviderType, ShotgunConfig
 logger = setup_logger(__name__)
 
 
+def get_shotgun_home() -> Path:
+    """Get the Shotgun home directory path.
+
+    Can be overridden with SHOTGUN_HOME environment variable for testing.
+
+    Returns:
+        Path to shotgun home directory (default: ~/.shotgun-sh/)
+    """
+    import os
+
+    # Allow override via environment variable (useful for testing)
+    if custom_home := os.environ.get("SHOTGUN_HOME"):
+        return Path(custom_home)
+
+    return Path.home() / ".shotgun-sh"
+
+
 class ConfigManager:
     """Manager for Shotgun configuration."""
 
@@ -23,7 +40,7 @@ class ConfigManager:
             config_path: Path to config file. If None, uses default ~/.shotgun-sh/config.json
         """
         if config_path is None:
-            self.config_path = Path.home() / ".shotgun-sh" / "config.json"
+            self.config_path = get_shotgun_home() / "config.json"
         else:
             self.config_path = config_path
 

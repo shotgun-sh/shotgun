@@ -122,6 +122,6 @@ def configure_root_logger(verbose: bool = False) -> None:
     elif verbose:
         level = "DEBUG"
     else:
-        level = "INFO"
+        level = "ERROR"
 
     setup_logger("shotgun", level=level, verbose=verbose)

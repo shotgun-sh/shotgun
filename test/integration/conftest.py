@@ -2,8 +2,6 @@
 
 import asyncio
 import os
-import tempfile
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -14,6 +12,7 @@ from shotgun.codebase import CodebaseService
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     # Load from project root (two levels up from test/integration/)
     project_root = Path(__file__).parent.parent.parent
     load_dotenv(project_root / ".env")
@@ -49,13 +48,6 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
-
-
-@pytest.fixture
-def temp_storage_dir() -> Generator[Path, None, None]:
-    """Create a temporary directory for test storage that gets cleaned up."""
-    with tempfile.TemporaryDirectory(prefix="shotgun_test_") as temp_dir:
-        yield Path(temp_dir)
 
 
 @pytest_asyncio.fixture

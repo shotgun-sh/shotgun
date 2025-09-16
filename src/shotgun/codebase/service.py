@@ -25,7 +25,7 @@ class CodebaseService:
             storage_dir = Path(storage_dir)
 
         self.storage_dir = storage_dir
-        self.storage_dir.mkdir(exist_ok=True)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.manager = CodebaseGraphManager(storage_dir)
 
     async def list_graphs(self) -> list[CodebaseGraph]:

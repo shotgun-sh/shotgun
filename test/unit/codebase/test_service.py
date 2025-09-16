@@ -29,7 +29,7 @@ def test_codebase_service_init_with_path_object():
 
             assert service.storage_dir == storage_dir
             assert service.manager == mock_manager
-            mock_mkdir.assert_called_once_with(exist_ok=True)
+            mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
             mock_manager_class.assert_called_once_with(storage_dir)
 
 
@@ -51,7 +51,7 @@ def test_codebase_service_init_with_string_path():
 
             assert service.storage_dir == Path(storage_dir)
             assert service.manager == mock_manager
-            mock_mkdir.assert_called_once_with(exist_ok=True)
+            mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
 @pytest.mark.asyncio
@@ -651,7 +651,7 @@ def test_service_directory_creation():
         ):
             service = CodebaseService(storage_dir)
 
-            mock_mkdir.assert_called_once_with(exist_ok=True)
+            mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
             assert service.storage_dir == Path(storage_dir)
 
 

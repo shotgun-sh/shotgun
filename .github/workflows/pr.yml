@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+env:
+  COVERAGE_THRESHOLD: 61.0
+
 concurrency:
   group: pr-checks-${{ github.ref }}
   cancel-in-progress: true
@@ -71,14 +74,24 @@ jobs:
       - name: Run mypy
         run: uv run mypy src/
         
-      - name: Run pytest with coverage
-        run: uv run pytest test/unit/ --cov=src --cov-report=xml --cov-report=term-missing
-        
-      - name: Check core coverage (51% minimum, excluding CLI/TUI)
+      - name: Run unit tests with coverage
+        run: uv run pytest test/unit/ --cov=src --cov-report= --cov-append
+
+      - name: Run integration tests with coverage (stop on first failure)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: uv run pytest test/integration/ -x --cov=src --cov-report= --cov-append -c pyproject.toml
+
+      - name: Generate coverage reports
         run: |
-          # Use coverage to generate a report and extract the coverage percentage
+          uv run coverage report --show-missing
+          uv run coverage xml
+        
+      - name: Check core coverage (${{ env.COVERAGE_THRESHOLD }}% minimum, excluding CLI/TUI)
+        run: |
+          # Use combined coverage data from both unit and integration tests
           # excluding CLI and TUI directories
-          echo "Checking coverage for core functionality (excluding CLI/TUI)..."
+          echo "Checking combined coverage for core functionality (excluding CLI/TUI)..."
 
           # Run coverage report with specific omit patterns for CLI/TUI and extract percentage
           COVERAGE_LINE=$(uv run coverage report --omit="*/cli/*,*/tui/*" | grep "^TOTAL" | awk '{print $NF}' | sed 's/%//')
@@ -90,18 +103,18 @@ jobs:
           uv run coverage report --omit="*/cli/*,*/tui/*" --show-missing
           echo ""
 
-          # Check if coverage meets 51% threshold using bc for decimal comparison
-          if (( $(echo "${COVERAGE_OUTPUT} < 51.0" | bc -l) )); then
-              echo "❌ Coverage check failed: ${COVERAGE_OUTPUT}% < 51.0%"
+          # Check if coverage meets threshold using bc for decimal comparison
+          if (( $(echo "${COVERAGE_OUTPUT} < ${COVERAGE_THRESHOLD}" | bc -l) )); then
+              echo "❌ Coverage check failed: ${COVERAGE_OUTPUT}% < ${COVERAGE_THRESHOLD}%"
               echo ""
               echo "Please add tests to improve coverage of core functionality"
               echo "Focus on: agents/, config/, tools/, models/, history/ directories"
               echo ""
               echo "Low coverage files that need attention:"
-              uv run coverage report --omit="*/cli/*,*/tui/*" --show-missing | grep -E "^\w" | awk '$NF ~ /%/ && $NF+0 < 51 {print "  - " $1 ": " $NF}'
+              uv run coverage report --omit="*/cli/*,*/tui/*" --show-missing | grep -E "^\w" | awk -v threshold="${COVERAGE_THRESHOLD}" '$NF ~ /%/ && $NF+0 < threshold {print "  - " $1 ": " $NF}'
               exit 1
           else
-              echo "✅ Coverage check passed: ${COVERAGE_OUTPUT}% >= 51.0%"
+              echo "✅ Coverage check passed: ${COVERAGE_OUTPUT}% >= ${COVERAGE_THRESHOLD}%"
           fi
 
   basic-cli-smoke-tests:

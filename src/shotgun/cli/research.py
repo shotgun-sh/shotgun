@@ -12,7 +12,9 @@ from shotgun.agents.research import (
     get_research_history,
     run_research_agent,
 )
-from shotgun.logging_config import set_global_log_level, setup_logger
+from shotgun.logging_config import setup_logger
+
+from .utils import set_logging_level
 
 app = typer.Typer(
     name="research", help="Perform research with agentic loops", no_args_is_help=True
@@ -43,8 +45,8 @@ def research(
     gathering information from multiple sources and refining the search process.
     """
     # Set log level based on verbose flag
+    set_logging_level(verbose)
     if verbose:
-        set_global_log_level("DEBUG")
         logger.debug("📊 Verbose mode enabled - DEBUG level logging active")
 
     logger.info("🔍 Research Query: %s", query)

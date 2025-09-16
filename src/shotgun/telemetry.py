@@ -28,7 +28,7 @@ def setup_phoenix_observability() -> bool:
             return False
 
         # Cloud Phoenix setup (Arize) - following exact docs pattern
-        logger.info("Setting up cloud Phoenix AI observability")
+        logger.debug("Setting up cloud Phoenix AI observability")
 
         from openinference.instrumentation.pydantic_ai import (
             OpenInferenceSpanProcessor,
@@ -55,9 +55,9 @@ def setup_phoenix_observability() -> bool:
         tracer_provider.add_span_processor(OpenInferenceSpanProcessor())
         tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
 
-        logger.info("Cloud Phoenix AI observability configured successfully")
-        logger.info("Endpoint: %s", phoenix_collector_endpoint)
-        logger.info("API key configured: %s", "Yes" if phoenix_api_key else "No")
+        logger.debug("Cloud Phoenix AI observability configured successfully")
+        logger.debug("Endpoint: %s", phoenix_collector_endpoint)
+        logger.debug("API key configured: %s", "Yes" if phoenix_api_key else "No")
         return True
 
     except ImportError as e:
