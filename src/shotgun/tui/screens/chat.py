@@ -247,6 +247,37 @@ class AgentModeProvider(Provider):
                 yield Hit(score, matcher.highlight(title), callback, help=help_text)
 
 
+class ProviderSetupProvider(Provider):
+    """Command palette entries for provider configuration."""
+
+    @property
+    def chat_screen(self) -> "ChatScreen":
+        return cast(ChatScreen, self.screen)
+
+    def open_provider_config(self) -> None:
+        """Show the provider configuration screen."""
+        self.chat_screen.app.push_screen("provider_config")
+
+    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        yield DiscoveryHit(
+            "Open Provider Setup",
+            self.open_provider_config,
+            help="⚙️ Manage API keys for available providers",
+        )
+
+    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        matcher = self.matcher(query)
+        title = "Open Provider Setup"
+        score = matcher.match(title)
+        if score > 0:
+            yield Hit(
+                score,
+                matcher.highlight(title),
+                self.open_provider_config,
+                help="⚙️ Manage API keys for available providers",
+            )
+
+
 class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
 
@@ -254,7 +285,7 @@ class ChatScreen(Screen[None]):
         ("ctrl+p", "command_palette", "Command Palette"),
     ]
 
-    COMMANDS = {AgentModeProvider}
+    COMMANDS = {AgentModeProvider, ProviderSetupProvider}
 
     value = reactive("")
     mode = reactive(AgentType.RESEARCH, recompose=True)

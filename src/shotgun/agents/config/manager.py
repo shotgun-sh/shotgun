@@ -116,23 +116,15 @@ class ConfigManager:
             **kwargs: Configuration fields to update (only api_key supported)
         """
         config = self.load()
-        # Convert string to ProviderType enum if needed
-        provider_enum = (
-            provider if isinstance(provider, ProviderType) else ProviderType(provider)
-        )
-
-        if provider_enum == ProviderType.OPENAI:
-            provider_config = config.openai
-        elif provider_enum == ProviderType.ANTHROPIC:
-            provider_config = config.anthropic  # type: ignore[assignment]
-        elif provider_enum == ProviderType.GOOGLE:
-            provider_config = config.google  # type: ignore[assignment]
-        else:
-            raise ValueError(f"Unsupported provider: {provider_enum}")
+        provider_enum = self._ensure_provider_enum(provider)
+        provider_config = self._get_provider_config(config, provider_enum)
 
         # Only support api_key updates
-        if "api_key" in kwargs and kwargs["api_key"] is not None:
-            provider_config.api_key = SecretStr(kwargs["api_key"])
+        if "api_key" in kwargs:
+            api_key_value = kwargs["api_key"]
+            provider_config.api_key = (
+                SecretStr(api_key_value) if api_key_value is not None else None
+            )
 
         # Reject other fields
         unsupported_fields = set(kwargs.keys()) - {"api_key"}
@@ -140,6 +132,33 @@ class ConfigManager:
             raise ValueError(f"Unsupported configuration fields: {unsupported_fields}")
 
         self.save(config)
+
+    def clear_provider_key(self, provider: ProviderType | str) -> None:
+        """Remove the API key for the given provider."""
+        config = self.load()
+        provider_enum = self._ensure_provider_enum(provider)
+        provider_config = self._get_provider_config(config, provider_enum)
+        provider_config.api_key = None
+        self.save(config)
+
+    def has_provider_key(self, provider: ProviderType | str) -> bool:
+        """Check if the given provider has a non-empty API key configured."""
+        config = self.load()
+        provider_enum = self._ensure_provider_enum(provider)
+        provider_config = self._get_provider_config(config, provider_enum)
+        return self._provider_has_api_key(provider_config)
+
+    def has_any_provider_key(self) -> bool:
+        """Determine whether any provider has a configured API key."""
+        config = self.load()
+        return any(
+            self._provider_has_api_key(self._get_provider_config(config, provider))
+            for provider in (
+                ProviderType.OPENAI,
+                ProviderType.ANTHROPIC,
+                ProviderType.GOOGLE,
+            )
+        )
 
     def initialize(self) -> ShotgunConfig:
         """Initialize configuration with defaults and save to file.
@@ -174,6 +193,37 @@ class ConfigManager:
                         data[provider]["api_key"] = data[provider][
                             "api_key"
                         ].get_secret_value()
+
+    def _ensure_provider_enum(self, provider: ProviderType | str) -> ProviderType:
+        """Normalize provider values to ProviderType enum."""
+        return (
+            provider if isinstance(provider, ProviderType) else ProviderType(provider)
+        )
+
+    def _get_provider_config(
+        self, config: ShotgunConfig, provider: ProviderType
+    ) -> Any:
+        """Retrieve the provider-specific configuration section."""
+        if provider == ProviderType.OPENAI:
+            return config.openai
+        if provider == ProviderType.ANTHROPIC:
+            return config.anthropic
+        if provider == ProviderType.GOOGLE:
+            return config.google
+        raise ValueError(f"Unsupported provider: {provider}")
+
+    def _provider_has_api_key(self, provider_config: Any) -> bool:
+        """Return True if the provider config contains a usable API key."""
+        api_key = getattr(provider_config, "api_key", None)
+        if api_key is None:
+            return False
+
+        if isinstance(api_key, SecretStr):
+            value = api_key.get_secret_value()
+        else:
+            value = str(api_key)
+
+        return bool(value.strip())
 
 
 def get_config_manager() -> ConfigManager:

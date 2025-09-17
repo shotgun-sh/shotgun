@@ -1,0 +1,10 @@
+Screen {
+  background: $surface;
+}
+
+Input {
+  border: round $border-blurred;
+  &:focus {
+    border: round $border;
+  }
+}
