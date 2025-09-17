@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  COVERAGE_THRESHOLD: 61.0
+  COVERAGE_THRESHOLD: 71.0
 
 concurrency:
   group: pr-checks-${{ github.ref }}

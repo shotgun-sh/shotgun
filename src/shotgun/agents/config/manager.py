@@ -7,27 +7,11 @@ from typing import Any
 from pydantic import SecretStr
 
 from shotgun.logging_config import get_logger
+from shotgun.utils import get_shotgun_home
 
 from .models import ProviderType, ShotgunConfig
 
 logger = get_logger(__name__)
-
-
-def get_shotgun_home() -> Path:
-    """Get the Shotgun home directory path.
-
-    Can be overridden with SHOTGUN_HOME environment variable for testing.
-
-    Returns:
-        Path to shotgun home directory (default: ~/.shotgun-sh/)
-    """
-    import os
-
-    # Allow override via environment variable (useful for testing)
-    if custom_home := os.environ.get("SHOTGUN_HOME"):
-        return Path(custom_home)
-
-    return Path.home() / ".shotgun-sh"
 
 
 class ConfigManager:

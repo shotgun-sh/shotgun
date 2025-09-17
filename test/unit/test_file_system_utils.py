@@ -82,23 +82,17 @@ class TestEnsureShotgunDirectoryExists:
             shutil.rmtree(temp_dir)
 
     def test_logging_behavior(self):
-        """Test that directory creation is logged properly."""
+        """Test that directory creation works properly (logging removed to avoid circular dependency)."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with (
-                patch("shotgun.utils.file_system_utils.Path.cwd") as mock_cwd,
-                patch("shotgun.utils.file_system_utils.logger") as mock_logger,
-            ):
+            with patch("shotgun.utils.file_system_utils.Path.cwd") as mock_cwd:
                 mock_cwd.return_value = Path(temp_dir)
 
                 result = ensure_shotgun_directory_exists()
 
                 expected_path = Path(temp_dir) / ".shotgun"
                 assert result == expected_path
-
-                # Verify logging call
-                mock_logger.debug.assert_called_once_with(
-                    "Ensured .shotgun directory exists: %s", expected_path
-                )
+                # Note: Logger was removed from file_system_utils to avoid circular dependency
+                # with logging_config, so we only test functionality, not logging
 
     def test_permission_error_handling(self):
         """Test handling of permission errors during directory creation."""

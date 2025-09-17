@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from shotgun.agents.config.manager import get_shotgun_home
 from shotgun.codebase.service import CodebaseService
+from shotgun.utils import get_shotgun_home
 
 
 def get_codebase_service(storage_dir: Path | str | None = None) -> CodebaseService:
