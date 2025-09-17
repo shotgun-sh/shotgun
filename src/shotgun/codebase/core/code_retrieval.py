@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
     from shotgun.codebase.core.manager import CodebaseGraphManager
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 class CodeSnippet(BaseModel):

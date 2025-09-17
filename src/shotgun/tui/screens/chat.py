@@ -24,6 +24,7 @@ from textual.widgets import Markdown
 from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.models import AgentDeps, UserAnswer, UserQuestion
+from shotgun.sdk.services import get_codebase_service
 
 from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
@@ -296,9 +297,14 @@ class ChatScreen(Screen[None]):
 
     def __init__(self) -> None:
         super().__init__()
-        # Get the model configuration
+        # Get the model configuration and codebase service
         model_config = get_provider_model()
-        self.deps = AgentDeps(interactive_mode=True, llm_model=model_config)
+        codebase_service = get_codebase_service()
+        self.deps = AgentDeps(
+            interactive_mode=True,
+            llm_model=model_config,
+            codebase_service=codebase_service,
+        )
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
 
     def on_mount(self) -> None:

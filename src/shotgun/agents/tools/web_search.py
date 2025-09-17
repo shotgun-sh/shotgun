@@ -3,9 +3,9 @@
 from openai import OpenAI
 from opentelemetry import trace
 
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def web_search_tool(query: str) -> str:

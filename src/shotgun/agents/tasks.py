@@ -9,10 +9,11 @@ from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config import ProviderType
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 
 from .common import (
+    add_system_status_message,
     create_base_agent,
     create_usage_limits,
     ensure_file_exists,
@@ -21,7 +22,7 @@ from .common import (
 )
 from .models import AgentDeps, AgentRuntimeOptions
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()
@@ -57,7 +58,7 @@ def create_tasks_agent(
     """
     logger.debug("Initializing tasks agent")
     agent, deps = create_base_agent(
-        _build_tasks_agent_system_prompt, agent_runtime_options, None, provider
+        _build_tasks_agent_system_prompt, agent_runtime_options, provider=provider
     )
     return agent, deps
 
@@ -83,6 +84,8 @@ async def run_tasks_agent(
 
     # Ensure tasks.md exists
     ensure_file_exists("tasks.md", "# Tasks")
+
+    message_history = await add_system_status_message(deps, message_history)
 
     # Let the agent use its tools to read existing tasks, plan, and research
     full_prompt = f"Create or update tasks based on: {instruction}"

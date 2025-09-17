@@ -6,13 +6,16 @@ from pydantic_ai import (
     RunContext,
 )
 from pydantic_ai.agent import AgentRunResult
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import (
+    ModelMessage,
+)
 
 from shotgun.agents.config import ProviderType
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 
 from .common import (
+    add_system_status_message,
     create_base_agent,
     create_usage_limits,
     ensure_file_exists,
@@ -22,7 +25,7 @@ from .common import (
 from .models import AgentDeps, AgentRuntimeOptions
 from .tools import web_search_tool
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()
@@ -60,8 +63,9 @@ def create_research_agent(
     agent, deps = create_base_agent(
         _build_research_agent_system_prompt,
         agent_runtime_options,
-        [web_search_tool],
-        provider,
+        load_codebase_understanding_tools=True,
+        additional_tools=[web_search_tool],
+        provider=provider,
     )
     return agent, deps
 
@@ -87,9 +91,12 @@ async def run_research_agent(
     # Ensure research.md exists
     ensure_file_exists("research.md", "# Research")
 
-    # Let the agent use its tools to read existing research
-    full_prompt = (
-        f"Research this topic thoroughly and provide comprehensive findings: {query}"
+    message_history = await add_system_status_message(deps, message_history)
+
+    user_prompt = prompt_loader.render(
+        "user/research.j2",
+        user_query=query,
+        context="research output",
     )
 
     try:
@@ -98,7 +105,7 @@ async def run_research_agent(
 
         result = await run_agent(
             agent=agent,
-            prompt=full_prompt,
+            prompt=user_prompt,
             deps=deps,
             message_history=message_history,
             usage_limits=usage_limits,

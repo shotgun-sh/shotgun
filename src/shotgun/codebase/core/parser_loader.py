@@ -7,9 +7,9 @@ from typing import Any
 from tree_sitter import Language, Parser
 
 from shotgun.codebase.core.language_config import LANGUAGE_CONFIGS
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def load_parsers() -> tuple[dict[str, Parser], dict[str, Any]]:

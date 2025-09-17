@@ -8,11 +8,14 @@ from pathlib import Path
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
 from .models import ShellCommandResult
 
-logger = setup_logger(__name__)
+# Output size limits
+MAX_OUTPUT_SIZE = 50000  # Maximum characters allowed in combined stdout/stderr
+
+logger = get_logger(__name__)
 
 # Whitelist of safe read-only commands
 ALLOWED_COMMANDS = {
@@ -52,6 +55,20 @@ async def codebase_shell(
     graph_id: str | None = None,
 ) -> ShellCommandResult:
     """Execute safe shell commands in codebase context.
+
+    Example: Use grep patterns like this so you limit the
+    number of results while also getting the total count
+    in one command. So as not to exceed output limits.
+      `command`:
+    ```
+    # first 10 hits + grand total
+    grep -m 10 -nH "foo" src/main.cpp
+    echo "-----"
+    echo "total: $(grep -c 'foo' src/main.cpp)"
+
+    # case-insensitive, whole word, with totals
+    grep -iw -nH "foo" src/*.cpp | tee /dev/tty | wc -l
+    ```
 
     Args:
         ctx: RunContext containing AgentDeps with codebase service
@@ -186,6 +203,32 @@ async def codebase_shell(
                 return_code,
                 execution_time_ms,
             )
+
+            # Check if output is too large
+            combined_output_size = len(stdout) + len(stderr)
+            if combined_output_size > MAX_OUTPUT_SIZE:
+                # Format size info
+                if combined_output_size < 1024 * 1024:
+                    size_str = f"{combined_output_size / 1024:.1f}KB"
+                else:
+                    size_str = f"{combined_output_size / (1024 * 1024):.1f}MB"
+
+                guidance_msg = (
+                    f"Command output is very large ({size_str}). "
+                    "Consider using more targeted commands:\n"
+                    "• Use 'head' or 'tail' to limit lines: `head -50 file.txt`\n"
+                    "• Add filters to grep: `grep -n 'pattern' file.txt`\n"
+                    "• Use find with specific criteria: `find . -name '*.py' -type f`\n"
+                    "• Limit directory depth: `find . -maxdepth 2 -type f`\n"
+                    "• Use wc to get counts: `wc -l *.py`"
+                )
+
+                return ShellCommandResult(
+                    success=False,
+                    command=command,
+                    args=args,
+                    error=guidance_msg,
+                )
 
             return ShellCommandResult(
                 success=success,

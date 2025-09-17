@@ -31,16 +31,12 @@ class ColoredFormatter(logging.Formatter):
 
 def setup_logger(
     name: str,
-    level: str = "INFO",
-    verbose: bool = False,
     format_string: str | None = None,
 ) -> logging.Logger:
     """Set up a logger with consistent configuration.
 
     Args:
         name: Logger name (typically __name__)
-        level: Base logging level ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
-        verbose: If True, set level to DEBUG regardless of level parameter
         format_string: Custom format string, uses default if None
 
     Returns:
@@ -52,19 +48,16 @@ def setup_logger(
     if logger.handlers:
         return logger
 
-    # Set log level - check environment variable first, then verbose flag, then default
-    env_level = os.getenv("SHOTGUN_LOG_LEVEL", "").upper()
-    if env_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-        log_level = env_level
-    elif verbose:
-        log_level = "DEBUG"
-    else:
-        log_level = level
-    logger.setLevel(getattr(logging, log_level.upper()))
+    # Get log level from environment variable, default to ERROR
+    env_level = os.getenv("SHOTGUN_LOG_LEVEL", "ERROR").upper()
+    if env_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+        env_level = "ERROR"
+
+    logger.setLevel(getattr(logging, env_level))
 
     # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, log_level.upper()))
+    console_handler.setLevel(getattr(logging, env_level))
 
     # Create formatter
     if format_string is None:
@@ -90,9 +83,15 @@ def get_logger(name: str) -> logging.Logger:
         name: Logger name (typically __name__)
 
     Returns:
-        Logger instance
+        Logger instance with handlers configured
     """
-    return logging.getLogger(name)
+    logger = logging.getLogger(name)
+
+    # If logger doesn't have handlers, set it up
+    if not logger.handlers:
+        return setup_logger(name)
+
+    return logger
 
 
 def set_global_log_level(level: str) -> None:
@@ -109,19 +108,6 @@ def set_global_log_level(level: str) -> None:
                 handler.setLevel(getattr(logging, level.upper()))
 
 
-def configure_root_logger(verbose: bool = False) -> None:
-    """Configure the root shotgun logger.
-
-    Args:
-        verbose: Enable debug level logging
-    """
-    # Environment variable takes precedence over verbose flag
-    env_level = os.getenv("SHOTGUN_LOG_LEVEL", "").upper()
-    if env_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-        level = env_level
-    elif verbose:
-        level = "DEBUG"
-    else:
-        level = "ERROR"
-
-    setup_logger("shotgun", level=level, verbose=verbose)
+def configure_root_logger() -> None:
+    """Configure the root shotgun logger."""
+    setup_logger("shotgun")

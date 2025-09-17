@@ -44,9 +44,11 @@ def mock_model_config() -> ModelConfig:
 @pytest.fixture
 def mock_agent_deps(mock_model_config: ModelConfig) -> AgentDeps:
     """Create mock AgentDeps with model configuration."""
-    return AgentDeps(
+    mock_codebase_service = MagicMock()
+    return AgentDeps.model_construct(
         interactive_mode=False,
         llm_model=mock_model_config,
+        codebase_service=mock_codebase_service,
     )
 
 

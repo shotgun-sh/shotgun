@@ -7,9 +7,9 @@ from typing import Any
 from shotgun.codebase.core.manager import CodebaseGraphManager
 from shotgun.codebase.core.nl_query import generate_cypher
 from shotgun.codebase.models import CodebaseGraph, QueryResult, QueryType
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 class CodebaseService:

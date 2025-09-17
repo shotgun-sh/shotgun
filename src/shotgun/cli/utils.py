@@ -5,17 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from shotgun.logging_config import set_global_log_level
-
 from .models import OutputFormat
-
-
-def set_logging_level(verbose: bool) -> None:
-    """Set logging level based on verbose flag."""
-    if verbose:
-        set_global_log_level("DEBUG")
-    else:
-        set_global_log_level("ERROR")
 
 
 def format_result_json(result: Any) -> str:

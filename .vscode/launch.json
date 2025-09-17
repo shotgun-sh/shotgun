@@ -8,13 +8,14 @@
             "module": "shotgun.main",
             "args": [
                 "research",
-                "How can I use OpenAI's new open source models with Ollama and use Pydantic AI?"
+                "Is Pydantic AI in the requirements for this project?"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
             },
             "envFile": "${workspaceFolder}/.env",
             "justMyCode": false,
@@ -34,7 +35,8 @@
             "cwd": "${workspaceFolder}",
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
             },
             "envFile": "${workspaceFolder}/.env",
             "justMyCode": false,
@@ -50,7 +52,8 @@
             "cwd": "${workspaceFolder}",
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
             },
             "envFile": "${workspaceFolder}/.env",
             "justMyCode": false,
@@ -65,7 +68,8 @@
             "cwd": "${fileDirname}",
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
             },
             "envFile": "${workspaceFolder}/.env",
             "justMyCode": false,
@@ -88,7 +92,8 @@
             "cwd": "${workspaceFolder}",
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
             },
             "envFile": "${workspaceFolder}/.env",
             "justMyCode": false,

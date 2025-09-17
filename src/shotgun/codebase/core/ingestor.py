@@ -13,9 +13,9 @@ from tree_sitter import Node, Parser, QueryCursor
 
 from shotgun.codebase.core.language_config import LANGUAGE_CONFIGS, get_language_config
 from shotgun.codebase.core.parser_loader import load_parsers
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 # Default ignore patterns

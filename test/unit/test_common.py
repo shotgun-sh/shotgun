@@ -347,8 +347,8 @@ class TestCreateUsageLimits:
         limits = create_usage_limits()
 
         assert isinstance(limits, UsageLimits)
-        assert limits.request_limit == 15
-        assert limits.tool_calls_limit == 12
+        assert limits.request_limit == 100
+        assert limits.tool_calls_limit == 100
 
 
 class TestGetFileHistory:

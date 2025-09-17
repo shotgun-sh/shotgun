@@ -4,11 +4,11 @@ from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
 from shotgun.codebase.models import QueryType
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
 from .models import QueryGraphResult
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 async def query_graph(

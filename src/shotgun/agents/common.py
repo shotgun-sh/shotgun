@@ -13,17 +13,36 @@ from pydantic_ai import (
     UsageLimits,
 )
 from pydantic_ai.agent import AgentRunResult
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelResponse,
+    TextPart,
+)
 
 from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
+from shotgun.prompts import PromptLoader
+from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
 
 from .history import token_limit_compactor
 from .models import AgentDeps, AgentRuntimeOptions
-from .tools import append_file, ask_user, read_file, write_file
+from .tools import (
+    append_file,
+    ask_user,
+    codebase_shell,
+    directory_lister,
+    file_read,
+    query_graph,
+    read_file,
+    retrieve_code,
+    write_file,
+)
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
+
+# Global prompt loader instance
+prompt_loader = PromptLoader()
 
 
 def ensure_file_exists(filename: str, header: str) -> str:
@@ -90,9 +109,41 @@ def register_common_tools(
     logger.debug("✅ Tool registration complete")
 
 
+async def add_system_status_message(
+    deps: AgentDeps,
+    message_history: list[ModelMessage] | None = None,
+) -> list[ModelMessage]:
+    """Add a system status message to the message history.
+
+    Args:
+        deps: Agent dependencies containing runtime options
+        message_history: Existing message history
+
+    Returns:
+        Updated message history with system status message prepended
+    """
+    message_history = message_history or []
+    codebase_understanding_graphs = await deps.codebase_service.list_graphs()
+
+    system_state = prompt_loader.render(
+        "agents/state/system_state.j2",
+        codebase_understanding_graphs=codebase_understanding_graphs,
+        context="system state",
+    )
+    message_history.append(
+        ModelResponse(
+            parts=[
+                TextPart(content=system_state),
+            ]
+        )
+    )
+    return message_history
+
+
 def create_base_agent(
     system_prompt_fn: Callable[[RunContext[AgentDeps]], str],
     agent_runtime_options: AgentRuntimeOptions,
+    load_codebase_understanding_tools: bool = True,
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
 ) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
@@ -121,8 +172,13 @@ def create_base_agent(
         )
         model = model_config.pydantic_model_name
 
-        # Create deps with model config
-        deps = AgentDeps(**agent_runtime_options.model_dump(), llm_model=model_config)
+        # Create deps with model config and codebase service
+        codebase_service = get_codebase_service()
+        deps = AgentDeps(
+            **agent_runtime_options.model_dump(),
+            llm_model=model_config,
+            codebase_service=codebase_service,
+        )
 
     except Exception as e:
         logger.warning("Failed to load configured model, using fallback: %s", e)
@@ -154,6 +210,17 @@ def create_base_agent(
     agent.tool_plain(write_file)
     agent.tool_plain(append_file)
 
+    # Register codebase understanding tools (always available)
+    if load_codebase_understanding_tools:
+        agent.tool(query_graph)
+        agent.tool(retrieve_code)
+        agent.tool(file_read)
+        agent.tool(directory_lister)
+        agent.tool(codebase_shell)
+        logger.debug("🧠 Codebase understanding tools registered")
+    else:
+        logger.debug("🚫🧠 Codebase understanding tools not registered")
+
     logger.debug("✅ Agent creation complete")
     return agent, deps
 
@@ -165,8 +232,8 @@ def create_usage_limits() -> UsageLimits:
         UsageLimits configured for responsible API usage
     """
     return UsageLimits(
-        request_limit=15,  # Maximum number of model requests per run
-        tool_calls_limit=12,  # Maximum number of successful tool calls
+        request_limit=100,  # Maximum number of model requests per run
+        tool_calls_limit=100,  # Maximum number of successful tool calls
     )
 
 

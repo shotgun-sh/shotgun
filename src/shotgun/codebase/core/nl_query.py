@@ -13,13 +13,13 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import get_provider_model
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()

@@ -4,12 +4,12 @@ import os
 
 from pydantic import SecretStr
 
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
 from .manager import get_config_manager
 from .models import ModelConfig, ProviderType, get_model_by_name
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:

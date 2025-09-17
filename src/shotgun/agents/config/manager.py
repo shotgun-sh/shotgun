@@ -6,11 +6,11 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
 from .models import ProviderType, ShotgunConfig
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def get_shotgun_home() -> Path:

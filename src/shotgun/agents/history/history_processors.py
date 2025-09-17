@@ -19,10 +19,10 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.models import AgentDeps
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()

@@ -22,9 +22,9 @@ from shotgun.codebase.models import (
     GraphStatus,
     OperationStats,
 )
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 class CodebaseFileHandler(FileSystemEventHandler):

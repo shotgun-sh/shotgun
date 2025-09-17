@@ -1,0 +1,13 @@
+{% if codebase_understanding_graphs -%}
+
+You have access to the following codebase graphs:
+
+{% for graph in codebase_understanding_graphs -%}
+- {{ graph.name }} ID: {{ graph.graph_id }}
+{% endfor -%}
+
+{% else -%}
+
+You have no access to codebase graphs. You can optionally ask the user to load a codebase if the user asked a codebase question.
+
+{% endif %}

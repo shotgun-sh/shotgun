@@ -6,11 +6,11 @@ from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
 from shotgun.codebase.core.language_config import get_language_config
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
 from .models import FileReadResult
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 async def file_read(

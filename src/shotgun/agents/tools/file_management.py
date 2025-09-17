@@ -6,9 +6,9 @@ These tools are restricted to the .shotgun directory for security.
 from pathlib import Path
 from typing import Literal
 
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def _get_shotgun_base_path() -> Path:

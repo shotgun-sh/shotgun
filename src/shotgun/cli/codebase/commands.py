@@ -8,12 +8,12 @@ from typing import Annotated
 import typer
 
 from shotgun.codebase.models import CodebaseGraph, QueryType
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 
 from ..models import OutputFormat
-from ..utils import output_result, set_logging_level
+from ..utils import output_result
 from .models import ErrorResult
 
 app = typer.Typer(
@@ -23,20 +23,16 @@ app = typer.Typer(
 )
 
 # Set up logger but it will be suppressed by default
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 @app.command(name="list")
 def list_codebases(
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-    ] = False,
     format_type: Annotated[
         OutputFormat, typer.Option("--format", "-f", help="Output format")
     ] = OutputFormat.TEXT,
 ) -> None:
     """List all indexed codebases."""
-    set_logging_level(verbose)
     sdk = CodebaseSDK()
 
     try:
@@ -45,7 +41,7 @@ def list_codebases(
     except Exception as e:
         error_result = ErrorResult(
             error_message=f"Error listing codebases: {e}",
-            details=f"Full traceback:\n{traceback.format_exc()}" if verbose else None,
+            details=f"Full traceback:\n{traceback.format_exc()}",
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e
@@ -57,15 +53,11 @@ def index(
     name: Annotated[
         str, typer.Option("--name", "-n", help="Human-readable name for the codebase")
     ],
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-    ] = False,
     format_type: Annotated[
         OutputFormat, typer.Option("--format", "-f", help="Output format")
     ] = OutputFormat.TEXT,
 ) -> None:
     """Index a new codebase."""
-    set_logging_level(verbose)
     sdk = CodebaseSDK()
 
     try:
@@ -79,7 +71,7 @@ def index(
     except Exception as e:
         error_result = ErrorResult(
             error_message=f"Error indexing codebase: {e}",
-            details=f"Full traceback:\n{traceback.format_exc()}" if verbose else None,
+            details=f"Full traceback:\n{traceback.format_exc()}",
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e
@@ -88,15 +80,11 @@ def index(
 @app.command()
 def delete(
     graph_id: Annotated[str, typer.Argument(help="Graph ID to delete")],
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-    ] = False,
     format_type: Annotated[
         OutputFormat, typer.Option("--format", "-f", help="Output format")
     ] = OutputFormat.TEXT,
 ) -> None:
     """Delete an indexed codebase."""
-    set_logging_level(verbose)
     sdk = CodebaseSDK()
 
     # CLI-specific confirmation callback
@@ -117,7 +105,7 @@ def delete(
     except Exception as e:
         error_result = ErrorResult(
             error_message=f"Error deleting codebase: {e}",
-            details=f"Full traceback:\n{traceback.format_exc()}" if verbose else None,
+            details=f"Full traceback:\n{traceback.format_exc()}",
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e
@@ -126,15 +114,11 @@ def delete(
 @app.command()
 def info(
     graph_id: Annotated[str, typer.Argument(help="Graph ID to show info for")],
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-    ] = False,
     format_type: Annotated[
         OutputFormat, typer.Option("--format", "-f", help="Output format")
     ] = OutputFormat.TEXT,
 ) -> None:
     """Show detailed information about a codebase."""
-    set_logging_level(verbose)
     sdk = CodebaseSDK()
 
     try:
@@ -147,7 +131,7 @@ def info(
     except Exception as e:
         error_result = ErrorResult(
             error_message=f"Error getting codebase info: {e}",
-            details=f"Full traceback:\n{traceback.format_exc()}" if verbose else None,
+            details=f"Full traceback:\n{traceback.format_exc()}",
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e
@@ -165,15 +149,11 @@ def query(
             "--cypher", help="Treat query as Cypher instead of natural language"
         ),
     ] = False,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-    ] = False,
     format_type: Annotated[
         OutputFormat, typer.Option("--format", "-f", help="Output format")
     ] = OutputFormat.TEXT,
 ) -> None:
     """Query a codebase using natural language or Cypher."""
-    set_logging_level(verbose)
 
     try:
         sdk = CodebaseSDK()
@@ -188,7 +168,7 @@ def query(
     except Exception as e:
         error_result = ErrorResult(
             error_message=f"Error executing query: {e}",
-            details=f"Full traceback:\n{traceback.format_exc()}" if verbose else None,
+            details=f"Full traceback:\n{traceback.format_exc()}",
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e
@@ -197,22 +177,16 @@ def query(
 @app.command()
 def reindex(
     graph_id: Annotated[str, typer.Argument(help="Graph ID to reindex")],
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-    ] = False,
     format_type: Annotated[
         OutputFormat, typer.Option("--format", "-f", help="Output format")
     ] = OutputFormat.TEXT,
 ) -> None:
     """Reindex an existing codebase."""
-    set_logging_level(verbose)
 
     try:
         sdk = CodebaseSDK()
         result = asyncio.run(sdk.reindex_codebase(graph_id))
-        # Only show stats if verbose mode is enabled
-        if not verbose:
-            result.stats = None
+        # Stats are always shown now that verbose is controlled by env var
         output_result(result, format_type)
     except CodebaseNotFoundError as e:
         error_result = ErrorResult(error_message=str(e))
@@ -222,7 +196,7 @@ def reindex(
     except Exception as e:
         error_result = ErrorResult(
             error_message=f"Error reindexing codebase: {e}",
-            details=f"Full traceback:\n{traceback.format_exc()}" if verbose else None,
+            details=f"Full traceback:\n{traceback.format_exc()}",
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e

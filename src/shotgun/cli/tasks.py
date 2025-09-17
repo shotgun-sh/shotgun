@@ -12,12 +12,10 @@ from shotgun.agents.tasks import (
     get_tasks_history,
     run_tasks_agent,
 )
-from shotgun.logging_config import setup_logger
-
-from .utils import set_logging_level
+from shotgun.logging_config import get_logger
 
 app = typer.Typer(name="tasks", help="Generate task lists with agentic approach")
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 @app.callback(invoke_without_command=True)
@@ -25,9 +23,6 @@ def tasks(
     instruction: Annotated[
         str, typer.Argument(help="Task creation instruction or project description")
     ],
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Verbose output")
-    ] = False,
     non_interactive: Annotated[
         bool,
         typer.Option(
@@ -45,10 +40,6 @@ def tasks(
     your research and plans to generate prioritized, actionable tasks with
     acceptance criteria and effort estimates.
     """
-    # Set log level based on verbose flag
-    set_logging_level(verbose)
-    if verbose:
-        logger.debug("📊 Verbose mode enabled - DEBUG level logging active")
 
     logger.info("📋 Task Creation Instruction: %s", instruction)
 
@@ -70,14 +61,11 @@ def tasks(
         logger.info("📋 Results:")
         logger.info("%s", result.output)
         logger.info("📄 Tasks saved to: .shotgun/tasks.md")
-
-        if verbose:
-            logger.debug("📚 Current tasks:")
-            logger.debug("%s", get_tasks_history())
+        logger.debug("📚 Current tasks:")
+        logger.debug("%s", get_tasks_history())
 
     except Exception as e:
         logger.error("❌ Error during task creation: %s", str(e))
-        if verbose:
-            import traceback
+        import traceback
 
-            logger.debug("Full traceback:\n%s", traceback.format_exc())
+        logger.debug("Full traceback:\n%s", traceback.format_exc())

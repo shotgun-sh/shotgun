@@ -5,9 +5,9 @@ from asyncio import get_running_loop
 from pydantic_ai import CallDeferred, RunContext
 
 from shotgun.agents.models import AgentDeps, UserQuestion
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 async def ask_user(ctx: RunContext[AgentDeps], question: str) -> str:

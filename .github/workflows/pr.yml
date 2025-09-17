@@ -153,24 +153,28 @@ jobs:
           shotgun --help
         
       - name: Test research command
+        env:
+          SHOTGUN_LOG_LEVEL: DEBUG
         run: |
           source .venv/bin/activate
-          shotgun research --non-interactive --verbose "How can I make a simple Agent using Pydantic AI?"
+          shotgun research --non-interactive "How can I make a simple Agent using Pydantic AI?"
 
       - name: Test plan command
+        env:
+          SHOTGUN_LOG_LEVEL: DEBUG
         run: |
           source .venv/bin/activate
-          shotgun plan --non-interactive --verbose "Build a simple Agent using Pydantic AI"
+          shotgun plan --non-interactive "Build a simple Agent using Pydantic AI"
         
       - name: Test tasks command
+        env:
+          SHOTGUN_LOG_LEVEL: DEBUG
         run: |
           source .venv/bin/activate
-          shotgun tasks --non-interactive --verbose "Create the tasks for building a simple Agent using Pydantic AI"
+          shotgun tasks --non-interactive "Create the tasks for building a simple Agent using Pydantic AI"
 
   todo-checker:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4

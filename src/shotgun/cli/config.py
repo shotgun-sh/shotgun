@@ -8,9 +8,9 @@ from rich.console import Console
 from rich.table import Table
 
 from shotgun.agents.config import ProviderType, get_config_manager
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 console = Console()
 
 app = typer.Typer(

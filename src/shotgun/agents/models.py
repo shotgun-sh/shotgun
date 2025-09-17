@@ -79,9 +79,8 @@ class AgentDeps(AgentRuntimeOptions):
         description="Model configuration with token limits and provider info",
     )
 
-    codebase_service: "CodebaseService | None" = Field(
-        default=None,
-        description="Optional codebase service for code analysis tools",
+    codebase_service: "CodebaseService" = Field(
+        description="Codebase service for code analysis tools",
     )
 
 

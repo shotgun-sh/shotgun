@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from shotgun.logging_config import setup_logger
+from shotgun.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def ensure_shotgun_directory_exists() -> Path:
