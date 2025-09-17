@@ -20,58 +20,12 @@ from pydantic_ai.messages import (
 
 from shotgun.agents.models import AgentDeps
 from shotgun.logging_config import setup_logger
+from shotgun.prompts import PromptLoader
 
 logger = setup_logger(__name__)
 
-# NOTE: Ported over from the shotgun-alpha repo, may need adjustments
-SUMMARIZATION_PROMPT = """
-Summarize the following conversation. Focus on key information and maintain context.
-Provide the output as specified in <OUTPUT_FORMAT>.
-Remove noisy information or irrelevant messages.
-
-<OUTPUT_FORMAT>
-# Context
-
-Short summary of the discussion, grouped by topics or tasks if any.
-Present it as clear bullet points. Be brief but do not lose information that might be important for the current state, task or objectives.
-
-# Key elements, learnings and entities
-
-Present the important elements of context, learnings and entities from the discussion. Be very detailed.
-
-Present it as clear bullet points. Be brief but do not lose information that might be important for the current state, task or objectives.
-
-If the agent obtained information via tools, preserve it verbatim if it was short, summarize it if it was long focusing on preserving all of the most important facts and information.
-
-If the agent has acknowledged the user's request, make sure to include the summary of the work done in the output so it doesn't acknowledge the user again.
-
-If agent listed files, code or retrieved parts of the code, preserve it verbatim unless it's very long, then summarize it. ALWAYS IN THE CONTEXT OF WHAT THE AGENT NEEDS.
-
-Keep user's messages verbatim if they are short to medium length, summarize them if they are long focusing on preserving all of the most important facts and information.
-
-If there are any links mentioned, IDs, filenames, etc. - preserve them verbatim.
-
-# Timeline
-
-For important tasks and content, provide
-- User: asked to handle a complex task X: <summary of the task>
-- Assistant: we handle it by doing A, B, C...
-- Tools used and output summary
-
-...
-- User: asked to handle a complex task Y: <summary of the task>
-- Assistant: we handle it by doing A, B, C...
-- Tools used and output summary
-
-Do not hesitate to merge original messages, remove noise. We want to be as concise and brief as possible.
-
-# Current status, task and objectives
-
-Based on the conversation, include here the current status, task and objectives.
-
-CRITICAL: This is not about summarizing or compacting. We are talking about the status, task and objectives currently active in the convertion to keep as much context as possible regarding the last messages.
-</OUTPUT_FORMAT>
-"""
+# Global prompt loader instance
+prompt_loader = PromptLoader()
 
 
 async def token_limit_compactor(
@@ -131,10 +85,11 @@ async def token_limit_compactor(
             # Handle whatever this is
             pass
 
+    summarization_prompt = prompt_loader.render("history/summarization.j2")
     summary_response = await model_request(
         model=ctx.model,
         messages=[
-            ModelRequest.user_text_prompt(context, instructions=SUMMARIZATION_PROMPT)
+            ModelRequest.user_text_prompt(context, instructions=summarization_prompt)
         ],
     )
     # Usage before and after

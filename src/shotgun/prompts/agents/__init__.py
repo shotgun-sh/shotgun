@@ -1,0 +1,1 @@
+"""Agent-specific prompt templates."""

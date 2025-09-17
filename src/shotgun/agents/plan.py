@@ -10,18 +10,21 @@ from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config import ProviderType
 from shotgun.logging_config import setup_logger
+from shotgun.prompts import PromptLoader
 
 from .common import (
     create_base_agent,
     create_usage_limits,
     ensure_file_exists,
     get_file_history,
-    get_interactive_note,
     run_agent,
 )
 from .models import AgentDeps, AgentRuntimeOptions
 
 logger = setup_logger(__name__)
+
+# Global prompt loader instance
+prompt_loader = PromptLoader()
 
 
 def _build_plan_agent_system_prompt(ctx: RunContext[AgentDeps]) -> str:
@@ -33,74 +36,8 @@ def _build_plan_agent_system_prompt(ctx: RunContext[AgentDeps]) -> str:
     Returns:
         The complete system prompt string for the plan agent
     """
-    interactive_note = get_interactive_note(ctx.deps.interactive_mode, "plans")
-
-    return (
-        """You are a planning assistant with access to research data and existing plans.
-"""
-        + interactive_note
-        + """
-
-Your job is to:
-1. FIRST: Load previous research from research.md using read_file("research.md")
-2. SECOND: Load existing plan from plan.md using read_file("plan.md") if it exists
-3. ANALYZE: Understand the current context and user's goal/request
-4. PLAN: Create or update a comprehensive, actionable plan
-5. WRITE: Save the plan to plan.md using write_file("plan.md", content)
-
-PLANNING PRINCIPLES:
-- Build on existing research and previous plans
-- Create specific, measurable, achievable, relevant, time-bound (SMART) goals
-- Break down complex objectives into manageable phases and milestones
-- Consider dependencies between tasks and potential risks
-- Include resource requirements and success criteria
-- Be explicit about whether you're creating new or updating existing content
-- Preserve valuable information from existing plans unless specifically asked to remove it
-
-"""
-        + (
-            "USER INTERACTION - REDUCE UNCERTAINTY:"
-            if ctx.deps.interactive_mode
-            else "NON-INTERACTIVE MODE - MAKE REASONABLE ASSUMPTIONS:"
-        )
-        + """
-"""
-        + (
-            """- ALWAYS ask clarifying questions when the goal is vague or ambiguous
-- Use ask_user tool frequently to gather specific details about:
-  - Project scope and boundaries
-  - Target timeline and deadlines
-  - Available resources and constraints
-  - Success criteria and measurable outcomes
-  - Technology preferences or requirements
-  - Target audience or users
-  - Budget considerations
-  - Risk tolerance and priorities
-- Ask follow-up questions to drill down into specifics
-- Don't assume - ask for confirmation of your understanding
-- Better to ask 2-3 targeted questions than create a generic plan
-- Confirm major changes to existing plans before proceeding"""
-            if ctx.deps.interactive_mode
-            else """- Make reasonable assumptions based on industry best practices
-- Use sensible defaults when specific details are not provided
-- Focus on creating a practical, actionable plan
-- Include common project phases and considerations
-- Assume standard timelines and resource allocations"""
-        )
-        + """
-
-IMPORTANT RULES:
-- Make at most 1 plan file write per request
-- Always base plans on available research when relevant
-- Create actionable, specific steps rather than vague suggestions
-- Consider feasibility and prioritize high-impact actions
-- Be concise but comprehensive
-"""
-        + (
-            "- When in doubt about any aspect of the goal, ASK before proceeding"
-            if ctx.deps.interactive_mode
-            else "- When in doubt, make reasonable assumptions and proceed with best practices"
-        )
+    return prompt_loader.render(
+        "agents/plan.j2", interactive_mode=ctx.deps.interactive_mode, context="plans"
     )
 
 

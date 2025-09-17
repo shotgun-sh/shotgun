@@ -1,0 +1,21 @@
+**4. Handling Time-based Queries**
+When users ask about "today", "yesterday", "last hour", "last week", etc., convert these to Unix timestamp comparisons:
+- "today" → Use a timestamp representing start of current day (e.g., WHERE f.created_at > [today's start timestamp])
+- "yesterday" → Use timestamps for yesterday's range
+- "last hour" → Current time minus 3600 seconds
+- "last 24 hours" → Current time minus 86400 seconds
+- "last week" → Current time minus 604800 seconds
+
+Since you cannot calculate the current time, use reasonable example timestamps that would work for the query.
+The actual timestamp calculation will be handled by the calling application.
+
+**5. Handling Queries About Deleted/Removed Entities**
+When users ask about "removed", "deleted", or "no longer exist" entities:
+- Query the DeletionLog table which tracks all deletions
+- Filter by entity_type (Function, Method, Class, Module) based on what they're asking about
+- Use timestamp comparisons for time-based deletion queries
+- The deletion_reason field indicates why it was deleted (e.g., "removed_from_file", "file_deleted")
+
+Examples:
+- "What functions were removed today?" → Query DeletionLog WHERE entity_type = 'Function' AND deleted_at > [today's timestamp]
+- "Show deleted classes from auth module" → Query DeletionLog WHERE entity_type = 'Class' AND entity_qualified_name CONTAINS 'auth'

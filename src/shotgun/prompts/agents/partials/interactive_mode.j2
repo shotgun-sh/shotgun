@@ -1,0 +1,8 @@
+{% if not interactive_mode -%}
+
+IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).
+- You cannot ask clarifying questions using ask_user tool
+- Make reasonable assumptions based on best practices
+- Use sensible defaults when information is missing
+- Focus on creating minimal but functional {{ context }}
+{% endif %}

@@ -14,7 +14,6 @@ from shotgun.agents.common import (
     create_usage_limits,
     ensure_file_exists,
     get_file_history,
-    get_interactive_note,
     register_common_tools,
 )
 from shotgun.agents.config.models import ModelConfig, ProviderType
@@ -106,31 +105,37 @@ class TestEnsureFileExists:
             assert result == "# Error Header\n\n"
 
 
-class TestGetInteractiveNote:
-    """Test suite for get_interactive_note function."""
+class TestPromptTemplateIntegration:
+    """Test suite for prompt template integration."""
 
-    def test_interactive_mode_returns_empty(self):
-        """Test interactive mode returns empty string."""
-        result = get_interactive_note(True, "test context")
-        assert result == ""
+    def test_interactive_mode_template_rendering(self):
+        """Test that templates render correctly for interactive mode."""
+        from shotgun.prompts import PromptLoader
 
-    def test_non_interactive_mode_returns_note(self):
-        """Test non-interactive mode returns formatted note."""
-        context = "research output"
-        result = get_interactive_note(False, context)
+        loader = PromptLoader()
+        result = loader.render(
+            "agents/partials/interactive_mode.j2",
+            interactive_mode=True,
+            context="test context"
+        )
+        # Interactive mode should render empty (no warning)
+        assert result.strip() == ""
+
+    def test_non_interactive_mode_template_rendering(self):
+        """Test that templates render correctly for non-interactive mode."""
+        from shotgun.prompts import PromptLoader
+
+        loader = PromptLoader()
+        result = loader.render(
+            "agents/partials/interactive_mode.j2",
+            interactive_mode=False,
+            context="research output"
+        )
 
         assert "USER INTERACTION IS DISABLED" in result
         assert "non-interactive mode" in result
         assert "ask_user tool" in result
-        assert context in result
         assert "research output" in result
-
-    def test_context_is_included_in_note(self):
-        """Test that context parameter is included in the note."""
-        context = "plans"
-        result = get_interactive_note(False, context)
-
-        assert f"functional {context}" in result
 
 
 class TestRegisterCommonTools:
@@ -399,14 +404,21 @@ class TestIntegrationScenarios:
             finally:
                 os.chdir(original_cwd)
 
-    def test_interactive_note_context_variations(self):
-        """Test interactive note with various context strings."""
+    def test_template_context_variations(self):
+        """Test template rendering with various context strings."""
+        from shotgun.prompts import PromptLoader
+
+        loader = PromptLoader()
         contexts = ["research output", "plans", "task lists", "documentation"]
 
         for context in contexts:
-            note = get_interactive_note(False, context)
-            assert context in note
-            assert "USER INTERACTION IS DISABLED" in note
+            result = loader.render(
+                "agents/partials/interactive_mode.j2",
+                interactive_mode=False,
+                context=context
+            )
+            assert context in result
+            assert "USER INTERACTION IS DISABLED" in result
 
     def test_usage_limits_consistency(self):
         """Test that usage limits are consistent across multiple calls."""

@@ -5,42 +5,55 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from shotgun.codebase.core.nl_query import GRAPH_SCHEMA_AND_RULES, generate_cypher
+from shotgun.codebase.core.nl_query import generate_cypher
+from shotgun.prompts import PromptLoader
 
 
-def test_graph_schema_and_rules_content():
-    """Test that GRAPH_SCHEMA_AND_RULES contains expected schema information."""
-    assert "Node Labels and Their Key Properties" in GRAPH_SCHEMA_AND_RULES
-    assert "Project:" in GRAPH_SCHEMA_AND_RULES
-    assert "Package:" in GRAPH_SCHEMA_AND_RULES
-    assert "Module:" in GRAPH_SCHEMA_AND_RULES
-    assert "Class:" in GRAPH_SCHEMA_AND_RULES
-    assert "Function:" in GRAPH_SCHEMA_AND_RULES
-    assert "Method:" in GRAPH_SCHEMA_AND_RULES
-    assert "Relationships" in GRAPH_SCHEMA_AND_RULES
-    assert "CONTAINS_PACKAGE" in GRAPH_SCHEMA_AND_RULES
-    assert "DEFINES" in GRAPH_SCHEMA_AND_RULES
-    assert "INHERITS" in GRAPH_SCHEMA_AND_RULES
-    assert "CALLS" in GRAPH_SCHEMA_AND_RULES
+def test_graph_schema_template_content():
+    """Test that graph schema template contains expected schema information."""
+    loader = PromptLoader()
+    schema_content = loader.render("codebase/partials/graph_schema.j2")
+
+    assert "Node Labels and Their Key Properties" in schema_content
+    assert "Project:" in schema_content
+    assert "Package:" in schema_content
+    assert "Module:" in schema_content
+    assert "Class:" in schema_content
+    assert "Function:" in schema_content
+    assert "Method:" in schema_content
+    assert "Relationships" in schema_content
+    assert "CONTAINS_PACKAGE" in schema_content
+    assert "DEFINES" in schema_content
+    assert "INHERITS" in schema_content
+    assert "CALLS" in schema_content
 
 
 def test_graph_schema_includes_file_extensions():
     """Test that schema includes file extension information."""
-    assert "extension includes the dot" in GRAPH_SCHEMA_AND_RULES
-    assert '".ts"' in GRAPH_SCHEMA_AND_RULES
-    assert '".py"' in GRAPH_SCHEMA_AND_RULES
-    assert '".js"' in GRAPH_SCHEMA_AND_RULES
+    loader = PromptLoader()
+    schema_content = loader.render("codebase/partials/graph_schema.j2")
+
+    assert "extension includes the dot" in schema_content
+    assert '".ts"' in schema_content
+    assert '".py"' in schema_content
+    assert '".js"' in schema_content
 
 
 def test_graph_schema_includes_qualified_names():
     """Test that schema includes qualified name information."""
-    assert "qualified_name: string" in GRAPH_SCHEMA_AND_RULES
+    loader = PromptLoader()
+    schema_content = loader.render("codebase/partials/graph_schema.j2")
+
+    assert "qualified_name: string" in schema_content
 
 
 def test_graph_schema_includes_line_numbers():
     """Test that schema includes line number information."""
-    assert "line_start: int" in GRAPH_SCHEMA_AND_RULES
-    assert "line_end: int" in GRAPH_SCHEMA_AND_RULES
+    loader = PromptLoader()
+    schema_content = loader.render("codebase/partials/graph_schema.j2")
+
+    assert "line_start: int" in schema_content
+    assert "line_end: int" in schema_content
 
 
 @pytest.mark.asyncio
@@ -446,6 +459,9 @@ async def test_generate_cypher_relationship_query():
 
 def test_graph_schema_completeness():
     """Test that graph schema includes all necessary node types."""
+    loader = PromptLoader()
+    schema_content = loader.render("codebase/partials/graph_schema.j2")
+
     required_nodes = [
         "Project",
         "Package",
@@ -461,11 +477,14 @@ def test_graph_schema_completeness():
     ]
 
     for node_type in required_nodes:
-        assert f"{node_type}:" in GRAPH_SCHEMA_AND_RULES
+        assert f"{node_type}:" in schema_content
 
 
 def test_graph_schema_relationship_completeness():
     """Test that graph schema includes all necessary relationship types."""
+    loader = PromptLoader()
+    schema_content = loader.render("codebase/partials/graph_schema.j2")
+
     required_relationships = [
         "CONTAINS_PACKAGE",
         "CONTAINS_FOLDER",
@@ -480,7 +499,7 @@ def test_graph_schema_relationship_completeness():
     ]
 
     for rel_type in required_relationships:
-        assert rel_type in GRAPH_SCHEMA_AND_RULES
+        assert rel_type in schema_content
 
 
 @pytest.mark.asyncio

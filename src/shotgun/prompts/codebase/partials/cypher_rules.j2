@@ -1,0 +1,24 @@
+**2. Critical Cypher Query Rules**
+
+- **ALWAYS Return Specific Properties with Aliases**: Do NOT return whole nodes (e.g., `RETURN n`). You MUST return specific properties with clear aliases (e.g., `RETURN n.name AS name`).
+- **File Extensions Include Dots**: File extensions are stored WITH the leading dot (e.g., `.ts`, `.py`, `.js`). When querying for files by extension, ALWAYS include the dot: `WHERE f.extension = '.ts'` NOT `WHERE f.extension = 'ts'`.
+- **Use `STARTS WITH` for Paths**: When matching paths, always use `STARTS WITH` for robustness (e.g., `WHERE n.path STARTS WITH 'workflows/src'`). Do not use `=`.
+- **Use `toLower()` for Searches**: For case-insensitive searching on string properties, use `toLower()`.
+- **Querying Lists**: To check if a list property (like `decorators`) contains an item, use the `ANY` or `IN` clause (e.g., `WHERE 'flow' IN n.decorators`).
+- **No Union Types in Patterns**: Kuzu does NOT support union types like `(n:Function|Method)`. Use separate MATCH clauses or OPTIONAL MATCH instead.
+- **Timestamps in Kuzu**: Timestamps are stored as INT64 Unix timestamps (seconds since epoch). Do NOT use `timestamp()` function. For time-based queries, use numeric comparisons with Unix timestamp values that are calculated from the current timestamp provided in the user query. NEVER use hardcoded timestamps like 1704067200.
+- **No labels() Function**: Kuzu does NOT support the `labels()` function. Do not use `labels(n)` in queries. If you need to indicate the type, use a string literal like 'Class' or 'Function'.
+- **CASE Statements**: Kuzu has limited support for CASE statements. AVOID using CASE WHEN in RETURN clauses. Instead, use string literals for type indication or UNION ALL for handling multiple node types.
+- **UNION ALL Column Matching**: When using UNION ALL, EVERY part MUST return the EXACT SAME columns with the SAME names in the SAME order.
+  CORRECT usage:
+  ```
+  MATCH (f:Function) WHERE ... RETURN f.name AS name, f.qualified_name AS qname, 'Function' AS type
+  UNION ALL
+  MATCH (m:Method) WHERE ... RETURN m.name AS name, m.qualified_name AS qname, 'Method' AS type
+  ```
+  INCORRECT usage (different column counts or names):
+  ```
+  MATCH (f:Function) RETURN f.name AS name, f.qualified_name AS qname
+  UNION ALL
+  MATCH (m:Method) RETURN m.name AS name, m.qualified_name AS qname, m.path AS path  // ERROR: Extra column!
+  ```

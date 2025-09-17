@@ -1,0 +1,221 @@
+**Pattern: Finding All Classes**
+```cypher
+// "Find all Python classes" or "list all classes" or "show me all classes"
+MATCH (c:Class)
+RETURN c.name AS name, c.qualified_name AS qualified_name, 'Class' AS type
+ORDER BY c.name
+```
+
+**Pattern: Finding Classes with Path Information**
+```cypher
+// "Find Python classes with their file paths" or "show classes and where they are defined"
+MATCH (m:Module)-[:DEFINES]->(c:Class)
+RETURN c.name AS name, c.qualified_name AS qualified_name, m.path AS module_path, 'Class' AS type
+ORDER BY m.path, c.name
+```
+
+**Pattern: Finding Decorated Functions/Methods (e.g., Workflows, Tasks)**
+```cypher
+// "Find all prefect flows" or "what are the workflows?" or "show me the tasks"
+// Use separate MATCH clauses since Kuzu doesn't support union types
+MATCH (n:Function)
+WHERE ANY(d IN n.decorators WHERE toLower(d) IN ['flow', 'task'])
+RETURN n.name AS name, n.qualified_name AS qualified_name, 'Function' AS type
+UNION ALL
+MATCH (n:Method)
+WHERE ANY(d IN n.decorators WHERE toLower(d) IN ['flow', 'task'])
+RETURN n.name AS name, n.qualified_name AS qualified_name, 'Method' AS type
+```
+
+**Pattern: Finding Content by Path (Using UNION ALL for Different Types)**
+```cypher
+// "what is in the 'workflows/src' directory?" or "list files in workflows"
+// Use separate queries with UNION ALL to handle different node types
+MATCH (n:Module)
+WHERE n.path STARTS WITH 'workflows'
+RETURN n.name AS name, n.path AS path, 'Module' AS type
+UNION ALL
+MATCH (n:File)
+WHERE n.path STARTS WITH 'workflows'
+RETURN n.name AS name, n.path AS path, 'File' AS type
+UNION ALL
+MATCH (n:Folder)
+WHERE n.path STARTS WITH 'workflows'
+RETURN n.name AS name, n.path AS path, 'Folder' AS type
+```
+
+**Pattern: Keyword & Concept Search (Fallback for general terms)**
+```cypher
+// "find things related to 'database'"
+MATCH (n)
+WHERE toLower(n.name) CONTAINS 'database' OR (n.qualified_name IS NOT NULL AND toLower(n.qualified_name) CONTAINS 'database')
+```
+
+**Pattern: Time-based Queries (IMPORTANT: Use actual timestamps from user query)**
+```cypher
+// "What functions were added in the last 2 minutes?" when current timestamp is provided
+MATCH (f:Function)
+WHERE f.created_at > [current_timestamp - 120]  // This is current_timestamp - 120
+RETURN f.name AS name, f.qualified_name AS qualified_name, f.created_at AS created_timestamp
+ORDER BY f.created_at DESC
+```
+
+```cypher
+// "What classes were modified today?" when current timestamp is provided
+MATCH (c:Class)
+WHERE c.updated_at >= [today's start timestamp]  // This is today's start
+RETURN c.name AS name, c.qualified_name AS qualified_name, c.updated_at AS updated_timestamp
+ORDER BY c.updated_at DESC
+```
+
+**Pattern: Finding Files by Extension**
+```cypher
+// "Find all TypeScript files" or "show me .ts files"
+// IMPORTANT: File extensions are stored WITH the dot (e.g., ".ts" not "ts")
+MATCH (f:File)
+WHERE f.extension = '.ts'
+RETURN f.path AS path, f.name AS name, f.extension AS extension, 'File' AS type
+ORDER BY f.path
+```
+
+```cypher
+// "Find JavaScript and TypeScript files"
+MATCH (f:File)
+WHERE f.extension IN ['.js', '.ts', '.jsx', '.tsx']
+RETURN f.path AS path, f.name AS name, f.extension AS extension, 'File' AS type
+ORDER BY f.path
+```
+
+**Pattern: Finding a Specific File**
+```cypher
+// "Find the main README.md"
+MATCH (f:File) WHERE toLower(f.name) = 'readme.md' AND f.path = 'README.md'
+RETURN f.path as path, f.name as name, 'File' as type
+```
+
+**Pattern: Finding Classes in a Specific Directory**
+```cypher
+// "Find classes in the server directory"
+MATCH (m:Module)-[:DEFINES]->(c:Class)
+WHERE m.path STARTS WITH 'server/'
+RETURN c.name AS name, c.qualified_name AS qualified_name, 'Class' AS type
+```
+
+**Pattern: Finding Modules with Most Classes**
+```cypher
+// "Find modules that define the most classes"
+MATCH (m:Module)-[:DEFINES]->(c:Class)
+WITH m, count(c) AS class_count
+ORDER BY class_count DESC
+LIMIT 10
+RETURN m.name AS name, m.qualified_name AS qualified_name, m.path AS path, class_count
+```
+
+**Pattern: Finding Classes with Method Counts**
+```cypher
+// "Find classes with more than N methods" or "Show me classes that have at least X methods"
+MATCH (c:Class)-[:DEFINES_METHOD]->(m:Method)
+WITH c, count(m) AS method_count
+WHERE method_count > 10  // Replace 10 with the actual number from query
+RETURN c.name AS name, c.qualified_name AS qualified_name, method_count
+ORDER BY method_count DESC
+```
+
+**Pattern: Finding Classes with Inheritance (Note: INHERITS relationships must exist)**
+```cypher
+// "Find classes with children/subclasses"
+// This will return NO results if no inheritance relationships exist in the graph
+MATCH (child:Class)-[:INHERITS]->(parent:Class)
+WITH parent, count(child) AS child_count
+ORDER BY child_count DESC
+LIMIT 10
+RETURN parent.name AS name, parent.qualified_name AS qualified_name, child_count
+```
+
+**Pattern: Finding Parent Classes of a Specific Class**
+```cypher
+// "What are the parent classes of DeputyAgent?" or "What does DeputyAgent inherit from?"
+// Use name for short class names (when user doesn't provide full path)
+MATCH (child:Class)-[:INHERITS]->(parent:Class)
+WHERE toLower(child.name) = 'deputyagent'
+RETURN parent.name AS name, parent.qualified_name AS qualified_name
+```
+
+**Pattern: Finding Methods of a Specific Class**
+```cypher
+// "What methods does WebSocketServer have?" or "List methods in WebSocketServer class"
+// When user provides just the class name without full path
+MATCH (c:Class)-[:DEFINES_METHOD]->(m:Method)
+WHERE c.name = 'WebSocketServer'
+RETURN m.name AS name, m.qualified_name AS qualified_name, 'Method' AS type
+ORDER BY m.name
+```
+
+**Pattern: Finding a Specific Entity by Full Qualified Name**
+```cypher
+// "Find shotgun.server.WebSocketServer" or "Show me api.websocket.server.WebSocketServer"
+// When user provides a dotted path, match against qualified_name
+MATCH (c:Class)
+WHERE c.qualified_name = 'shotgun2.server.src.shotgun.api.websocket.server.WebSocketServer'
+RETURN c.name AS name, c.qualified_name AS qualified_name, 'Class' AS type
+```
+
+**Pattern: Finding Recently Added/Modified Code**
+```cypher
+// "Find functions added in the last 24 hours" or "What new functions were added today?"
+// Note: In Kuzu, use Unix timestamps directly (seconds since epoch)
+// Example: 1704067200 represents 2024-01-01 00:00:00 UTC
+// For "today": use timestamp from start of current day
+// For "last 24 hours": use current_timestamp - 86400
+MATCH (f:Function)
+WHERE f.created_at > [current_timestamp - 86400]  // Replace with actual timestamp for "24 hours ago"
+RETURN f.name AS name, f.qualified_name AS qualified_name, f.created_at AS created_timestamp
+ORDER BY f.created_at DESC
+```
+
+**Pattern: Finding Files Modified Recently**
+```cypher
+// "Find files modified today" or "Which files changed in the last hour?"
+// For "last hour": use current_timestamp - 3600
+// For "today": use timestamp from start of current day
+MATCH (fm:FileMetadata)
+WHERE fm.mtime > [current_timestamp - 3600]  // Replace with actual timestamp
+RETURN fm.filepath AS path, fm.mtime AS last_modified
+ORDER BY fm.mtime DESC
+```
+
+**Pattern: Queries About Deleted/Removed Entities**
+```cypher
+// "What functions were deleted/removed?" or "Show me classes that no longer exist"
+// Query the DeletionLog table for tracking removed entities
+MATCH (d:DeletionLog)
+WHERE d.entity_type = 'Function' AND d.deleted_at > [current_timestamp - 86400]  // Replace with timestamp for time range
+RETURN d.entity_qualified_name AS name, d.deleted_from_file AS file, d.deleted_at AS deleted_at, d.deletion_reason AS reason
+ORDER BY d.deleted_at DESC
+```
+
+**Pattern: Finding Where a Method/Function is Called**
+```cypher
+// "where is WebSocketServer.start called?" or "find callers of method X"
+// For partial names like 'WebSocketServer.start', use ENDS WITH pattern
+MATCH (caller:Method)-[:CALLS]->(target:Method)
+WHERE target.qualified_name ENDS WITH '.WebSocketServer.start'
+RETURN caller.name AS name, caller.qualified_name AS qualified_name, 'Method' AS caller_type
+UNION ALL
+MATCH (caller:Function)-[:CALLS]->(target:Method)
+WHERE target.qualified_name ENDS WITH '.WebSocketServer.start'
+RETURN caller.name AS name, caller.qualified_name AS qualified_name, 'Function' AS caller_type
+```
+
+**Pattern: Finding What a Method/Function Calls**
+```cypher
+// "what does WebSocketServer.start call?" or "what methods does X invoke?"
+// Use ENDS WITH for partial names, UNION ALL to handle different target types
+MATCH (source:Method)-[:CALLS]->(target:Method)
+WHERE source.qualified_name ENDS WITH '.WebSocketServer.start'
+RETURN target.name AS name, target.qualified_name AS qualified_name, 'Method' AS target_type
+UNION ALL
+MATCH (source:Method)-[:CALLS]->(target:Function)
+WHERE source.qualified_name ENDS WITH '.WebSocketServer.start'
+RETURN target.name AS name, target.qualified_name AS qualified_name, 'Function' AS target_type
+```

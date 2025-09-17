@@ -1,0 +1,28 @@
+**1. Graph Schema Definition**
+The database contains information about a codebase, structured with the following nodes and relationships.
+
+Node Labels and Their Key Properties:
+- Project: {name: string}
+- Package: {qualified_name: string, name: string, path: string}
+- Folder: {path: string, name: string}
+- File: {path: string, name: string, extension: string}  // Note: extension includes the dot (e.g., ".ts", ".py", ".js")
+- FileMetadata: {filepath: string, mtime: int64, hash: string, last_updated: int64}
+- Module: {qualified_name: string, name: string, path: string, created_at: int64, updated_at: int64}
+- Class: {qualified_name: string, name: string, decorators: list[string], line_start: int, line_end: int, created_at: int64, updated_at: int64}
+- Function: {qualified_name: string, name: string, decorators: list[string], line_start: int, line_end: int, created_at: int64, updated_at: int64}
+- Method: {qualified_name: string, name: string, decorators: list[string], line_start: int, line_end: int, created_at: int64, updated_at: int64}
+- ExternalPackage: {name: string, version_spec: string}
+- DeletionLog: {id: string, entity_type: string, entity_qualified_name: string, deleted_from_file: string, deleted_at: int64, deletion_reason: string}
+
+Relationships (source)-[REL_TYPE]->(target):
+- (Project|Package|Folder) -[:CONTAINS_PACKAGE|CONTAINS_FOLDER|CONTAINS_FILE|CONTAINS_MODULE]-> (various)
+- Module -[:DEFINES]-> (Class|Function)
+- Class -[:DEFINES_METHOD]-> Method
+- (Child Class) -[:INHERITS]-> (Parent Class)
+- Method -[:OVERRIDES]-> Method
+- Project -[:DEPENDS_ON_EXTERNAL]-> ExternalPackage
+- (Function|Method) -[:CALLS]-> (Function|Method)
+- FileMetadata -[:TRACKS_Module]-> Module
+- FileMetadata -[:TRACKS_Class]-> Class
+- FileMetadata -[:TRACKS_Function]-> Function
+- FileMetadata -[:TRACKS_Method]-> Method

@@ -1,0 +1,10 @@
+Current datetime: {{ current_datetime }} (Unix timestamp: {{ current_timestamp }})
+
+User query: {{ natural_language_query }}
+
+IMPORTANT: All timestamps in the database are stored as Unix timestamps (INT64). When generating time-based queries:
+- For "2 minutes ago": use {{ current_timestamp - 120 }}
+- For "1 hour ago": use {{ current_timestamp - 3600 }}
+- For "today": use timestamps >= {{ current_timestamp - (current_timestamp % 86400) }}
+- For "yesterday": use timestamps between {{ current_timestamp - 86400 - (current_timestamp % 86400) }} and {{ current_timestamp - (current_timestamp % 86400) }}
+- NEVER use placeholder values like 1704067200, always calculate based on the current timestamp: {{ current_timestamp }}

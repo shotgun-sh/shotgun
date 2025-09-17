@@ -59,28 +59,6 @@ def ensure_file_exists(filename: str, header: str) -> str:
         return f"{header}\n\n"
 
 
-def get_interactive_note(interactive_mode: bool, context: str) -> str:
-    """Generate interactive mode note for system prompts.
-
-    Args:
-        interactive_mode: Whether user interaction is enabled
-        context: Context-specific text (e.g., "research output", "plans")
-
-    Returns:
-        Formatted note for system prompt
-    """
-    if interactive_mode:
-        return ""
-
-    return f"""
-IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).
-- You cannot ask clarifying questions using ask_user tool
-- Make reasonable assumptions based on best practices
-- Use sensible defaults when information is missing
-- Focus on creating minimal but functional {context}
-"""
-
-
 def register_common_tools(
     agent: Agent[AgentDeps], additional_tools: list[Any], interactive_mode: bool
 ) -> None:
