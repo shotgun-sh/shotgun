@@ -26,3 +26,7 @@ ModeIndicator {
 #window {
   align: left bottom;
 }
+
+.hidden {
+  display: none;
+}

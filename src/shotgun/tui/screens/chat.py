@@ -146,7 +146,7 @@ class StatusBar(Widget):
     """
 
     def render(self) -> str:
-        return """[$foreground-muted]Press [bold $text]Enter[/] to send • [bold $text]Ctrl+P[/] for command palette • /help for commands[/]"""
+        return """[$foreground-muted][bold $text]enter[/] to send • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
 
 
 class ModeIndicator(Widget):
@@ -284,12 +284,13 @@ class ChatScreen(Screen[None]):
 
     BINDINGS = [
         ("ctrl+p", "command_palette", "Command Palette"),
+        ("shift+tab", "toggle_mode", "Toggle mode"),
     ]
 
     COMMANDS = {AgentModeProvider, ProviderSetupProvider}
 
     value = reactive("")
-    mode = reactive(AgentType.RESEARCH, recompose=True)
+    mode = reactive(AgentType.RESEARCH)
     history: PromptHistory = PromptHistory()
     messages = reactive(list[ModelMessage]())
     working = reactive(False)
@@ -314,13 +315,19 @@ class ChatScreen(Screen[None]):
 
     def watch_mode(self, new_mode: AgentType) -> None:
         """React to mode changes by updating the agent manager."""
-        if hasattr(self, "agent_manager"):
+
+        if self.is_mounted:
             self.agent_manager.set_agent(new_mode)
+
+            mode_indicator = self.query_one(ModeIndicator)
+            mode_indicator.mode = new_mode
+            mode_indicator.refresh()
 
     def watch_working(self, is_working: bool) -> None:
         """Show or hide the spinner based on working state."""
         if self.is_mounted:
             spinner = self.query_one("#spinner")
+            spinner.set_classes("" if is_working else "hidden")
             spinner.display = is_working
 
     def watch_messages(self, messages: list[ModelMessage]) -> None:
@@ -340,6 +347,13 @@ class ChatScreen(Screen[None]):
                 question_display.update("")
                 question_display.display = False
 
+    def action_toggle_mode(self) -> None:
+        modes = [AgentType.RESEARCH, AgentType.PLAN, AgentType.TASKS]
+        self.mode = modes[(modes.index(self.mode) + 1) % len(modes)]
+        self.agent_manager.set_agent(self.mode)
+        # whoops it actually changes focus. Let's be brutal for now
+        self.call_later(lambda: self.query_one(PromptInput).focus())
+
     @work
     async def add_question_listener(self) -> None:
         while True:
@@ -355,7 +369,11 @@ class ChatScreen(Screen[None]):
             yield Markdown(markdown="", id="question-display")
             yield self.agent_manager
             with Container(id="footer"):
-                yield Spinner(text="Processing...", id="spinner")
+                yield Spinner(
+                    text="Processing...",
+                    id="spinner",
+                    classes="" if self.working else "hidden",
+                )
                 yield StatusBar()
                 yield PromptInput(
                     text=self.value,
