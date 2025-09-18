@@ -1,14 +1,16 @@
-"""Web search tool for Pydantic AI agents."""
+"""OpenAI web search tool implementation."""
 
 from openai import OpenAI
 from opentelemetry import trace
 
+from shotgun.agents.config import get_provider_model
+from shotgun.agents.config.models import ProviderType
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def web_search_tool(query: str) -> str:
+def openai_web_search_tool(query: str) -> str:
     """Perform a web search and return results.
 
     This tool uses OpenAI's web search capabilities to find current information
@@ -20,15 +22,25 @@ def web_search_tool(query: str) -> str:
     Returns:
         Search results as a formatted string
     """
-    logger.debug("🔧 Invoking web_search_tool with query: %s", query)
+    logger.debug("🔧 Invoking OpenAI web_search_tool with query: %s", query)
 
     span = trace.get_current_span()
     span.set_attribute("input.value", f"**Query:** {query}\n")
 
     try:
-        logger.debug("📡 Executing web search with prompt: %s", query)
+        logger.debug("📡 Executing OpenAI web search with prompt: %s", query)
 
-        client = OpenAI()
+        # Get API key from centralized configuration
+        try:
+            model_config = get_provider_model(ProviderType.OPENAI)
+            api_key = model_config.api_key
+        except ValueError as e:
+            error_msg = f"OpenAI API key not configured: {str(e)}"
+            logger.error("❌ %s", error_msg)
+            span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
+            return error_msg
+
+        client = OpenAI(api_key=api_key)
         response = client.responses.create(  # type: ignore[call-overload]
             model="gpt-5-mini",
             input=[

@@ -35,8 +35,9 @@ async def llm_cypher_prompt(system_prompt: str, user_prompt: str) -> str:
         The generated Cypher query as a string
     """
     model_config = get_provider_model()
+    # Use the Model instance directly (has API key baked in)
     query_cypher_response = await model_request(
-        model=model_config.pydantic_model_name,
+        model=model_config.model_instance,
         messages=[
             ModelRequest(
                 parts=[

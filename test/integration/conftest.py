@@ -194,6 +194,7 @@ def check_llm_configuration():
 def pytest_runtest_setup(item):
     """Setup for individual test runs."""
     # Skip tests that require LLM if not configured
+    # Exception: tests that explicitly test "without_api_key" scenarios should always run
     if "integration" in item.keywords:
-        if not check_llm_configuration():
+        if "without_api_key" not in item.name and not check_llm_configuration():
             pytest.skip("LLM not configured - skipping integration test")

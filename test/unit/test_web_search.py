@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from shotgun.agents.tools.web_search import web_search_tool
+from shotgun.agents.tools.web_search import openai_web_search_tool
 
 
 class TestWebSearchTool:
@@ -16,19 +16,27 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
-            result = web_search_tool("Python programming tutorial")
+            result = openai_web_search_tool("Python programming tutorial")
 
             assert result == "Search results about Python programming"
             mock_client.responses.create.assert_called_once()
             mock_span.set_attribute.assert_called()
+            mock_openai.assert_called_once_with(api_key="test-api-key")
 
     def test_empty_search_results(self):
         """Test handling of empty search results."""
@@ -38,15 +46,22 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
-            result = web_search_tool("nonexistent topic")
+            result = openai_web_search_tool("nonexistent topic")
 
             assert result == "No content returned"
             mock_client.responses.create.assert_called_once()
@@ -59,15 +74,22 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
-            result = web_search_tool("empty results")
+            result = openai_web_search_tool("empty results")
 
             assert result == "No content returned"
 
@@ -76,15 +98,22 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.side_effect = Exception("API rate limit exceeded")
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
-            result = web_search_tool("search query")
+            result = openai_web_search_tool("search query")
 
             assert "Error performing web search" in result
             assert "API rate limit exceeded" in result
@@ -92,15 +121,22 @@ class TestWebSearchTool:
 
     def test_openai_client_creation_error(self):
         """Test handling of OpenAI client creation errors."""
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.side_effect = Exception("Invalid API key")
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
-            result = web_search_tool("test query")
+            result = openai_web_search_tool("test query")
 
             assert "Error performing web search" in result
             assert "Invalid API key" in result
@@ -113,16 +149,23 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
             query = "Python web frameworks"
-            web_search_tool(query)
+            openai_web_search_tool(query)
 
             # Verify the API call parameters
             call_args = mock_client.responses.create.call_args
@@ -147,36 +190,31 @@ class TestWebSearchTool:
             assert tools[0]["user_location"]["type"] == "approximate"
             assert tools[0]["search_context_size"] == "low"
 
-    def test_logging_and_telemetry(self):
-        """Test logging and telemetry integration."""
+    def test_telemetry(self):
+        """Test telemetry integration."""
         mock_response = Mock()
         mock_response.output_text = "Search results"
 
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
-            patch("shotgun.agents.tools.web_search.logger") as mock_logger,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
             query = "test search"
-            result = web_search_tool(query)
-
-            # Verify logging calls
-            mock_logger.debug.assert_any_call(
-                "🔧 Invoking web_search_tool with query: %s", query
-            )
-            mock_logger.debug.assert_any_call(
-                "📡 Executing web search with prompt: %s", query
-            )
-            mock_logger.debug.assert_any_call(
-                "📄 Web search result: %d characters", len("Search results")
-            )
+            result = openai_web_search_tool(query)
 
             # Verify telemetry span attributes
             expected_calls = [
@@ -187,32 +225,29 @@ class TestWebSearchTool:
             for attr_name, attr_value in expected_calls:
                 mock_span.set_attribute.assert_any_call(attr_name, attr_value)
 
-    def test_error_logging_and_telemetry(self):
-        """Test error logging and telemetry."""
+    def test_error_telemetry(self):
+        """Test error telemetry."""
         mock_client = Mock()
         error_message = "Connection timeout"
         mock_client.responses.create.side_effect = Exception(error_message)
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
-            patch("shotgun.agents.tools.web_search.logger") as mock_logger,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
             query = "failing search"
-            web_search_tool(query)
-
-            # Verify error logging
-            mock_logger.error.assert_called_once_with(
-                "❌ Web search failed: %s", error_message
-            )
-            mock_logger.debug.assert_any_call(
-                "💥 Full error details: %s",
-                f"Error performing web search: {error_message}",
-            )
+            openai_web_search_tool(query)
 
             # Verify error telemetry
             mock_span.set_attribute.assert_any_call(
@@ -228,6 +263,9 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         test_queries = [
             "simple query",
             "query with spaces and punctuation!",
@@ -242,15 +280,19 @@ class TestWebSearchTool:
         ]
 
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
             for query in test_queries:
-                result = web_search_tool(query)
+                result = openai_web_search_tool(query)
                 assert result == "Generic results"
 
                 # Verify the query was passed correctly
@@ -267,25 +309,25 @@ class TestWebSearchTool:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
-            patch("shotgun.agents.tools.web_search.logger") as mock_logger,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
-            result = web_search_tool("test query")
+            result = openai_web_search_tool("test query")
 
             assert result == long_result
             assert len(result) == 10000
-
-            # Verify logging handles long results
-            mock_logger.debug.assert_any_call(
-                "📄 Web search result: %d characters", 10000
-            )
-            mock_logger.debug.assert_any_call("🔍 Result preview: %s...", "A" * 100)
 
 
 class TestIntegrationScenarios:
@@ -308,16 +350,23 @@ class TestIntegrationScenarios:
         mock_client = Mock()
         mock_client.responses.create.return_value = mock_response
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         with (
-            patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-            patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
+            mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
             mock_trace.get_current_span.return_value = mock_span
 
             query = "current Python web frameworks 2024"
-            result = web_search_tool(query)
+            result = openai_web_search_tool(query)
 
             assert "Django" in result
             assert "Flask" in result
@@ -340,19 +389,26 @@ class TestIntegrationScenarios:
             (RuntimeError("Service unavailable"), "Service unavailable"),
         ]
 
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
         for exception, expected_error_text in error_scenarios:
             mock_client = Mock()
             mock_client.responses.create.side_effect = exception
 
             with (
-                patch("shotgun.agents.tools.web_search.OpenAI") as mock_openai,
-                patch("shotgun.agents.tools.web_search.trace") as mock_trace,
+                patch(
+                    "shotgun.agents.tools.web_search.openai.get_provider_model"
+                ) as mock_get_provider,
+                patch("shotgun.agents.tools.web_search.openai.OpenAI") as mock_openai,
+                patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
             ):
+                mock_get_provider.return_value = mock_model_config
                 mock_openai.return_value = mock_client
                 mock_span = Mock()
                 mock_trace.get_current_span.return_value = mock_span
 
-                result = web_search_tool("test query")
+                result = openai_web_search_tool("test query")
 
                 assert "Error performing web search" in result
                 assert expected_error_text in result

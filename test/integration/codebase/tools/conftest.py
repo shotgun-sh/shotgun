@@ -1,13 +1,14 @@
 """Configuration and shared fixtures for codebase tools integration tests."""
 
 import asyncio
+import os
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from pydantic_ai import Agent, RunContext
 
-from shotgun.agents.config.models import CLAUDE_3_5_SONNET
+from shotgun.agents.config.models import ModelConfig, ProviderType
 from shotgun.agents.models import AgentDeps, AgentRuntimeOptions
 from shotgun.agents.tools.codebase import (
     codebase_shell,
@@ -235,10 +236,18 @@ def agent_deps(codebase_service: CodebaseService, temp_storage_dir: Path) -> Age
         working_directory=temp_storage_dir,
     )
 
-    # Use Claude 3.5 Sonnet for testing (fast and reliable)
+    # Create ModelConfig for testing
+    model_config = ModelConfig(
+        name="claude-3-5-sonnet-latest",
+        provider=ProviderType.ANTHROPIC,
+        max_input_tokens=200_000,
+        max_output_tokens=20_000,
+        api_key=os.getenv("ANTHROPIC_API_KEY", "test-api-key"),
+    )
+
     return AgentDeps(
         **runtime_options.model_dump(),
-        llm_model=CLAUDE_3_5_SONNET,
+        llm_model=model_config,
         codebase_service=codebase_service,
     )
 
@@ -247,7 +256,7 @@ def agent_deps(codebase_service: CodebaseService, temp_storage_dir: Path) -> Age
 async def test_agent(agent_deps: AgentDeps) -> Agent:
     """Create a test agent with codebase tools registered."""
     agent = Agent(
-        model=agent_deps.llm_model.pydantic_model_name,
+        model=agent_deps.llm_model.model_instance,
         deps_type=AgentDeps,
         instrument=False,  # Disable instrumentation for tests
     )

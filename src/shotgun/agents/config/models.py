@@ -2,7 +2,8 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, PrivateAttr, SecretStr
+from pydantic_ai.models import Model
 
 
 class ProviderType(str, Enum):
@@ -13,17 +14,42 @@ class ProviderType(str, Enum):
     GOOGLE = "google"
 
 
-class ModelConfig(BaseModel):
-    """Configuration for an LLM model."""
+class ModelSpec(BaseModel):
+    """Static specification for a model - just metadata."""
 
     name: str  # Model identifier (e.g., "gpt-5", "claude-opus-4-1")
     provider: ProviderType
     max_input_tokens: int
     max_output_tokens: int
 
+
+class ModelConfig(BaseModel):
+    """A fully configured model with API key and settings."""
+
+    name: str  # Model identifier (e.g., "gpt-5", "claude-opus-4-1")
+    provider: ProviderType
+    max_input_tokens: int
+    max_output_tokens: int
+    api_key: str
+    _model_instance: Model | None = PrivateAttr(default=None)
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    @property
+    def model_instance(self) -> Model:
+        """Lazy load the Model instance."""
+        if self._model_instance is None:
+            from .provider import get_or_create_model
+
+            self._model_instance = get_or_create_model(
+                self.provider, self.name, self.api_key
+            )
+        return self._model_instance
+
     @property
     def pydantic_model_name(self) -> str:
-        """Compute the full Pydantic AI model identifier."""
+        """Compute the full Pydantic AI model identifier. For backward compatibility."""
         provider_prefix = {
             ProviderType.OPENAI: "openai",
             ProviderType.ANTHROPIC: "anthropic",
@@ -32,60 +58,39 @@ class ModelConfig(BaseModel):
         return f"{provider_prefix[self.provider]}:{self.name}"
 
 
-# OpenAI Models
-GPT_5 = ModelConfig(
-    name="gpt-5",
-    provider=ProviderType.OPENAI,
-    max_input_tokens=400_000,
-    max_output_tokens=128_000,
-)
-
-GPT_4O = ModelConfig(
-    name="gpt-4o",
-    provider=ProviderType.OPENAI,
-    max_input_tokens=128_000,
-    max_output_tokens=16_000,
-)
-
-# Anthropic Models
-CLAUDE_OPUS_4_1 = ModelConfig(
-    name="claude-opus-4-1",
-    provider=ProviderType.ANTHROPIC,
-    max_input_tokens=200_000,
-    max_output_tokens=32_000,
-)
-
-CLAUDE_3_5_SONNET = ModelConfig(
-    name="claude-3-5-sonnet-latest",
-    provider=ProviderType.ANTHROPIC,
-    max_input_tokens=200_000,
-    max_output_tokens=20_000,
-)
-
-# Google Models
-GEMINI_2_5_PRO = ModelConfig(
-    name="gemini-2.5-pro",
-    provider=ProviderType.GOOGLE,
-    max_input_tokens=1_000_000,
-    max_output_tokens=64_000,
-)
-
-# List of all available models
-AVAILABLE_MODELS = [
-    GPT_5,
-    GPT_4O,
-    CLAUDE_OPUS_4_1,
-    CLAUDE_3_5_SONNET,
-    GEMINI_2_5_PRO,
-]
-
-
-def get_model_by_name(name: str) -> ModelConfig:
-    """Find a model configuration by name."""
-    for model in AVAILABLE_MODELS:
-        if model.name == name:
-            return model
-    raise ValueError(f"Model '{name}' not found")
+# Model specifications registry (static metadata)
+MODEL_SPECS: dict[str, ModelSpec] = {
+    "gpt-5": ModelSpec(
+        name="gpt-5",
+        provider=ProviderType.OPENAI,
+        max_input_tokens=400_000,
+        max_output_tokens=128_000,
+    ),
+    "gpt-4o": ModelSpec(
+        name="gpt-4o",
+        provider=ProviderType.OPENAI,
+        max_input_tokens=128_000,
+        max_output_tokens=16_000,
+    ),
+    "claude-opus-4-1": ModelSpec(
+        name="claude-opus-4-1",
+        provider=ProviderType.ANTHROPIC,
+        max_input_tokens=200_000,
+        max_output_tokens=32_000,
+    ),
+    "claude-3-5-sonnet-latest": ModelSpec(
+        name="claude-3-5-sonnet-latest",
+        provider=ProviderType.ANTHROPIC,
+        max_input_tokens=200_000,
+        max_output_tokens=20_000,
+    ),
+    "gemini-2.5-pro": ModelSpec(
+        name="gemini-2.5-pro",
+        provider=ProviderType.GOOGLE,
+        max_input_tokens=1_000_000,
+        max_output_tokens=64_000,
+    ),
+}
 
 
 class OpenAIConfig(BaseModel):

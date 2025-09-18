@@ -9,7 +9,6 @@ from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.research import (
     create_research_agent,
-    get_research_history,
     run_research_agent,
 )
 from shotgun.logging_config import get_logger
@@ -70,9 +69,6 @@ async def async_research(
     result = await run_research_agent(agent, query, deps)
 
     # Display results
-    logger.info("✅ Research Complete!")
-    logger.info("📋 Findings:")
-    logger.info("%s", result.output)
-    logger.info("📄 Full research saved to: .shotgun/research.md")
-    logger.debug("📚 Research history:")
-    logger.debug("%s", get_research_history())
+    print("✅ Research Complete!")
+    print("📋 Findings:")
+    print(result.output)

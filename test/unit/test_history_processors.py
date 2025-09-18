@@ -38,6 +38,7 @@ def mock_model_config() -> ModelConfig:
         provider=ProviderType.OPENAI,
         max_input_tokens=4096,
         max_output_tokens=2048,
+        api_key="test-api-key",
     )
 
 

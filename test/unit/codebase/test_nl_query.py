@@ -76,7 +76,7 @@ async def test_generate_cypher_simple_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -112,7 +112,7 @@ async def test_generate_cypher_complex_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -148,7 +148,7 @@ async def test_generate_cypher_with_file_extension_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -167,7 +167,7 @@ async def test_generate_cypher_model_error():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.side_effect = Exception("Model API error")
 
@@ -207,7 +207,7 @@ async def test_generate_cypher_request_structure():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -240,7 +240,7 @@ async def test_generate_cypher_with_datetime():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -285,7 +285,7 @@ async def test_generate_cypher_empty_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -315,7 +315,7 @@ async def test_generate_cypher_whitespace_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -344,7 +344,7 @@ async def test_generate_cypher_unicode_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -380,7 +380,7 @@ async def test_generate_cypher_long_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -411,7 +411,7 @@ async def test_generate_cypher_aggregation_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -447,7 +447,7 @@ async def test_generate_cypher_relationship_query():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 
@@ -512,7 +512,7 @@ async def test_generate_cypher_timeout_handling():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
 
         # Simulate timeout
@@ -538,7 +538,7 @@ async def test_generate_cypher_response_validation():
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
-        mock_model.pydantic_model_name = "test-model"
+        mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
         mock_model_request.return_value = mock_response
 

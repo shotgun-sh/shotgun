@@ -38,10 +38,10 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "openai:gpt-5"
+        assert model.name == "gpt-5"
         assert model.name == "gpt-5"
         assert model.provider == ProviderType.OPENAI
-        assert os.environ.get("OPENAI_API_KEY") == "test-openai-key"
+        assert model.api_key == "test-openai-key"
 
 
 @patch.dict(os.environ, {"OPENAI_API_KEY": "env-openai-key"})
@@ -56,7 +56,7 @@ def test_get_provider_model_openai_with_env_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "openai:gpt-5"
+        assert model.name == "gpt-5"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -90,8 +90,8 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
-        assert os.environ.get("ANTHROPIC_API_KEY") == "test-anthropic-key"
+        assert model.name == "claude-opus-4-1"
+        assert model.api_key == "test-anthropic-key"
 
 
 @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "env-anthropic-key"})
@@ -106,7 +106,7 @@ def test_get_provider_model_anthropic_with_env_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
+        assert model.name == "claude-opus-4-1"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -140,11 +140,11 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.GOOGLE)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "google-gla:gemini-2.5-pro"
-        assert os.environ.get("GOOGLE_API_KEY") == "test-google-key"
+        assert model.name == "gemini-2.5-pro"
+        assert model.api_key == "test-google-key"
 
 
-@patch.dict(os.environ, {"GOOGLE_API_KEY": "env-google-key"})
+@patch.dict(os.environ, {"GEMINI_API_KEY": "env-google-key"})
 @patch("shotgun.agents.config.provider.get_config_manager")
 def test_get_provider_model_google_with_env_key(mock_get_config_manager):
     """Test get_provider_model for Google with API key in environment."""
@@ -156,7 +156,7 @@ def test_get_provider_model_google_with_env_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.GOOGLE)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "google-gla:gemini-2.5-pro"
+        assert model.name == "gemini-2.5-pro"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -168,7 +168,7 @@ def test_get_provider_model_google_no_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
         mock_get_config_manager.return_value = manager
 
-        with pytest.raises(ValueError, match="Google API key not configured"):
+        with pytest.raises(ValueError, match="Gemini API key not configured"):
             get_provider_model(ProviderType.GOOGLE)
 
 
@@ -187,7 +187,7 @@ def test_get_provider_model_with_enum(mock_get_config_manager):
         model = get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "openai:gpt-5"
+        assert model.name == "gpt-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -208,7 +208,7 @@ def test_get_provider_model_none_uses_default(mock_get_config_manager):
         model = get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
+        assert model.name == "claude-opus-4-1"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -223,10 +223,10 @@ def test_get_provider_model_unsupported_provider(mock_get_config_manager):
             get_provider_model("unsupported")
 
 
-@patch.dict(os.environ, {}, clear=True)
+@patch.dict(os.environ, {"OPENAI_API_KEY": "existing-env-key"}, clear=False)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_sets_env_var_only_if_missing(mock_get_config_manager):
-    """Test get_provider_model doesn't override existing environment variables."""
+def test_get_provider_model_prefers_config_over_env(mock_get_config_manager):
+    """Test get_provider_model prefers config API key over environment variable."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
@@ -236,15 +236,12 @@ def test_get_provider_model_sets_env_var_only_if_missing(mock_get_config_manager
         manager._config = config
         mock_get_config_manager.return_value = manager
 
-        # Pre-set environment variable
-        os.environ["OPENAI_API_KEY"] = "existing-env-key"
-
         model = get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "openai:gpt-5"
-        # Should not override existing environment variable
-        assert os.environ.get("OPENAI_API_KEY") == "existing-env-key"
+        assert model.name == "gpt-5"
+        # Should use config key, not environment variable
+        assert model.api_key == "config-key"
 
 
 def test_get_api_key_from_config():
@@ -298,7 +295,7 @@ def test_get_provider_model_provider_enum_conversion(mock_get_config_manager):
         model = get_provider_model("anthropic")
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
+        assert model.name == "claude-opus-4-1"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -322,8 +319,11 @@ def test_get_provider_model_with_env_key_precedence(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.pydantic_model_name == "anthropic:claude-opus-4-1"
-        # Environment variable should not be overridden
+        assert model.name == "claude-opus-4-1"
+        assert model.provider == ProviderType.ANTHROPIC
+        # Config key takes precedence over environment variable
+        assert model.api_key == "config-anthropic-key"
+        # Environment variable should remain unchanged
         assert os.environ.get("ANTHROPIC_API_KEY") == "existing-env-key"
 
 
@@ -344,14 +344,13 @@ def test_get_provider_model_api_key_environment_isolation(mock_get_config_manage
         mock_get_config_manager.return_value = manager
 
         # Test OpenAI provider
-        get_provider_model(ProviderType.OPENAI)
-        assert os.environ.get("OPENAI_API_KEY") == "openai-key"
-        assert os.environ.get("ANTHROPIC_API_KEY") is None
+        openai_model = get_provider_model(ProviderType.OPENAI)
+        assert openai_model.api_key == "openai-key"
 
-        # Clear environment and test Anthropic provider
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
+        # Test Anthropic provider
+        anthropic_model = get_provider_model(ProviderType.ANTHROPIC)
+        assert anthropic_model.api_key == "anthropic-key"
 
-        get_provider_model(ProviderType.ANTHROPIC)
-        assert os.environ.get("ANTHROPIC_API_KEY") == "anthropic-key"
+        # Verify environment variables are NOT set (we no longer set them)
         assert os.environ.get("OPENAI_API_KEY") is None
+        assert os.environ.get("ANTHROPIC_API_KEY") is None

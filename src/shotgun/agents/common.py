@@ -170,7 +170,8 @@ def create_base_agent(
             provider_name.upper(),
             model_config.name,
         )
-        model = model_config.pydantic_model_name
+        # Use the Model instance directly (has API key baked in)
+        model = model_config.model_instance
 
         # Create deps with model config and codebase service
         codebase_service = get_codebase_service()

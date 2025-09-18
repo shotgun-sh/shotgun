@@ -23,7 +23,7 @@ from .common import (
     run_agent,
 )
 from .models import AgentDeps, AgentRuntimeOptions
-from .tools import web_search_tool
+from .tools import get_available_web_search_tools
 
 logger = get_logger(__name__)
 
@@ -60,11 +60,22 @@ def create_research_agent(
         Tuple of (Configured Pydantic AI agent for research tasks, Agent dependencies)
     """
     logger.debug("Initializing research agent")
+
+    # Get available web search tools based on configured API keys
+    web_search_tools = get_available_web_search_tools()
+    if web_search_tools:
+        logger.info(
+            "Research agent configured with %d web search tool(s)",
+            len(web_search_tools),
+        )
+    else:
+        logger.warning("Research agent configured without web search tools")
+
     agent, deps = create_base_agent(
         _build_research_agent_system_prompt,
         agent_runtime_options,
         load_codebase_understanding_tools=True,
-        additional_tools=[web_search_tool],
+        additional_tools=web_search_tools,
         provider=provider,
     )
     return agent, deps

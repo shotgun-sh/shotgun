@@ -116,7 +116,7 @@ class TestPromptTemplateIntegration:
         result = loader.render(
             "agents/partials/interactive_mode.j2",
             interactive_mode=True,
-            context="test context"
+            context="test context",
         )
         # Interactive mode should render empty (no warning)
         assert result.strip() == ""
@@ -129,7 +129,7 @@ class TestPromptTemplateIntegration:
         result = loader.render(
             "agents/partials/interactive_mode.j2",
             interactive_mode=False,
-            context="research output"
+            context="research output",
         )
 
         assert "USER INTERACTION IS DISABLED" in result
@@ -203,6 +203,7 @@ class TestCreateBaseAgent:
             provider=ProviderType.OPENAI,
             max_input_tokens=4096,
             max_output_tokens=2048,
+            api_key="test-api-key",
         )
 
     @pytest.fixture
@@ -248,7 +249,7 @@ class TestCreateBaseAgent:
             # Verify agent was created with correct model
             mock_agent_class.assert_called_once()
             args, kwargs = mock_agent_class.call_args
-            assert args[0] == mock_model_config.pydantic_model_name
+            assert args[0] == mock_model_config.model_instance
             assert kwargs["deps_type"] == AgentDeps
             assert kwargs["instrument"] is True
 
@@ -415,7 +416,7 @@ class TestIntegrationScenarios:
             result = loader.render(
                 "agents/partials/interactive_mode.j2",
                 interactive_mode=False,
-                context=context
+                context=context,
             )
             assert context in result
             assert "USER INTERACTION IS DISABLED" in result

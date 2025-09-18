@@ -80,6 +80,8 @@ jobs:
       - name: Run integration tests with coverage (stop on first failure)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: uv run pytest test/integration/ -x --cov=src --cov-report= --cov-append -c pyproject.toml
 
       - name: Generate coverage reports
