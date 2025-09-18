@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from shotgun.agents.config import get_config_manager
 from shotgun.cli import codebase, config, plan, research, tasks
 from shotgun.logging_config import configure_root_logger, get_logger
-from shotgun.telemetry import setup_phoenix_observability
+from shotgun.telemetry import setup_logfire_observability
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,8 +25,8 @@ except Exception as e:
     logger.debug("Configuration initialization warning: %s", e)
 
 # Initialize telemetry
-_telemetry_enabled = setup_phoenix_observability()
-logger.debug("Phoenix observability enabled: %s", _telemetry_enabled)
+_logfire_enabled = setup_logfire_observability()
+logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
 app = typer.Typer(
     name="shotgun",
