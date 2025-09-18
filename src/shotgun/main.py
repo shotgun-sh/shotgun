@@ -9,6 +9,7 @@ from shotgun.agents.config import get_config_manager
 from shotgun.cli import codebase, config, plan, research, tasks
 from shotgun.logging_config import configure_root_logger, get_logger
 from shotgun.telemetry import setup_logfire_observability
+from shotgun.tui import app as tui_app
 
 # Load environment variables from .env file
 load_dotenv()
@@ -31,7 +32,6 @@ logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 app = typer.Typer(
     name="shotgun",
     help="Shotgun - AI-powered CLI tool for research, planning, and task management",
-    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
@@ -52,8 +52,9 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: Annotated[
         bool,
         typer.Option(
@@ -67,6 +68,10 @@ def main(
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
+    if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
+        logger.debug("Launching shotgun TUI application")
+        tui_app.run()
+        raise typer.Exit()
 
 
 if __name__ == "__main__":
