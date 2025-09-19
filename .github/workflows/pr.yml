@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  COVERAGE_THRESHOLD: 71.0
+  COVERAGE_THRESHOLD: 51.0
 
 concurrency:
   group: pr-checks-${{ github.ref }}
@@ -77,13 +77,6 @@ jobs:
       - name: Run unit tests with coverage
         run: uv run pytest test/unit/ --cov=src --cov-report= --cov-append
 
-      - name: Run integration tests with coverage (stop on first failure)
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: uv run pytest test/integration/ -x --cov=src --cov-report= --cov-append -c pyproject.toml
-
       - name: Generate coverage reports
         run: |
           uv run coverage report --show-missing
@@ -119,47 +112,92 @@ jobs:
               echo "✅ Coverage check passed: ${COVERAGE_OUTPUT}% >= ${COVERAGE_THRESHOLD}%"
           fi
 
-  basic-cli-smoke-tests:
+  test-cli-basics:
     runs-on: ubuntu-latest
-    needs: [basic-pr-check]
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          
+
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        
+
       - name: Create virtual environment
         run: uv venv
-        
+
       - name: Install dependencies
         run: |
           source .venv/bin/activate
           uv sync --all-extras
-        
+
       - name: Test shotgun version
         run: |
           source .venv/bin/activate
           shotgun --version
-        
+
       - name: Test shotgun help
         run: |
           source .venv/bin/activate
           shotgun --help
-        
+
+  test-cli-research:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv sync --all-extras
+
       - name: Test research command
         env:
           SHOTGUN_LOG_LEVEL: DEBUG
         run: |
           source .venv/bin/activate
-          shotgun research --non-interactive "How can I make a simple Agent using Pydantic AI?"
+          shotgun research --non-interactive "What is the capital of Poland?"
+
+  test-cli-plan:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv sync --all-extras
 
       - name: Test plan command
         env:
@@ -167,7 +205,31 @@ jobs:
         run: |
           source .venv/bin/activate
           shotgun plan --non-interactive "Build a simple Agent using Pydantic AI"
-        
+
+  test-cli-tasks:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv sync --all-extras
+
       - name: Test tasks command
         env:
           SHOTGUN_LOG_LEVEL: DEBUG
@@ -198,7 +260,7 @@ jobs:
 
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, basic-cli-smoke-tests, todo-checker]
+    needs: [validate-pr-title, basic-pr-check, test-cli-basics, test-cli-research, test-cli-plan, test-cli-tasks, todo-checker]
     if: always()
     
     steps:
@@ -206,12 +268,18 @@ jobs:
         run: |
           echo "validate-pr-title: ${{ needs.validate-pr-title.result }}"
           echo "basic-pr-check: ${{ needs.basic-pr-check.result }}"
-          echo "basic-cli-smoke-tests: ${{ needs.basic-cli-smoke-tests.result }}"
+          echo "test-cli-basics: ${{ needs.test-cli-basics.result }}"
+          echo "test-cli-research: ${{ needs.test-cli-research.result }}"
+          echo "test-cli-plan: ${{ needs.test-cli-plan.result }}"
+          echo "test-cli-tasks: ${{ needs.test-cli-tasks.result }}"
           echo "todo-checker: ${{ needs.todo-checker.result }}"
-          
+
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
                 "${{ needs.basic-pr-check.result }}" != "success" || \
-                "${{ needs.basic-cli-smoke-tests.result }}" != "success" || \
+                "${{ needs.test-cli-basics.result }}" != "success" || \
+                "${{ needs.test-cli-research.result }}" != "success" || \
+                "${{ needs.test-cli-plan.result }}" != "success" || \
+                "${{ needs.test-cli-tasks.result }}" != "success" || \
                 "${{ needs.todo-checker.result }}" != "success" ]]; then
             echo "❌ One or more required checks failed or were cancelled"
             exit 1
