@@ -188,7 +188,7 @@ class TestWebSearchTool:
             assert len(tools) == 1
             assert tools[0]["type"] == "web_search"
             assert tools[0]["user_location"]["type"] == "approximate"
-            assert tools[0]["search_context_size"] == "low"
+            assert tools[0]["search_context_size"] == "high"  # Updated from low
 
     def test_telemetry(self):
         """Test telemetry integration."""

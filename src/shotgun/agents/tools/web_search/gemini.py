@@ -1,5 +1,6 @@
 """Gemini web search tool implementation."""
 
+import google.generativeai as genai
 from opentelemetry import trace
 
 from shotgun.agents.config import get_provider_model
@@ -26,33 +27,43 @@ def gemini_web_search_tool(query: str) -> str:
     span = trace.get_current_span()
     span.set_attribute("input.value", f"**Query:** {query}\n")
 
+    logger.debug("📡 Executing Gemini web search with prompt: %s", query)
+
+    # Get API key from centralized configuration
     try:
-        import google.generativeai as genai  # type: ignore[import-untyped]
+        model_config = get_provider_model(ProviderType.GOOGLE)
+        api_key = model_config.api_key
+    except ValueError as e:
+        error_msg = f"Gemini API key not configured: {str(e)}"
+        logger.error("❌ %s", error_msg)
+        span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
+        return error_msg
 
-        logger.debug("📡 Executing Gemini web search with prompt: %s", query)
+    genai.configure(api_key=api_key)  # type: ignore[attr-defined]
 
-        # Get API key from centralized configuration
-        try:
-            model_config = get_provider_model(ProviderType.GOOGLE)
-            api_key = model_config.api_key
-        except ValueError as e:
-            error_msg = f"Gemini API key not configured: {str(e)}"
-            logger.error("❌ %s", error_msg)
-            span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
-            return error_msg
+    # Create model without built-in tools to avoid conflict with Pydantic AI
+    # Using prompt-based search approach instead
+    model = genai.GenerativeModel("gemini-2.5-pro")  # type: ignore[attr-defined]
 
-        genai.configure(api_key=api_key)
+    # Create a search-optimized prompt that leverages Gemini's knowledge
+    search_prompt = f"""Please provide current and accurate information about the following query:
 
-        # Create model with grounding
-        model = genai.GenerativeModel(
-            "gemini-2.0-flash-exp",
-            tools=["google_search"],
-        )
+Query: {query}
 
-        # Generate response with grounding
+Instructions:
+- Provide comprehensive, factual information
+- Include relevant details and context
+- Focus on current and recent information
+- Be specific and accurate in your response"""
+
+    # Generate response using the model's knowledge
+    try:
         response = model.generate_content(
-            query,
-            generation_config=genai.GenerationConfig(temperature=0.3),
+            search_prompt,
+            generation_config=genai.GenerationConfig(  # type: ignore[attr-defined]
+                temperature=0.3,
+                max_output_tokens=8192,  # Explicit limit for comprehensive results
+            ),
         )
 
         result_text = response.text or "No content returned from search"
@@ -66,14 +77,6 @@ def gemini_web_search_tool(query: str) -> str:
         span.set_attribute("output.value", f"**Results:**\n {result_text}\n")
 
         return result_text
-    except ImportError:
-        error_msg = (
-            "google-generativeai package not installed. "
-            "Install with: pip install google-generativeai"
-        )
-        logger.error("❌ %s", error_msg)
-        span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
-        return error_msg
     except Exception as e:
         error_msg = f"Error performing Gemini web search: {str(e)}"
         logger.error("❌ Gemini web search failed: %s", str(e))

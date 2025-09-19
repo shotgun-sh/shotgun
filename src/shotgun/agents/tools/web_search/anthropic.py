@@ -1,5 +1,6 @@
 """Anthropic web search tool implementation."""
 
+import anthropic
 from opentelemetry import trace
 
 from shotgun.agents.config import get_provider_model
@@ -26,27 +27,25 @@ def anthropic_web_search_tool(query: str) -> str:
     span = trace.get_current_span()
     span.set_attribute("input.value", f"**Query:** {query}\n")
 
+    logger.debug("📡 Executing Anthropic web search with prompt: %s", query)
+
+    # Get API key from centralized configuration
     try:
-        import anthropic
+        model_config = get_provider_model(ProviderType.ANTHROPIC)
+        api_key = model_config.api_key
+    except ValueError as e:
+        error_msg = f"Anthropic API key not configured: {str(e)}"
+        logger.error("❌ %s", error_msg)
+        span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
+        return error_msg
 
-        logger.debug("📡 Executing Anthropic web search with prompt: %s", query)
+    client = anthropic.Anthropic(api_key=api_key)
 
-        # Get API key from centralized configuration
-        try:
-            model_config = get_provider_model(ProviderType.ANTHROPIC)
-            api_key = model_config.api_key
-        except ValueError as e:
-            error_msg = f"Anthropic API key not configured: {str(e)}"
-            logger.error("❌ %s", error_msg)
-            span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
-            return error_msg
-
-        client = anthropic.Anthropic(api_key=api_key)
-
-        # Use the Messages API with web search tool
+    # Use the Messages API with web search tool
+    try:
         response = client.messages.create(
             model="claude-3-5-sonnet-latest",
-            max_tokens=4096,
+            max_tokens=8192,  # Increased from 4096 for more comprehensive results
             messages=[{"role": "user", "content": f"Search for: {query}"}],
             tools=[
                 {
@@ -79,13 +78,6 @@ def anthropic_web_search_tool(query: str) -> str:
         span.set_attribute("output.value", f"**Results:**\n {result_text}\n")
 
         return result_text
-    except ImportError:
-        error_msg = (
-            "anthropic package not installed. Install with: pip install anthropic"
-        )
-        logger.error("❌ %s", error_msg)
-        span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
-        return error_msg
     except Exception as e:
         error_msg = f"Error performing Anthropic web search: {str(e)}"
         logger.error("❌ Anthropic web search failed: %s", str(e))

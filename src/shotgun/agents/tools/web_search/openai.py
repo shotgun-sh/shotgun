@@ -46,13 +46,16 @@ def openai_web_search_tool(query: str) -> str:
             input=[
                 {"role": "user", "content": [{"type": "input_text", "text": query}]}
             ],
-            text={"format": {"type": "text"}, "verbosity": "medium"},
-            reasoning={"effort": "medium", "summary": "auto"},
+            text={
+                "format": {"type": "text"},
+                "verbosity": "high",
+            },  # Increased from medium
+            reasoning={"effort": "high", "summary": "auto"},  # Increased from medium
             tools=[
                 {
                     "type": "web_search",
                     "user_location": {"type": "approximate"},
-                    "search_context_size": "low",
+                    "search_context_size": "high",  # Increased from low for more context
                 }
             ],
             store=False,
