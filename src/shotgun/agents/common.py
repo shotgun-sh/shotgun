@@ -2,7 +2,6 @@
 
 import asyncio
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from pydantic_ai import (
@@ -15,7 +14,9 @@ from pydantic_ai import (
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelRequest,
     ModelResponse,
+    SystemPromptPart,
     TextPart,
 )
 
@@ -38,75 +39,19 @@ from .tools import (
     retrieve_code,
     write_file,
 )
+from .tools.artifact_management import (
+    create_artifact,
+    list_artifact_templates,
+    list_artifacts,
+    read_artifact,
+    read_artifact_section,
+    write_artifact_section,
+)
 
 logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()
-
-
-def ensure_file_exists(filename: str, header: str) -> str:
-    """Ensure a markdown file exists with proper header and return its content.
-
-    Args:
-        filename: Name of the file (e.g., "research.md")
-        header: Header to add if file is empty (e.g., "# Research")
-
-    Returns:
-        Current file content
-    """
-    shotgun_dir = Path.cwd() / ".shotgun"
-    file_path = shotgun_dir / filename
-
-    try:
-        if file_path.exists():
-            content = file_path.read_text(encoding="utf-8")
-            if not content.strip():
-                # File exists but is empty, add header
-                header_content = f"{header}\n\n"
-                file_path.write_text(header_content, encoding="utf-8")
-                return header_content
-            return content
-        else:
-            # File doesn't exist, create it with header
-            shotgun_dir.mkdir(exist_ok=True)
-            header_content = f"{header}\n\n"
-            file_path.write_text(header_content, encoding="utf-8")
-            return header_content
-    except Exception as e:
-        logger.error("Failed to initialize %s: %s", filename, str(e))
-        return f"{header}\n\n"
-
-
-def register_common_tools(
-    agent: Agent[AgentDeps], additional_tools: list[Any], interactive_mode: bool
-) -> None:
-    """Register common tools with an agent.
-
-    Args:
-        agent: The Pydantic AI agent to register tools with
-        additional_tools: List of additional tools specific to this agent
-        interactive_mode: Whether to register interactive tools
-    """
-    logger.debug("📌 Registering tools with agent")
-
-    # Register additional tools first (agent-specific)
-    for tool in additional_tools:
-        agent.tool_plain(tool)
-
-    # Register interactive tool if enabled
-    if interactive_mode:
-        agent.tool(ask_user)
-        logger.debug("📞 User interaction tool registered")
-    else:
-        logger.debug("🚫 User interaction disabled (non-interactive mode)")
-
-    # Register common file management tools
-    agent.tool_plain(read_file)
-    agent.tool_plain(write_file)
-    agent.tool_plain(append_file)
-
-    logger.debug("✅ Tool registration complete")
 
 
 async def add_system_status_message(
@@ -128,7 +73,6 @@ async def add_system_status_message(
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
-        context="system state",
     )
     message_history.append(
         ModelResponse(
@@ -179,6 +123,7 @@ def create_base_agent(
             **agent_runtime_options.model_dump(),
             llm_model=model_config,
             codebase_service=codebase_service,
+            system_prompt_fn=system_prompt_fn,
         )
 
     except Exception as e:
@@ -194,8 +139,9 @@ def create_base_agent(
         history_processors=[token_limit_compactor],
     )
 
-    # Decorate the system prompt function
-    agent.system_prompt(system_prompt_fn)
+    # System prompt function is stored in deps and will be called manually in run_agent
+    func_name = getattr(system_prompt_fn, "__name__", str(system_prompt_fn))
+    logger.debug("🔧 System prompt function stored: %s", func_name)
 
     # Register additional tools first (agent-specific)
     for tool in additional_tools or []:
@@ -211,7 +157,15 @@ def create_base_agent(
     agent.tool_plain(write_file)
     agent.tool_plain(append_file)
 
-    # Register codebase understanding tools (always available)
+    # Register artifact management tools (always available)
+    agent.tool_plain(create_artifact)
+    agent.tool_plain(list_artifacts)
+    agent.tool_plain(list_artifact_templates)
+    agent.tool_plain(read_artifact)
+    agent.tool_plain(read_artifact_section)
+    agent.tool_plain(write_artifact_section)
+
+    # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:
         agent.tool(query_graph)
         agent.tool(retrieve_code)
@@ -222,8 +176,45 @@ def create_base_agent(
     else:
         logger.debug("🚫🧠 Codebase understanding tools not registered")
 
-    logger.debug("✅ Agent creation complete")
+    logger.debug("✅ Agent creation complete with artifact and codebase tools")
     return agent, deps
+
+
+def build_agent_system_prompt(
+    agent_type: str,
+    ctx: RunContext[AgentDeps],
+    context_name: str | None = None,
+) -> str:
+    """Build system prompt for any agent type.
+
+    Args:
+        agent_type: Type of agent ('research', 'plan', 'tasks')
+        ctx: RunContext containing AgentDeps
+        context_name: Optional context name for template rendering
+
+    Returns:
+        Rendered system prompt
+    """
+    prompt_loader = PromptLoader()
+
+    # Add logging if research agent
+    if agent_type == "research":
+        logger.debug("🔧 Building research agent system prompt...")
+        logger.debug("Interactive mode: %s", ctx.deps.interactive_mode)
+
+    result = prompt_loader.render(
+        f"agents/{agent_type}.j2",
+        interactive_mode=ctx.deps.interactive_mode,
+        mode=agent_type,
+    )
+
+    if agent_type == "research":
+        logger.debug(
+            "✅ Research system prompt built successfully (length: %d chars)",
+            len(result),
+        )
+
+    return result
 
 
 def create_usage_limits() -> UsageLimits:
@@ -238,20 +229,41 @@ def create_usage_limits() -> UsageLimits:
     )
 
 
-def get_file_history(filename: str) -> str:
-    """Get the history content from a file.
+async def add_system_prompt_message(
+    deps: AgentDeps,
+    message_history: list[ModelMessage] | None = None,
+) -> list[ModelMessage]:
+    """Add the system prompt as the first message in the message history.
 
     Args:
-        filename: Name of the file (e.g., "research.md")
+        deps: Agent dependencies containing system_prompt_fn
+        message_history: Existing message history
 
     Returns:
-        File content or fallback message
+        Updated message history with system prompt prepended as first message
     """
-    try:
-        return read_file(filename)
-    except Exception as e:
-        logger.debug("Could not load %s history: %s", filename, str(e))
-        return f"No {filename.replace('.md', '')} history available."
+    message_history = message_history or []
+
+    # Create a minimal RunContext to call the system prompt function
+    # We'll pass None for model and usage since they're not used by our system prompt functions
+    context = type(
+        "RunContext", (), {"deps": deps, "retry": 0, "model": None, "usage": None}
+    )()
+
+    # Render the system prompt using the stored function
+    system_prompt_content = deps.system_prompt_fn(context)
+    logger.debug(
+        "🎯 Rendered system prompt (length: %d chars)", len(system_prompt_content)
+    )
+
+    # Create system message and prepend to message history
+    system_message = ModelRequest(
+        parts=[SystemPromptPart(content=system_prompt_content)]
+    )
+    message_history.insert(0, system_message)
+    logger.debug("✅ System prompt prepended as first message")
+
+    return message_history
 
 
 async def run_agent(
@@ -261,6 +273,9 @@ async def run_agent(
     message_history: list[ModelMessage] | None = None,
     usage_limits: UsageLimits | None = None,
 ) -> AgentRunResult[str | DeferredToolRequests]:
+    # Add system prompt as first message
+    message_history = await add_system_prompt_message(deps, message_history)
+
     result = await agent.run(
         prompt,
         deps=deps,

@@ -1,0 +1,66 @@
+name: Delivery & Release Plan
+purpose: |
+  Convert scope and roadmap into a staffed, scheduled, dependency-aware execution plan with 
+  clear ownership, milestones, risk management, and cutover/rollback strategies.
+prompt: |
+  Use this template to build a delivery plan we have the specification ready.
+  The output should enable both engineering and product stakeholders to track progress, 
+  manage dependencies, and prepare for a safe release.
+sections:
+  delivery.workstreams:
+    instructions: |
+      Define parallel streams of work (e.g., Backend, Frontend, Data, DevOps, QA, Security).
+      For each: owner (DRI), objectives, deliverables, and relation to PRD scope.
+  wbs.estimates:
+    instructions: |
+      Create a Work Breakdown Structure. Break epics → features → stories → tasks.
+      Provide estimates (T-shirt sizes + P50/P90 time in days). Highlight critical path items.
+      Include buffers for integration and testing.
+  capacity_and_staffing:
+    instructions: |
+      List team members, roles, and availability (holidays, partial allocations).
+      Define velocity assumptions and utilization factors.
+      Highlight gaps and hiring needs if capacity < required.
+  dependency_map:
+    instructions: |
+      Capture internal and external dependencies (libraries, vendors, APIs).
+      Define lead times and SLAs. Show dependency graph (Mermaid or table).
+      Suggest decoupling via feature flags, mocks, or phased integration.
+  schedule.plan:
+    instructions: |
+      Translate WBS + capacity into a timeline. Provide both:
+        - High-level milestones (alpha, beta, GA)
+        - Detailed Gantt/roadmap (Mermaid or markdown tables)
+      Show critical path and dependency-driven slips.
+  raci_and_ceremonies:
+    instructions: |
+      Define RACI (Responsible, Accountable, Consulted, Informed) for decisions.
+      Define governance cadences: daily standups, weekly demos, fortnightly checkpoints.
+      Specify escalation path for blockers.
+  quality_and_testing:
+    instructions: |
+      Define QA strategy: test types (unit, integration, regression, perf).
+      Define gates: test coverage %, perf benchmarks, security scans.
+      Specify environments: staging, pre-prod, canary.
+  cutover_and_rollback:
+    instructions: |
+      Provide release checklist: build, config, migrations, monitoring, comms.
+      Define dark launch/canary steps, health checks, rollback triggers, and procedures.
+      Specify post-release monitoring window and owner on-call.
+  release_comms:
+    instructions: |
+      Draft internal and external comms: release notes, stakeholder briefings, customer updates.
+      Specify timing relative to rollout phases.
+  delivery_risks:
+    instructions: |
+      Maintain a risk register: description, prob×impact, owner, mitigation, contingency.
+      Track status weekly. Mark high-priority risks explicitly.
+  metrics_and_tracking:
+    instructions: |
+      Link to PRD success metrics and Experiment Plan metrics.
+      Define delivery metrics: burn-down, velocity, on-time %.
+      Provide dashboards or reporting cadence.
+  status_reporting:
+    instructions: |
+      Define status update format (traffic-light summary, burndown chart, risk log).
+      Specify frequency (weekly) and audience (exec, product, eng).

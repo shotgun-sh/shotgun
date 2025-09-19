@@ -43,7 +43,7 @@ dependencies = [
     "watchdog>=4.0.0",
     "openai>=1.0.0",
     "anthropic>=0.39.0",
-    "google-generativeai>=0.8.0",
+    "google-generativeai>=0.8.5",
     "packaging>=23.0",
 ]
 
@@ -138,6 +138,7 @@ dev = [
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=7.0.0",
     "python-dotenv>=1.0.0",
+    "types-pyyaml>=6.0.12.20250915",
 ]
 
 [tool.pytest.ini_options]

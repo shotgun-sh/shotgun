@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import cast
 
-from pydantic_ai import DeferredToolResults
+from pydantic_ai import DeferredToolResults, RunContext
 from pydantic_ai.messages import (
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
@@ -29,6 +29,11 @@ from shotgun.sdk.services import get_codebase_service
 from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
 from ..components.vertical_tail import VerticalTail
+
+
+def _dummy_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
+    """Dummy system prompt function for TUI chat interface."""
+    return "You are a helpful AI assistant."
 
 
 class PromptHistory:
@@ -305,6 +310,7 @@ class ChatScreen(Screen[None]):
             interactive_mode=True,
             llm_model=model_config,
             codebase_service=codebase_service,
+            system_prompt_fn=_dummy_system_prompt_fn,
         )
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
 

@@ -1,0 +1,257 @@
+name: SDK & Library Research Template
+purpose: Use this template to build a comprehensive research and comparison document for SDKs and libraries considered in a project.
+prompt: |
+  First, suggest creating a research.overview section to establish the problem and requirements. 
+  Then, once the user reviews, move on to the discovery and evaluation sections.
+  Include a systematic evaluation framework that defines technical requirements, constraints, and quality criteria for the SDK/library selection.
+  The research should enable the team to make an informed decision based on objective comparisons and practical testing.
+  Prioritize evaluation criteria by technical criticality × business impact to maximize long-term project success.
+  Facilitate thorough investigation: Breadth of options before depth of analysis
+  Suggest alternatives if the user's initial requirements seem too restrictive: Flexibility over perfect fit
+  Your focus needs to be on creating clear, actionable research artifacts that development teams can use to make and justify technical decisions.
+  If user provides detailed requirements with use case, technical constraints, and project context, acknowledge and get to work OR ask for more details if critical context is truly missing.
+sections:
+    research.overview:
+        instructions: |
+            # What is a good research.overview section?
+
+            •	Clarifies the technical need
+            •	Establishes scope and constraints
+            •	Aligns the team on evaluation criteria
+            •	Sets realistic timeline for decision
+
+            # Questions to ask yourself:
+            •	What problem are we trying to solve with this SDK/library?
+            •	What happens if we make the wrong choice?
+            •	What are our non-negotiable requirements?
+            •	Is there anything specific to our tech stack that constrains choices?
+
+            # Includes:
+              Research Objective: [One clear sentence stating what SDK/library type we need and why]
+              Problem Context:
+                Current limitation: [What can't we do now?]
+                Business impact: [Cost of not solving this]
+                Technical debt risk: [What happens if we choose poorly?]
+                Timeline: [When do we need to decide?]
+                [additional relevant context]
+
+            # Success Criteria:
+
+            | Criterion | Description | Priority |
+            |-----------|-------------|----------|
+            | Performance requirements | Must handle X operations/sec | Critical |
+            | Developer experience | Clear documentation, active community | High |
+            | Maintenance burden | Regular updates, security patches | Medium |
+            [more criteria relevant to the specific research]
+
+    research.requirements:
+        instructions: |
+            # How to write a good research.requirements section
+
+            Define technical and business requirements that will guide the evaluation.
+
+            •	Separates must-haves from nice-to-haves
+            •	Includes both functional and non-functional requirements
+            •	Considers team capabilities and constraints
+
+            # Questions to ask yourself:
+            •	What features are absolutely essential vs. "would be nice"?
+            •	What are our technical constraints (language, platform, licenses)?
+            •	What are our resource constraints (budget, team expertise)?
+
+            # Includes:
+              ## Functional Requirements
+              Essential Features:
+                - [Core functionality needed]
+                - [Integration requirements]
+                - [Performance benchmarks]
+              
+              Nice-to-Have Features:
+                - [Additional capabilities]
+                - [Future-proofing considerations]
+              
+              ## Non-Functional Requirements
+              Technical Constraints:
+                - Language/Platform: [e.g., Must support TypeScript]
+                - Architecture: [e.g., Must work in serverless environment]
+                - Performance: [e.g., < 50ms latency for operations]
+              
+              Business Constraints:
+                - License: [e.g., MIT or Apache 2.0 preferred]
+                - Cost: [e.g., Free for commercial use or < $X/month]
+                - Support: [e.g., Active community or paid support available]
+        depends_on:
+            - "research.overview"
+
+    research.discovery:
+        instructions: |
+            # How to write a good research.discovery section
+
+            Document the process and results of finding available options.
+
+            •	Shows comprehensive search methodology
+            •	Lists all viable candidates with brief descriptions
+            •	Explains why certain options were excluded early
+
+            # Questions to ask yourself:
+            •	Where did we search? (GitHub, npm, package managers, forums)
+            •	What keywords and criteria did we use?
+            •	Are there any industry-standard or popular choices we're missing?
+
+            # Includes:
+              ## Search Methodology
+              Sources Consulted:
+                - [Package registries searched]
+                - [Community recommendations]
+                - [Industry reports/comparisons referenced]
+              
+              ## Initial Candidates
+
+              | Library/SDK | Description | Stars/Downloads | Initial Assessment |
+              |-------------|-------------|-----------------|-------------------|
+              | Option A | Brief description | GitHub stars or weekly downloads | Meets X requirements, concerns about Y |
+              | Option B | Brief description | Metrics | Strong community, lacks feature Z |
+              [comprehensive list]
+
+              ## Early Eliminations
+              Excluded Options:
+                - **[Library Name]**: [Reason for exclusion]
+                - **[Library Name]**: [Critical missing feature or constraint violation]
+
+        depends_on:
+            - "research.requirements"
+
+    research.technical_evaluation:
+        instructions: |
+            # How to write a good research.technical_evaluation section
+
+            Deep technical analysis of the top candidates.
+
+            •	Provides objective, measurable comparisons
+            •	Includes code examples and API comparisons
+            •	Evaluates developer experience and learning curve
+
+            # Questions to ask yourself:
+            •	How easy is it to implement our use case in each option?
+            •	What are the performance characteristics under our expected load?
+            •	How well does each option integrate with our existing stack?
+
+            # Includes:
+              ## Evaluated Options (Top 3-5 candidates)
+
+              ### **Option A: [Name]**
+              Technical Architecture:
+                - Core design philosophy
+                - Key abstractions and patterns
+                - Dependencies and size
+              
+              Code Example:
+              ```[language]
+              // Example implementing our primary use case
+              ```
+              
+              Performance Metrics:
+                - Benchmark results
+                - Memory footprint
+                - Bundle size impact
+              
+              Developer Experience:
+                - Setup complexity: [Rating]
+                - Documentation quality: [Rating]
+                - API design: [Rating]
+                - Debugging tools: [Rating]
+
+              [Repeat for each candidate]
+
+        depends_on:
+            - "research.discovery"
+
+    research.comparison_matrix:
+        instructions: |
+            # How to write a good research.comparison_matrix section
+
+            Side-by-side comparison of all evaluation criteria.
+
+            •	Enables quick visual comparison
+            •	Uses consistent scoring methodology
+            •	Weights criteria by importance
+
+            # Questions to ask yourself:
+            •	Are we comparing apples to apples?
+            •	Is our scoring methodology clear and reproducible?
+            •	Have we weighted criteria appropriately for our use case?
+
+            # Includes:
+              ## Scoring Methodology
+              - 🟢 Excellent (3 points): Exceeds requirements
+              - 🟡 Good (2 points): Meets requirements
+              - 🔴 Poor (1 point): Below requirements
+              - ❌ Missing (0 points): Doesn't support
+
+              ## Feature Comparison
+
+              | Criterion | Weight | Option A | Option B | Option C |
+              |-----------|--------|----------|----------|----------|
+              | Core Functionality | 3x | 🟢 (3) | 🟡 (2) | 🟢 (3) |
+              | Performance | 2x | 🟡 (2) | 🟢 (3) | 🟡 (2) |
+              | Documentation | 1x | 🟢 (3) | 🟡 (2) | 🔴 (1) |
+              | Community Support | 1x | 🟡 (2) | 🟢 (3) | 🟡 (2) |
+              | **Weighted Total** | | **17** | **18** | **15** |
+
+              ## Risk Assessment
+
+              | Risk Factor | Option A | Option B | Option C |
+              |-------------|----------|----------|----------|
+              | Vendor Lock-in | Low | Medium | Low |
+              | Technical Debt | Low | Low | High |
+              | Maintenance Risk | Medium | Low | High |
+
+        depends_on:
+            - "research.technical_evaluation"
+
+    research.decision:
+        instructions: |
+            # How to write a good research.decision section
+
+            Clear recommendation with thorough justification.
+
+            •	States the recommendation unambiguously
+            •	Provides clear rationale tied to requirements
+            •	Addresses concerns and mitigation strategies
+
+            # Questions to ask yourself:
+            •	Will stakeholders understand why we chose this option?
+            •	Have we addressed all major concerns about our choice?
+            •	Is our decision reversible if needed?
+
+            # Includes:
+              ## Recommendation
+              **Selected Solution:** [Name and version]
+              
+              **Primary Reasons:**
+              1. [Most compelling reason tied to critical requirement]
+              2. [Second key differentiator]
+              3. [Long-term benefit]
+
+              ## Detailed Justification
+              
+              ### Why [Selected] Over [Alternative A]
+              - [Specific technical advantage]
+              - [Business consideration]
+              - [Risk mitigation]
+
+              ### Why [Selected] Over [Alternative B]
+              - [Comparison points]
+
+              ## Risk Mitigation Plan
+
+              | Identified Risk | Mitigation Strategy | Owner |
+              |----------------|---------------------|-------|
+              | [Specific risk] | [How we'll address it] | [Team/Person] |
+
+              ## Dissenting Opinions
+              - [Any team concerns and how they were addressed]
+
+        depends_on:
+            - "research.comparison_matrix"
+            - "research.technical_evaluation"

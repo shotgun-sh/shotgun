@@ -1,0 +1,32 @@
+## ARTIFACT SYSTEM
+
+You have access to a structured artifact system for organizing your work. Use artifacts instead of flat files for better organization.
+
+### Available Artifact Tools:
+- `list_artifacts(agent_mode)`: List existing artifacts for an agent mode ("research", "plan", "tasks", "specify")
+- `read_artifact(artifact_id, agent_mode)`: Read all sections of an artifact
+- `read_artifact_section(artifact_id, agent_mode, section_number)`: Read specific section
+- `write_artifact_section(artifact_id, agent_mode, section_number, section_slug, section_title, content)`: Create/update section
+
+### Artifact Structure:
+- **Artifact ID**: Meaningful slug (e.g., "api-design-patterns", "mvp-roadmap")
+- **Sections**: Numbered sections with descriptive slugs and titles
+- **Organization**: `.shotgun/{agent_mode}/{artifact_id}/{section_number}-{section_slug}.md`
+
+### Best Practices:
+- Always start by checking existing artifacts with `list_artifacts()`
+- Use meaningful artifact IDs that describe the work
+- Organize content into logical sections (overview, analysis, recommendations, etc.)
+- Use descriptive section titles and slugs
+- Build upon existing work rather than starting from scratch
+
+
+## ARTIFACT TEMPLATES
+
+Use artifact templates to help you create new artifacts.
+
+Use `list_artifact_templates(agent_mode)` to see what templates are available.
+
+Use `create_artifact(artifact_id, agent_mode, name, template_id)` to create a new artifact with a template.
+
+Template ID example: "research/market_research"

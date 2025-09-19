@@ -1,4 +1,4 @@
-"""Plan agent factory and functions using Pydantic AI with file-based memory."""
+"""Specify agent factory and functions using Pydantic AI with file-based memory."""
 
 from functools import partial
 
@@ -24,21 +24,21 @@ from .models import AgentDeps, AgentRuntimeOptions
 logger = get_logger(__name__)
 
 
-def create_plan_agent(
+def create_specify_agent(
     agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
 ) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
-    """Create a plan agent with artifact management capabilities.
+    """Create a specify agent with artifact management capabilities.
 
     Args:
         agent_runtime_options: Agent runtime options for the agent
         provider: Optional provider override. If None, uses configured default
 
     Returns:
-        Tuple of (Configured Pydantic AI agent for planning tasks, Agent dependencies)
+        Tuple of (Configured Pydantic AI agent for specification tasks, Agent dependencies)
     """
-    logger.debug("Initializing plan agent")
-    # Use partial to create system prompt function for plan agent
-    system_prompt_fn = partial(build_agent_system_prompt, "plan")
+    logger.debug("Initializing specify agent")
+    # Use partial to create system prompt function for specify agent
+    system_prompt_fn = partial(build_agent_system_prompt, "specify")
 
     agent, deps = create_base_agent(
         system_prompt_fn,
@@ -50,27 +50,27 @@ def create_plan_agent(
     return agent, deps
 
 
-async def run_plan_agent(
+async def run_specify_agent(
     agent: Agent[AgentDeps, str | DeferredToolRequests],
-    goal: str,
+    requirement: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
 ) -> AgentRunResult[str | DeferredToolRequests]:
-    """Create or update a plan based on the given goal using artifacts.
+    """Create or update specifications based on the given requirement.
 
     Args:
-        agent: The configured plan agent
-        goal: The planning goal or instruction
+        agent: The configured specify agent
+        requirement: The specification requirement or instruction
         deps: Agent dependencies
         message_history: Optional message history for conversation continuity
 
     Returns:
-        AgentRunResult containing the planning process output
+        AgentRunResult containing the specification process output
     """
-    logger.debug("📋 Starting planning for goal: %s", goal)
+    logger.debug("📋 Starting specification for requirement: %s", requirement)
 
     # Simple prompt - the agent system prompt has all the artifact instructions
-    full_prompt = f"Create a comprehensive plan for: {goal}"
+    full_prompt = f"Create a comprehensive specification for: {requirement}"
 
     try:
         # Create usage limits for responsible API usage
@@ -86,12 +86,12 @@ async def run_plan_agent(
             usage_limits=usage_limits,
         )
 
-        logger.debug("✅ Planning completed successfully")
+        logger.debug("✅ Specification completed successfully")
         return result
 
     except Exception as e:
         import traceback
 
         logger.error("Full traceback:\n%s", traceback.format_exc())
-        logger.error("❌ Planning failed: %s", str(e))
+        logger.error("❌ Specification failed: %s", str(e))
         raise

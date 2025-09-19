@@ -1,0 +1,331 @@
+name: Product Requirements Document (PRD) Template
+purpose: Use this template to produce a crisp, decision-oriented PRD that enables engineers to build and executives to understand the bet. Optimize for specificity, thresholds, and rollout decisions; cut anything that doesn’t change how someone builds, measures, or kills the feature.
+prompt: |
+  First, create prd.overview to capture the two-sentence problem statement and core inputs. 
+  Then proceed through the sections in order. 
+  Keep it ≤5 formatted pages. Favor real data, prototype learnings, concrete thresholds, and adult rollout plans. 
+  Delete sections that don’t change decisions.
+
+  Critical principles:
+  - No fluff; defend decisions like a Staff PM.
+  - Decisions > documentation; thresholds over adjectives.
+  - Use real examples and prototype learnings.
+  - Set explicit rollout gates, owners, and kill criteria.
+
+sections:
+  prd.overview:
+    instructions: |
+      # What to capture
+      - **Feature Name** and a **2-sentence problem statement**:
+        1) One-sentence problem with data.
+        2) One sentence on why solving now unlocks value.
+      - **Inputs** (fill what you have; leave gaps as Open Questions):
+        COMPANY, PRODUCT/AREA, TARGET USERS, STRATEGIC BET/OKR,
+        CORE PROBLEM (with data), CURRENT BASELINE METRICS,
+        PROTOTYPE LEARNINGS, AI FEATURE? (model/latency/cost),
+        HARD DEADLINE, KEY STAKEHOLDERS (names).
+
+      # Output should make an engineer say “I can build this” and an exec say “I get the bet.”
+
+      # Includes
+      Feature Name: [ ]
+      Problem Statement: "[Data-backed sentence]. [Why now unlocks value.]"
+      Inputs:
+        company: [ ]
+        product_area: [ ]
+        target_users: [ ]
+        strategic_bet_or_okr: [ ]
+        core_problem: "[e.g., 73% of X experience Y causing $Z loss]"
+        current_baseline_metrics: [ ]
+        prototype_learnings: [ ]
+        ai_feature:
+          enabled: [true|false]
+          model: [ ]
+          latency_requirements_ms:
+            p50: [ ]
+            p99: [ ]
+          cost_per_1k_requests_usd_max: [ ]
+        hard_deadline: [YYYY-MM-DD]
+        key_stakeholders:
+          - name: [ ]
+            role: [ ]
+    # first section, no deps
+
+  opportunity.framing:
+    instructions: |
+      # Frame the bet crisply
+      Core Problem: "[X% of users do Y causing $Z impact]"
+      Hypothesis: "If we do X, then Y will improve by Z%."
+      Strategy Fit: "[Which OKR this unlocks AND what we are explicitly NOT doing]"
+
+      Financial Model (monthly impact):
+        - Pessimistic: assumptions=[ ], impact=$X, confidence=60%
+        - Most Likely: assumptions=[ ], impact=$Y, confidence=30%
+        - Optimistic: assumptions=[ ], impact=$Z, confidence=10%
+    depends_on:
+      - "prd.overview"
+
+  scope.boundaries:
+    instructions: |
+      # Draw hard lines to prevent scope creep
+      In Scope (checked user stories/surfaces/endpoints):
+        - [ ]
+        - [ ]
+        - [ ]
+
+      NON-GOALS:
+        1) **[Not building X]** because [reason]
+        2) **[Deferring Z to Qn]** because [dependency]
+        3) **[Not touching system V]** due to [migration/constraints]
+    depends_on:
+      - "opportunity.framing"
+
+  success.measurement:
+    instructions: |
+      # Define success with numbers and decision thresholds
+      Primary Success Metrics:
+        - name: [ ]
+          baseline: "[value ± variance]"
+          target: "[value]"
+          mde: "[%]"
+          decision_threshold: "Ship if >A, kill if <B"
+        - name: [ ]
+          baseline: "[ ]"
+          target: "[ ]"
+          mde: "[%]"
+          decision_threshold: "[e.g., Must exceed by week 2]"
+
+      Guardrails (must not regress):
+        - metric: [ ]
+          threshold: [e.g., P99 latency < Y ms]
+        - metric: [ ]
+          threshold: [e.g., FP rate < Z%]
+
+      Graduation Criteria:
+        scale_to_100_if: [clear conditions]
+        kill_and_revert_if: [explicit failure conditions]
+        iterate_if: [middle-ground conditions]
+    depends_on:
+      - "scope.boundaries"
+
+  rollout.plan:
+    instructions: |
+      # Adult rollout plan with real gates, names, and dates
+      Phase 1: Validation (Days 1–7)
+        exposure: "[X% of specific segment]"
+        sampling: "[user/session/request]"
+        gate_1:
+          date: [YYYY-MM-DD]
+          decider: [Name]
+          criteria: "[metrics and thresholds]"
+
+      Phase 2: Controlled Expansion (Days 8–21)
+        exposure_ramp: ["X%" , "Y%" , "Z%"]
+        gate_2:
+          date: [YYYY-MM-DD]
+          stakeholder_check: "[specific metric] with [stakeholder]"
+        finance_approval_if: "[condition]"
+
+      Phase 3: Full Launch (Day 22+)
+        contingent_on: "[specific criteria]"
+        regional_or_segment_order: "[sequence + why]"
+    depends_on:
+      - "success.measurement"
+
+  prototype.loop:
+    instructions: |
+      # Close the loop between prototypes and PRD
+      What prototypes taught us:
+        - [Learning 1 → changed approach from X to Y]
+        - [Learning 2 → discovered edge case Z]
+        - [Learning 3 → users want A not B]
+
+      Next prototype must answer:
+        - [ ] Can we handle [edge case] at scale?
+        - [ ] Does [approach] work for [segment]?
+        - [ ] Is [latency] acceptable for [use case]?
+
+      PRD revision triggers:
+        - If prototype shows [X], revisit [section Y].
+        - If [metric] differs by >20% from estimate, reopen financial model.
+    depends_on:
+      - "rollout.plan"
+
+  ai.behavior_contract:
+    instructions: |
+      # Include only if AI feature; otherwise skip this section
+      Behavior Contract:
+        must:
+          - [Specific behavior 1]
+          - [Specific behavior 2]
+        must_not:
+          - [Prohibited behavior 1]
+          - [Prohibited behavior 2]
+
+      Reference Examples (use real data)
+        good_examples: 7-10 with Input / Output / Why Good
+        bad_examples: 7-10 with Input / Current Output / Correct Handling / Why Bad
+        reject_cases: 5 edge cases with Scenario / Detection / Response / Why Reject
+
+      AI Guardrails:
+        pii_echo: "[detection + prevention]"
+        hallucination_handling: "[threshold + fallback]"
+        latency_ms:
+          p50: [ ]
+          p99: [ ]
+        cost_per_1k_requests_usd_max: [ ]
+        token_limits:
+          input_tokens_max: [ ]
+          output_tokens_max: [ ]
+    depends_on:
+      - "prototype.loop"
+
+  risk.management:
+    instructions: |
+      # Name risks, detection, mitigation, and owners
+      risks:
+        - risk: [ ]
+          likelihood: [Low|Med|High]
+          impact: [Low|Med|High]
+          detection: "[How detected]"
+          mitigation: "[Response]"
+          owner: "[Name]"
+
+      kill_switch:
+        location: "[config/flag path]"
+        who_can_pull: "[team on-call + escalation]"
+        ttr_minutes: [ ]
+        fallback_state: "[system reverts to X]"
+    depends_on:
+      - "prototype.loop"
+
+  launch.readiness:
+    instructions: |
+      # Prove we’re ready to ship Day 1
+      pre_launch_checklist:
+        - golden_eval_set: "[X examples, Y% coverage]"
+        - load_test: "Confirmed [X] QPS with [Y] ms P99"
+        - dashboards: "[link]"
+        - runbook: "[link]"
+        - legal_review: "[Name approved Date]"
+        - security_review: "[Name approved Date]"
+        - finance_model: "Approval if > $[X] impact"
+
+      day_1_success:
+        - "[Metric 1] within expected range"
+        - "No P0 incidents"
+        - "[X]% of traffic successfully served"
+    depends_on:
+      - "risk.management"
+
+  ownership.decisions:
+    instructions: |
+      # Who decides what, and when
+      core_team:
+        - role: DRI
+          name: [ ]
+          accountable_for: "Overall success, kill decision"
+        - role: Eng Lead
+          name: [ ]
+          accountable_for: "Technical delivery, latency"
+        - role: Data
+          name: [ ]
+          accountable_for: "Experiment design, analysis"
+        - role: Design
+          name: [ ]
+          accountable_for: "User experience bar"
+        - role: Legal/Security
+          name: [ ]
+          accountable_for: "Compliance, data handling"
+
+      decision_calendar:
+        - date: [YYYY-MM-DD]
+          decision: "Gate 1: Expand?"
+          criteria: "[Metrics]"
+          decider: "[Name]"
+        - date: [YYYY-MM-DD]
+          decision: "Gate 2: Graduate?"
+          criteria: "[Metrics]"
+          decider: "[Name]"
+        - date: [YYYY-MM-DD]
+          decision: "Post-mortem"
+          criteria: "Learnings"
+          decider: "All"
+    depends_on:
+      - "launch.readiness"
+
+  open.questions:
+    instructions: |
+      # Track gaps with owners and due dates
+      questions:
+        - question: "[Missing data X?]"
+          owner: "[Name]"
+          due_date: [YYYY-MM-DD]
+          blocks: "[Launch|Phase 2|—]"
+        - question: "[Technical unknown Y?]"
+          owner: "[Name]"
+          due_date: [YYYY-MM-DD]
+          blocks: "[ ]"
+    depends_on:
+      - "ownership.decisions"
+
+  json.summary:
+    instructions: |
+      # Brief machine-readable summary for dashboards/automation
+      schema:
+        title: "[Feature Name]"
+        hypothesis: "[One sentence]"
+        problem_magnitude: "$[X]M annual impact"
+        confidence_level: "[X]%"
+        primary_metrics:
+          - name: ""
+            baseline: ""
+            target: ""
+            mde: ""
+            threshold: ""
+        guardrails:
+          - metric: ""
+            threshold: ""
+            consequence: "auto-kill if breached"
+        rollout:
+          start_date: "YYYY-MM-DD"
+          initial_exposure: "X%"
+          duration_days: X
+          gates:
+            - date: ""
+              decision: ""
+              criteria: ""
+        kill_switch:
+          location: ""
+          owners: [""]
+          ttr_minutes: X
+        ai_config:
+          model: ""
+          behavior_examples:
+            good: X
+            bad: Y
+            reject: Z
+          max_latency_p99_ms: X
+          max_cost_per_1k: X
+        owners:
+          dri: ""
+          eng_lead: ""
+          data_lead: ""
+        prototype_learnings_incorporated: true
+        next_revision_date: "YYYY-MM-DD"
+    depends_on:
+      - "open.questions"
+
+  final.quality_checks:
+    instructions: |
+      # Run this quick list before sharing
+      checklist:
+        - "Would an engineer know exactly what to build?"
+        - "Can an exec understand the bet in 30 seconds?"
+        - "All metrics have baselines and targets?"
+        - "Prototype learnings reflected (not hypotheticals)?"
+        - "Examples come from real data?"
+        - "Every section helps ship, measure, or kill?"
+        - "Total length ≤ 5 pages when formatted?"
+    depends_on:
+      - "json.summary"

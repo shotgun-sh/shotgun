@@ -245,10 +245,15 @@ def agent_deps(codebase_service: CodebaseService, temp_storage_dir: Path) -> Age
         api_key=os.getenv("ANTHROPIC_API_KEY", "test-api-key"),
     )
 
+    # Dummy system prompt function for tests
+    def dummy_system_prompt_fn(_ctx):
+        return "You are a helpful AI assistant for codebase analysis."
+
     return AgentDeps(
         **runtime_options.model_dump(),
         llm_model=model_config,
         codebase_service=codebase_service,
+        system_prompt_fn=dummy_system_prompt_fn,
     )
 
 

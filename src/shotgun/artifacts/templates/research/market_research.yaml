@@ -1,0 +1,585 @@
+name: Market Research Template
+purpose: Use this template to build a comprehensive market research document for understanding market opportunities, competition, and customer needs.
+prompt: |
+  First, suggest creating a market_overview section to establish the market landscape and opportunity. Then, once the user reviews, move on to deeper analysis sections.
+  Include systematic market analysis that defines market size, growth potential, competitive dynamics, and customer insights. The research should enable stakeholders to make informed decisions about market entry, product positioning, and go-to-market strategies.
+  Prioritize research areas by business impact × feasibility to maximize ROI on market entry.
+  Balance quantitative data with qualitative insights: Numbers tell what, interviews tell why
+  Challenge assumptions with data: Evidence over intuition
+  Your focus needs to be on creating clear, actionable market insights that business teams can use to make strategic decisions.
+  If user provides specific market or product context, acknowledge and get to work OR ask for more details if critical market definition is missing.
+  Try to suggest next steps for validating market hypotheses and reducing risk.
+sections:
+    market.overview:
+        instructions: |
+            # What is a good market_overview section?
+
+            •	Defines the market scope and boundaries
+            •	Quantifies market size and growth potential
+            •	Identifies key trends and drivers
+            •	Sets context for all subsequent analysis
+
+            # Questions to ask yourself:
+            •	What market are we really in? (Be specific about segments)
+            •	Is this market growing, stable, or declining? Why?
+            •	What macro trends affect this market?
+            •	What would need to be true for this to be a billion-dollar opportunity?
+
+            # Includes:
+              Market Definition: [Clear boundaries of the market we're analyzing]
+              
+              Market Size & Growth:
+                Total Addressable Market (TAM): $[Amount] [Year]
+                Serviceable Addressable Market (SAM): $[Amount]
+                Serviceable Obtainable Market (SOM): $[Amount]
+                CAGR: [X]% ([Year range])
+                
+              Key Market Drivers:
+                - [Technology trend driving growth]
+                - [Regulatory change creating opportunity]
+                - [Demographic shift]
+                - [Economic factor]
+
+              Market Maturity:
+                Stage: [Nascent/Growing/Mature/Declining]
+                Adoption Rate: [Early adopters/Early majority/Late majority]
+                Key Indicators: [What shows the maturity level]
+
+            # Market Segmentation:
+
+            | Segment | Size | Growth Rate | Our Fit |
+            |---------|------|-------------|---------|
+            | Enterprise | $XB | 15% | High - strong product fit |
+            | SMB | $XB | 25% | Medium - needs adaptation |
+            | Consumer | $XB | 10% | Low - different needs |
+
+    market.customer_segments:
+        instructions: |
+            # How to write a good market.customer_segments section
+
+            Deep dive into target customer groups with actionable insights.
+
+            •	Goes beyond demographics to psychographics and behaviors
+            •	Quantifies segment attractiveness
+            •	Identifies underserved needs
+
+            # Questions to ask yourself:
+            •	Which segments have the most acute pain points?
+            •	Where do we have unfair advantages?
+            •	Which segments are most profitable to serve?
+            •	Who's being ignored by current solutions?
+
+            # Includes:
+              ## Primary Segments Analysis
+
+              ### Segment 1: [Name]
+              **Demographics:**
+                - Company Size: [Employees/Revenue]
+                - Industry: [Verticals]
+                - Geography: [Regions]
+                - Budget: [Typical spend on solutions]
+
+              **Psychographics:**
+                - Values: [What they care about]
+                - Fears: [What keeps them up at night]
+                - Aspirations: [What success looks like]
+
+              **Behavioral Patterns:**
+                - Buying Process: [How they evaluate and purchase]
+                - Decision Makers: [Titles and roles involved]
+                - Sales Cycle: [Typical length and stages]
+                - Price Sensitivity: [High/Medium/Low]
+
+              **Unmet Needs:**
+                - 🔴 Critical: [Painful problem without good solution]
+                - 🟡 Important: [Current solutions are inadequate]
+                - 🟢 Nice-to-have: [Would pay for if available]
+
+              **Segment Attractiveness Score:** [1-10]
+              Factors: Market size (X/10), Growth (X/10), Competition (X/10), Our fit (X/10)
+
+              [Repeat for each major segment]
+
+              ## Segment Prioritization Matrix
+
+              | Segment | Size | Growth | Competition | Our Advantage | Priority |
+              |---------|------|--------|-------------|---------------|----------|
+              | [Name] | Large | High | Low | Strong | 1 |
+              | [Name] | Medium | High | Medium | Medium | 2 |
+
+        depends_on:
+            - "market.overview"
+
+    market.competitive_landscape:
+        instructions: |
+            # How to write a good market.competitive_landscape section
+
+            Comprehensive analysis of competitive dynamics and positioning opportunities.
+
+            •	Maps all competitive forces (not just direct competitors)
+            •	Identifies white spaces and differentiation opportunities
+            •	Analyzes competitive strategies and weaknesses
+
+            # Questions to ask yourself:
+            •	Who are we really competing against? (Including "do nothing" option)
+            •	What would it take to win against the market leader?
+            •	Where are competitors vulnerable?
+            •	What moats can we build?
+
+            # Includes:
+              ## Market Structure
+              
+              Market Concentration: [Fragmented/Consolidated]
+              Competitive Intensity: [High/Medium/Low]
+              Barrier to Entry: [List key barriers]
+              Substitution Threats: [Alternative solutions]
+
+              ## Competitor Analysis
+
+              ### Direct Competitors
+
+              | Company | Market Share | Strengths | Weaknesses | Strategy | Funding |
+              |---------|--------------|-----------|------------|----------|---------|
+              | Leader Corp | 35% | Brand, Scale | Slow innovation, High price | Enterprise focus | $200M |
+              | Challenger Inc | 20% | Product quality | Limited reach | Product-led growth | $50M |
+              | Startup X | 5% | Innovation | Unproven | Disruption | $15M |
+
+              ### Indirect Competitors & Substitutes
+              - **DIY/Manual Processes**: [Who still does this manually and why]
+              - **Adjacent Solutions**: [Products that partially solve the problem]
+              - **Platform Players**: [Big tech that might enter]
+
+              ## Competitive Positioning Map
+
+              ```mermaid
+              quadrantChart
+                  title Competitive Positioning (Price vs. Capability)
+                  x-axis Low Capability --> High Capability
+                  y-axis Low Price --> High Price
+                  quadrant-1 Premium Leaders
+                  quadrant-2 Overpriced
+                  quadrant-3 Budget Options  
+                  quadrant-4 Value Players
+                  Leader Corp: [0.8, 0.9]
+                  Challenger Inc: [0.7, 0.6]
+                  Startup X: [0.6, 0.3]
+                  Our Position: [0.75, 0.5]
+              ```
+
+              ## Differentiation Opportunities
+              1. **[Unique angle]**: No one is addressing [specific need]
+              2. **[Technology advantage]**: We can deliver [capability] others can't
+              3. **[Business model]**: Different pricing/delivery model
+
+        depends_on:
+            - "market.customer_segments"
+
+    market.customer_research:
+        instructions: |
+            # How to write a good market.customer_research section
+
+            Primary research findings from customer interviews, surveys, and data analysis.
+
+            •	Captures voice of customer authentically
+            •	Validates assumptions with real data
+            •	Uncovers non-obvious insights
+
+            # Questions to ask yourself:
+            •	What surprised us in the research?
+            •	Are we solving a vitamin or painkiller problem?
+            •	What words do customers use (not our jargon)?
+            •	How much would they actually pay?
+
+            # Includes:
+              ## Research Methodology
+              - Interview Count: [Number] customers/prospects
+              - Survey Responses: [Number] participants  
+              - Segments Covered: [List]
+              - Research Period: [Dates]
+
+              ## Key Findings
+
+              ### Pain Point Validation
+
+              | Pain Point | Severity (1-10) | Frequency | Current Solution | Willing to Pay |
+              |------------|-----------------|-----------|------------------|----------------|
+              | [Problem 1] | 8.5 | Daily | Manual workaround | $XXX/month |
+              | [Problem 2] | 7.2 | Weekly | Competitor product | $XXX/month |
+              | [Problem 3] | 6.1 | Monthly | Nothing | $XX/month |
+
+              ### Customer Quotes
+              > "**[Powerful quote about the problem]**"  
+              > — [Title, Company Size, Industry]
+
+              > "**[Quote about current solution frustrations]**"  
+              > — [Title, Company Size, Industry]
+
+              ### Jobs-to-be-Done Analysis
+              
+              **Functional Jobs:**
+              - [Primary job customer is trying to accomplish]
+              - [Secondary jobs]
+
+              **Emotional Jobs:**
+              - [How they want to feel]
+              - [What they want to avoid feeling]
+
+              **Social Jobs:**
+              - [How they want to be perceived]
+              - [Status considerations]
+
+              ### Willingness to Pay Analysis
+
+              | Price Point | % Would Pay | % Sweet Spot | % Too Expensive |
+              |-------------|-------------|--------------|-----------------|
+              | $49/month | 85% | 15% | 0% |
+              | $99/month | 65% | 45% | 5% |
+              | $199/month | 30% | 25% | 40% |
+              | $299/month | 15% | 10% | 75% |
+
+        depends_on:
+            - "market.competitive_landscape"
+
+    market.trends_analysis:
+        instructions: |
+            # How to write a good market.trends_analysis section
+
+            Forward-looking analysis of market evolution and disruption potential.
+
+            •	Identifies trends before they're obvious
+            •	Connects dots between different market forces
+            •	Predicts market evolution scenarios
+
+            # Questions to ask yourself:
+            •	What will this market look like in 5 years?
+            •	What could make our solution obsolete?
+            •	What tailwinds can we ride?
+            •	What regulations or technologies could reshape everything?
+
+            # Includes:
+              ## Macro Trends
+
+              ### Technology Trends
+              | Trend | Impact on Market | Timeline | Opportunity/Threat |
+              |-------|------------------|----------|-------------------|
+              | AI/ML adoption | Automates X, enables Y | 2-3 years | Opportunity - we can leverage |
+              | API-first architecture | Changes buying behavior | Now | Opportunity - our strength |
+              | No-code movement | Democratizes access | 3-5 years | Threat - must simplify |
+
+              ### Regulatory & Compliance
+              - **[Regulation Name]**: [Impact and timeline]
+              - **Industry Standards**: [Emerging requirements]
+              - **Data Privacy**: [How it affects market]
+
+              ### Social & Economic Trends
+              - Remote Work: [How it changes demand]
+              - Generation Shift: [Millennial/Gen Z expectations]
+              - Economic Factors: [Recession resilience, budget shifts]
+
+              ## Market Evolution Scenarios
+
+              ### Scenario 1: Status Quo Evolution (60% probability)
+              - Market grows steadily at 15-20%
+              - Current leaders maintain position
+              - Our opportunity: [Carve out niche]
+
+              ### Scenario 2: Disruption (25% probability)
+              - New technology changes the game
+              - Customer expectations shift dramatically
+              - Our opportunity: [Lead the change]
+
+              ### Scenario 3: Consolidation (15% probability)
+              - Major acquisitions reshape market
+              - Platforms bundle our functionality
+              - Our opportunity: [Acquisition target or acquirer]
+
+              ## Leading Indicators to Watch
+              1. [Metric that predicts market shift]
+              2. [Early adopter behavior to monitor]
+              3. [Technology milestone that changes things]
+
+        depends_on:
+            - "market.customer_research"
+
+    market.opportunities:
+        instructions: |
+            # How to write a good market.opportunities section
+
+            Specific, actionable opportunities with quantified potential.
+
+            •	Connects market insights to business opportunities
+            •	Sizes each opportunity realistically
+            •	Prioritizes based on fit and feasibility
+
+            # Questions to ask yourself:
+            •	Which opportunity could we uniquely win?
+            •	What's the fastest path to $10M ARR?
+            •	Where's the blue ocean?
+            •	What would we regret not pursuing?
+
+            # Includes:
+              ## Opportunity Assessment
+
+              ### Opportunity 1: [Specific market gap]
+              **Description**: [What's the opportunity]
+              
+              **Market Evidence**:
+              - Customer research: [X% expressed need]
+              - Competitive gap: [No one addresses this well]
+              - Trend alignment: [Riding trend X]
+
+              **Sizing**:
+              - Target Customers: [Number]
+              - Average Deal Size: $[Amount]
+              - Potential Revenue: $[Amount] in Year 3
+              - Market Share Required: [X%]
+
+              **Why Us**:
+              - Unique Advantages: [What we have others don't]
+              - Speed to Market: [Timeline advantage]
+              - Resource Requirements: [What it takes to win]
+
+              **Risk Assessment**: [Low/Medium/High]
+              - Execution Risk: [What could go wrong]
+              - Market Risk: [External factors]
+              - Mitigation: [How to reduce risk]
+
+              [Repeat for top 3-5 opportunities]
+
+              ## Opportunity Prioritization Matrix
+
+              ```mermaid
+              quadrantChart
+                  title Opportunity Priority (Impact vs. Effort)
+                  x-axis Low Effort --> High Effort
+                  y-axis Low Impact --> High Impact
+                  quadrant-1 Strategic Bets
+                  quadrant-2 Quick Wins
+                  quadrant-3 Fill-ins
+                  quadrant-4 Question Marks
+                  Opportunity 1: [0.3, 0.8]
+                  Opportunity 2: [0.7, 0.7]
+                  Opportunity 3: [0.2, 0.3]
+              ```
+
+              ## Recommended Focus
+              **Primary Opportunity**: [Which one and why]
+              **Quick Wins**: [What we can capture immediately]
+              **Future Options**: [What to revisit later]
+
+        depends_on:
+            - "market.trends_analysis"
+
+    market.business_model:
+        instructions: |
+            # How to write a good market.business_model section
+
+            Analysis of viable business models and monetization strategies for the market.
+
+            •	Examines what customers actually pay for
+            •	Compares different revenue models
+            •	Projects unit economics
+
+            # Questions to ask yourself:
+            •	How do customers prefer to buy in this market?
+            •	What pricing models create the most value?
+            •	How do we align price with value delivered?
+            •	What's the path to positive unit economics?
+
+            # Includes:
+              ## Market Pricing Analysis
+
+              ### Current Market Pricing Models
+              | Model Type | Examples | Typical Price Range | Pros | Cons |
+              |------------|----------|-------------------|------|------|
+              | Subscription | SaaS leaders | $50-500/mo | Predictable revenue | Churn risk |
+              | Usage-based | API companies | $0.001-0.10/call | Scales with value | Revenue unpredictable |
+              | One-time license | Traditional software | $1K-50K | Large upfront | No recurring |
+              | Freemium | PLG companies | $0-99/mo | Wide funnel | Low conversion |
+
+              ## Proposed Business Model
+
+              **Revenue Model**: [Subscription/Usage/Hybrid]
+              
+              **Pricing Strategy**:
+              - Pricing Metric: [Per user/Per usage/Per value]
+              - Price Points: [Tiers and prices]
+              - Value Alignment: [How price scales with customer value]
+
+              **Monetization Funnel**:
+              ```
+              Free Trial → Starter ($X) → Professional ($Y) → Enterprise (Custom)
+                 ↓ 20%        ↓ 30%           ↓ 40%              ↓ 10%
+              ```
+
+              ## Unit Economics Model
+
+              | Metric | Year 1 | Year 2 | Year 3 |
+              |--------|--------|--------|--------|
+              | CAC | $1,200 | $1,000 | $800 |
+              | ACV | $2,400 | $3,600 | $4,800 |
+              | Gross Margin | 70% | 75% | 80% |
+              | Payback Period | 8 months | 5 months | 3 months |
+              | LTV:CAC | 2.5:1 | 4:1 | 6:1 |
+
+              ## Revenue Projections
+
+              | Revenue Stream | Year 1 | Year 2 | Year 3 |
+              |----------------|--------|--------|--------|
+              | Subscriptions | $2M | $8M | $20M |
+              | Services | $0.5M | $1M | $2M |
+              | Platform Fees | $0 | $0.5M | $3M |
+              | **Total** | **$2.5M** | **$9.5M** | **$25M** |
+
+        depends_on:
+            - "market.opportunities"
+
+    market.go_to_market:
+        instructions: |
+            # How to write a good market.go_to_market section
+
+            Strategic plan for market entry and customer acquisition.
+
+            •	Defines clear market entry strategy
+            •	Identifies optimal channels and tactics
+            •	Sets realistic timeline and milestones
+
+            # Questions to ask yourself:
+            •	What's the path of least resistance to first customers?
+            •	Which channels do our customers trust?
+            •	How do we create unfair advantages in distribution?
+            •	What would a competitor fear most about our GTM?
+
+            # Includes:
+              ## Market Entry Strategy
+
+              **Approach**: [Land and expand/Horizontal/Vertical/Platform]
+              
+              **Initial Target**: 
+              - Segment: [Most receptive early adopters]
+              - Geography: [Where to start]
+              - Use Case: [Killer app to lead with]
+
+              ## Channel Strategy
+
+              | Channel | Priority | Investment | Expected CAC | Timeline |
+              |---------|----------|------------|--------------|----------|
+              | Direct Sales | High | $2M/year | $5,000 | Immediate |
+              | Partner Channel | Medium | $500K/year | $2,000 | 6 months |
+              | Self-serve/PLG | High | $1M/year | $500 | 3 months |
+              | Marketplace | Low | $100K/year | $1,000 | 12 months |
+
+              ## Competitive Positioning
+
+              **Market Category**: [Create new or join existing?]
+              
+              **Key Messages**:
+              1. **Primary**: [Main value prop vs. status quo]
+              2. **Differentiator**: [Why us vs. competitors]
+              3. **Vision**: [Where market is heading]
+
+              **Proof Points**:
+              - [Metric that proves value]
+              - [Customer success story]
+              - [Technology advantage]
+
+              ## Launch Plan
+
+              ### Phase 1: Beta (Months 1-3)
+              - [ ] Recruit 10-20 design partners
+              - [ ] Refine value proposition
+              - [ ] Gather case studies
+              - [ ] Build reference customers
+
+              ### Phase 2: Limited Availability (Months 4-6)
+              - [ ] Launch to waitlist
+              - [ ] Optimize pricing
+              - [ ] Scale customer success
+              - [ ] Develop channel partnerships
+
+              ### Phase 3: General Availability (Months 7+)
+              - [ ] Public launch
+              - [ ] PR and analyst briefings
+              - [ ] Demand generation campaigns
+              - [ ] Scale all channels
+
+              ## Success Metrics
+
+              | Milestone | 3 Months | 6 Months | 12 Months |
+              |-----------|----------|----------|-----------|
+              | Customers | 20 | 100 | 500 |
+              | ARR | $200K | $1M | $5M |
+              | NPS | >50 | >60 | >70 |
+              | CAC Payback | <18mo | <12mo | <6mo |
+
+        depends_on:
+            - "market.business_model"
+
+    market.risks_validation:
+        instructions: |
+            # How to write a good market.risks_validation section
+
+            Honest assessment of market risks and validation strategies.
+
+            •	Identifies major risks to market success
+            •	Proposes validation experiments
+            •	Creates learning milestones
+
+            # Questions to ask yourself:
+            •	What could kill this opportunity?
+            •	What assumptions are we making that could be wrong?
+            •	How can we test our riskiest assumptions cheaply?
+            •	When should we pivot vs. persist?
+
+            # Includes:
+              ## Risk Assessment
+
+              ### Market Risks
+
+              | Risk | Probability | Impact | Mitigation Strategy |
+              |------|-------------|---------|-------------------|
+              | Market size smaller than estimated | Medium | High | Validate with more customer research |
+              | Incumbent response | High | Medium | Move fast, build moat |
+              | Customer adoption slower | Medium | High | Start with easier segment |
+              | Regulatory changes | Low | High | Monitor, build compliance early |
+
+              ### Assumption Testing Plan
+
+              **Critical Assumptions to Validate**:
+              
+              1. **Assumption**: Customers will pay $X for Y value
+                 - **Test**: Pricing page A/B test
+                 - **Success Criteria**: 5% conversion at target price
+                 - **Timeline**: 4 weeks
+
+              2. **Assumption**: We can acquire customers at <$Z CAC
+                 - **Test**: Limited ad campaign
+                 - **Success Criteria**: <$Z cost per qualified lead
+                 - **Timeline**: 6 weeks
+
+              3. **Assumption**: Market is shifting from build to buy
+                 - **Test**: Customer interview series
+                 - **Success Criteria**: >60% considering purchase
+                 - **Timeline**: 2 weeks
+
+              ## Validation Milestones
+
+              | Stage | Key Question | Evidence Required | Go/No-Go Criteria |
+              |-------|--------------|-------------------|-------------------|
+              | Month 1 | Is the pain real? | 20 customer interviews | >80% validate pain |
+              | Month 3 | Will they pay? | 10 paid pilots | >50% convert |
+              | Month 6 | Can we scale? | 50 customers | CAC < 0.5x ACV |
+              | Month 12 | Is there a market? | $1M ARR | Growth >20% MoM |
+
+              ## Pivot Triggers
+              - If conversion <2% after 6 months → Revisit pricing/packaging
+              - If CAC >2x ACV after 9 months → Change GTM strategy
+              - If NPS <30 after 50 customers → Product-market fit issue
+
+              ## Next Steps
+              1. **Immediate** (This week): [Specific action]
+              2. **Short-term** (This month): [Key validation]
+              3. **Medium-term** (This quarter): [Major milestone]
+
+        depends_on:
+            - "market.go_to_market"

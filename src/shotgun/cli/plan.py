@@ -7,7 +7,7 @@ import typer
 
 from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentRuntimeOptions
-from shotgun.agents.plan import create_plan_agent, get_plan_history, run_plan_agent
+from shotgun.agents.plan import create_plan_agent, run_plan_agent
 from shotgun.logging_config import get_logger
 
 app = typer.Typer(name="plan", help="Generate structured plans", no_args_is_help=True)
@@ -65,9 +65,6 @@ def plan(
         logger.info("✅ Planning Complete!")
         logger.info("📋 Results:")
         logger.info("%s", result.output)
-        logger.info("📄 Plan saved to: .shotgun/plan.md")
-        logger.debug("📚 Current plan:")
-        logger.debug("%s", get_plan_history())
 
     except Exception as e:
         logger.error("❌ Error during planning: %s", str(e))

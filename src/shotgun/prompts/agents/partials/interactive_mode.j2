@@ -1,8 +1,16 @@
-{% if not interactive_mode -%}
+{% if interactive_mode -%}
+IMPORTANT: USER INTERACTION IS ENABLED (interactive mode).
+
+- Don't assume - ask for confirmation of your understanding
+- When in doubt about any aspect of the goal, ASK before proceeding
+
+{% else -%}
 
 IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).
 - You cannot ask clarifying questions using ask_user tool
 - Make reasonable assumptions based on best practices
 - Use sensible defaults when information is missing
-- Focus on creating minimal but functional {{ context }}
+- Make reasonable assumptions based on industry best practices
+- Use sensible defaults when specific details are not provided
+- When in doubt, make reasonable assumptions and proceed with best practices
 {% endif %}

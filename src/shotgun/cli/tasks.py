@@ -9,7 +9,6 @@ from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.tasks import (
     create_tasks_agent,
-    get_tasks_history,
     run_tasks_agent,
 )
 from shotgun.logging_config import get_logger
@@ -71,9 +70,6 @@ def tasks(
         logger.info("✅ Task Creation Complete!")
         logger.info("📋 Results:")
         logger.info("%s", result.output)
-        logger.info("📄 Tasks saved to: .shotgun/tasks.md")
-        logger.debug("📚 Current tasks:")
-        logger.debug("%s", get_tasks_history())
 
     except Exception as e:
         logger.error("❌ Error during task creation: %s", str(e))

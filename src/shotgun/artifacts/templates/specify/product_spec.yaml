@@ -1,0 +1,301 @@
+name: Product Specification Template
+purpose: Use this to template to build a product specification for the user's product.
+prompt: |
+  First, suggest creating a product.overview section. Then, once the user reviews, move on to the next sections.
+  Include a technology architecture blueprint that defines boundaries, responsibilities, and quality goals for the product. The system enables end users to perform core workflows reliably and securely while supporting iterative evolution.
+  Prioritize features by user value × business value to maximize the ROI.
+  Facilitate ideation & discovery: Divergent thinking before convergence
+  Fill blanks creatively if the user lacks detail: Momentum over paralysis
+  Your focus needs to be on creating clear, actionable product artifacts that development teams can use.
+  If user provides detailed description with problem, solution, target users, acknowledge and get to work OR ask for more details if critical details are truly missing.
+  Try to suggest next steps for the user in their product definition journey.
+sections:
+    product.overview:
+        instructions: |
+            # A good product.overview:
+            •	Inspires action
+            •	Focuses on a real pain for real users
+            •	Aligns the team on desired outcomes
+            * Is complete and comprehensive
+
+            # Questions to ask yourself:
+            •	What would success headlines say 12 months after launch?
+            •	What user behavior or workflow do we want to eliminate or unlock?
+            * Is there anything else, specific to the product, that we should include?
+
+            # Includes:
+              Product Vision: [One punchy sentence that inspires; problem + aspirational outcome]
+              Problem Statement:
+                Who hurts? [Persona or segment]
+                Pain intensity? [Metric / qualitative quote]
+                Existing workaround? [Current solution]
+                [additional relevant information]
+
+            # Goals & Success Metrics:
+
+            | Goal | KPI | Target |
+            |------|-----|--------|
+            | Reduce payroll processing time | Avg. run time | < 5 min |
+            | Increase retention | NPS | > 60 |
+            [more like that]
+    product.user_personas:
+        instructions: |
+            # How to write a good product.user_personas section
+
+            Capture the motivations, frustrations, and context of your target users.
+
+              •	Makes the user feel real to the team
+              •	Communicates job context and emotional stakes
+              •	Informs tradeoffs during prioritization
+
+            # Questions to ask yourself:
+              •	What would frustrate this person about our current plan?
+              •	What would success feel like in their words?
+
+            Each persona should have their own Emoji you'll use throughout the product specification.
+
+            # Includes:
+              Name / Archetype: [Short, memorable]
+              Role & Demographics: [Job, age, environment]
+              Goals:
+                - [Primary job‑to‑be‑done]
+                - [Secondary]
+              Frustrations / Pain Points:
+                - [Top pain]
+                - [Tech constraints]
+              Success Definition: “[Quote in their words]”
+        depends_on:
+            - "product.overview"
+    product.user_stories:
+        instructions: |
+            Create a concise set of INVEST-compliant user stories, each with clear acceptance criteria using the **Given / When / Then** pattern.
+
+            # Voice & Style
+            Professional, direct, and unambiguous. Avoid marketing fluff and technical implementation details.
+
+            # How to write a good product.user_stories section
+
+            •	Is short, clear, and framed around user benefit
+            •	Has testable, concrete acceptance criteria
+            •	Maps to a real persona and real-world situation
+            * Comprehensively cover the whole system
+            * They cover all personas already defined in the product.personas section (do not create new personas here)
+
+            # Questions to ask yourself:
+            •	Could the team design/build this without ambiguity?
+            •	Is this too big? Can it be split?
+
+            # Key Principles to Apply
+            - **User story format:** "As a \<role>, I want \<goal> so that \<benefit>."
+            - **INVEST:** Independent, Negotiable, Valuable, Estimable, Small, Testable.
+            - **3 Cs:**
+              - **Card:** Concise statement
+              - **Conversation:** Brief elaboration if needed
+              - **Confirmation:** Acceptance criteria clearly defined
+            - **Do’s:** User-centric, outcome-oriented, sprint-sized, measurable value.
+            - **Don’ts:** No UI specifics, vague benefits, or bundled epics.
+            - ALWAYS include at least one acceptance criteria for each user story.
+            - ALWAYS assign the story a JIRA-like ID that we can later refer to easily. Format prefix should come from the product name or EPIC.
+
+            Write key parts of user stories in **bold**.
+
+            # Context Sensitivity
+            - **Startup Context:** Allow lighter processes and faster iteration.
+            - **Enterprise Context:** Include 1–2 "Enabler" stories for compliance, performance, and note dependencies explicitly.
+
+
+            # (Optional) Enabler / Technical Stories
+
+            - As a developer…, I want… so that…
+        depends_on:
+            - "product.user_personas"
+
+    product.user_journeys:
+        instructions: |
+            # How to write a good product.user_journeys section
+
+            Visually maps the end-to-end experience from the user's perspective, highlighting actions, thoughts, and feelings.
+              •	Tells a Story: It should have a clear beginning, middle, and end, following a specific user and scenario.	•	Reveals Pain & Opportunity: Clearly identifies moments of frustration (pain points) and moments of delight.	•	Holistic View: Captures touchpoints both inside and outside the product (e.g., receiving an email notification).	•	Uses Mermaid: Creates a clean, easy-to-read visual diagram of the journey.
+            Questions to ask yourself:
+              •	What happens before the user opens our app and after they close it?	•	Where is the emotional low point of this journey? How can we fix it?	•	What is the "happy path," and what are the most common deviations?
+
+            # Includes:
+            * A Mermaid diagram for each key persona or critical task.
+            * Title: A clear, descriptive title for the journey (e.g., "Journey of a New User Onboarding").
+            * Sections: Logical phases of the journey (e.g., Awareness, Consideration, Purchase, Onboarding, Regular Use).
+            * Tasks: Specific actions the user takes, assigned to a persona.
+            * Sentiment Score: A rating (e.g., 1-5) to show the user's emotional state at each step.
+            * Include a description of the journey in the section content. Make important things in **bold**.
+
+            # Diagram example
+
+            IMPORTANT: DO NOT use semicolons in the content.
+
+            ```mermaid
+            journey
+                title My working day
+                section Go to work
+                  Make tea: 5: Me
+                  Go upstairs: 3: Me
+                  Do work: 1: Me, Cat
+                section Go home
+                  Go downstairs: 5: Me
+                  Sit down: 5: Me
+            ```
+
+        depends_on:
+            - "product.user_stories"
+
+    product.features:
+        instructions: |
+            # How to write a good product.features section
+
+            Detailed specification of product capabilities. Tied directly to user needs and business outcomes.
+
+            •	Explains why the feature matters (not just what it does)
+            •	Specifies functional and non-functional behavior
+            •	Clarifies edge cases and constraints
+
+            # Questions to ask yourself:
+            •	What would make a developer or designer fail to implement this right?
+            •	What are the failure modes or critical risks?
+
+            # Includes:
+              Feature: **[Name]**
+              Objective: **[Problem it solves]**
+              User Benefit: **[Why user cares]**
+              Detailed Requirements:
+                - **[Functional spec]**
+                - **[Performance spec]**
+              Non‑Functional:
+                - Security: **[e.g., SOC 2 compliance]**
+                - Localization: **[e.g., EN/ES at launch]**
+        depends_on:
+            - "product.user_stories"
+
+    product.roadmap:
+        instructions: |
+            # How to write a good product.roadmap section?
+
+            Defines the sequence of what gets built when — and why.
+
+            •	Shows clear strategic themes
+            •	Communicates tradeoffs and intent
+            •	Helps stakeholders set expectations
+
+            # Questions to ask yourself:
+            •	What themes are we prioritizing this quarter and why?
+            •	What’s realistic to deliver given team velocity?
+
+            # Includes:
+              Quarter
+              Theme
+              Initiatives
+              Mermaid Gantt diagram
+
+            # Diagram example (syntax)
+
+            ```mermaid
+            gantt
+                dateFormat  YYYY-MM-DD
+                title       Adding GANTT diagram functionality to mermaid
+                excludes    weekends
+                %% (`excludes` accepts specific dates in YYYY-MM-DD format, days of the week ("sunday") or "weekends", but not the word "weekdays".)
+
+                section A section
+                Completed task            :done,    des1, 2014-01-06,2014-01-08
+                Active task               :active,  des2, 2014-01-09, 3d
+                Future task               :         des3, after des2, 5d
+                Future task2              :         des4, after des3, 5d
+
+                section Critical tasks
+                Completed task in the critical line :crit, done, 2014-01-06,24h
+                Implement parser and jison          :crit, done, after des1, 2d
+                Create tests for parser             :crit, active, 3d
+                Future task in critical line        :crit, 5d
+                Create tests for renderer           :2d
+                Add to mermaid                      :until isadded
+                Functionality added                 :milestone, isadded, 2014-01-25, 0d
+
+                section Documentation
+                Describe gantt syntax               :active, a1, after des1, 3d
+                Add gantt diagram to demo page      :after a1  , 20h
+                Add another diagram to demo page    :doc1, after a1  , 48h
+
+                section Last section
+                Describe gantt syntax               :after doc1, 3d
+                Add gantt diagram to demo page      :20h
+                Add another diagram to demo page    :48h
+            ```
+
+    architecture.overview:
+        instructions: |
+            # A good architecture_overview:
+              •	Establishes scope, purpose, high‑level constraints
+              •	Gives a north‑star vision for future evolution
+
+            # Ask yourself:
+              •	What external systems/actors touch us?
+              •	Which constraints shape every other decision (regulations, runtime, budget)?
+
+            # Includes:
+              •	System Purpose – 1‑sentence mission
+              •	Context Diagram – Mermaid
+              •	Key Constraints – Regs, legacy ties, SLAs
+
+        depends_on:
+            - "product.features"
+
+    architecture.key_components:
+        instructions: |
+            This section should include all key components and their relationships.
+
+            Include diagrams on how they interact and dependencies.
+
+        depends_on:
+            - "architecture.overview"
+            
+    architecture.quality_attributes:
+        instructions: |
+            # Example of a good architecture_quality_attributes section
+
+            Attribute	Metric	Target	Design Strategies
+            Performance	P99 latency	< 200 ms	Async queue, in‑memory cache
+            Scalability	Sustained RPS	5 k	Stateless services + HPA
+            Security	OWASP Top 10	0 critical vulns	CSP, parameterized SQL
+
+            Use measurable targets and map to architectural mechanisms.
+
+        depends_on:
+            - "architecture.key_components"
+
+    architecture.cross_cutting_concerns:
+      instructions: |
+          Capture reusable patterns/services (e.g., centralized logging stack, OAuth provider, feature flags).
+          State ownership and SLOs so ops knows who to page.
+
+      depends_on:
+          - "architecture.key_components"
+          - "architecture.quality_attributes"
+
+    architecture.tech_stack_requirements:
+        instructions: |
+            Next up, we will engage tech research agent to find the best tech stack for the project.
+            Outline key elements of the stack so they can focus on finding the best option for each element in terms of programming language, frameworks, libraries, databases, etc.
+        depends_on:
+            - "architecture.cross_cutting_concerns"
+            - "architecture.quality_attributes"
+            - "architecture.key_components"
+
+    architecture.tech_stack_decisions:
+        instructions: |
+            # Example of a good architecture_tech_stack_decisions section
+
+            Include a summary of the tech stack decisions and why they were made.
+
+        depends_on:
+            - "architecture.tech_stack_requirements"
+            - "architecture.cross_cutting_concerns"
+            - "architecture.quality_attributes"
+            - "architecture.key_components"
+            - "architecture.overview"

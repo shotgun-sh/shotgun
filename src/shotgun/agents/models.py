@@ -1,10 +1,12 @@
 """Pydantic models for agent dependencies and configuration."""
 
 from asyncio import Future, Queue
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic_ai import RunContext
 
 from .config.models import ModelConfig
 
@@ -81,6 +83,10 @@ class AgentDeps(AgentRuntimeOptions):
 
     codebase_service: "CodebaseService" = Field(
         description="Codebase service for code analysis tools",
+    )
+
+    system_prompt_fn: Callable[[RunContext["AgentDeps"]], str] = Field(
+        description="Function that generates the system prompt for this agent",
     )
 
 
