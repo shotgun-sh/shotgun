@@ -30,6 +30,7 @@ dependencies = [
     "jinja2>=3.1.0",
     "logfire[pydantic-ai]>=2.0.0",
     "sentry-sdk[pure_eval]>=2.0.0",
+    "posthog>=3.0.0",
     "textual>=6.1.0",
     "textual-dev>=1.7.0",
     "kuzu>=0.7.0",

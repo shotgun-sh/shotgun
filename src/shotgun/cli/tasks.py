@@ -44,6 +44,17 @@ def tasks(
     logger.info("📋 Task Creation Instruction: %s", instruction)
 
     try:
+        # Track tasks command usage
+        from shotgun.posthog_telemetry import track_event
+
+        track_event(
+            "tasks_command",
+            {
+                "non_interactive": non_interactive,
+                "provider": provider.value if provider else "default",
+            },
+        )
+
         # Create agent dependencies
         agent_runtime_options = AgentRuntimeOptions(
             interactive_mode=not non_interactive

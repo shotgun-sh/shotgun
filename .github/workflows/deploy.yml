@@ -100,12 +100,15 @@ jobs:
       - name: Build package
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
         run: |
           echo "🔨 Building package version: ${{ steps.version_update.outputs.version }}"
-          if [[ -n "$SENTRY_DSN" ]]; then
-            echo "✅ Building with Sentry integration enabled"
+          if [[ -n "$SENTRY_DSN" ]] || [[ -n "$POSTHOG_API_KEY" ]]; then
+            [[ -n "$SENTRY_DSN" ]] && echo "✅ Building with Sentry integration enabled"
+            [[ -n "$POSTHOG_API_KEY" ]] && echo "✅ Building with PostHog analytics enabled"
           else
-            echo "⚠️  Building without Sentry DSN (Sentry will use fallback)"
+            echo "⚠️  Building without analytics (Sentry/PostHog will use fallback)"
           fi
           python -m build
 

@@ -38,6 +38,17 @@ def plan(
     logger.info("📋 Planning Goal: %s", goal)
 
     try:
+        # Track plan command usage
+        from shotgun.posthog_telemetry import track_event
+
+        track_event(
+            "plan_command",
+            {
+                "non_interactive": non_interactive,
+                "provider": provider.value if provider else "default",
+            },
+        )
+
         # Create agent dependencies
         agent_runtime_options = AgentRuntimeOptions(
             interactive_mode=not non_interactive

@@ -9,6 +9,7 @@ from shotgun import __version__
 from shotgun.agents.config import get_config_manager
 from shotgun.cli import codebase, config, plan, research, tasks, update
 from shotgun.logging_config import configure_root_logger, get_logger
+from shotgun.posthog_telemetry import setup_posthog_observability
 from shotgun.sentry_telemetry import setup_sentry_observability
 from shotgun.telemetry import setup_logfire_observability
 from shotgun.tui import app as tui_app
@@ -35,6 +36,10 @@ logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 # Initialize Sentry telemetry
 _sentry_enabled = setup_sentry_observability()
 logger.debug("Sentry observability enabled: %s", _sentry_enabled)
+
+# Initialize PostHog analytics
+_posthog_enabled = setup_posthog_observability()
+logger.debug("PostHog analytics enabled: %s", _posthog_enabled)
 
 # Global variable to store update notification
 _update_notification: str | None = None
@@ -129,6 +134,14 @@ def main(
                 console.print(f"\n[cyan]{_update_notification}[/cyan]", style="bold")
 
         atexit.register(show_update_notification)
+
+        # Register PostHog shutdown handler
+        def shutdown_posthog() -> None:
+            from shotgun.posthog_telemetry import shutdown
+
+            shutdown()
+
+        atexit.register(shutdown_posthog)
 
 
 if __name__ == "__main__":

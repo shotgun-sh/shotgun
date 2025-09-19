@@ -1,4 +1,4 @@
-"""Hatchling build hook for generating build constants."""  # type: ignore[no-untyped-def]
+"""Hatchling build hook for generating build constants."""
 
 import os
 from pathlib import Path
@@ -19,6 +19,10 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[misc]
         # Only generate constants if SENTRY_DSN is provided (production builds)
         sentry_dsn = os.environ.get("SENTRY_DSN", "")
 
+        # Get PostHog configuration from environment
+        posthog_api_key = os.environ.get("POSTHOG_API_KEY", "")
+        posthog_project_id = os.environ.get("POSTHOG_PROJECT_ID", "")
+
         # Generate Python configuration file with build-time constants
         constants_content = f'''"""Build-time constants generated during packaging.
 
@@ -28,6 +32,10 @@ DO NOT EDIT MANUALLY.
 
 # Sentry DSN embedded at build time (empty string if not provided)
 SENTRY_DSN = {repr(sentry_dsn)}
+
+# PostHog configuration embedded at build time (empty strings if not provided)
+POSTHOG_API_KEY = {repr(posthog_api_key)}
+POSTHOG_PROJECT_ID = {repr(posthog_project_id)}
 
 # Build metadata
 BUILD_TIME_ENV = "production" if SENTRY_DSN else "development"
@@ -41,9 +49,16 @@ BUILD_TIME_ENV = "production" if SENTRY_DSN else "development"
             f.write(constants_content)
 
         # Log the build hook execution
-        if sentry_dsn:
-            print("✅ Generated build_constants.py with Sentry DSN (production build)")
+        if sentry_dsn or posthog_api_key:
+            features = []
+            if sentry_dsn:
+                features.append("Sentry")
+            if posthog_api_key:
+                features.append("PostHog")
+            print(
+                f"✅ Generated build_constants.py with {', '.join(features)} (production build)"
+            )
         else:
             print(
-                "⚠️  Generated build_constants.py without Sentry DSN (development build)"
+                "⚠️  Generated build_constants.py without analytics keys (development build)"
             )

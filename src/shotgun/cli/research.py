@@ -58,6 +58,17 @@ async def async_research(
     provider: ProviderType | None = None,
 ) -> None:
     """Async wrapper for research process."""
+    # Track research command usage
+    from shotgun.posthog_telemetry import track_event
+
+    track_event(
+        "research_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
+
     # Create agent dependencies
     agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
 

@@ -35,6 +35,11 @@ class ShotgunApp(App[None]):
         logger.debug(f"Update notification received: {notification}")
 
     def on_mount(self) -> None:
+        # Track TUI startup
+        from shotgun.posthog_telemetry import track_event
+
+        track_event("tui_started", {})
+
         self.push_screen(
             SplashScreen(), callback=lambda _arg: self.refresh_startup_screen()
         )
