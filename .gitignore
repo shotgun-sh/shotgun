@@ -7,6 +7,9 @@ playground/
 # Output directory
 .shotgun/
 
+# Generated build files
+src/shotgun/build_constants.py
+
 # Claude code
 ./claude/.claude/settings.local.json
 

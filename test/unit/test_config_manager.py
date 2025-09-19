@@ -52,9 +52,12 @@ def test_load_config_not_exists(mock_logger):
         assert isinstance(config, ShotgunConfig)
         assert config.default_provider == ProviderType.OPENAI
         assert manager._config is config
-        mock_logger.info.assert_called_once_with(
-            "Configuration file not found, using defaults: %s", config_path
-        )
+        # Now creates new config with user_id, so we get two log messages
+        assert mock_logger.info.call_count == 2
+        assert hasattr(config, "user_id")
+        assert config.user_id is not None
+        assert hasattr(config, "config_version")
+        assert config.config_version == 1
 
 
 @patch("shotgun.agents.config.manager.logger")
@@ -68,17 +71,23 @@ def test_load_config_cached(mock_logger):
         config2 = manager.load()
 
         assert config1 is config2
-        mock_logger.info.assert_called_once()
+        # First load creates config with user_id (2 log messages)
+        # Second load returns cached config (no additional log messages)
+        assert mock_logger.info.call_count == 2
 
 
 @patch("shotgun.agents.config.manager.logger")
 def test_load_config_valid_file(mock_logger):
     """Test loading config from valid file."""
+    import uuid
+
     config_data = {
         "openai": {"api_key": "test-openai-key"},
         "anthropic": {"api_key": "test-anthropic-key"},
         "google": {"api_key": "test-google-key"},
         "default_provider": "anthropic",
+        "user_id": str(uuid.uuid4()),
+        "config_version": 1,
     }
 
     with tempfile.NamedTemporaryFile(
@@ -122,8 +131,11 @@ def test_load_config_invalid_json(mock_logger):
 
             assert isinstance(config, ShotgunConfig)
             assert config.default_provider == ProviderType.OPENAI
+            assert hasattr(config, "user_id")
+            assert config.user_id is not None
             mock_logger.error.assert_called_once()
-            mock_logger.info.assert_called_once_with("Using default configuration")
+            # Now calls initialize() which logs twice
+            assert mock_logger.info.call_count == 2
         finally:
             os.unlink(temp_file.name)
 
@@ -131,6 +143,8 @@ def test_load_config_invalid_json(mock_logger):
 @patch("shotgun.agents.config.manager.logger")
 def test_save_config_with_argument(mock_logger):
     """Test saving config with explicit config argument."""
+    import uuid
+
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "test_config.json"
         manager = ConfigManager(config_path=config_path)
@@ -138,6 +152,8 @@ def test_save_config_with_argument(mock_logger):
         config = ShotgunConfig(
             default_provider=ProviderType.ANTHROPIC,
             openai=OpenAIConfig(api_key=SecretStr("test-key")),
+            user_id=str(uuid.uuid4()),
+            config_version=1,
         )
 
         manager.save(config)
@@ -167,19 +183,23 @@ def test_save_config_without_argument(mock_logger):
         manager.save()
 
         assert config_path.exists()
-        mock_logger.debug.assert_called_once_with(
-            "Configuration saved to %s", config_path
-        )
+        # Multiple log calls due to initialize() and save()
+        assert mock_logger.debug.call_count >= 1
 
 
 @patch("shotgun.agents.config.manager.logger")
 def test_save_config_creates_directory(mock_logger):
     """Test saving config creates parent directory if it doesn't exist."""
+    import uuid
+
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "nested" / "dir" / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        config = ShotgunConfig()
+        config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+        )
         manager.save(config)
 
         assert config_path.exists()
@@ -189,6 +209,8 @@ def test_save_config_creates_directory(mock_logger):
 @patch("shotgun.agents.config.manager.logger")
 def test_save_config_failure(mock_logger):
     """Test save config handles file write errors."""
+    import uuid
+
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "readonly" / "config.json"
         # Create readonly parent directory
@@ -196,7 +218,10 @@ def test_save_config_failure(mock_logger):
         config_path.parent.chmod(0o444)
 
         manager = ConfigManager(config_path=config_path)
-        config = ShotgunConfig()
+        config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+        )
 
         try:
             with pytest.raises((OSError, PermissionError)):
@@ -217,8 +242,12 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
-            openai=OpenAIConfig(api_key=SecretStr("test-openai-key"))
+            openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
+            user_id=str(uuid.uuid4()),
+            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -267,8 +296,12 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
-            anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key"))
+            anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key")),
+            user_id=str(uuid.uuid4()),
+            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -317,8 +350,12 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
-            google=GoogleConfig(api_key=SecretStr("test-google-key"))
+            google=GoogleConfig(api_key=SecretStr("test-google-key")),
+            user_id=str(uuid.uuid4()),
+            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -366,7 +403,13 @@ def test_get_provider_model_string_provider(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
-        config = ShotgunConfig(openai=OpenAIConfig(api_key=SecretStr("test-key")))
+        import uuid
+
+        config = ShotgunConfig(
+            openai=OpenAIConfig(api_key=SecretStr("test-key")),
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+        )
         manager._config = config
         mock_get_config_manager.return_value = manager
 
@@ -384,9 +427,13 @@ def test_get_provider_model_none_uses_default(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
             default_provider=ProviderType.ANTHROPIC,
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
+            user_id=str(uuid.uuid4()),
+            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -501,9 +548,16 @@ def test_initialize(mock_logger):
         assert isinstance(config, ShotgunConfig)
         assert config.default_provider == ProviderType.OPENAI
         assert config_path.exists()
-        mock_logger.info.assert_called_once_with(
-            "Configuration initialized at %s", config_path
-        )
+        assert hasattr(config, "user_id")
+        assert config.user_id is not None
+        assert hasattr(config, "config_version")
+        assert config.config_version == 1
+        # The log message now includes user_id
+        assert mock_logger.info.call_count == 1
+        call_args = mock_logger.info.call_args[0]
+        assert "Configuration initialized at" in call_args[0]
+        assert config_path == call_args[1]
+        assert config.user_id == call_args[2]
 
 
 def test_convert_secrets_to_secretstr():

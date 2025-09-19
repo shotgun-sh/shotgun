@@ -123,3 +123,5 @@ class ShotgunConfig(BaseModel):
     default_provider: ProviderType = Field(
         default=ProviderType.OPENAI, description="Default AI provider to use"
     )
+    user_id: str = Field(description="Unique anonymous user identifier")
+    config_version: int = Field(default=1, description="Configuration schema version")

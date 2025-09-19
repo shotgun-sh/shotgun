@@ -1,6 +1,7 @@
 """Configuration manager for Shotgun CLI."""
 
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -41,9 +42,11 @@ class ConfigManager:
 
         if not self.config_path.exists():
             logger.info(
-                "Configuration file not found, using defaults: %s", self.config_path
+                "Configuration file not found, creating new config with user_id: %s",
+                self.config_path,
             )
-            self._config = ShotgunConfig()
+            # Create new config with generated user_id
+            self._config = self.initialize()
             return self._config
 
         try:
@@ -61,8 +64,8 @@ class ConfigManager:
             logger.error(
                 "Failed to load configuration from %s: %s", self.config_path, e
             )
-            logger.info("Using default configuration")
-            self._config = ShotgunConfig()
+            logger.info("Creating new configuration with generated user_id")
+            self._config = self.initialize()
             return self._config
 
     def save(self, config: ShotgunConfig | None = None) -> None:
@@ -72,7 +75,14 @@ class ConfigManager:
             config: Configuration to save. If None, saves current loaded config
         """
         if config is None:
-            config = self._config or ShotgunConfig()
+            if self._config:
+                config = self._config
+            else:
+                # Create a new config with generated user_id
+                config = ShotgunConfig(
+                    user_id=str(uuid.uuid4()),
+                    config_version=1,
+                )
 
         # Ensure directory exists
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,9 +160,17 @@ class ConfigManager:
         Returns:
             Default ShotgunConfig
         """
-        config = ShotgunConfig()
+        # Generate unique user ID for new config
+        config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+        )
         self.save(config)
-        logger.info("Configuration initialized at %s", self.config_path)
+        logger.info(
+            "Configuration initialized at %s with user_id: %s",
+            self.config_path,
+            config.user_id,
+        )
         return config
 
     def _convert_secrets_to_secretstr(self, data: dict[str, Any]) -> None:
@@ -208,6 +226,15 @@ class ConfigManager:
             value = str(api_key)
 
         return bool(value.strip())
+
+    def get_user_id(self) -> str:
+        """Get the user ID from configuration.
+
+        Returns:
+            The unique user ID string
+        """
+        config = self.load()
+        return config.user_id
 
 
 def get_config_manager() -> ConfigManager:

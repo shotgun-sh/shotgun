@@ -300,6 +300,114 @@ GitHub Actions automatically:
 - Validates code with ruff, ruff-format, and mypy
 - Ensures all checks pass before merge
 
+## Observability & Telemetry
+
+Shotgun includes built-in observability with Sentry for error tracking and Logfire for logging and tracing. Both services track users anonymously using a UUID generated on first run.
+
+### Anonymous User Tracking
+
+Each user gets a unique anonymous ID stored in their config:
+```bash
+# Get your anonymous user ID
+shotgun config get-user-id
+```
+
+This ID is automatically included in:
+- **Sentry**: Error reports and exceptions
+- **Logfire**: All logs, traces, and spans
+
+### Logfire Queries
+
+Logfire uses SQL for querying logs. Here are helpful queries for debugging and analysis:
+
+#### Find all logs for a specific user
+```sql
+SELECT * FROM records
+WHERE attributes->>'user_id' = 'your-user-id-here'
+ORDER BY timestamp DESC;
+```
+
+#### Track user actions
+```sql
+SELECT
+  timestamp,
+  span_name,
+  message,
+  attributes
+FROM records
+WHERE attributes->>'user_id' = 'your-user-id-here'
+  AND span_name LIKE '%research%'
+ORDER BY timestamp DESC;
+```
+
+#### Find slow operations for a user
+```sql
+SELECT
+  span_name,
+  duration_ms,
+  attributes
+FROM records
+WHERE attributes->>'user_id' = 'your-user-id-here'
+  AND duration_ms > 1000
+ORDER BY duration_ms DESC;
+```
+
+#### Find errors for a user
+```sql
+SELECT * FROM records
+WHERE attributes->>'user_id' = 'your-user-id-here'
+  AND level = 'error'
+ORDER BY timestamp DESC;
+```
+
+#### Analyze user's AI provider usage
+```sql
+SELECT
+  attributes->>'provider' as provider,
+  COUNT(*) as usage_count,
+  AVG(duration_ms) as avg_duration
+FROM records
+WHERE attributes->>'user_id' = 'your-user-id-here'
+  AND attributes->>'provider' IS NOT NULL
+GROUP BY provider;
+```
+
+#### Track feature usage by user
+```sql
+SELECT
+  span_name,
+  COUNT(*) as usage_count
+FROM records
+WHERE attributes->>'user_id' = 'your-user-id-here'
+  AND span_name IN ('research', 'plan', 'tasks')
+GROUP BY span_name
+ORDER BY usage_count DESC;
+```
+
+### Setting Up Observability (Optional)
+
+For local development with Logfire:
+```bash
+# Set environment variables
+export LOGFIRE_ENABLED=true
+export LOGFIRE_TOKEN=your-logfire-token
+
+# Run shotgun - will now send logs to Logfire
+shotgun research "topic"
+```
+
+For Sentry (automatically configured in production builds):
+```bash
+# Set for local development
+export SENTRY_DSN=your-sentry-dsn
+```
+
+### Privacy
+
+- **No PII collected**: Only anonymous UUIDs are used for identification
+- **Opt-in for development**: Telemetry requires explicit environment variables
+- **Automatic in production**: Production builds include telemetry for error tracking
+
 ## Support
 
 Join our discord https://discord.gg/5RmY6J2N7s

@@ -98,8 +98,15 @@ jobs:
           pip install build twine
 
       - name: Build package
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           echo "🔨 Building package version: ${{ steps.version_update.outputs.version }}"
+          if [[ -n "$SENTRY_DSN" ]]; then
+            echo "✅ Building with Sentry integration enabled"
+          else
+            echo "⚠️  Building without Sentry DSN (Sentry will use fallback)"
+          fi
           python -m build
 
       - name: Verify package version

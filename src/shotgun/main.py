@@ -9,6 +9,7 @@ from shotgun import __version__
 from shotgun.agents.config import get_config_manager
 from shotgun.cli import codebase, config, plan, research, tasks, update
 from shotgun.logging_config import configure_root_logger, get_logger
+from shotgun.sentry_telemetry import setup_sentry_observability
 from shotgun.telemetry import setup_logfire_observability
 from shotgun.tui import app as tui_app
 from shotgun.utils.update_checker import check_for_updates_async
@@ -30,6 +31,10 @@ except Exception as e:
 # Initialize telemetry
 _logfire_enabled = setup_logfire_observability()
 logger.debug("Logfire observability enabled: %s", _logfire_enabled)
+
+# Initialize Sentry telemetry
+_sentry_enabled = setup_sentry_observability()
+logger.debug("Sentry observability enabled: %s", _sentry_enabled)
 
 # Global variable to store update notification
 _update_notification: str | None = None

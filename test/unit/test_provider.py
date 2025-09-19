@@ -29,8 +29,12 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
-            openai=OpenAIConfig(api_key=SecretStr("test-openai-key"))
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -81,8 +85,12 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
-            anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key"))
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key")),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -131,8 +139,12 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
-            google=GoogleConfig(api_key=SecretStr("test-google-key"))
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            google=GoogleConfig(api_key=SecretStr("test-google-key")),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -180,7 +192,13 @@ def test_get_provider_model_with_enum(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
-        config = ShotgunConfig(openai=OpenAIConfig(api_key=SecretStr("test-key")))
+        import uuid
+
+        config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            openai=OpenAIConfig(api_key=SecretStr("test-key")),
+        )
         manager._config = config
         mock_get_config_manager.return_value = manager
 
@@ -198,7 +216,11 @@ def test_get_provider_model_none_uses_default(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
+        import uuid
+
         config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
             default_provider=ProviderType.ANTHROPIC,
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
         )
@@ -232,7 +254,13 @@ def test_get_provider_model_prefers_config_over_env(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
-        config = ShotgunConfig(openai=OpenAIConfig(api_key=SecretStr("config-key")))
+        import uuid
+
+        config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            openai=OpenAIConfig(api_key=SecretStr("config-key")),
+        )
         manager._config = config
         mock_get_config_manager.return_value = manager
 
@@ -287,7 +315,13 @@ def test_get_provider_model_provider_enum_conversion(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config directly
-        config = ShotgunConfig(anthropic=AnthropicConfig(api_key=SecretStr("test-key")))
+        import uuid
+
+        config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
+        )
         manager._config = config
         mock_get_config_manager.return_value = manager
 
@@ -307,8 +341,12 @@ def test_get_provider_model_with_env_key_precedence(mock_get_config_manager):
         manager = ConfigManager(config_path=config_path)
 
         # Set config with API key
+        import uuid
+
         config = ShotgunConfig(
-            anthropic=AnthropicConfig(api_key=SecretStr("config-anthropic-key"))
+            user_id=str(uuid.uuid4()),
+            config_version=1,
+            anthropic=AnthropicConfig(api_key=SecretStr("config-anthropic-key")),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -336,7 +374,11 @@ def test_get_provider_model_api_key_environment_isolation(mock_get_config_manage
         manager = ConfigManager(config_path=config_path)
 
         # Set cached config with multiple provider keys
+        import uuid
+
         config = ShotgunConfig(
+            user_id=str(uuid.uuid4()),
+            config_version=1,
             openai=OpenAIConfig(api_key=SecretStr("openai-key")),
             anthropic=AnthropicConfig(api_key=SecretStr("anthropic-key")),
         )

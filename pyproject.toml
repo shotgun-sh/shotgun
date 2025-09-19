@@ -29,6 +29,7 @@ dependencies = [
     "httpx>=0.27.0",
     "jinja2>=3.1.0",
     "logfire[pydantic-ai]>=2.0.0",
+    "sentry-sdk[pure_eval]>=2.0.0",
     "textual>=6.1.0",
     "textual-dev>=1.7.0",
     "kuzu>=0.7.0",
@@ -78,9 +79,18 @@ include = [
     "/pyproject.toml"
 ]
 
+[tool.hatch.build.hooks.custom]
+# Custom build hook configuration
+
+[tool.hatch.build]
+artifacts = [
+    "src/shotgun/build_constants.py"
+]
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+exclude = ["src/shotgun/build_constants.py"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "S", "C4", "PIE", "T20"]
@@ -94,8 +104,8 @@ python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
-# Remove test exclusion to enable type checking on tests
-# exclude = ["^test/"]
+# Exclude build hooks and generated files
+exclude = ["hatch_build.py", "src/shotgun/build_constants.py"]
 plugins = ["pydantic.mypy"]
 
 # Configure test-specific settings

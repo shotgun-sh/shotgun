@@ -32,6 +32,22 @@ def setup_logfire_observability() -> bool:
         # Instrument Pydantic AI for better observability
         logfire.instrument_pydantic_ai()
 
+        # Set user context using baggage for all logs and spans
+        try:
+            from opentelemetry import baggage, context
+
+            from shotgun.agents.config import get_config_manager
+
+            config_manager = get_config_manager()
+            user_id = config_manager.get_user_id()
+
+            # Set user_id as baggage in global context - this will be included in all logs/spans
+            ctx = baggage.set_baggage("user_id", user_id)
+            context.attach(ctx)
+            logger.debug("Logfire user context set with user_id: %s", user_id)
+        except Exception as e:
+            logger.warning("Failed to set Logfire user context: %s", e)
+
         logger.debug("Logfire observability configured successfully")
         logger.debug("Token configured: %s", "Yes" if logfire_token else "No")
         return True
