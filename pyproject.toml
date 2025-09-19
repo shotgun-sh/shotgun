@@ -42,6 +42,7 @@ dependencies = [
     "openai>=1.0.0",
     "anthropic>=0.39.0",
     "google-generativeai>=0.8.0",
+    "packaging>=23.0",
 ]
 
 [project.urls]

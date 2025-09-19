@@ -5,11 +5,13 @@ from typing import Annotated
 import typer
 from dotenv import load_dotenv
 
+from shotgun import __version__
 from shotgun.agents.config import get_config_manager
-from shotgun.cli import codebase, config, plan, research, tasks
+from shotgun.cli import codebase, config, plan, research, tasks, update
 from shotgun.logging_config import configure_root_logger, get_logger
 from shotgun.telemetry import setup_logfire_observability
 from shotgun.tui import app as tui_app
+from shotgun.utils.update_checker import check_for_updates_async
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,6 +31,16 @@ except Exception as e:
 _logfire_enabled = setup_logfire_observability()
 logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
+# Global variable to store update notification
+_update_notification: str | None = None
+
+
+def _update_callback(notification: str) -> None:
+    """Callback to store update notification."""
+    global _update_notification
+    _update_notification = notification
+
+
 app = typer.Typer(
     name="shotgun",
     help="Shotgun - AI-powered CLI tool for research, planning, and task management",
@@ -43,12 +55,16 @@ app.add_typer(
 app.add_typer(research.app, name="research", help="Perform research with agentic loops")
 app.add_typer(plan.app, name="plan", help="Generate structured plans")
 app.add_typer(tasks.app, name="tasks", help="Generate task lists with agentic approach")
+app.add_typer(update.app, name="update", help="Check for and install updates")
 
 
 def version_callback(value: bool) -> None:
     """Show version and exit."""
     if value:
-        logger.info("shotgun 0.1.0")
+        from rich.console import Console
+
+        console = Console()
+        console.print(f"shotgun {__version__}")
         raise typer.Exit()
 
 
@@ -65,13 +81,49 @@ def main(
             help="Show version and exit",
         ),
     ] = False,
+    no_update_check: Annotated[
+        bool,
+        typer.Option(
+            "--no-update-check",
+            help="Disable automatic update checks",
+        ),
+    ] = False,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
+
+    # Start async update check (non-blocking)
+    if not ctx.resilient_parsing:
+        check_for_updates_async(
+            callback=_update_callback, no_update_check=no_update_check
+        )
+
     if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
         logger.debug("Launching shotgun TUI application")
-        tui_app.run()
+        tui_app.run(no_update_check=no_update_check)
+
+        # Show update notification after TUI exits
+        if _update_notification:
+            from rich.console import Console
+
+            console = Console()
+            console.print(f"\n[cyan]{_update_notification}[/cyan]", style="bold")
+
         raise typer.Exit()
+
+    # For CLI commands, we'll show notification at the end
+    # This is handled by registering an atexit handler
+    if not ctx.resilient_parsing and ctx.invoked_subcommand is not None:
+        import atexit
+
+        def show_update_notification() -> None:
+            if _update_notification:
+                from rich.console import Console
+
+                console = Console()
+                console.print(f"\n[cyan]{_update_notification}[/cyan]", style="bold")
+
+        atexit.register(show_update_notification)
 
 
 if __name__ == "__main__":

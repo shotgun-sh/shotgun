@@ -81,6 +81,44 @@ uv run shotgun plan "Build a web application"
 uv run shotgun tasks "Create a machine learning model"
 ```
 
+## Auto-Updates
+
+Shotgun automatically checks for updates to keep you on the latest version.
+
+### How it works
+
+- Checks for updates on startup (runs in background, non-blocking)
+- Caches results for 24 hours to minimize API calls
+- Shows notification after command execution if an update is available
+- Never auto-updates development versions
+
+### Update Commands
+
+```bash
+# Check for available updates
+shotgun update --check
+
+# Install available updates
+shotgun update
+
+# Force update (even for dev versions with confirmation)
+shotgun update --force
+```
+
+### Disable Update Checks
+
+```bash
+# Disable for a single command
+shotgun --no-update-check research "topic"
+```
+
+### Installation Methods
+
+The update command automatically detects and uses the appropriate method:
+- **pipx**: `pipx upgrade shotgun-sh`
+- **pip**: `pip install --upgrade shotgun-sh`
+- **venv**: Updates within the virtual environment
+
 ## Development Setup
 
 ### Requirements
