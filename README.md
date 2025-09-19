@@ -10,6 +10,12 @@ A Python CLI tool for research, planning, and task management powered by AI agen
 
 ## Installation
 
+### From PyPI (Recommended)
+
+```bash
+pip install shotgun-sh
+```
+
 ### From Source
 
 ```bash
@@ -18,7 +24,7 @@ cd shotgun
 uv sync --all-extras
 ```
 
-After installation, you can use either method:
+After installation from source, you can use either method:
 
 **Method 1: Direct command (after uv sync)**
 ```bash
@@ -28,6 +34,11 @@ shotgun --help
 **Method 2: Via uv run**
 ```bash
 uv run shotgun --help
+```
+
+If installed from PyPI, simply use:
+```bash
+shotgun --help
 ```
 
 ### Virtual Environment Setup (Optional)

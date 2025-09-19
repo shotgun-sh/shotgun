@@ -68,32 +68,6 @@ def load_parsers() -> tuple[dict[str, Parser], dict[str, Any]]:
     except ImportError as e:
         logger.warning(f"Failed to import tree_sitter_rust: {e}")
 
-    # If no individual imports worked, try tree_sitter_languages
-    if not available_languages:
-        try:
-            import tree_sitter_languages  # type: ignore[import-untyped]
-
-            # Get available languages from tree_sitter_languages
-            for lang_name in [
-                "python",
-                "javascript",
-                "typescript",
-                "go",
-                "rust",
-                "java",
-                "cpp",
-            ]:
-                try:
-                    lang = tree_sitter_languages.get_language(lang_name)
-                    language_loaders[lang_name] = lambda lang=lang: lang  # type: ignore[misc]
-                    available_languages.append(lang_name)
-                except Exception as e:
-                    logger.debug(f"Failed to load {lang_name} parser: {e}")
-        except ImportError:
-            logger.warning(
-                "No tree-sitter language libraries found. Install tree-sitter-languages or individual language packages."
-            )
-
     logger.info(f"Available languages: {', '.join(available_languages)}")
 
     # Create parsers for available languages
@@ -144,9 +118,11 @@ def load_parsers() -> tuple[dict[str, Parser], dict[str, Any]]:
 
     if not parsers:
         logger.error(
-            "No parsers could be loaded. Please install tree-sitter-languages or language-specific packages."
+            "No parsers could be loaded. Please install language-specific tree-sitter packages."
         )
-        logger.error("Install with: pip install tree-sitter-languages")
+        logger.error(
+            "Install with: pip install tree-sitter-python tree-sitter-javascript tree-sitter-typescript tree-sitter-go tree-sitter-rust"
+        )
         sys.exit(1)
 
     return parsers, queries

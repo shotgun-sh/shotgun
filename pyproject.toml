@@ -1,12 +1,27 @@
 [project]
-name = "shotgun"
-version = "0.1.0"
-description = "Shotgun - A Python CLI tool"
+name = "shotgun-sh"
+version = "0.1.0.dev3"
+description = "AI-powered research, planning, and task management CLI tool"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name = "Proofs.io", email = "hello@proofs.io" }
 ]
 requires-python = ">=3.10"
+keywords = ["cli", "ai", "agent", "research", "planning", "task-management", "productivity", "llm", "pydantic-ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "typer>=0.12.0",
     "rich>=13.0.0",
@@ -23,12 +38,17 @@ dependencies = [
     "tree-sitter-typescript>=0.23.0",
     "tree-sitter-go>=0.23.0",
     "tree-sitter-rust>=0.23.0",
-    "tree-sitter-languages>=1.10.0",
     "watchdog>=4.0.0",
     "openai>=1.0.0",
     "anthropic>=0.39.0",
     "google-generativeai>=0.8.0",
 ]
+
+[project.urls]
+Homepage = "https://shotgun.sh/"
+Repository = "https://github.com/shotgun-sh/shotgun"
+Issues = "https://github.com/shotgun-sh/shotgun-alpha/issues"
+Discord = "https://discord.gg/5RmY6J2N7s"
 
 [project.optional-dependencies]
 dev = [
@@ -46,8 +66,16 @@ tui = "shotgun.tui.app:run"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatchling.build]
-sources = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/shotgun"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml"
+]
 
 [tool.ruff]
 line-length = 88
