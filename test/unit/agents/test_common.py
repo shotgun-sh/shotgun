@@ -32,6 +32,12 @@ def mock_deps():
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt content")
     deps.queue = AsyncMock()
     deps.tasks = []
+    # Add file_tracker mock
+    file_tracker_mock = MagicMock()
+    file_tracker_mock.clear = MagicMock()
+    file_tracker_mock.operations = []
+    file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
+    deps.file_tracker = file_tracker_mock
     return deps
 
 

@@ -49,6 +49,13 @@ def mock_context(mock_artifact_service):
     ctx = MagicMock(spec=RunContext)
     deps = MagicMock(spec=AgentDeps)
     deps.artifact_service = mock_artifact_service
+    # Add file_tracker mock
+    file_tracker_mock = MagicMock()
+    file_tracker_mock.add_operation = MagicMock()
+    file_tracker_mock.clear = MagicMock()
+    file_tracker_mock.operations = []
+    file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
+    deps.file_tracker = file_tracker_mock
     ctx.deps = deps
     return ctx
 
@@ -253,9 +260,7 @@ async def test_read_artifact_section(mock_context):
     mock_section.content = "Test content"
     mock_context.deps.artifact_service.get_section.return_value = mock_section
 
-    result = await read_artifact_section(
-        mock_context, "test-artifact", "research", 1
-    )
+    result = await read_artifact_section(mock_context, "test-artifact", "research", 1)
 
     mock_context.deps.artifact_service.get_section.assert_called_once_with(
         "test-artifact", AgentMode.RESEARCH, 1
@@ -271,9 +276,7 @@ async def test_read_artifact_section_error_handling(mock_context):
         "Section read failed"
     )
 
-    result = await read_artifact_section(
-        mock_context, "test-artifact", "research", 1
-    )
+    result = await read_artifact_section(mock_context, "test-artifact", "research", 1)
 
     assert "Error: Failed to read section" in result
     assert "Section read failed" in result

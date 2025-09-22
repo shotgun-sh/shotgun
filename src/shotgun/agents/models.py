@@ -2,6 +2,8 @@
 
 from asyncio import Future, Queue
 from collections.abc import Callable
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -75,6 +77,117 @@ class AgentRuntimeOptions(BaseModel):
     )
 
 
+class FileOperationType(str, Enum):
+    """Types of file operations that can be tracked."""
+
+    CREATED = "created"
+    UPDATED = "updated"
+    DELETED = "deleted"
+
+
+class FileOperation(BaseModel):
+    """Single file operation record."""
+
+    file_path: str = Field(
+        description="Full absolute path to the file",
+    )
+    operation: FileOperationType = Field(
+        description="Type of operation performed",
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.now,
+        description="When the operation occurred",
+    )
+
+
+class FileOperationTracker(BaseModel):
+    """Tracks file operations during a single agent run."""
+
+    operations: list[FileOperation] = Field(
+        default_factory=list,
+        description="List of file operations performed",
+    )
+
+    def add_operation(
+        self, file_path: Path | str, operation: FileOperationType
+    ) -> None:
+        """Record a file operation.
+
+        Args:
+            file_path: Path to the file (will be converted to absolute)
+            operation: Type of operation performed
+        """
+        # Convert to absolute path string
+        if isinstance(file_path, Path):
+            absolute_path = str(file_path.resolve())
+        else:
+            absolute_path = str(Path(file_path).resolve())
+
+        self.operations.append(
+            FileOperation(file_path=absolute_path, operation=operation)
+        )
+
+    def clear(self) -> None:
+        """Clear all tracked operations for a new run."""
+        self.operations = []
+
+    def get_summary(self) -> dict[FileOperationType, list[str]]:
+        """Get operations grouped by type.
+
+        Returns:
+            Dictionary mapping operation types to lists of file paths
+        """
+        summary: dict[FileOperationType, list[str]] = {
+            FileOperationType.CREATED: [],
+            FileOperationType.UPDATED: [],
+            FileOperationType.DELETED: [],
+        }
+
+        for op in self.operations:
+            summary[op.operation].append(op.file_path)
+
+        # Remove duplicates while preserving order
+        for op_type in summary:
+            seen = set()
+            unique_paths = []
+            for path in summary[op_type]:
+                if path not in seen:
+                    seen.add(path)
+                    unique_paths.append(path)
+            summary[op_type] = unique_paths
+
+        return summary
+
+    def format_summary(self) -> str:
+        """Generate human-readable summary for the user.
+
+        Returns:
+            Formatted string showing files modified during the run
+        """
+        if not self.operations:
+            return "No files were modified during this run."
+
+        summary = self.get_summary()
+        lines = ["Files modified during this run:"]
+
+        if summary[FileOperationType.CREATED]:
+            lines.append("\nCreated:")
+            for path in summary[FileOperationType.CREATED]:
+                lines.append(f"  - {path}")
+
+        if summary[FileOperationType.UPDATED]:
+            lines.append("\nUpdated:")
+            for path in summary[FileOperationType.UPDATED]:
+                lines.append(f"  - {path}")
+
+        if summary[FileOperationType.DELETED]:
+            lines.append("\nDeleted:")
+            for path in summary[FileOperationType.DELETED]:
+                lines.append(f"  - {path}")
+
+        return "\n".join(lines)
+
+
 class AgentDeps(AgentRuntimeOptions):
     """Dependencies passed to all agents for configuration and runtime behavior."""
 
@@ -92,6 +205,11 @@ class AgentDeps(AgentRuntimeOptions):
 
     system_prompt_fn: Callable[[RunContext["AgentDeps"]], str] = Field(
         description="Function that generates the system prompt for this agent",
+    )
+
+    file_tracker: FileOperationTracker = Field(
+        default_factory=FileOperationTracker,
+        description="Tracker for file operations during agent run",
     )
 
 

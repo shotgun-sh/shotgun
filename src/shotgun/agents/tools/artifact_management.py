@@ -54,6 +54,15 @@ async def create_artifact(
         template_to_use = template_id.strip() if template_id.strip() else None
         artifact = service.create_artifact(artifact_id, mode, name, template_to_use)
 
+        # Track the artifact file creation
+        from shotgun.agents.models import FileOperationType
+        from shotgun.utils.file_system_utils import get_shotgun_base_path
+
+        artifact_path = (
+            get_shotgun_base_path() / mode.value / artifact_id / "artifact.yaml"
+        )
+        ctx.deps.file_tracker.add_operation(artifact_path, FileOperationType.CREATED)
+
         success_msg = (
             f"Created artifact '{artifact_id}' in {agent_mode} mode with name '{name}'"
         )
@@ -257,6 +266,19 @@ async def write_artifact_section(
         section, created = service.get_or_create_section(
             artifact_id, mode, section_number, section_slug, section_title, content
         )
+
+        # Track the section file operation
+        from shotgun.agents.models import FileOperationType
+        from shotgun.utils.file_system_utils import get_shotgun_base_path
+
+        section_path = (
+            get_shotgun_base_path()
+            / mode.value
+            / artifact_id
+            / f"{section_number:02d}_{section_slug}.md"
+        )
+        operation = FileOperationType.CREATED if created else FileOperationType.UPDATED
+        ctx.deps.file_tracker.add_operation(section_path, operation)
 
         if created:
             success_msg = (

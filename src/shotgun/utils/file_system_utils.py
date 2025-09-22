@@ -4,6 +4,11 @@ import os
 from pathlib import Path
 
 
+def get_shotgun_base_path() -> Path:
+    """Get the absolute path to the .shotgun directory."""
+    return Path.cwd() / ".shotgun"
+
+
 def get_shotgun_home() -> Path:
     """Get the Shotgun home directory path.
 
@@ -25,7 +30,7 @@ def ensure_shotgun_directory_exists() -> Path:
     Returns:
         Path: The path to the .shotgun directory.
     """
-    shotgun_dir = Path.cwd() / ".shotgun"
+    shotgun_dir = get_shotgun_base_path()
     shotgun_dir.mkdir(exist_ok=True)
     # Note: Removed logger to avoid circular dependency with logging_config
     return shotgun_dir

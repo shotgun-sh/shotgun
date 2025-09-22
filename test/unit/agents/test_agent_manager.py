@@ -22,6 +22,12 @@ def mock_agent_deps():
     deps.max_iterations = 10
     deps.queue = asyncio.Queue()
     deps.tasks = []
+    # Add file_tracker mock
+    file_tracker_mock = MagicMock()
+    file_tracker_mock.clear = MagicMock()
+    file_tracker_mock.operations = []
+    file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
+    deps.file_tracker = file_tracker_mock
     return deps
 
 
@@ -293,6 +299,12 @@ async def test_agent_manager_run_with_custom_deps(
     manager.post_message = MagicMock()
 
     custom_deps = MagicMock(spec=AgentDeps)
+    # Add file_tracker mock to custom_deps
+    file_tracker_mock = MagicMock()
+    file_tracker_mock.clear = MagicMock()
+    file_tracker_mock.operations = []
+    file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
+    custom_deps.file_tracker = file_tracker_mock
     await manager.run("test", deps=custom_deps)
 
     # Should use custom deps instead of manager deps

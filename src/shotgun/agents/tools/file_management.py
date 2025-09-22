@@ -6,14 +6,13 @@ These tools are restricted to the .shotgun directory for security.
 from pathlib import Path
 from typing import Literal
 
+from pydantic_ai import RunContext
+
+from shotgun.agents.models import AgentDeps, FileOperationType
 from shotgun.logging_config import get_logger
+from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 logger = get_logger(__name__)
-
-
-def get_shotgun_base_path() -> Path:
-    """Get the absolute path to the .shotgun directory."""
-    return Path.cwd() / ".shotgun"
 
 
 def _validate_shotgun_path(filename: str) -> Path:
@@ -44,7 +43,7 @@ def _validate_shotgun_path(filename: str) -> Path:
     return full_path
 
 
-def read_file(filename: str) -> str:
+async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
     """Read a file from the .shotgun directory.
 
     Args:
@@ -75,7 +74,12 @@ def read_file(filename: str) -> str:
         return error_msg
 
 
-def write_file(filename: str, content: str, mode: Literal["w", "a"] = "w") -> str:
+async def write_file(
+    ctx: RunContext[AgentDeps],
+    filename: str,
+    content: str,
+    mode: Literal["w", "a"] = "w",
+) -> str:
     """Write content to a file in the .shotgun directory.
 
     Args:
@@ -97,6 +101,16 @@ def write_file(filename: str, content: str, mode: Literal["w", "a"] = "w") -> st
     try:
         file_path = _validate_shotgun_path(filename)
 
+        # Determine operation type
+        if mode == "a":
+            operation = FileOperationType.UPDATED
+        else:
+            operation = (
+                FileOperationType.CREATED
+                if not file_path.exists()
+                else FileOperationType.UPDATED
+            )
+
         # Ensure parent directory exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -105,11 +119,16 @@ def write_file(filename: str, content: str, mode: Literal["w", "a"] = "w") -> st
             with open(file_path, "a", encoding="utf-8") as f:
                 f.write(content)
             logger.debug("📄 Appended %d characters to %s", len(content), filename)
-            return f"Successfully appended {len(content)} characters to {filename}"
+            result = f"Successfully appended {len(content)} characters to {filename}"
         else:
             file_path.write_text(content, encoding="utf-8")
             logger.debug("📄 Wrote %d characters to %s", len(content), filename)
-            return f"Successfully wrote {len(content)} characters to {filename}"
+            result = f"Successfully wrote {len(content)} characters to {filename}"
+
+        # Track the file operation
+        ctx.deps.file_tracker.add_operation(file_path, operation)
+
+        return result
 
     except Exception as e:
         error_msg = f"Error writing file '{filename}': {str(e)}"
@@ -117,7 +136,7 @@ def write_file(filename: str, content: str, mode: Literal["w", "a"] = "w") -> st
         return error_msg
 
 
-def append_file(filename: str, content: str) -> str:
+async def append_file(ctx: RunContext[AgentDeps], filename: str, content: str) -> str:
     """Append content to a file in the .shotgun directory.
 
     Args:
@@ -127,4 +146,4 @@ def append_file(filename: str, content: str) -> str:
     Returns:
         Success message or error message
     """
-    return write_file(filename, content, mode="a")
+    return await write_file(ctx, filename, content, mode="a")

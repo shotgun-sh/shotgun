@@ -9,7 +9,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest
 from textual.message import Message
 from textual.widget import Widget
 
-from .models import AgentDeps, AgentRuntimeOptions
+from .models import AgentDeps, AgentRuntimeOptions, FileOperation
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .tasks import create_tasks_agent
@@ -84,6 +84,7 @@ class AgentManager(Widget):
         # Maintain shared message history
         self.ui_message_history: list[ModelMessage] = []
         self.message_history: list[ModelMessage] = []
+        self.recently_change_files: list[FileOperation] = []
 
     @property
     def current_agent(self) -> Agent[AgentDeps, str | DeferredToolRequests]:
@@ -183,6 +184,9 @@ class AgentManager(Widget):
 
         self.message_history = result.all_messages()
         self._post_messages_updated()
+
+        # Log file operations summary if any files were modified
+        self.recently_change_files = deps.file_tracker.operations.copy()
 
         return result
 

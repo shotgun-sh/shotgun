@@ -2,9 +2,9 @@ from textual.app import App
 from textual.binding import Binding
 
 from shotgun.agents.config import ConfigManager, get_config_manager
-from shotgun.agents.tools.file_management import get_shotgun_base_path
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.splash import SplashScreen
+from shotgun.utils.file_system_utils import get_shotgun_base_path
 from shotgun.utils.update_checker import check_for_updates_async
 
 from .screens.chat import ChatScreen

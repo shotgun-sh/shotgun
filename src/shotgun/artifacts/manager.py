@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from shotgun.logging_config import setup_logger
+from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 from .exceptions import (
     ArtifactFileSystemError,
@@ -32,7 +33,7 @@ class ArtifactManager:
             base_path: Base path for artifacts. Defaults to .shotgun in current directory.
         """
         if base_path is None:
-            base_path = Path.cwd() / ".shotgun"
+            base_path = get_shotgun_base_path()
         elif isinstance(base_path, str):
             base_path = Path(base_path)
 

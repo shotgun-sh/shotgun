@@ -155,9 +155,9 @@ def create_base_agent(
         logger.debug("📞 Interactive mode enabled - ask_user tool registered")
 
     # Register common file management tools (always available)
-    agent.tool_plain(read_file)
-    agent.tool_plain(write_file)
-    agent.tool_plain(append_file)
+    agent.tool(read_file)
+    agent.tool(write_file)
+    agent.tool(append_file)
 
     # Register artifact management tools (always available)
     agent.tool(create_artifact)
@@ -275,6 +275,10 @@ async def run_agent(
     message_history: list[ModelMessage] | None = None,
     usage_limits: UsageLimits | None = None,
 ) -> AgentRunResult[str | DeferredToolRequests]:
+    # Clear file tracker for new run
+    deps.file_tracker.clear()
+    logger.debug("🔧 Cleared file tracker for new agent run")
+
     # Add system prompt as first message
     message_history = await add_system_prompt_message(deps, message_history)
 
@@ -309,5 +313,10 @@ async def run_agent(
             deferred_tool_results=results,
         )
         messages = result.all_messages()
+
+    # Log file operations summary if any files were modified
+    if deps.file_tracker.operations:
+        summary = deps.file_tracker.format_summary()
+        logger.info("📁 %s", summary)
 
     return result

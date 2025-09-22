@@ -2,6 +2,44 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug Shotgun Main",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "shotgun.main",
+            "args": [],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "subProcess": true
+        },
+        {
+            "name": "Debug Shotgun Main (with args)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "shotgun.main",
+            "args": [
+                "${input:commandArgs}"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "SHOTGUN_LOG_LEVEL": "DEBUG"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "subProcess": true
+        },
+        {
             "name": "Debug Shotgun Research",
             "type": "debugpy",
             "request": "launch",
@@ -99,6 +137,14 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "subProcess": true
+        }
+    ],
+    "inputs": [
+        {
+            "id": "commandArgs",
+            "type": "promptString",
+            "description": "Enter command line arguments for shotgun",
+            "default": "--help"
         }
     ]
 }

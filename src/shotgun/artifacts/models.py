@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from shotgun.utils.file_system_utils import get_shotgun_base_path
+
 
 class AgentMode(str, Enum):
     """Supported agent modes for artifacts."""
@@ -181,7 +183,7 @@ class Artifact(BaseModel):
     def has_template(self, base_path: Path | None = None) -> bool:
         """Check if this artifact was created from a template."""
         if base_path is None:
-            base_path = Path.cwd() / ".shotgun"
+            base_path = get_shotgun_base_path()
         elif isinstance(base_path, str):
             base_path = Path(base_path)
 
@@ -212,7 +214,7 @@ class Artifact(BaseModel):
         import yaml
 
         if base_path is None:
-            base_path = Path.cwd() / ".shotgun"
+            base_path = get_shotgun_base_path()
         elif isinstance(base_path, str):
             base_path = Path(base_path)
 
@@ -248,7 +250,7 @@ class Artifact(BaseModel):
             Creation timestamp based on artifact directory creation time.
         """
         if base_path is None:
-            base_path = Path.cwd() / ".shotgun"
+            base_path = get_shotgun_base_path()
         elif isinstance(base_path, str):
             base_path = Path(base_path)
 
@@ -267,7 +269,7 @@ class Artifact(BaseModel):
             Last modified timestamp based on most recently modified file in artifact directory.
         """
         if base_path is None:
-            base_path = Path.cwd() / ".shotgun"
+            base_path = get_shotgun_base_path()
         elif isinstance(base_path, str):
             base_path = Path(base_path)
 
