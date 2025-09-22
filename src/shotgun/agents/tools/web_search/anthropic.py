@@ -11,10 +11,10 @@ logger = get_logger(__name__)
 
 
 def anthropic_web_search_tool(query: str) -> str:
-    """Perform a web search using Anthropic's Claude API.
+    """Perform a web search using Anthropic's Claude API with streaming.
 
     This tool uses Anthropic's web search capabilities to find current information
-    about the given query.
+    about the given query. Results are streamed for faster response times.
 
     Args:
         query: The search query
@@ -27,7 +27,7 @@ def anthropic_web_search_tool(query: str) -> str:
     span = trace.get_current_span()
     span.set_attribute("input.value", f"**Query:** {query}\n")
 
-    logger.debug("📡 Executing Anthropic web search with prompt: %s", query)
+    logger.debug("📡 Executing Anthropic web search with streaming prompt: %s", query)
 
     # Get API key from centralized configuration
     try:
@@ -41,11 +41,13 @@ def anthropic_web_search_tool(query: str) -> str:
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    # Use the Messages API with web search tool
+    # Use the Messages API with web search tool and streaming
     try:
-        response = client.messages.create(
+        result_text = ""
+
+        with client.messages.stream(
             model="claude-3-5-sonnet-latest",
-            max_tokens=8192,  # Increased from 4096 for more comprehensive results
+            max_tokens=8192,  # Maximum for Claude 3.5 Sonnet
             messages=[{"role": "user", "content": f"Search for: {query}"}],
             tools=[
                 {
@@ -54,17 +56,17 @@ def anthropic_web_search_tool(query: str) -> str:
                 }
             ],
             tool_choice={"type": "tool", "name": "web_search"},
-        )
+        ) as stream:
+            logger.debug("🌊 Started streaming Anthropic web search response")
 
-        # Extract the search results from the response
-        result_text = ""
-        if hasattr(response, "content") and response.content:
-            for content in response.content:
-                if hasattr(content, "text"):
-                    result_text += content.text
-                elif hasattr(content, "tool_use") and content.tool_use:
-                    # Handle tool use response
-                    result_text += f"Search performed for: {query}\n"
+            for event in stream:
+                if event.type == "content_block_delta":
+                    if hasattr(event.delta, "text"):
+                        result_text += event.delta.text
+                elif event.type == "message_start":
+                    logger.debug("🚀 Streaming started")
+                elif event.type == "message_stop":
+                    logger.debug("✅ Streaming completed")
 
         if not result_text:
             result_text = "No content returned from search"
@@ -84,3 +86,62 @@ def anthropic_web_search_tool(query: str) -> str:
         logger.debug("💥 Full error details: %s", error_msg)
         span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
         return error_msg
+
+
+def main() -> None:
+    """Main function for testing the Anthropic web search tool."""
+    import logging
+    import os
+    import sys
+
+    # Set up basic console logging for testing
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        stream=sys.stdout,
+    )
+
+    if len(sys.argv) < 2:
+        print(
+            "Usage: python -m shotgun.agents.tools.web_search.anthropic <search_query>"
+        )
+        print(
+            "Example: python -m shotgun.agents.tools.web_search.anthropic 'latest Python updates'"
+        )
+        sys.exit(1)
+
+    # Join all arguments as the search query
+    query = " ".join(sys.argv[1:])
+
+    print("🔍 Testing Anthropic Web Search with streaming")
+    print(f"📝 Query: {query}")
+    print("=" * 60)
+
+    # Check if API key is available
+    if not (
+        os.getenv("ANTHROPIC_API_KEY")
+        or (
+            callable(get_provider_model)
+            and get_provider_model(ProviderType.ANTHROPIC).api_key
+        )
+    ):
+        print("❌ Error: ANTHROPIC_API_KEY environment variable not set")
+        print("   Please set it with: export ANTHROPIC_API_KEY=your_key_here")
+        sys.exit(1)
+
+    try:
+        result = anthropic_web_search_tool(query)
+        print(f"✅ Search completed! Result length: {len(result)} characters")
+        print("=" * 60)
+        print("📄 RESULTS:")
+        print("=" * 60)
+        print(result)
+    except KeyboardInterrupt:
+        print("\n⏹️  Search interrupted by user")
+    except Exception as e:
+        print(f"❌ Error during search: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
