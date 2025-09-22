@@ -1,9 +1,11 @@
 """Unit tests for agents.tools.artifact_management module."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
+from pydantic_ai import RunContext
 
+from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.artifact_management import (
     create_artifact,
     list_artifact_templates,
@@ -13,6 +15,7 @@ from shotgun.agents.tools.artifact_management import (
     write_artifact_section,
 )
 from shotgun.artifacts.models import AgentMode
+from shotgun.artifacts.service import ArtifactService
 
 
 @pytest.fixture
@@ -27,380 +30,376 @@ def mock_artifact():
 @pytest.fixture
 def mock_artifact_service(mock_artifact):
     """Create mock artifact service."""
-    service = MagicMock()
+    service = create_autospec(ArtifactService, spec_set=True)
     service.create_artifact.return_value = mock_artifact
-    service.list_artifacts.return_value = ["artifact1", "artifact2"]
+    service.list_artifacts.return_value = []
     service.get_artifact.return_value = mock_artifact
-    service.get_section_content.return_value = "section content"
-    service.add_section.return_value = None
+    service.get_section.return_value = MagicMock(
+        title="Test Section", content="section content"
+    )
+    service.get_or_create_section.return_value = (MagicMock(), True)
+    service.update_section.return_value = None
+    service.list_templates.return_value = []
     return service
 
 
 @pytest.fixture
-def mock_template_service():
-    """Create mock template service."""
-    service = MagicMock()
-    service.list_templates.return_value = ["template1", "template2"]
-    return service
+def mock_context(mock_artifact_service):
+    """Create mock RunContext with AgentDeps."""
+    ctx = MagicMock(spec=RunContext)
+    deps = MagicMock(spec=AgentDeps)
+    deps.artifact_service = mock_artifact_service
+    ctx.deps = deps
+    return ctx
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_create_artifact_basic(
-    mock_handle_parsing, mock_get_service, mock_artifact_service
-):
+@pytest.mark.asyncio
+async def test_create_artifact_basic(mock_context):
     """Test basic artifact creation."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
+    result = await create_artifact(
+        mock_context, "test-artifact", "research", "Test Artifact"
+    )
 
-    result = create_artifact("test-artifact", "research", "Test Artifact")
-
-    mock_artifact_service.create_artifact.assert_called_once_with(
+    mock_context.deps.artifact_service.create_artifact.assert_called_once_with(
         "test-artifact", AgentMode.RESEARCH, "Test Artifact", None
     )
     assert "Created artifact 'test-artifact' in research mode" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_create_artifact_with_template(
-    mock_handle_parsing, mock_get_service, mock_artifact_service
-):
+@pytest.mark.asyncio
+async def test_create_artifact_with_template(mock_context):
     """Test artifact creation with template."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
-
-    result = create_artifact(
-        "test-artifact", "research", "Test Artifact", "research-template"
+    result = await create_artifact(
+        mock_context, "test-artifact", "research", "Test Artifact", "research-template"
     )
 
-    mock_artifact_service.create_artifact.assert_called_once_with(
+    mock_context.deps.artifact_service.create_artifact.assert_called_once_with(
         "test-artifact", AgentMode.RESEARCH, "Test Artifact", "research-template"
     )
     assert "Created artifact 'test-artifact' in research mode" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_create_artifact_error_handling(mock_handle_parsing, mock_get_service):
+@pytest.mark.asyncio
+async def test_create_artifact_error_handling(mock_context):
     """Test artifact creation error handling."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_service = MagicMock()
-    mock_service.create_artifact.side_effect = Exception("Creation failed")
-    mock_get_service.return_value = mock_service
+    mock_context.deps.artifact_service.create_artifact.side_effect = Exception(
+        "Creation failed"
+    )
 
-    result = create_artifact("test-artifact", "research", "Test Artifact")
+    result = await create_artifact(
+        mock_context, "test-artifact", "research", "Test Artifact"
+    )
 
     assert "Error: Failed to create artifact" in result
     assert "Creation failed" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-def test_list_artifacts_all(mock_get_service, mock_artifact_service):
+@pytest.mark.asyncio
+async def test_list_artifacts_all(mock_context):
     """Test listing all artifacts."""
-    mock_get_service.return_value = mock_artifact_service
+    from datetime import datetime
 
-    # Create properly mocked artifacts with necessary attributes
-    mock_artifact1 = MagicMock()
-    mock_artifact1.artifact_id = "artifact1"
-    mock_artifact1.agent_mode = MagicMock()
-    mock_artifact1.agent_mode.value = "research"
-    mock_artifact1.section_count = 3
-    mock_artifact1.updated_at.strftime.return_value = "2024-01-01"
+    from shotgun.artifacts.models import ArtifactSummary
 
-    mock_artifact2 = MagicMock()
-    mock_artifact2.artifact_id = "artifact2"
-    mock_artifact2.agent_mode = MagicMock()
-    mock_artifact2.agent_mode.value = "plan"
-    mock_artifact2.section_count = 2
-    mock_artifact2.updated_at.strftime.return_value = "2024-01-02"
+    mock_summaries = [
+        ArtifactSummary(
+            artifact_id="artifact1",
+            name="Artifact 1",
+            agent_mode=AgentMode.RESEARCH,
+            section_count=3,
+            created_at=datetime(2024, 1, 1),
+            updated_at=datetime(2024, 1, 1),
+        ),
+        ArtifactSummary(
+            artifact_id="artifact2",
+            name="Artifact 2",
+            agent_mode=AgentMode.PLAN,
+            section_count=2,
+            created_at=datetime(2024, 1, 2),
+            updated_at=datetime(2024, 1, 2),
+        ),
+    ]
+    mock_context.deps.artifact_service.list_artifacts.return_value = mock_summaries
 
-    mock_artifact_service.list_artifacts.return_value = [mock_artifact1, mock_artifact2]
+    result = await list_artifacts(mock_context)
 
-    result = list_artifacts()
-
-    mock_artifact_service.list_artifacts.assert_called_once_with(None)
+    mock_context.deps.artifact_service.list_artifacts.assert_called_once_with(None)
     assert "artifact1" in result
     assert "artifact2" in result
+    assert "Total: 2 artifacts" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_list_artifacts_by_type(
-    mock_handle_parsing, mock_get_service, mock_artifact_service
-):
+@pytest.mark.asyncio
+async def test_list_artifacts_by_type(mock_context):
     """Test listing artifacts by type."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
+    from datetime import datetime
 
-    # Create properly mocked artifact
-    mock_artifact1 = MagicMock()
-    mock_artifact1.artifact_id = "artifact1"
-    mock_artifact1.agent_mode = MagicMock()
-    mock_artifact1.agent_mode.value = "research"
-    mock_artifact1.section_count = 2
-    mock_artifact1.updated_at.strftime.return_value = "2024-01-01"
+    from shotgun.artifacts.models import ArtifactSummary
 
-    mock_artifact_service.list_artifacts.return_value = [mock_artifact1]
+    mock_summaries = [
+        ArtifactSummary(
+            artifact_id="artifact1",
+            name="Artifact 1",
+            agent_mode=AgentMode.RESEARCH,
+            section_count=3,
+            created_at=datetime(2024, 1, 1),
+            updated_at=datetime(2024, 1, 1),
+        ),
+    ]
+    mock_context.deps.artifact_service.list_artifacts.return_value = mock_summaries
 
-    result = list_artifacts("research")
+    result = await list_artifacts(mock_context, "research")
 
-    mock_artifact_service.list_artifacts.assert_called_once_with(AgentMode.RESEARCH)
+    mock_context.deps.artifact_service.list_artifacts.assert_called_once_with(
+        AgentMode.RESEARCH
+    )
     assert "artifact1" in result
+    assert "Total: 1 artifacts" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-def test_list_artifacts_error_handling(mock_get_service):
-    """Test listing artifacts error handling."""
-    mock_service = MagicMock()
-    mock_service.list_artifacts.side_effect = Exception("List failed")
-    mock_get_service.return_value = mock_service
+@pytest.mark.asyncio
+async def test_list_artifacts_error_handling(mock_context):
+    """Test list artifacts error handling."""
+    mock_context.deps.artifact_service.list_artifacts.side_effect = Exception(
+        "List failed"
+    )
 
-    result = list_artifacts()
+    result = await list_artifacts(mock_context)
 
     assert "Error: Failed to list artifacts" in result
     assert "List failed" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-def test_list_artifact_templates(mock_get_service, mock_artifact_service):
+@pytest.mark.asyncio
+async def test_list_artifact_templates(mock_context):
     """Test listing artifact templates."""
-    mock_get_service.return_value = mock_artifact_service
-    template1 = MagicMock()
-    template1.template_id = "template1"
-    template1.name = "Template 1"
-    template1.agent_mode = MagicMock()
-    template1.agent_mode.value = "research"
-    template1.purpose = "Test purpose"
-    template1.section_count = 3
-    mock_artifact_service.list_templates.return_value = [template1]
+    from shotgun.artifacts.templates.models import TemplateSummary
 
-    result = list_artifact_templates()
+    mock_templates = [
+        TemplateSummary(
+            template_id="template1",
+            name="Template 1",
+            agent_mode=AgentMode.RESEARCH,
+            purpose="Research template",
+            section_count=3,
+        ),
+    ]
+    mock_context.deps.artifact_service.list_templates.return_value = mock_templates
 
-    mock_artifact_service.list_templates.assert_called_once()
+    result = await list_artifact_templates(mock_context, "research")
+
+    mock_context.deps.artifact_service.list_templates.assert_called_once_with(
+        AgentMode.RESEARCH
+    )
     assert "template1" in result
+    assert "Template 1" in result
+    assert "Research template" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-def test_list_artifact_templates_error_handling(mock_get_service):
-    """Test listing templates error handling."""
-    mock_service = MagicMock()
-    mock_service.list_templates.side_effect = Exception("Template list failed")
-    mock_get_service.return_value = mock_service
+@pytest.mark.asyncio
+async def test_list_artifact_templates_error_handling(mock_context):
+    """Test list templates error handling."""
+    mock_context.deps.artifact_service.list_templates.side_effect = Exception(
+        "List failed"
+    )
 
-    result = list_artifact_templates()
+    result = await list_artifact_templates(mock_context)
 
     assert "Error: Failed to list templates" in result
-    assert "Template list failed" in result
+    assert "List failed" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_read_artifact(mock_handle_parsing, mock_get_service, mock_artifact_service):
+@pytest.mark.asyncio
+async def test_read_artifact(mock_context):
     """Test reading an artifact."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
-
-    # Mock artifact with necessary attributes for read_artifact function
     mock_artifact = MagicMock()
     mock_artifact.name = "Test Artifact"
-    mock_artifact.sections = [MagicMock()]  # Non-empty to avoid early return
-    mock_artifact.has_template.return_value = False
-    mock_artifact.get_ordered_sections.return_value = [
-        MagicMock(title="Section 1", content="Section content")
+    mock_artifact.sections = [
+        MagicMock(title="Section 1", content="Content 1", number=1),
     ]
-    mock_artifact_service.get_artifact.return_value = mock_artifact
+    mock_artifact.has_template.return_value = False
+    mock_artifact.get_ordered_sections.return_value = mock_artifact.sections
 
-    result = read_artifact("test-artifact", "research")
+    mock_context.deps.artifact_service.get_artifact.return_value = mock_artifact
 
-    mock_artifact_service.get_artifact.assert_called_once_with(
+    result = await read_artifact(mock_context, "test-artifact", "research")
+
+    mock_context.deps.artifact_service.get_artifact.assert_called_once_with(
         "test-artifact", AgentMode.RESEARCH, ""
     )
     assert "Test Artifact" in result
-    assert "Section content" in result
+    assert "Section 1" in result
+    assert "Content 1" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_read_artifact_error_handling(mock_handle_parsing, mock_get_service):
-    """Test reading artifact error handling."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_service = MagicMock()
-    mock_service.get_artifact.side_effect = Exception("Read failed")
-    mock_get_service.return_value = mock_service
+@pytest.mark.asyncio
+async def test_read_artifact_error_handling(mock_context):
+    """Test read artifact error handling."""
+    mock_context.deps.artifact_service.get_artifact.side_effect = Exception(
+        "Read failed"
+    )
 
-    result = read_artifact("test-artifact", "research")
+    result = await read_artifact(mock_context, "test-artifact", "research")
 
     assert "Error: Failed to read artifact" in result
     assert "Read failed" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_read_artifact_section(
-    mock_handle_parsing, mock_get_service, mock_artifact_service
-):
-    """Test reading an artifact section."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
-
-    # Mock section with necessary attributes
+@pytest.mark.asyncio
+async def test_read_artifact_section(mock_context):
+    """Test reading a specific artifact section."""
     mock_section = MagicMock()
-    mock_section.title = "Section Title"
-    mock_section.content = "Section content"
-    mock_artifact_service.get_section.return_value = mock_section
+    mock_section.title = "Test Section"
+    mock_section.content = "Test content"
+    mock_context.deps.artifact_service.get_section.return_value = mock_section
 
-    result = read_artifact_section("test-artifact", "research", 1)
+    result = await read_artifact_section(
+        mock_context, "test-artifact", "research", 1
+    )
 
-    mock_artifact_service.get_section.assert_called_once_with(
+    mock_context.deps.artifact_service.get_section.assert_called_once_with(
         "test-artifact", AgentMode.RESEARCH, 1
     )
-    assert "Section Title" in result
-    assert "Section content" in result
+    assert "Test Section" in result
+    assert "Test content" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_read_artifact_section_error_handling(mock_handle_parsing, mock_get_service):
-    """Test reading section error handling."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_service = MagicMock()
-    mock_service.get_section.side_effect = Exception("Section read failed")
-    mock_get_service.return_value = mock_service
+@pytest.mark.asyncio
+async def test_read_artifact_section_error_handling(mock_context):
+    """Test read artifact section error handling."""
+    mock_context.deps.artifact_service.get_section.side_effect = Exception(
+        "Section read failed"
+    )
 
-    result = read_artifact_section("test-artifact", "research", 1)
+    result = await read_artifact_section(
+        mock_context, "test-artifact", "research", 1
+    )
 
     assert "Error: Failed to read section" in result
     assert "Section read failed" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_write_artifact_section(
-    mock_handle_parsing, mock_get_service, mock_artifact_service
-):
-    """Test writing an artifact section."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
-
-    # Mock section and return value for get_or_create_section
+@pytest.mark.asyncio
+async def test_write_artifact_section(mock_context):
+    """Test writing to an artifact section."""
     mock_section = MagicMock()
-    mock_artifact_service.get_or_create_section.return_value = (mock_section, True)
+    mock_context.deps.artifact_service.get_or_create_section.return_value = (
+        mock_section,
+        True,  # created=True
+    )
 
-    result = write_artifact_section(
+    result = await write_artifact_section(
+        mock_context,
         "test-artifact",
         "research",
         1,
-        "section-slug",
-        "Section Title",
-        "Section content",
+        "test-section",
+        "Test Section",
+        "Test content",
     )
 
-    mock_artifact_service.get_or_create_section.assert_called_once_with(
+    mock_context.deps.artifact_service.get_or_create_section.assert_called_once_with(
         "test-artifact",
         AgentMode.RESEARCH,
         1,
-        "section-slug",
-        "Section Title",
-        "Section content",
+        "test-section",
+        "Test Section",
+        "Test content",
     )
-    assert "Created section 1" in result
-    assert "Section Title" in result
+    assert "Created section 1 'Test Section'" in result
+    assert "with 12 characters" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_write_artifact_section_error_handling(mock_handle_parsing, mock_get_service):
-    """Test writing section error handling."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_service = MagicMock()
-    mock_service.get_or_create_section.side_effect = Exception("Write failed")
-    mock_get_service.return_value = mock_service
+@pytest.mark.asyncio
+async def test_write_artifact_section_error_handling(mock_context):
+    """Test write artifact section error handling."""
+    mock_context.deps.artifact_service.get_or_create_section.side_effect = Exception(
+        "Write failed"
+    )
 
-    result = write_artifact_section(
+    result = await write_artifact_section(
+        mock_context,
         "test-artifact",
         "research",
         1,
-        "section-slug",
-        "Section Title",
-        "Section content",
+        "test-section",
+        "Test Section",
+        "Test content",
     )
 
     assert "Error: Failed to write section" in result
     assert "Write failed" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_write_artifact_section_update_existing(
-    mock_handle_parsing, mock_get_service, mock_artifact_service
-):
+@pytest.mark.asyncio
+async def test_write_artifact_section_update_existing(mock_context):
     """Test updating an existing artifact section."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_get_service.return_value = mock_artifact_service
-
-    # Mock section and return value for get_or_create_section (existing section)
     mock_section = MagicMock()
-    mock_artifact_service.get_or_create_section.return_value = (mock_section, False)
+    mock_context.deps.artifact_service.get_or_create_section.return_value = (
+        mock_section,
+        False,  # created=False (already exists)
+    )
 
-    result = write_artifact_section(
+    result = await write_artifact_section(
+        mock_context,
         "test-artifact",
         "research",
         1,
-        "section-slug",
-        "Updated Section Title",
-        "Updated section content",
+        "test-section",
+        "Test Section",
+        "Updated content",
     )
 
-    assert "Updated section 1" in result
-    assert "Updated Section Title" in result
+    mock_context.deps.artifact_service.update_section.assert_called_once_with(
+        "test-artifact", AgentMode.RESEARCH, 1, content="Updated content"
+    )
+    assert "Updated section 1 'Test Section'" in result
+    assert "with 15 characters" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_read_artifact_empty_sections(mock_handle_parsing, mock_get_service):
-    """Test reading an artifact with no sections."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_service = MagicMock()
-    mock_get_service.return_value = mock_service
-
-    # Mock artifact with empty sections
+@pytest.mark.asyncio
+async def test_read_artifact_empty_sections(mock_context):
+    """Test reading artifact with empty sections."""
     mock_artifact = MagicMock()
-    mock_artifact.name = "Empty Artifact"
-    mock_artifact.sections = []  # Empty sections list
-    mock_service.get_artifact.return_value = mock_artifact
+    mock_artifact.name = "Test Artifact"
+    mock_artifact.sections = []
+    mock_artifact.has_template.return_value = False
 
-    result = read_artifact("empty-artifact", "research")
+    mock_context.deps.artifact_service.get_artifact.return_value = mock_artifact
 
-    assert "empty-artifact" in result
-    assert "has no sections" in result
+    result = await read_artifact(mock_context, "test-artifact", "research")
+
+    assert "exists but has no sections" in result
 
 
-@patch("shotgun.agents.tools.artifact_management.get_artifact_service")
-@patch("shotgun.agents.tools.artifact_management.handle_agent_mode_parsing")
-def test_read_artifact_with_template(mock_handle_parsing, mock_get_service):
-    """Test reading an artifact that has a template."""
-    mock_handle_parsing.return_value = (AgentMode.RESEARCH, None)
-    mock_service = MagicMock()
-    mock_get_service.return_value = mock_service
-
-    # Mock artifact with template
+@pytest.mark.asyncio
+async def test_read_artifact_with_template(mock_context):
+    """Test reading artifact with template information."""
     mock_artifact = MagicMock()
-    mock_artifact.name = "Templated Artifact"
-    mock_artifact.sections = [MagicMock()]  # Non-empty
-    mock_artifact.has_template.return_value = True
-    mock_artifact.template_info = MagicMock()
-    mock_artifact.template_info.name = "Research Template"
-    mock_artifact.get_ordered_sections.return_value = [
-        MagicMock(title="Template Section", content="Template content")
+    mock_artifact.name = "Test Artifact"
+    mock_artifact.sections = [
+        MagicMock(title="Section 1", content="Content 1", number=1),
     ]
-    mock_service.get_artifact.return_value = mock_artifact
+    mock_artifact.has_template.return_value = True
+    mock_artifact.get_template_id.return_value = "test-template"
+    mock_artifact.load_template_from_file.return_value = {
+        "name": "Test Template",
+        "purpose": "Testing",
+        "prompt": "Test prompt",
+        "sections": {
+            "section1": {"instructions": "Do something", "order": 1},
+        },
+    }
+    mock_artifact.get_ordered_sections.return_value = mock_artifact.sections
 
-    result = read_artifact("templated-artifact", "research")
+    mock_context.deps.artifact_service.get_artifact.return_value = mock_artifact
 
-    assert "Templated Artifact" in result
-    assert "Template content" in result
-    # The template name might be accessed differently, just check the content is there
+    result = await read_artifact(mock_context, "test-artifact", "research")
 
-
-# Test removed - get_template_service doesn't exist, the template listing uses get_artifact_service
+    assert "Test Artifact" in result
+    assert "Template Information" in result
+    assert "Test Template" in result
+    assert "Testing" in result
+    assert "Test prompt" in result
+    assert "section1" in result
+    assert "Do something" in result

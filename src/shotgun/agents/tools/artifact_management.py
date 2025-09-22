@@ -4,25 +4,17 @@ These tools provide agents with the ability to create and manage structured
 artifacts instead of flat markdown files.
 """
 
-from shotgun.artifacts.service import ArtifactService
+from pydantic_ai import RunContext
+
+from shotgun.agents.models import AgentDeps
 from shotgun.artifacts.utils import handle_agent_mode_parsing
 from shotgun.logging_config import setup_logger
 
 logger = setup_logger(__name__)
 
-# Global artifact service instance
-_artifact_service: ArtifactService | None = None
 
-
-def get_artifact_service() -> ArtifactService:
-    """Get or create the global artifact service instance."""
-    global _artifact_service
-    if _artifact_service is None:
-        _artifact_service = ArtifactService()
-    return _artifact_service
-
-
-def create_artifact(
+async def create_artifact(
+    ctx: RunContext[AgentDeps],
     artifact_id: str,
     agent_mode: str,
     name: str,
@@ -31,6 +23,7 @@ def create_artifact(
     """Create a new artifact.
 
     Args:
+        ctx: RunContext containing AgentDeps with artifact service
         artifact_id: Unique identifier for the artifact (slug format)
         agent_mode: Agent mode (research, plan, tasks)
         name: Human-readable name for the artifact
@@ -55,7 +48,7 @@ def create_artifact(
         return "Error: Invalid agent mode"
 
     try:
-        service = get_artifact_service()
+        service = ctx.deps.artifact_service
 
         # Pass template_id if provided and not empty
         template_to_use = template_id.strip() if template_id.strip() else None
@@ -110,10 +103,15 @@ def create_artifact(
         return f"Error: {error_msg}"
 
 
-def read_artifact(artifact_id: str, agent_mode: str) -> str:
+async def read_artifact(
+    ctx: RunContext[AgentDeps],
+    artifact_id: str,
+    agent_mode: str,
+) -> str:
     """Read all sections of an artifact.
 
     Args:
+        ctx: RunContext containing AgentDeps with artifact service
         artifact_id: Artifact identifier
         agent_mode: Agent mode (research, plan, tasks)
 
@@ -135,7 +133,7 @@ def read_artifact(artifact_id: str, agent_mode: str) -> str:
         return "Error: Invalid agent mode"
 
     try:
-        service = get_artifact_service()
+        service = ctx.deps.artifact_service
         artifact = service.get_artifact(artifact_id, mode, "")
 
         if not artifact.sections:
@@ -207,7 +205,8 @@ def read_artifact(artifact_id: str, agent_mode: str) -> str:
         return f"Error: {error_msg}"
 
 
-def write_artifact_section(
+async def write_artifact_section(
+    ctx: RunContext[AgentDeps],
     artifact_id: str,
     agent_mode: str,
     section_number: int,
@@ -220,6 +219,7 @@ def write_artifact_section(
     Creates the artifact and/or section if they don't exist.
 
     Args:
+        ctx: RunContext containing AgentDeps with artifact service
         artifact_id: Artifact identifier
         agent_mode: Agent mode (research, plan, tasks)
         section_number: Section number (1, 2, 3, etc.)
@@ -251,7 +251,7 @@ def write_artifact_section(
         return "Error: Agent mode validation failed"
 
     try:
-        service = get_artifact_service()
+        service = ctx.deps.artifact_service
 
         # Get or create the section
         section, created = service.get_or_create_section(
@@ -283,7 +283,8 @@ def write_artifact_section(
         return f"Error: {error_msg}"
 
 
-def read_artifact_section(
+async def read_artifact_section(
+    ctx: RunContext[AgentDeps],
     artifact_id: str,
     agent_mode: str,
     section_number: int,
@@ -291,6 +292,7 @@ def read_artifact_section(
     """Read content from a specific section of an artifact.
 
     Args:
+        ctx: RunContext containing AgentDeps with artifact service
         artifact_id: Artifact identifier
         agent_mode: Agent mode (research, plan, tasks)
         section_number: Section number
@@ -319,7 +321,7 @@ def read_artifact_section(
         return "Error: Agent mode validation failed"
 
     try:
-        service = get_artifact_service()
+        service = ctx.deps.artifact_service
 
         section = service.get_section(artifact_id, mode, section_number)
 
@@ -341,10 +343,14 @@ def read_artifact_section(
         return f"Error: {error_msg}"
 
 
-def list_artifacts(agent_mode: str | None = None) -> str:
+async def list_artifacts(
+    ctx: RunContext[AgentDeps],
+    agent_mode: str | None = None,
+) -> str:
     """List all artifacts, optionally filtered by agent mode.
 
     Args:
+        ctx: RunContext containing AgentDeps with artifact service
         agent_mode: Optional agent mode filter (research, plan, tasks)
 
     Returns:
@@ -357,7 +363,7 @@ def list_artifacts(agent_mode: str | None = None) -> str:
     logger.debug("🔧 Listing artifacts for mode: %s", agent_mode or "all")
 
     try:
-        service = get_artifact_service()
+        service = ctx.deps.artifact_service
 
         mode = None
         if agent_mode:
@@ -399,10 +405,14 @@ def list_artifacts(agent_mode: str | None = None) -> str:
         return f"Error: {error_msg}"
 
 
-def list_artifact_templates(agent_mode: str | None = None) -> str:
+async def list_artifact_templates(
+    ctx: RunContext[AgentDeps],
+    agent_mode: str | None = None,
+) -> str:
     """List available artifact templates, optionally filtered by agent mode.
 
     Args:
+        ctx: RunContext containing AgentDeps with artifact service
         agent_mode: Optional agent mode filter (research, plan, tasks)
 
     Returns:
@@ -415,7 +425,7 @@ def list_artifact_templates(agent_mode: str | None = None) -> str:
     logger.debug("🔧 Listing templates for mode: %s", agent_mode or "all")
 
     try:
-        service = get_artifact_service()
+        service = ctx.deps.artifact_service
 
         mode = None
         if agent_mode:

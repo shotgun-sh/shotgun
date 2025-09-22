@@ -11,6 +11,7 @@ from pydantic_ai import RunContext
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
+    from shotgun.artifacts.service import ArtifactService
     from shotgun.codebase.service import CodebaseService
 
 
@@ -85,6 +86,10 @@ class AgentDeps(AgentRuntimeOptions):
         description="Codebase service for code analysis tools",
     )
 
+    artifact_service: "ArtifactService" = Field(
+        description="Artifact service for managing structured artifacts",
+    )
+
     system_prompt_fn: Callable[[RunContext["AgentDeps"]], str] = Field(
         description="Function that generates the system prompt for this agent",
     )
@@ -92,9 +97,10 @@ class AgentDeps(AgentRuntimeOptions):
 
 # Rebuild model to resolve forward references after imports are available
 try:
+    from shotgun.artifacts.service import ArtifactService
     from shotgun.codebase.service import CodebaseService
 
     AgentDeps.model_rebuild()
 except ImportError:
-    # CodebaseService may not be available in all contexts
+    # Services may not be available in all contexts
     pass

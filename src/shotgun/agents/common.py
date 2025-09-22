@@ -23,7 +23,7 @@ from pydantic_ai.messages import (
 from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
-from shotgun.sdk.services import get_codebase_service
+from shotgun.sdk.services import get_artifact_service, get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
 
 from .history import token_limit_compactor
@@ -117,12 +117,14 @@ def create_base_agent(
         # Use the Model instance directly (has API key baked in)
         model = model_config.model_instance
 
-        # Create deps with model config and codebase service
+        # Create deps with model config and services
         codebase_service = get_codebase_service()
+        artifact_service = get_artifact_service()
         deps = AgentDeps(
             **agent_runtime_options.model_dump(),
             llm_model=model_config,
             codebase_service=codebase_service,
+            artifact_service=artifact_service,
             system_prompt_fn=system_prompt_fn,
         )
 
@@ -158,12 +160,12 @@ def create_base_agent(
     agent.tool_plain(append_file)
 
     # Register artifact management tools (always available)
-    agent.tool_plain(create_artifact)
-    agent.tool_plain(list_artifacts)
-    agent.tool_plain(list_artifact_templates)
-    agent.tool_plain(read_artifact)
-    agent.tool_plain(read_artifact_section)
-    agent.tool_plain(write_artifact_section)
+    agent.tool(create_artifact)
+    agent.tool(list_artifacts)
+    agent.tool(list_artifact_templates)
+    agent.tool(read_artifact)
+    agent.tool(read_artifact_section)
+    agent.tool(write_artifact_section)
 
     # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:
