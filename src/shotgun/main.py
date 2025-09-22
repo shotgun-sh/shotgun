@@ -18,9 +18,13 @@ from shotgun.utils.update_checker import check_for_updates_async
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize logging
+# Initialize telemetry FIRST (before logging setup to prevent handler conflicts)
+_logfire_enabled = setup_logfire_observability()
+
+# Initialize logging AFTER telemetry
 configure_root_logger()
 logger = get_logger(__name__)
+logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
 # Initialize configuration
 try:
@@ -28,10 +32,6 @@ try:
     config_manager.load()  # Ensure config is loaded at startup
 except Exception as e:
     logger.debug("Configuration initialization warning: %s", e)
-
-# Initialize telemetry
-_logfire_enabled = setup_logfire_observability()
-logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
 # Initialize Sentry telemetry
 _sentry_enabled = setup_sentry_observability()

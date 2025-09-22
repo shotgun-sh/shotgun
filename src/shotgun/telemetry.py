@@ -26,8 +26,11 @@ def setup_logfire_observability() -> bool:
             logger.warning("LOGFIRE_TOKEN not set, Logfire observability disabled")
             return False
 
-        # Configure Logfire
-        logfire.configure(token=logfire_token)
+        # Configure Logfire (disable console output, only send to website)
+        logfire.configure(
+            token=logfire_token,
+            console=False,  # Disable console output entirely
+        )
 
         # Instrument Pydantic AI for better observability
         logfire.instrument_pydantic_ai()

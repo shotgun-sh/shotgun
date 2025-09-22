@@ -63,14 +63,20 @@ def setup_logger(
     """
     logger = logging.getLogger(name)
 
-    # Avoid adding duplicate handlers
-    if logger.handlers:
+    # Check if we already have a file handler
+    has_file_handler = any(
+        isinstance(h, logging.handlers.TimedRotatingFileHandler)
+        for h in logger.handlers
+    )
+
+    # If we already have a file handler, just return the logger
+    if has_file_handler:
         return logger
 
-    # Get log level from environment variable, default to ERROR
-    env_level = os.getenv("SHOTGUN_LOG_LEVEL", "ERROR").upper()
+    # Get log level from environment variable, default to INFO
+    env_level = os.getenv("SHOTGUN_LOG_LEVEL", "INFO").upper()
     if env_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-        env_level = "ERROR"
+        env_level = "INFO"
 
     logger.setLevel(getattr(logging, env_level))
 
@@ -145,8 +151,14 @@ def get_logger(name: str) -> logging.Logger:
     """
     logger = logging.getLogger(name)
 
-    # If logger doesn't have handlers, set it up
-    if not logger.handlers:
+    # Check if we have a file handler already
+    has_file_handler = any(
+        isinstance(h, logging.handlers.TimedRotatingFileHandler)
+        for h in logger.handlers
+    )
+
+    # If no file handler, set up the logger (will add file handler)
+    if not has_file_handler:
         return setup_logger(name)
 
     return logger
@@ -169,4 +181,8 @@ def set_global_log_level(level: str) -> None:
 
 def configure_root_logger() -> None:
     """Configure the root shotgun logger."""
+    # Always set up the root logger to ensure file handler is added
     setup_logger("shotgun")
+
+    # Also ensure main module gets configured
+    setup_logger("__main__")
