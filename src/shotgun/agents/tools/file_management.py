@@ -11,7 +11,7 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _get_shotgun_base_path() -> Path:
+def get_shotgun_base_path() -> Path:
     """Get the absolute path to the .shotgun directory."""
     return Path.cwd() / ".shotgun"
 
@@ -28,7 +28,7 @@ def _validate_shotgun_path(filename: str) -> Path:
     Raises:
         ValueError: If the path attempts to access files outside .shotgun directory
     """
-    base_path = _get_shotgun_base_path()
+    base_path = get_shotgun_base_path()
 
     # Create the full path
     full_path = (base_path / filename).resolve()

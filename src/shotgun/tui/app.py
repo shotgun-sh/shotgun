@@ -2,18 +2,24 @@ from textual.app import App
 from textual.binding import Binding
 
 from shotgun.agents.config import ConfigManager, get_config_manager
+from shotgun.agents.tools.file_management import get_shotgun_base_path
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.splash import SplashScreen
 from shotgun.utils.update_checker import check_for_updates_async
 
 from .screens.chat import ChatScreen
+from .screens.directory_setup import DirectorySetupScreen
 from .screens.provider_config import ProviderConfigScreen
 
 logger = get_logger(__name__)
 
 
 class ShotgunApp(App[None]):
-    SCREENS = {"chat": ChatScreen, "provider_config": ProviderConfigScreen}
+    SCREENS = {
+        "chat": ChatScreen,
+        "provider_config": ProviderConfigScreen,
+        "directory_setup": DirectorySetupScreen,
+    }
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit the app"),
     ]
@@ -43,21 +49,34 @@ class ShotgunApp(App[None]):
         self.push_screen(
             SplashScreen(), callback=lambda _arg: self.refresh_startup_screen()
         )
-        # self.refresh_startup_screen()
 
     def refresh_startup_screen(self) -> None:
         """Push the appropriate screen based on configured providers."""
-        if self.config_manager.has_any_provider_key():
-            if isinstance(self.screen, ChatScreen):
-                return
-            self.push_screen("chat")
-        else:
+        if not self.config_manager.has_any_provider_key():
             if isinstance(self.screen, ProviderConfigScreen):
                 return
 
             self.push_screen(
                 "provider_config", callback=lambda _arg: self.refresh_startup_screen()
             )
+            return
+
+        if not self.check_local_shotgun_directory_exists():
+            if isinstance(self.screen, DirectorySetupScreen):
+                return
+
+            self.push_screen(
+                "directory_setup", callback=lambda _arg: self.refresh_startup_screen()
+            )
+            return
+
+        if isinstance(self.screen, ChatScreen):
+            return
+        self.push_screen("chat")
+
+    def check_local_shotgun_directory_exists(self) -> bool:
+        shotgun_dir = get_shotgun_base_path()
+        return shotgun_dir.exists() and shotgun_dir.is_dir()
 
     async def action_quit(self) -> None:
         """Override quit action to show update notification."""

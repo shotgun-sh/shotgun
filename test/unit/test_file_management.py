@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from shotgun.agents.tools.file_management import (
-    _get_shotgun_base_path,
+    get_shotgun_base_path,
     _validate_shotgun_path,
     append_file,
     read_file,
@@ -16,7 +16,7 @@ from shotgun.agents.tools.file_management import (
 
 
 class TestGetShotgunBasePath:
-    """Test suite for _get_shotgun_base_path function."""
+    """Test suite for get_shotgun_base_path function."""
 
     def test_returns_shotgun_directory_in_cwd(self):
         """Test that it returns .shotgun directory in current working directory."""
@@ -24,7 +24,7 @@ class TestGetShotgunBasePath:
             mock_cwd = MagicMock()
             mock_path.cwd.return_value = mock_cwd
 
-            result = _get_shotgun_base_path()
+            result = get_shotgun_base_path()
 
             mock_path.cwd.assert_called_once()
             mock_cwd.__truediv__.assert_called_once_with(".shotgun")
@@ -38,7 +38,7 @@ class TestValidateShotgunPath:
         """Test validation of valid relative path."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -53,7 +53,7 @@ class TestValidateShotgunPath:
         """Test validation of valid nested path."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -68,7 +68,7 @@ class TestValidateShotgunPath:
         """Test that path traversal attacks are blocked."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -83,7 +83,7 @@ class TestValidateShotgunPath:
         """Test that absolute paths are blocked."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -98,7 +98,7 @@ class TestValidateShotgunPath:
         """Test that symlink escapes are blocked."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -124,7 +124,7 @@ class TestReadFile:
         """Test successful file reading."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -143,7 +143,7 @@ class TestReadFile:
         """Test handling of non-existent file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -169,7 +169,7 @@ class TestReadFile:
         """Test handling of permission errors."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -196,7 +196,7 @@ class TestWriteFile:
         """Test successful file writing in write mode."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -216,7 +216,7 @@ class TestWriteFile:
         """Test successful file writing in append mode."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -248,7 +248,7 @@ class TestWriteFile:
         """Test that parent directories are created."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -279,7 +279,7 @@ class TestWriteFile:
         """Test handling of write permission errors."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -298,7 +298,7 @@ class TestWriteFile:
         """Test overwriting an existing file in write mode."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -333,7 +333,7 @@ class TestAppendFile:
         """Test appending to an existing file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -358,7 +358,7 @@ class TestAppendFile:
         """Test that append creates new file if it doesn't exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -382,7 +382,7 @@ class TestIntegrationScenarios:
         """Test complete read-write-append workflow."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()
@@ -421,7 +421,7 @@ class TestIntegrationScenarios:
         """Test that security boundaries are consistently enforced."""
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
-                "shotgun.agents.tools.file_management._get_shotgun_base_path"
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
             ) as mock_base:
                 shotgun_dir = Path(temp_dir) / ".shotgun"
                 shotgun_dir.mkdir()

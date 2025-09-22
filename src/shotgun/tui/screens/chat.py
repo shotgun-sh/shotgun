@@ -294,6 +294,18 @@ class ChatScreen(Screen[None]):
 
     COMMANDS = {AgentModeProvider, ProviderSetupProvider}
 
+    _PLACEHOLDER_BY_MODE: dict[AgentType, str] = {
+        AgentType.RESEARCH: (
+            "Ask for investigations, e.g. research strengths and weaknesses of PydanticAI vs its rivals"
+        ),
+        AgentType.PLAN: (
+            "Describe a goal to plan, e.g. draft a rollout plan for launching our Slack automation"
+        ),
+        AgentType.TASKS: (
+            "Request actionable work, e.g. break down tasks to wire OpenTelemetry into the API"
+        ),
+    }
+
     value = reactive("")
     mode = reactive(AgentType.RESEARCH)
     history: PromptHistory = PromptHistory()
@@ -328,6 +340,10 @@ class ChatScreen(Screen[None]):
             mode_indicator = self.query_one(ModeIndicator)
             mode_indicator.mode = new_mode
             mode_indicator.refresh()
+
+            prompt_input = self.query_one(PromptInput)
+            prompt_input.placeholder = self._placeholder_for_mode(new_mode)
+            prompt_input.refresh()
 
     def watch_working(self, is_working: bool) -> None:
         """Show or hide the spinner based on working state."""
@@ -385,7 +401,7 @@ class ChatScreen(Screen[None]):
                     text=self.value,
                     highlight_cursor_line=False,
                     id="prompt-input",
-                    placeholder="Type your message",
+                    placeholder=self._placeholder_for_mode(self.mode),
                 )
                 yield ModeIndicator(mode=self.mode)
 
@@ -404,7 +420,10 @@ class ChatScreen(Screen[None]):
 
         prompt_input = self.query_one(PromptInput)
         prompt_input.clear()
-        prompt_input.focus()
+
+    def _placeholder_for_mode(self, mode: AgentType) -> str:
+        """Return the placeholder text appropriate for the current mode."""
+        return self._PLACEHOLDER_BY_MODE.get(mode, "Type your message")
 
     @work
     async def run_agent(self, message: str) -> None:
