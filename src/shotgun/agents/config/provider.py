@@ -13,6 +13,11 @@ from pydantic_ai.providers.openai import OpenAIProvider
 
 from shotgun.logging_config import get_logger
 
+from .constants import (
+    ANTHROPIC_API_KEY_ENV,
+    GEMINI_API_KEY_ENV,
+    OPENAI_API_KEY_ENV,
+)
 from .manager import get_config_manager
 from .models import MODEL_SPECS, ModelConfig, ProviderType
 
@@ -86,10 +91,10 @@ def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
     )
 
     if provider_enum == ProviderType.OPENAI:
-        api_key = _get_api_key(config.openai.api_key, "OPENAI_API_KEY")
+        api_key = _get_api_key(config.openai.api_key, OPENAI_API_KEY_ENV)
         if not api_key:
             raise ValueError(
-                "OpenAI API key not configured. Set via environment variable OPENAI_API_KEY or config."
+                f"OpenAI API key not configured. Set via environment variable {OPENAI_API_KEY_ENV} or config."
             )
 
         # Get model spec
@@ -108,10 +113,10 @@ def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
         )
 
     elif provider_enum == ProviderType.ANTHROPIC:
-        api_key = _get_api_key(config.anthropic.api_key, "ANTHROPIC_API_KEY")
+        api_key = _get_api_key(config.anthropic.api_key, ANTHROPIC_API_KEY_ENV)
         if not api_key:
             raise ValueError(
-                "Anthropic API key not configured. Set via environment variable ANTHROPIC_API_KEY or config."
+                f"Anthropic API key not configured. Set via environment variable {ANTHROPIC_API_KEY_ENV} or config."
             )
 
         # Get model spec
@@ -130,10 +135,10 @@ def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
         )
 
     elif provider_enum == ProviderType.GOOGLE:
-        api_key = _get_api_key(config.google.api_key, "GEMINI_API_KEY")
+        api_key = _get_api_key(config.google.api_key, GEMINI_API_KEY_ENV)
         if not api_key:
             raise ValueError(
-                "Gemini API key not configured. Set via environment variable GEMINI_API_KEY or config."
+                f"Gemini API key not configured. Set via environment variable {GEMINI_API_KEY_ENV} or config."
             )
 
         # Get model spec
