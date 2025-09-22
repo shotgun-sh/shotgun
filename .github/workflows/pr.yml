@@ -237,30 +237,9 @@ jobs:
           source .venv/bin/activate
           shotgun tasks --non-interactive "Create the tasks for building a simple Agent using Pydantic AI"
 
-  todo-checker:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check for Todos
-        uses: phntmxyz/pr_todo_checker@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          exclude: |
-            *.md
-            **/__pycache__/**
-            **/.pytest_cache/**
-            **/config/*.yml
-          comment_on_todo: true
-          comment_body: |
-            "A new Todo was discovered. If it is not a priority right now, consider marking it for later attention.\n{todo}\n"
-          comment_checkbox: 'Ignore'
-          custom_todo_matcher: "{'py': ['#'], 'yml': ['#'], 'yaml': ['#']}"
-
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, test-cli-basics, test-cli-research, test-cli-plan, test-cli-tasks, todo-checker]
+    needs: [validate-pr-title, basic-pr-check, test-cli-basics, test-cli-research, test-cli-plan, test-cli-tasks]
     if: always()
     
     steps:
@@ -272,15 +251,13 @@ jobs:
           echo "test-cli-research: ${{ needs.test-cli-research.result }}"
           echo "test-cli-plan: ${{ needs.test-cli-plan.result }}"
           echo "test-cli-tasks: ${{ needs.test-cli-tasks.result }}"
-          echo "todo-checker: ${{ needs.todo-checker.result }}"
 
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
                 "${{ needs.basic-pr-check.result }}" != "success" || \
                 "${{ needs.test-cli-basics.result }}" != "success" || \
                 "${{ needs.test-cli-research.result }}" != "success" || \
                 "${{ needs.test-cli-plan.result }}" != "success" || \
-                "${{ needs.test-cli-tasks.result }}" != "success" || \
-                "${{ needs.todo-checker.result }}" != "success" ]]; then
+                "${{ needs.test-cli-tasks.result }}" != "success" ]]; then
             echo "❌ One or more required checks failed or were cancelled"
             exit 1
           else

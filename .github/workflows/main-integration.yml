@@ -33,14 +33,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run integration tests with coverage
+      - name: Run all tests with coverage
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "🧪 Running integration tests on main branch..."
-          uv run pytest test/integration/ -v --cov=src --cov-report= -c pyproject.toml
+          echo "🧪 Running all tests (unit + integration) on main branch..."
+          uv run pytest test/ -v --cov=src --cov-report= -c pyproject.toml
 
       - name: Generate coverage reports
         if: always()

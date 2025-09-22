@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from shotgun.utils.env_utils import is_truthy
+
 
 def get_log_directory() -> Path:
     """Get the log directory path, creating it if necessary.
@@ -84,8 +86,24 @@ def setup_logger(
     if format_string is None:
         format_string = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
+    # Check if this is a dev build with Logfire enabled
+    is_logfire_dev_build = False
+    try:
+        from shotgun.build_constants import IS_DEV_BUILD, LOGFIRE_ENABLED
+
+        if IS_DEV_BUILD and is_truthy(LOGFIRE_ENABLED):
+            is_logfire_dev_build = True
+            # This debug message will only appear in file logs
+            logger.debug("Console logging disabled for Logfire dev build")
+    except ImportError:
+        # No build constants available (local development)
+        pass
+
     # Check if console logging is enabled (default: off)
-    console_logging_enabled = os.getenv("LOGGING_TO_CONSOLE", "false").lower() == "true"
+    # Force console logging OFF if Logfire is enabled in dev build
+    console_logging_enabled = (
+        is_truthy(os.getenv("LOGGING_TO_CONSOLE", "false")) and not is_logfire_dev_build
+    )
 
     if console_logging_enabled:
         # Create console handler
@@ -100,7 +118,7 @@ def setup_logger(
         logger.addHandler(console_handler)
 
     # Check if file logging is enabled (default: on)
-    file_logging_enabled = os.getenv("LOGGING_TO_FILE", "true").lower() == "true"
+    file_logging_enabled = is_truthy(os.getenv("LOGGING_TO_FILE", "true"))
 
     if file_logging_enabled:
         try:

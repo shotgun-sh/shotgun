@@ -1,7 +1,7 @@
 """Unit tests for ArtifactTemplateLoader."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -129,7 +129,9 @@ sections:
 
 def test_loader_initialization_defaults():
     """Test ArtifactTemplateLoader initialization with defaults."""
-    with patch("shotgun.artifacts.templates.loader.TEMPLATES_DIR") as mock_templates_dir:
+    with patch(
+        "shotgun.artifacts.templates.loader.TEMPLATES_DIR"
+    ) as mock_templates_dir:
         mock_templates_dir.return_value = Path("/fake/templates")
 
         loader = ArtifactTemplateLoader()
@@ -158,11 +160,15 @@ def test_loader_initialization_no_user_templates():
 
 
 @patch("shotgun.artifacts.templates.loader.get_shotgun_home")
-def test_discover_built_in_templates_only(mock_get_shotgun_home, mock_built_in_templates_dir):
+def test_discover_built_in_templates_only(
+    mock_get_shotgun_home, mock_built_in_templates_dir
+):
     """Test discovering only built-in templates."""
     mock_get_shotgun_home.return_value = Path("/nonexistent/user/home")
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     templates = loader._discover_templates()
 
     assert len(templates) == 5
@@ -179,7 +185,9 @@ def test_discover_built_in_templates_only(mock_get_shotgun_home, mock_built_in_t
 
 
 @patch("shotgun.artifacts.templates.loader.get_shotgun_home")
-def test_discover_with_user_templates(mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir):
+def test_discover_with_user_templates(
+    mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir
+):
     """Test discovering both built-in and user templates."""
     mock_get_shotgun_home.return_value = mock_user_templates_dir.parent
 
@@ -188,10 +196,14 @@ def test_discover_with_user_templates(mock_get_shotgun_home, mock_built_in_templ
 
     # Move user templates to the expected location
     import shutil
-    shutil.move(str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates"))
-    user_templates_path = mock_user_templates_dir.parent / "templates"
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    shutil.move(
+        str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates")
+    )
+
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     templates = loader._discover_templates()
 
     # Should have built-in templates only (user templates not loading in test environment)
@@ -213,7 +225,9 @@ def test_discover_with_user_templates(mock_get_shotgun_home, mock_built_in_templ
 def test_discover_templates_from_dir_built_in(mock_built_in_templates_dir):
     """Test discovering templates from built-in directory."""
     loader = ArtifactTemplateLoader()
-    templates = loader._discover_templates_from_dir(mock_built_in_templates_dir, "built-in")
+    templates = loader._discover_templates_from_dir(
+        mock_built_in_templates_dir, "built-in"
+    )
 
     assert len(templates) == 5
     assert "research/market_research" in templates
@@ -291,7 +305,9 @@ def test_get_template_built_in_only(mock_get_shotgun_home, mock_built_in_templat
     """Test getting a template from built-in templates only."""
     mock_get_shotgun_home.return_value = Path("/nonexistent")
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     template = loader.get_template("research/market_research")
 
     assert template is not None
@@ -300,20 +316,29 @@ def test_get_template_built_in_only(mock_get_shotgun_home, mock_built_in_templat
 
 
 @patch("shotgun.artifacts.templates.loader.get_shotgun_home")
-def test_get_template_user_override(mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir):
+def test_get_template_user_override(
+    mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir
+):
     """Test getting a template that is overridden by user template."""
     mock_get_shotgun_home.return_value = mock_user_templates_dir.parent
 
     # Setup user templates directory
     (mock_user_templates_dir.parent / "templates").mkdir(exist_ok=True)
     import shutil
-    shutil.move(str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates"))
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    shutil.move(
+        str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates")
+    )
+
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     template = loader.get_template("research/market_research")
 
     assert template is not None
-    assert template.name == "Market Research Template"  # User override not working, gets built-in
+    assert (
+        template.name == "Market Research Template"
+    )  # User override not working, gets built-in
     assert template.agent_mode == AgentMode.RESEARCH
 
 
@@ -326,11 +351,15 @@ def test_get_template_nonexistent():
 
 
 @patch("shotgun.artifacts.templates.loader.get_shotgun_home")
-def test_list_templates_built_in_only(mock_get_shotgun_home, mock_built_in_templates_dir):
+def test_list_templates_built_in_only(
+    mock_get_shotgun_home, mock_built_in_templates_dir
+):
     """Test listing templates with built-in only."""
     mock_get_shotgun_home.return_value = Path("/nonexistent")
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     summaries = loader.list_templates()
 
     assert len(summaries) == 5
@@ -343,16 +372,23 @@ def test_list_templates_built_in_only(mock_get_shotgun_home, mock_built_in_templ
 
 
 @patch("shotgun.artifacts.templates.loader.get_shotgun_home")
-def test_list_templates_with_user_templates(mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir):
+def test_list_templates_with_user_templates(
+    mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir
+):
     """Test listing templates with user templates included."""
     mock_get_shotgun_home.return_value = mock_user_templates_dir.parent
 
     # Setup user templates directory
     (mock_user_templates_dir.parent / "templates").mkdir(exist_ok=True)
     import shutil
-    shutil.move(str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates"))
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    shutil.move(
+        str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates")
+    )
+
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     summaries = loader.list_templates()
 
     # Debug: Print what templates we actually found
@@ -361,7 +397,9 @@ def test_list_templates_with_user_templates(mock_get_shotgun_home, mock_built_in
     print(f"Found {len(summaries)} templates: {template_names}")
 
     # For now, just check the built-in templates are working
-    assert len(summaries) == 5  # Only built-in templates are found (user templates not being loaded)
+    assert (
+        len(summaries) == 5
+    )  # Only built-in templates are found (user templates not being loaded)
 
     # Built-in templates
     assert "research/market_research" in template_ids
@@ -372,19 +410,28 @@ def test_list_templates_with_user_templates(mock_get_shotgun_home, mock_built_in
 
 
 @patch("shotgun.artifacts.templates.loader.get_shotgun_home")
-def test_list_templates_filtered_by_mode(mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir):
+def test_list_templates_filtered_by_mode(
+    mock_get_shotgun_home, mock_built_in_templates_dir, mock_user_templates_dir
+):
     """Test listing templates filtered by agent mode."""
     mock_get_shotgun_home.return_value = mock_user_templates_dir.parent
 
     # Setup user templates directory
     (mock_user_templates_dir.parent / "templates").mkdir(exist_ok=True)
     import shutil
-    shutil.move(str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates"))
 
-    loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+    shutil.move(
+        str(mock_user_templates_dir), str(mock_user_templates_dir.parent / "templates")
+    )
+
+    loader = ArtifactTemplateLoader(
+        templates_dir=mock_built_in_templates_dir, include_user_templates=False
+    )
     summaries = loader.list_templates(AgentMode.RESEARCH)
 
-    assert len(summaries) == 2  # 2 built-in research templates (user templates not loading)
+    assert (
+        len(summaries) == 2
+    )  # 2 built-in research templates (user templates not loading)
     for summary in summaries:
         assert summary.agent_mode == AgentMode.RESEARCH
 
@@ -394,7 +441,9 @@ def test_get_templates_for_mode(mock_built_in_templates_dir):
     with patch("shotgun.artifacts.templates.loader.get_shotgun_home") as mock_home:
         mock_home.return_value = Path("/nonexistent")
 
-        loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+        loader = ArtifactTemplateLoader(
+            templates_dir=mock_built_in_templates_dir, include_user_templates=False
+        )
         templates = loader.get_templates_for_mode(AgentMode.RESEARCH)
 
         assert len(templates) == 2  # 2 research templates in built-in
@@ -409,7 +458,9 @@ def test_template_exists(mock_built_in_templates_dir):
     with patch("shotgun.artifacts.templates.loader.get_shotgun_home") as mock_home:
         mock_home.return_value = Path("/nonexistent")
 
-        loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
+        loader = ArtifactTemplateLoader(
+            templates_dir=mock_built_in_templates_dir, include_user_templates=False
+        )
 
         assert loader.template_exists("research/market_research") is True
         assert loader.template_exists("nonexistent/template") is False
@@ -420,8 +471,12 @@ def test_get_template_by_short_id(mock_built_in_templates_dir):
     with patch("shotgun.artifacts.templates.loader.get_shotgun_home") as mock_home:
         mock_home.return_value = Path("/nonexistent")
 
-        loader = ArtifactTemplateLoader(templates_dir=mock_built_in_templates_dir, include_user_templates=False)
-        template = loader.get_template_by_short_id("market_research", AgentMode.RESEARCH)
+        loader = ArtifactTemplateLoader(
+            templates_dir=mock_built_in_templates_dir, include_user_templates=False
+        )
+        template = loader.get_template_by_short_id(
+            "market_research", AgentMode.RESEARCH
+        )
 
         assert template is not None
         assert template.name == "Market Research Template"

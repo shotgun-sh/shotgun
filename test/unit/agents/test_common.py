@@ -206,9 +206,7 @@ def test_build_agent_system_prompt_custom_context():
         mock_loader_class.return_value = mock_loader
         mock_loader.render.return_value = "Custom context prompt"
 
-        result = build_agent_system_prompt(
-            "plan", mock_context
-        )
+        result = build_agent_system_prompt("plan", mock_context)
 
         assert result == "Custom context prompt"
         mock_loader.render.assert_called_once_with(

@@ -45,8 +45,12 @@ def test_setup_posthog_with_build_constants():
         with patch("posthog.api_key", None):
             with patch("posthog.host", None):
                 with patch("posthog.disabled", True):
-                    with patch("shotgun.build_constants.POSTHOG_API_KEY", "test_api_key"):
-                        with patch("shotgun.agents.config.get_config_manager") as mock_get_config:
+                    with patch(
+                        "shotgun.build_constants.POSTHOG_API_KEY", "test_api_key"
+                    ):
+                        with patch(
+                            "shotgun.agents.config.get_config_manager"
+                        ) as mock_get_config:
                             mock_config = MagicMock()
                             mock_config.get_user_id.return_value = "test-user-id"
                             mock_get_config.return_value = mock_config
@@ -72,7 +76,9 @@ def test_setup_posthog_with_env_vars():
                 with patch("posthog.disabled", True):
                     with patch.dict(os.environ, {"POSTHOG_API_KEY": "env_api_key"}):
                         with patch("shotgun.build_constants.POSTHOG_API_KEY", ""):
-                            with patch("shotgun.agents.config.get_config_manager") as mock_get_config:
+                            with patch(
+                                "shotgun.agents.config.get_config_manager"
+                            ) as mock_get_config:
                                 mock_config = MagicMock()
                                 mock_config.get_user_id.return_value = "test-user-id"
                                 mock_get_config.return_value = mock_config
@@ -93,18 +99,19 @@ def test_setup_posthog_import_error():
     try:
         # Temporarily hide the posthog module
         import sys
-        posthog_module = sys.modules.get('posthog')
-        if 'posthog' in sys.modules:
-            del sys.modules['posthog']
+
+        posthog_module = sys.modules.get("posthog")
+        if "posthog" in sys.modules:
+            del sys.modules["posthog"]
 
         # Now importing posthog should fail
-        with patch.dict('sys.modules', {'posthog': None}):
+        with patch.dict("sys.modules", {"posthog": None}):
             result = posthog_telemetry.setup_posthog_observability()
             assert result is False
 
         # Restore the module if it existed
         if posthog_module:
-            sys.modules['posthog'] = posthog_module
+            sys.modules["posthog"] = posthog_module
     finally:
         posthog_telemetry._posthog_client = original_client
 
@@ -142,8 +149,8 @@ def test_track_event_initialized():
                     properties={
                         "custom": "property",
                         "version": "1.0.0",
-                        "environment": "production"
-                    }
+                        "environment": "production",
+                    },
                 )
     finally:
         posthog_telemetry._posthog_client = original_client
@@ -179,7 +186,10 @@ def test_track_event_exception_handling():
     posthog_telemetry._posthog_client = mock_client
 
     try:
-        with patch("shotgun.agents.config.get_config_manager", side_effect=Exception("Config error")):
+        with patch(
+            "shotgun.agents.config.get_config_manager",
+            side_effect=Exception("Config error"),
+        ):
             # Should not raise exception
             posthog_telemetry.track_event("test_event", {})
     finally:

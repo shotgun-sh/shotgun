@@ -63,7 +63,6 @@ dev = [
 
 [project.scripts]
 shotgun = "shotgun.main:app"
-tui = "shotgun.tui.app:run"
 
 [build-system]
 requires = ["hatchling"]

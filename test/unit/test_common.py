@@ -93,7 +93,7 @@ class TestPromptTemplateIntegration:
         loader = PromptLoader()
         contexts = ["research output", "plans", "task lists", "documentation"]
 
-        for context in contexts:
+        for _ in contexts:
             result = loader.render(
                 "agents/partials/interactive_mode.j2",
                 interactive_mode=False,

@@ -102,13 +102,17 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          # Logfire configuration for dev builds only
+          LOGFIRE_TOKEN: ${{ steps.version_update.outputs.is_dev == 'true' && secrets.LOGFIRE_TOKEN || '' }}
+          LOGFIRE_ENABLED: ${{ steps.version_update.outputs.is_dev == 'true' && 'true' || '' }}
         run: |
           echo "🔨 Building package version: ${{ steps.version_update.outputs.version }}"
-          if [[ -n "$SENTRY_DSN" ]] || [[ -n "$POSTHOG_API_KEY" ]]; then
+          if [[ -n "$SENTRY_DSN" ]] || [[ -n "$POSTHOG_API_KEY" ]] || [[ "$LOGFIRE_ENABLED" == "true" ]]; then
             [[ -n "$SENTRY_DSN" ]] && echo "✅ Building with Sentry integration enabled"
             [[ -n "$POSTHOG_API_KEY" ]] && echo "✅ Building with PostHog analytics enabled"
+            [[ "$LOGFIRE_ENABLED" == "true" ]] && echo "✅ Building with Logfire observability enabled (dev build)"
           else
-            echo "⚠️  Building without analytics (Sentry/PostHog will use fallback)"
+            echo "⚠️  Building without analytics (Sentry/PostHog/Logfire will use fallback)"
           fi
           python -m build
 
@@ -308,14 +312,14 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*Installation:*\n\`\`\`\npipx install shotgun-sh==${VERSION}\n\`\`\`"
+                  "text": "*Installation:*\n\`\`\`\npipx install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh\n\`\`\`"
                 }
               },
               {
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "This is a pre-release development version for testing."
+                  "text": "⚠️ *Warning:* You might need to wait a minute for this version to be available for installation, as it was just published.\n\nThis is a pre-release development version for testing."
                 }
               },
               {
@@ -365,14 +369,14 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*Installation:*\n\`\`\`\n# Install latest version:\npipx install shotgun-sh\n\n# Or install this specific version:\npipx install shotgun-sh==${VERSION}\n\`\`\`"
+                  "text": "*Installation:*\n\`\`\`\n# Install latest version:\npipx install shotgun-sh\n\n# Or install this specific version:\npipx install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh\n\`\`\`"
                 }
               },
               {
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "✨ *Note for regular users:* You don't need to specify the version number. Simply use \`pipx install shotgun-sh\` to get the latest stable release. The version-specific command is included for testing this particular release."
+                  "text": "⚠️ *Warning:* You might need to wait a minute for this version to be available for installation, as it was just published.\n\n✨ *Note for regular users:* You don't need to specify the version number. Simply use \`pipx install shotgun-sh\` to get the latest stable release. The version-specific command is included for testing this particular release."
                 }
               },
               {
