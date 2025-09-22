@@ -62,7 +62,7 @@ Instructions:
             search_prompt,
             generation_config=genai.GenerationConfig(  # type: ignore[attr-defined]
                 temperature=0.3,
-                max_output_tokens=8192,  # Explicit limit for comprehensive results
+                max_output_tokens=8192,
             ),
         )
 

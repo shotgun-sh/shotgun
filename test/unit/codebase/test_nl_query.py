@@ -72,7 +72,9 @@ async def test_generate_cypher_simple_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -108,7 +110,9 @@ async def test_generate_cypher_complex_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -144,7 +148,9 @@ async def test_generate_cypher_with_file_extension_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -163,7 +169,9 @@ async def test_generate_cypher_model_error():
     nl_query = "Find all functions"
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -203,7 +211,9 @@ async def test_generate_cypher_request_structure():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -236,7 +246,9 @@ async def test_generate_cypher_with_datetime():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -281,7 +293,9 @@ async def test_generate_cypher_empty_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -311,7 +325,9 @@ async def test_generate_cypher_whitespace_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -340,7 +356,9 @@ async def test_generate_cypher_unicode_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -376,7 +394,9 @@ async def test_generate_cypher_long_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -407,7 +427,9 @@ async def test_generate_cypher_aggregation_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -443,7 +465,9 @@ async def test_generate_cypher_relationship_query():
     mock_response.parts = [mock_text_part]
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -508,7 +532,9 @@ async def test_generate_cypher_timeout_handling():
     nl_query = "Find functions"
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -534,7 +560,9 @@ async def test_generate_cypher_response_validation():
     mock_response.parts = None  # Invalid parts
 
     with (
-        patch("shotgun.codebase.core.nl_query.model_request") as mock_model_request,
+        patch(
+            "shotgun.codebase.core.nl_query.shotgun_model_request"
+        ) as mock_model_request,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()

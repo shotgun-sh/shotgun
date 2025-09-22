@@ -1,0 +1,23 @@
+{% if existing_artifacts %}
+
+## Existing Artifacts (All Modes)
+
+Work already completed across all agent modes:
+
+{% for mode, artifacts in existing_artifacts.items() %}
+### {{ mode.title() }} Artifacts
+{% for artifact in artifacts %}
+- **{{ artifact.artifact_id }}** ({{ artifact.section_count }} sections)
+  Updated: {{ artifact.updated_at.strftime('%B %d, %Y') }}
+{% endfor %}
+
+{% endfor %}
+Use `read_artifact(artifact_id)` to access full content, `list_artifacts()` for detailed view, or `list_artifacts("mode")` for specific mode.
+
+{% else %}
+
+## Existing Artifacts
+
+No artifacts have been created yet. Use `create_artifact()` with available templates to start new work.
+
+{% endif %}

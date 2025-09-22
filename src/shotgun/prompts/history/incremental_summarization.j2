@@ -1,0 +1,53 @@
+You are extending an existing conversation summary with new messages.
+
+Your task is to merge the new information into the existing summary while maintaining the same structured format and preserving all important information.
+
+<EXISTING_SUMMARY>
+{{ existing_summary }}
+</EXISTING_SUMMARY>
+
+<NEW_MESSAGES>
+{{ new_messages }}
+</NEW_MESSAGES>
+
+Instructions:
+1. Update the existing summary sections with new information from the NEW_MESSAGES
+2. Maintain the same structure and format as the existing summary
+3. Preserve all important information from both existing and new content
+4. Do not repeat information already covered in the existing summary unless it's been updated or expanded
+5. Focus on integrating new developments, decisions, or progress into the appropriate sections
+
+<OUTPUT_FORMAT>
+Provide the complete updated summary following the exact same format as the existing summary:
+
+# Context
+
+Updated summary of the discussion, incorporating new topics or tasks. Present it as clear bullet points. Be brief but do not lose information that might be important for the current state, task or objectives.
+
+# Key elements, learnings and entities
+
+Present the updated important elements of context, learnings and entities from the entire discussion. Be very detailed.
+
+Present it as clear bullet points. Be brief but do not lose information that might be important for the current state, task or objectives.
+
+If new tool results were obtained, preserve them verbatim if short, summarize if long focusing on preserving all important facts.
+
+If new user messages exist, preserve them verbatim if short to medium length, summarize if long focusing on preserving all important facts.
+
+If there are any new links, IDs, filenames, etc. - preserve them verbatim.
+
+# Timeline
+
+Update the timeline with new important tasks and content:
+- User: asked to handle a complex task X: <summary of the task>
+- Assistant: we handle it by doing A, B, C...
+- Tools used and output summary
+
+[Include any new timeline entries from the new messages]
+
+# Current status, task and objectives
+
+Based on the complete conversation including new messages, update the current status, task and objectives.
+
+CRITICAL: This section should reflect the most current state based on all messages including the new ones. This is not about summarizing but about the status, task and objectives currently active in the conversation to keep as much context as possible.
+</OUTPUT_FORMAT>

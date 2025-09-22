@@ -142,7 +142,7 @@ class TestWebSearchTool:
             assert "Invalid API key" in result
 
     def test_correct_api_parameters(self):
-        """Test that correct parameters are passed to OpenAI API."""
+        """Test that correct parameters are passed to OpenAI API with formatted prompt."""
         mock_response = Mock()
         mock_response.output_text = "Results"
 
@@ -180,7 +180,12 @@ class TestWebSearchTool:
             input_data = kwargs["input"]
             assert len(input_data) == 1
             assert input_data[0]["role"] == "user"
-            assert input_data[0]["content"][0]["text"] == query
+
+            # Verify the formatted prompt contains the query and instructions
+            passed_prompt = input_data[0]["content"][0]["text"]
+            assert query in passed_prompt
+            assert "Please provide current and accurate information" in passed_prompt
+            assert "Query: " + query in passed_prompt
 
             # Check tools configuration
             assert "tools" in kwargs
@@ -256,7 +261,7 @@ class TestWebSearchTool:
             )
 
     def test_query_variations(self):
-        """Test with various query formats and special characters."""
+        """Test that various query formats are properly embedded in formatted prompts."""
         mock_response = Mock()
         mock_response.output_text = "Generic results"
 
@@ -295,10 +300,17 @@ class TestWebSearchTool:
                 result = openai_web_search_tool(query)
                 assert result == "Generic results"
 
-                # Verify the query was passed correctly
+                # Verify the query was embedded correctly in the formatted prompt
                 call_args = mock_client.responses.create.call_args
-                passed_query = call_args.kwargs["input"][0]["content"][0]["text"]
-                assert passed_query == query
+                passed_prompt = call_args.kwargs["input"][0]["content"][0]["text"]
+
+                # Check that query is contained in the formatted prompt
+                if query.strip():  # Skip assertion for empty query
+                    assert query in passed_prompt
+                    assert "Query: " + query in passed_prompt
+                assert (
+                    "Please provide current and accurate information" in passed_prompt
+                )
 
     def test_long_search_results(self):
         """Test handling of very long search results."""
@@ -334,7 +346,7 @@ class TestIntegrationScenarios:
     """Integration test scenarios for web search."""
 
     def test_complete_search_workflow(self):
-        """Test complete search workflow with realistic data."""
+        """Test complete search workflow with realistic data and formatted prompts."""
         mock_response = Mock()
         mock_response.output_text = """
         Based on my search, here are the current Python web frameworks:
@@ -377,7 +389,12 @@ class TestIntegrationScenarios:
             mock_client.responses.create.assert_called_once()
             call_kwargs = mock_client.responses.create.call_args.kwargs
             assert call_kwargs["model"] == "gpt-5-mini"
-            assert call_kwargs["input"][0]["content"][0]["text"] == query
+
+            # Verify the formatted prompt contains the query
+            passed_prompt = call_kwargs["input"][0]["content"][0]["text"]
+            assert query in passed_prompt
+            assert "Please provide current and accurate information" in passed_prompt
+            assert "Query: " + query in passed_prompt
 
     def test_error_recovery_scenarios(self):
         """Test various error recovery scenarios."""

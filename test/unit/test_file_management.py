@@ -25,6 +25,7 @@ class TestGetShotgunBasePath:
 
             # Import from the new location
             from shotgun.utils.file_system_utils import get_shotgun_base_path
+
             result = get_shotgun_base_path()
 
             mock_path.cwd.assert_called_once()
@@ -265,7 +266,9 @@ class TestWriteFile:
 
                 # Append content
                 append_content = "Appended content"
-                result = await write_file(mock_ctx, "append.md", append_content, mode="a")
+                result = await write_file(
+                    mock_ctx, "append.md", append_content, mode="a"
+                )
 
                 assert "Successfully appended 16 characters to append.md" in result
 
@@ -374,7 +377,9 @@ class TestWriteFile:
 
                 # Overwrite with new content
                 new_content = "new content"
-                result = await write_file(mock_ctx, "overwrite.md", new_content, mode="w")
+                result = await write_file(
+                    mock_ctx, "overwrite.md", new_content, mode="w"
+                )
 
                 assert "Successfully wrote" in result
                 assert test_file.read_text(encoding="utf-8") == new_content
@@ -498,7 +503,9 @@ class TestIntegrationScenarios:
 
                 # 5. Overwrite with new content
                 new_content = "# New Content\n\nCompletely replaced.\n"
-                overwrite_result = await write_file(mock_ctx, filename, new_content, mode="w")
+                overwrite_result = await write_file(
+                    mock_ctx, filename, new_content, mode="w"
+                )
                 assert "Successfully wrote" in overwrite_result
 
                 # 6. Verify overwrite
@@ -531,8 +538,12 @@ class TestIntegrationScenarios:
                     read_result = await read_file(mock_ctx, malicious_path)
                     assert "Error reading file" in read_result
 
-                    write_result = await write_file(mock_ctx, malicious_path, "malicious")
+                    write_result = await write_file(
+                        mock_ctx, malicious_path, "malicious"
+                    )
                     assert "Error writing file" in write_result
 
-                    append_result = await append_file(mock_ctx, malicious_path, "malicious")
+                    append_result = await append_file(
+                        mock_ctx, malicious_path, "malicious"
+                    )
                     assert "Error writing file" in append_result

@@ -1,9 +1,13 @@
 """Pydantic models for configuration."""
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field, PrivateAttr, SecretStr
+from pydantic_ai.direct import model_request
+from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
 
 
 class ProviderType(str, Enum):
@@ -56,6 +60,22 @@ class ModelConfig(BaseModel):
             ProviderType.GOOGLE: "google-gla",
         }
         return f"{provider_prefix[self.provider]}:{self.name}"
+
+    def get_model_settings(self, max_tokens: int | None = None) -> ModelSettings:
+        """Get ModelSettings with optional token override.
+
+        This provides flexibility for specific use cases that need different
+        token limits while defaulting to maximum utilization.
+
+        Args:
+            max_tokens: Optional override for max_tokens. If None, uses max_output_tokens
+
+        Returns:
+            ModelSettings configured with specified or maximum tokens
+        """
+        return ModelSettings(
+            max_tokens=max_tokens if max_tokens is not None else self.max_output_tokens
+        )
 
 
 # Model specifications registry (static metadata)
@@ -125,3 +145,44 @@ class ShotgunConfig(BaseModel):
     )
     user_id: str = Field(description="Unique anonymous user identifier")
     config_version: int = Field(default=1, description="Configuration schema version")
+
+
+async def shotgun_model_request(
+    model_config: ModelConfig,
+    messages: list[ModelMessage],
+    max_tokens: int | None = None,
+    **kwargs: Any,
+) -> ModelResponse:
+    """Model request wrapper that uses full token capacity by default.
+
+    This wrapper ensures all LLM calls in Shotgun use the maximum available
+    token capacity of each model, improving response quality and completeness.
+    The most common issue this fixes is truncated summaries that were cut off
+    at default token limits (e.g., 4096 for Claude models).
+
+    Args:
+        model_config: ModelConfig instance with model settings and API key
+        messages: Messages to send to the model
+        max_tokens: Optional override for max_tokens. If None, uses model's max_output_tokens
+        **kwargs: Additional arguments passed to model_request
+
+    Returns:
+        ModelResponse from the model
+
+    Example:
+        # Uses full token capacity (e.g., 4096 for Claude, 128k for GPT-5)
+        response = await shotgun_model_request(model_config, messages)
+
+        # Override for specific use case
+        response = await shotgun_model_request(model_config, messages, max_tokens=1000)
+    """
+    # Get properly configured ModelSettings with maximum or overridden token limit
+    model_settings = model_config.get_model_settings(max_tokens)
+
+    # Make the model request with full token utilization
+    return await model_request(
+        model=model_config.model_instance,
+        messages=messages,
+        model_settings=model_settings,
+        **kwargs,
+    )

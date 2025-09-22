@@ -4,7 +4,6 @@ import time
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from pydantic_ai.direct import model_request
 from pydantic_ai.messages import (
     ModelRequest,
     SystemPromptPart,
@@ -13,6 +12,7 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import get_provider_model
+from shotgun.agents.config.models import shotgun_model_request
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 
@@ -35,9 +35,9 @@ async def llm_cypher_prompt(system_prompt: str, user_prompt: str) -> str:
         The generated Cypher query as a string
     """
     model_config = get_provider_model()
-    # Use the Model instance directly (has API key baked in)
-    query_cypher_response = await model_request(
-        model=model_config.model_instance,
+    # Use shotgun wrapper to maximize response quality for codebase queries
+    query_cypher_response = await shotgun_model_request(
+        model_config=model_config,
         messages=[
             ModelRequest(
                 parts=[

@@ -1,0 +1,18 @@
+{% if available_templates %}
+
+## Available Artifact Templates
+
+You have access to these pre-built templates for creating structured artifacts:
+
+{% for mode, templates in available_templates.items() %}
+### {{ mode.title() }} Templates
+{% for template in templates %}
+- **{{ template.name }}** (`{{ template.template_id }}`)
+  Purpose: {{ template.purpose[:150] }}{% if template.purpose|length > 150 %}...{% endif %}
+{% endfor %}
+
+{% endfor %}
+Use `list_artifact_templates("mode")` to get detailed template information for a specific mode, or `list_artifact_templates()` for all templates.
+Use `create_artifact(artifact_id, agent_mode, name, template_id)` to create a new artifact with any of these templates.
+
+{% endif %}

@@ -27,6 +27,7 @@ from shotgun.sdk.services import get_artifact_service, get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
 
 from .history import token_limit_compactor
+from .history.compaction import apply_persistent_compaction
 from .models import AgentDeps, AgentRuntimeOptions
 from .tools import (
     append_file,
@@ -70,10 +71,17 @@ async def add_system_status_message(
     message_history = message_history or []
     codebase_understanding_graphs = await deps.codebase_service.list_graphs()
 
+    # Collect artifact state information
+    from .artifact_state import collect_artifact_state
+
+    artifact_state = collect_artifact_state()
+
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
+        **artifact_state,
     )
+
     message_history.append(
         ModelResponse(
             parts=[
@@ -133,12 +141,25 @@ def create_base_agent(
         logger.debug("🤖 Creating agent with fallback OpenAI GPT-4o")
         raise ValueError("Configured model is required") from e
 
+    # Create a history processor that has access to deps via closure
+    async def history_processor(messages: list[ModelMessage]) -> list[ModelMessage]:
+        """History processor with access to deps via closure."""
+
+        # Create a minimal context for compaction
+        class ProcessorContext:
+            def __init__(self, deps: AgentDeps):
+                self.deps = deps
+                self.usage = None  # Will be estimated from messages
+
+        ctx = ProcessorContext(deps)
+        return await token_limit_compactor(ctx, messages)
+
     agent = Agent(
         model,
         output_type=[str, DeferredToolRequests],
         deps_type=AgentDeps,
         instrument=True,
-        history_processors=[token_limit_compactor],
+        history_processors=[history_processor],
     )
 
     # System prompt function is stored in deps and will be called manually in run_agent
@@ -289,7 +310,8 @@ async def run_agent(
         message_history=message_history,
     )
 
-    messages = result.all_messages()
+    # Apply persistent compaction to prevent cascading token growth across CLI commands
+    messages = await apply_persistent_compaction(result.all_messages(), deps)
     while isinstance(result.output, DeferredToolRequests):
         logger.info("got deferred tool requests")
         await deps.queue.join()
@@ -312,7 +334,8 @@ async def run_agent(
             message_history=messages,
             deferred_tool_results=results,
         )
-        messages = result.all_messages()
+        # Apply persistent compaction to prevent cascading token growth in multi-turn loops
+        messages = await apply_persistent_compaction(result.all_messages(), deps)
 
     # Log file operations summary if any files were modified
     if deps.file_tracker.operations:

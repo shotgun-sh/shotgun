@@ -3,12 +3,18 @@
 from enum import Enum
 from typing import Any
 
-from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults, UsageLimits
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    DeferredToolResults,
+    UsageLimits,
+)
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage, ModelRequest
 from textual.message import Message
 from textual.widget import Widget
 
+from .history.compaction import apply_persistent_compaction
 from .models import AgentDeps, AgentRuntimeOptions, FileOperation
 from .plan import create_plan_agent
 from .research import create_research_agent
@@ -182,7 +188,10 @@ class AgentManager(Widget):
             mes for mes in result.new_messages() if not isinstance(mes, ModelRequest)
         ]
 
-        self.message_history = result.all_messages()
+        # Apply compaction to persistent message history to prevent cascading growth
+        self.message_history = await apply_persistent_compaction(
+            result.all_messages(), deps
+        )
         self._post_messages_updated()
 
         # Log file operations summary if any files were modified

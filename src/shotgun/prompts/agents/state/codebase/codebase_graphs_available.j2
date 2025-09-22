@@ -1,9 +1,11 @@
+## Codebase Graphs Available
+
 {% if codebase_understanding_graphs -%}
 
 You have access to the following codebase graphs:
 
 {% for graph in codebase_understanding_graphs -%}
-- {{ graph.name }} ID: {{ graph.graph_id }}
+- {{ graph.name }} ID: {{ graph.graph_id }} Path: {{ graph.repo_path }}
 {% endfor -%}
 
 {% else -%}

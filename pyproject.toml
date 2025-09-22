@@ -44,6 +44,7 @@ dependencies = [
     "openai>=1.0.0",
     "anthropic>=0.39.0",
     "google-generativeai>=0.8.5",
+    "tiktoken>=0.7.0",
     "packaging>=23.0",
 ]
 

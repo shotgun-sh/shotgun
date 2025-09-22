@@ -40,17 +40,31 @@ def openai_web_search_tool(query: str) -> str:
             span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
             return error_msg
 
+        prompt = f"""Please provide current and accurate information about the following query:
+
+Query: {query}
+
+Instructions:
+- Provide comprehensive, factual information
+- Include relevant details and context
+- Focus on current and recent information
+- Be specific and accurate in your response
+- You can't ask the user for details, so assume the most relevant details for the query
+
+ALWAYS PROVIDE THE SOURCES (urls) TO BACK UP THE INFORMATION YOU PROVIDE.
+"""
+
         client = OpenAI(api_key=api_key)
         response = client.responses.create(  # type: ignore[call-overload]
             model="gpt-5-mini",
             input=[
-                {"role": "user", "content": [{"type": "input_text", "text": query}]}
+                {"role": "user", "content": [{"type": "input_text", "text": prompt}]}
             ],
             text={
                 "format": {"type": "text"},
                 "verbosity": "high",
             },  # Increased from medium
-            reasoning={"effort": "high", "summary": "auto"},  # Increased from medium
+            reasoning={"effort": "medium", "summary": "auto"},
             tools=[
                 {
                     "type": "web_search",
