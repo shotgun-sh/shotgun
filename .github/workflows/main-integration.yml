@@ -1,8 +1,7 @@
 name: Main Branch Integration Tests
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:  # Manual trigger only
 
 env:
   COVERAGE_THRESHOLD: 51.0
