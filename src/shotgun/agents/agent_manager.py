@@ -32,16 +32,23 @@ class AgentType(Enum):
 class MessageHistoryUpdated(Message):
     """Event posted when the message history is updated."""
 
-    def __init__(self, messages: list[ModelMessage], agent_type: AgentType) -> None:
+    def __init__(
+        self,
+        messages: list[ModelMessage],
+        agent_type: AgentType,
+        file_operations: list[FileOperation] | None = None,
+    ) -> None:
         """Initialize the message history updated event.
 
         Args:
             messages: The updated message history.
             agent_type: The type of agent that triggered the update.
+            file_operations: List of file operations from this run.
         """
         super().__init__()
         self.messages = messages
         self.agent_type = agent_type
+        self.file_operations = file_operations or []
 
 
 class AgentManager(Widget):
@@ -192,18 +199,22 @@ class AgentManager(Widget):
         self.message_history = await apply_persistent_compaction(
             result.all_messages(), deps
         )
-        self._post_messages_updated()
 
         # Log file operations summary if any files were modified
         self.recently_change_files = deps.file_tracker.operations.copy()
 
+        self._post_messages_updated(self.recently_change_files)
+
         return result
 
-    def _post_messages_updated(self) -> None:
+    def _post_messages_updated(
+        self, file_operations: list[FileOperation] | None = None
+    ) -> None:
         # Post event to notify listeners of the message history update
         self.post_message(
             MessageHistoryUpdated(
                 messages=self.ui_message_history.copy(),
                 agent_type=self._current_agent_type,
+                file_operations=file_operations,
             )
         )

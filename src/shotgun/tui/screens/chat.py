@@ -23,7 +23,12 @@ from textual.widgets import Markdown
 
 from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.models import AgentDeps, UserAnswer, UserQuestion
+from shotgun.agents.models import (
+    AgentDeps,
+    FileOperationTracker,
+    UserAnswer,
+    UserQuestion,
+)
 from shotgun.sdk.services import get_artifact_service, get_codebase_service
 
 from ..components.prompt_input import PromptInput
@@ -411,6 +416,38 @@ class ChatScreen(Screen[None]):
     def handle_message_history_updated(self, event: MessageHistoryUpdated) -> None:
         """Handle message history updates from the agent manager."""
         self.messages = event.messages
+
+        # If there are file operations, add a message showing the modified files
+        if event.file_operations:
+            chat_history = self.query_one(ChatHistory)
+            if chat_history.vertical_tail:
+                tracker = FileOperationTracker(operations=event.file_operations)
+                display_path = tracker.get_display_path()
+
+                if display_path:
+                    # Create a simple markdown message with the file path
+                    # The terminal emulator will make this clickable automatically
+                    from pathlib import Path
+
+                    path_obj = Path(display_path)
+
+                    if len(event.file_operations) == 1:
+                        message = f"📝 Modified: `{display_path}`"
+                    else:
+                        num_files = len({op.file_path for op in event.file_operations})
+                        if path_obj.is_dir():
+                            message = (
+                                f"📁 Modified {num_files} files in: `{display_path}`"
+                            )
+                        else:
+                            # Common path is a file, show parent directory
+                            message = (
+                                f"📁 Modified {num_files} files in: `{path_obj.parent}`"
+                            )
+
+                    # Add this as a simple markdown widget
+                    file_info_widget = Markdown(message)
+                    chat_history.vertical_tail.mount(file_info_widget)
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:

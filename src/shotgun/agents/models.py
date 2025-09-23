@@ -1,5 +1,6 @@
 """Pydantic models for agent dependencies and configuration."""
 
+import os
 from asyncio import Future, Queue
 from collections.abc import Callable
 from datetime import datetime
@@ -186,6 +187,25 @@ class FileOperationTracker(BaseModel):
                 lines.append(f"  - {path}")
 
         return "\n".join(lines)
+
+    def get_display_path(self) -> str | None:
+        """Get a single file path or common parent directory for display.
+
+        Returns:
+            Path string to display, or None if no files were modified
+        """
+        if not self.operations:
+            return None
+
+        unique_paths = list({op.file_path for op in self.operations})
+
+        if len(unique_paths) == 1:
+            # Single file - return its path
+            return unique_paths[0]
+
+        # Multiple files - find common parent directory
+        common_path = os.path.commonpath(unique_paths)
+        return common_path
 
 
 class AgentDeps(AgentRuntimeOptions):
