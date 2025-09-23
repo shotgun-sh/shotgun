@@ -1,16 +1,30 @@
 """Agent manager for coordinating multiple AI agents with shared message history."""
 
+import logging
+from collections.abc import AsyncIterable
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from pydantic_ai import (
     Agent,
     DeferredToolRequests,
     DeferredToolResults,
+    RunContext,
     UsageLimits,
 )
 from pydantic_ai.agent import AgentRunResult
-from pydantic_ai.messages import ModelMessage, ModelRequest
+from pydantic_ai.messages import (
+    AgentStreamEvent,
+    FinalResultEvent,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ModelResponsePart,
+    PartDeltaEvent,
+    PartStartEvent,
+    ToolCallPartDelta,
+)
 from textual.message import Message
 from textual.widget import Widget
 
@@ -19,6 +33,8 @@ from .models import AgentDeps, AgentRuntimeOptions, FileOperation
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .tasks import create_tasks_agent
+
+logger = logging.getLogger(__name__)
 
 
 class AgentType(Enum):
@@ -51,6 +67,25 @@ class MessageHistoryUpdated(Message):
         self.file_operations = file_operations or []
 
 
+class PartialResponseMessage(Message):
+    """Event posted when a partial response is received."""
+
+    def __init__(self, message: ModelResponse | None, is_last: bool) -> None:
+        """Initialize the partial response message."""
+        super().__init__()
+        self.message = message
+        self.is_last = is_last
+
+
+@dataclass(slots=True)
+class _PartialStreamState:
+    """Tracks partial response parts while streaming a single agent run."""
+
+    parts: list[ModelResponsePart | ToolCallPartDelta] = field(default_factory=list)
+    latest_partial: ModelResponse | None = None
+    final_sent: bool = False
+
+
 class AgentManager(Widget):
     """Manages multiple agents with shared message history."""
 
@@ -65,6 +100,8 @@ class AgentManager(Widget):
             deps: Optional agent dependencies. If not provided, defaults to interactive mode.
         """
         super().__init__()
+        self.display = False
+
         # Use provided deps or create default with interactive mode
         self.deps = deps
 
@@ -98,6 +135,7 @@ class AgentManager(Widget):
         self.ui_message_history: list[ModelMessage] = []
         self.message_history: list[ModelMessage] = []
         self.recently_change_files: list[FileOperation] = []
+        self._stream_state: _PartialStreamState | None = None
 
     @property
     def current_agent(self) -> Agent[AgentDeps, str | DeferredToolRequests]:
@@ -179,33 +217,146 @@ class AgentManager(Widget):
         self._post_messages_updated()
 
         # Run the agent with the shared message history
-        result: AgentRunResult[
-            str | DeferredToolRequests
-        ] = await self.current_agent.run(
-            prompt,
-            deps=deps,
-            usage_limits=usage_limits,
-            message_history=self.message_history,
-            deferred_tool_results=deferred_tool_results,
-            **kwargs,
+        self._stream_state = _PartialStreamState()
+
+        model_name = ""
+        if hasattr(deps, "llm_model") and deps.llm_model is not None:
+            model_name = deps.llm_model.name
+        is_gpt5 = (  # streaming is likely not supported for gpt5. It varies between keys.
+            "gpt-5" in model_name.lower()
         )
 
-        # Update the shared message history with all messages from this run
+        try:
+            result: AgentRunResult[
+                str | DeferredToolRequests
+            ] = await self.current_agent.run(
+                prompt,
+                deps=deps,
+                usage_limits=usage_limits,
+                message_history=self.message_history,
+                deferred_tool_results=deferred_tool_results,
+                event_stream_handler=self._handle_event_stream if not is_gpt5 else None,
+                **kwargs,
+            )
+        finally:
+            # If the stream ended unexpectedly without a final result, clear accumulated state.
+            if self._stream_state is not None and not self._stream_state.final_sent:
+                partial_message = self._build_partial_response(self._stream_state.parts)
+                if partial_message is not None:
+                    self._post_partial_message(partial_message, True)
+            self._stream_state = None
+
         self.ui_message_history = self.ui_message_history + [
             mes for mes in result.new_messages() if not isinstance(mes, ModelRequest)
         ]
 
         # Apply compaction to persistent message history to prevent cascading growth
-        self.message_history = await apply_persistent_compaction(
-            result.all_messages(), deps
-        )
+        all_messages = result.all_messages()
+        self.message_history = await apply_persistent_compaction(all_messages, deps)
 
         # Log file operations summary if any files were modified
-        self.recently_change_files = deps.file_tracker.operations.copy()
+        file_operations = deps.file_tracker.operations.copy()
+        self.recently_change_files = file_operations
 
-        self._post_messages_updated(self.recently_change_files)
+        self._post_messages_updated(file_operations)
 
         return result
+
+    async def _handle_event_stream(
+        self,
+        _ctx: RunContext[AgentDeps],
+        stream: AsyncIterable[AgentStreamEvent],
+    ) -> None:
+        """Process streamed events and forward partial updates to the UI."""
+
+        state = self._stream_state
+        if state is None:
+            state = self._stream_state = _PartialStreamState()
+
+        partial_parts = state.parts
+
+        async for event in stream:
+            try:
+                if isinstance(event, PartStartEvent):
+                    index = event.index
+                    if index < len(partial_parts):
+                        partial_parts[index] = event.part
+                    elif index == len(partial_parts):
+                        partial_parts.append(event.part)
+                    else:
+                        logger.warning(
+                            "Received PartStartEvent with out-of-bounds index",
+                            extra={"index": index, "current_len": len(partial_parts)},
+                        )
+                        partial_parts.append(event.part)
+
+                    partial_message = self._build_partial_response(partial_parts)
+                    if partial_message is not None:
+                        state.latest_partial = partial_message
+                        self._post_partial_message(partial_message, False)
+
+                elif isinstance(event, PartDeltaEvent):
+                    index = event.index
+                    if index >= len(partial_parts):
+                        logger.warning(
+                            "Received PartDeltaEvent before corresponding start event",
+                            extra={"index": index, "current_len": len(partial_parts)},
+                        )
+                        continue
+
+                    try:
+                        updated_part = event.delta.apply(
+                            cast(ModelResponsePart, partial_parts[index])
+                        )
+                    except Exception:  # pragma: no cover - defensive logging
+                        logger.exception(
+                            "Failed to apply part delta", extra={"event": event}
+                        )
+                        continue
+
+                    partial_parts[index] = updated_part
+
+                    partial_message = self._build_partial_response(partial_parts)
+                    if partial_message is not None:
+                        state.latest_partial = partial_message
+                        self._post_partial_message(partial_message, False)
+
+                elif isinstance(event, FinalResultEvent):
+                    final_message = (
+                        state.latest_partial
+                        or self._build_partial_response(partial_parts)
+                    )
+                    self._post_partial_message(final_message, True)
+                    state.latest_partial = None
+                    state.final_sent = True
+                    partial_parts.clear()
+                    self._stream_state = None
+                    break
+
+                # Ignore other AgentStreamEvent variants (e.g. tool call notifications) for partial UI updates.
+
+            except Exception:  # pragma: no cover - defensive logging
+                logger.exception(
+                    "Error while handling agent stream event", extra={"event": event}
+                )
+
+    def _build_partial_response(
+        self, parts: list[ModelResponsePart | ToolCallPartDelta]
+    ) -> ModelResponse | None:
+        """Create a `ModelResponse` from the currently streamed parts."""
+
+        completed_parts = [
+            part for part in parts if not isinstance(part, ToolCallPartDelta)
+        ]
+        if not completed_parts:
+            return None
+        return ModelResponse(parts=list(completed_parts))
+
+    def _post_partial_message(
+        self, message: ModelResponse | None, is_last: bool
+    ) -> None:
+        """Post a partial message to the UI."""
+        self.post_message(PartialResponseMessage(message, is_last))
 
     def _post_messages_updated(
         self, file_operations: list[FileOperation] | None = None

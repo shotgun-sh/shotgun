@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic_ai import Agent
@@ -22,6 +22,8 @@ def mock_agent_deps():
     deps.max_iterations = 10
     deps.queue = asyncio.Queue()
     deps.tasks = []
+    deps.llm_model = MagicMock()
+    deps.llm_model.name = "test-model"
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -223,6 +225,7 @@ async def test_agent_manager_run(
         usage_limits=None,
         message_history=[],
         deferred_tool_results=None,
+        event_stream_handler=ANY,
     )
 
     # Verify message history was updated

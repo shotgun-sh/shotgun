@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +20,12 @@ from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import Button, DirectoryTree, Input, Label, Markdown, Static
 
-from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
+from shotgun.agents.agent_manager import (
+    AgentManager,
+    AgentType,
+    MessageHistoryUpdated,
+    PartialResponseMessage,
+)
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.models import (
     AgentDeps,
@@ -41,6 +47,8 @@ from .chat_screen.command_providers import (
     DeleteCodebasePaletteProvider,
     ProviderSetupProvider,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _dummy_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
@@ -86,6 +94,7 @@ class StatusBar(Widget):
     DEFAULT_CSS = """
         StatusBar {
             text-wrap: wrap;
+            padding-left: 1;
         }
     """
 
@@ -99,6 +108,7 @@ class ModeIndicator(Widget):
     DEFAULT_CSS = """
         ModeIndicator {
             text-wrap: wrap;
+            padding-left: 1;
         }
     """
 
@@ -309,6 +319,7 @@ class ChatScreen(Screen[None]):
     working = reactive(False)
     question: reactive[UserQuestion | None] = reactive(None)
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
+    partial_message: reactive[ModelMessage | None] = reactive(None)
 
     def __init__(self) -> None:
         super().__init__()
@@ -419,9 +430,9 @@ class ChatScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
+            yield self.agent_manager
             yield ChatHistory()
             yield Markdown(markdown="", id="question-display")
-            yield self.agent_manager
             with Container(id="footer"):
                 yield Spinner(
                     text="Processing...",
@@ -444,6 +455,15 @@ class ChatScreen(Screen[None]):
         if not chat_history.vertical_tail:
             return
         chat_history.vertical_tail.mount(Markdown(markdown))
+
+    @on(PartialResponseMessage)
+    def handle_partial_response(self, event: PartialResponseMessage) -> None:
+        self.partial_message = event.message
+
+        partial_response_widget = self.query_one(ChatHistory)
+        partial_response_widget.partial_response = self.partial_message
+        if event.is_last:
+            partial_response_widget.partial_response = None
 
     @on(MessageHistoryUpdated)
     def handle_message_history_updated(self, event: MessageHistoryUpdated) -> None:
