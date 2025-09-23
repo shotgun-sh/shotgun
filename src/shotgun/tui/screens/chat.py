@@ -5,6 +5,10 @@ from pathlib import Path
 from pydantic_ai import DeferredToolResults, RunContext
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
 )
 from textual import on, work
 from textual.app import ComposeResult
@@ -26,6 +30,7 @@ from shotgun.agents.models import (
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.sdk.services import get_artifact_service, get_codebase_service
+from shotgun.tui.commands import CommandHandler
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 
 from ..components.prompt_input import PromptInput
@@ -320,6 +325,7 @@ class ChatScreen(Screen[None]):
             system_prompt_fn=_dummy_system_prompt_fn,
         )
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
+        self.command_handler = CommandHandler()
 
     def on_mount(self) -> None:
         self.query_one(PromptInput).focus(scroll_visible=True)
@@ -478,11 +484,42 @@ class ChatScreen(Screen[None]):
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:
+        text = message.text.strip()
+
+        # If empty text, just clear input and return
+        if not text:
+            prompt_input = self.query_one(PromptInput)
+            prompt_input.clear()
+            self.value = ""
+            return
+
+        # Check if it's a command
+        if self.command_handler.is_command(text):
+            success, response = self.command_handler.handle_command(text)
+
+            # Add the command to history
+            self.history.append(message.text)
+
+            # Display the command in chat history
+            user_message = ModelRequest(parts=[UserPromptPart(content=text)])
+            self.messages = self.messages + [user_message]
+
+            # Display the response (help text or error message)
+            response_message = ModelResponse(parts=[TextPart(content=response)])
+            self.messages = self.messages + [response_message]
+
+            # Clear the input
+            prompt_input = self.query_one(PromptInput)
+            prompt_input.clear()
+            self.value = ""
+            return
+
+        # Not a command, process as normal
         self.history.append(message.text)
 
         # Clear the input
         self.value = ""
-        self.run_agent(message.text)
+        self.run_agent(text)  # Use stripped text
 
         prompt_input = self.query_one(PromptInput)
         prompt_input.clear()

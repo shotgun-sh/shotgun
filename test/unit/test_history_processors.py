@@ -108,7 +108,12 @@ class TestTokenLimitCompactor:
         """Test that messages over token limit trigger summarization."""
         # Create large messages that will exceed token limit when counted directly
         # Create varied content that will exceed token threshold with real counting
-        large_content = " ".join([f"Test message {i} with diverse content to exceed token limits using real counting methods." for i in range(250)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"Test message {i} with diverse content to exceed token limits using real counting methods."
+                for i in range(250)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(
                 parts=[
@@ -173,7 +178,12 @@ class TestTokenLimitCompactor:
         # Create content that will actually exceed token threshold with real counting
         # Use varied text instead of repetitive content to ensure real tokens > threshold
         # Create diverse content that will exceed token threshold with real counting
-        large_content = " ".join([f"This is sentence number {i} with different content and varied tokens to exceed thresholds." for i in range(250)])  # Diverse content to trigger compaction
+        large_content = " ".join(
+            [
+                f"This is sentence number {i} with different content and varied tokens to exceed thresholds."
+                for i in range(250)
+            ]
+        )  # Diverse content to trigger compaction
         messages = [
             ModelRequest(
                 parts=[
@@ -486,7 +496,12 @@ class TestTokenLimitCompactorEdgeCases:
     async def test_handles_messages_without_system_prompt(self, mock_run_context):
         """Test compaction when there's no system prompt."""
         # Create diverse content that will exceed token threshold with real counting
-        large_content = " ".join([f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold." for i in range(200)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
+                for i in range(200)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(parts=[UserPromptPart(content="User message")]),
             ModelResponse(parts=[TextPart(content=large_content)]),
@@ -517,7 +532,12 @@ class TestTokenLimitCompactorEdgeCases:
     async def test_compacted_history_ends_with_model_request(self, mock_run_context):
         """Test that compacted history always ends with ModelRequest (critical for PydanticAI)."""
         # Create diverse content that will exceed token threshold with real counting
-        large_content = " ".join([f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold." for i in range(200)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
+                for i in range(200)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(
                 parts=[
@@ -568,7 +588,12 @@ class TestTokenLimitCompactorEdgeCases:
     ):
         """Test compaction when last and first user requests are the same."""
         # Create diverse content that will exceed token threshold with real counting
-        large_content = " ".join([f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold." for i in range(200)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
+                for i in range(200)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(
                 parts=[
@@ -663,7 +688,12 @@ class TestIncrementalCompaction:
     async def test_first_time_compaction_marks_summary(self, mock_run_context):
         """Test that first-time compaction marks the summary with the marker."""
         # Create diverse content that will exceed token threshold with real counting
-        large_content = " ".join([f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold." for i in range(200)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
+                for i in range(200)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(
                 parts=[
@@ -711,7 +741,12 @@ class TestIncrementalCompaction:
             f"{SUMMARY_MARKER} Existing summary of earlier conversation"
         )
         # Create diverse content that will trigger incremental compaction with real counting
-        large_new_content = " ".join([f"New message {i} after summary with lots of varied content and diverse tokens." for i in range(400)])  # Sufficient content
+        large_new_content = " ".join(
+            [
+                f"New message {i} after summary with lots of varied content and diverse tokens."
+                for i in range(400)
+            ]
+        )  # Sufficient content
         messages = [
             ModelRequest(
                 parts=[
@@ -770,7 +805,12 @@ class TestIncrementalCompaction:
         # Start with a compacted history (already has a summary) and large new content
         first_summary = f"{SUMMARY_MARKER} First compaction summary"
         # Create diverse content for real token counting
-        large_content = " ".join([f"Incremental test sentence {i} with varied content and tokens." for i in range(150)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"Incremental test sentence {i} with varied content and tokens."
+                for i in range(150)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(
                 parts=[
@@ -866,7 +906,12 @@ class TestIncrementalCompaction:
         # Create history with existing summary and large new content
         existing_summary = f"{SUMMARY_MARKER} Existing summary"
         # Create diverse content for real token counting
-        large_content = " ".join([f"Template test sentence {i} with different content and varied tokens." for i in range(180)])  # Diverse content
+        large_content = " ".join(
+            [
+                f"Template test sentence {i} with different content and varied tokens."
+                for i in range(180)
+            ]
+        )  # Diverse content
         messages = [
             ModelRequest(
                 parts=[
@@ -996,7 +1041,9 @@ class TestMaxTokensCalculation:
             ModelRequest(parts=[UserPromptPart(content="Test message")]),
         ]
 
-        estimated_tokens = estimate_tokens_from_message_parts(messages, mock_model_config)
+        estimated_tokens = estimate_tokens_from_message_parts(
+            messages, mock_model_config
+        )
 
         # Should be based on message parts content length
         assert estimated_tokens > 0
@@ -1031,7 +1078,12 @@ class TestMaxTokensCalculation:
             f"{SUMMARY_MARKER} Summary of a very long conversation with lots of content"
         )
         # Create diverse content for real token counting
-        large_new_content = " ".join([f"Context maintenance test {i} with varied sentences and different token patterns." for i in range(300)])  # Diverse content
+        large_new_content = " ".join(
+            [
+                f"Context maintenance test {i} with varied sentences and different token patterns."
+                for i in range(300)
+            ]
+        )  # Diverse content
 
         # Create messages representing: [system+user, summary, new_conversation]
         messages = [
