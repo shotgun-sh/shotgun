@@ -1,5 +1,9 @@
-from textual.app import App
+from collections.abc import Iterable
+from typing import Any
+
+from textual.app import App, SystemCommand
 from textual.binding import Binding
+from textual.screen import Screen
 
 from shotgun.agents.config import ConfigManager, get_config_manager
 from shotgun.logging_config import get_logger
@@ -41,6 +45,7 @@ class ShotgunApp(App[None]):
         logger.debug(f"Update notification received: {notification}")
 
     def on_mount(self) -> None:
+        self.theme = "gruvbox"
         # Track TUI startup
         from shotgun.posthog_telemetry import track_event
 
@@ -87,6 +92,9 @@ class ShotgunApp(App[None]):
             console = Console()
             console.print(f"\n[cyan]{self.update_notification}[/cyan]", style="bold")
         self.exit()
+
+    def get_system_commands(self, screen: Screen[Any]) -> Iterable[SystemCommand]:
+        return []  # we don't want any system commands
 
 
 def run(no_update_check: bool = False) -> None:

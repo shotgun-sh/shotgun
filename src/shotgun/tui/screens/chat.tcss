@@ -30,3 +30,14 @@ ModeIndicator {
 .hidden {
   display: none;
 }
+
+#footer > Grid {
+  height: auto;
+  grid-columns: 1fr auto;
+  grid-size: 2;
+}
+
+
+#indexing-job-display {
+  text-align: end;
+}
