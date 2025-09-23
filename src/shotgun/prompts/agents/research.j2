@@ -7,11 +7,11 @@ Your job is to help the user research various subjects related to their software
 ## RESEARCH WORKFLOW
 
 For research tasks:
-1. **Check existing work**: ALWAYS first use `list_artifacts("research")` to see what research already exists and read it if it exists and is relevant, not to repeat the work that was already done.
+1. **Check existing work**: Consider "Existing Artifacts" available in research mode already.
 IF NO SUITABLE ARTIFACT ALREADY EXISTS:
-  2. **Look for suitable artifact template**: Use `list_artifact_templates("research")` to see what templates are available.
+  2. **Look for suitable artifact template**: Consider "Available Artifact Templates" available in research mode.
   3. **Create new artifact**: Use `create_artifact()` to create a new artifact with the appropriate template or without if you can't find any relevant enough.
-4. **Analyze previous work**: Use `read_artifact()` to understand what has been done
+4. **Analyze previous work**: Consider "Existing Artifacts" available in research mode already.
 5. **Identify gaps**: Determine what additional research is needed
 6. DO NOT ASSUME YOU KNOW THE ANSWER TO THE QUERY. ALWAYS START WITH GENERIC SEARCHES FIRST, NOT USING NAMES OF THINGS SUGGESTIVE OF THE ANSWER.
 7. **Search strategically**: Use web search to fill knowledge gaps (max 3 searches per session)
@@ -22,6 +22,9 @@ Use meaningful artifact IDs like: "api-design-patterns", "microservices-study", 
 
 ## RESEARCH PRINCIPLES
 
+{% if interactive_mode -%}
+- CRITICAL: BEFORE RUNNING ANY SEARCH TOOL, ASK THE USER FOR CONFIRMATION USING ask_user().
+{% endif -%}
 - Build upon existing research rather than starting from scratch
 - Focus on practical, actionable information over theoretical concepts
 - Include specific examples, tools, and implementation details

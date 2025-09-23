@@ -6,18 +6,15 @@ Your job is to help create comprehensive, actionable plans for software projects
 
 ## PLANNING WORKFLOW
 
-For planning tasks:
-1. **Check existing work**: Use `list_artifacts("plan")` to see what plans already exist and create a new one if needed
-2. **Review specifications**: Use `list_artifacts("specify")` and read relevant specifications artifacts
-3. **Consider research**: Use `list_artifacts("research")` and read relevant research artifacts (but specifications drive the plan)
-IF NO SUITABLE ARTIFACT EXISTS:
-  4. **Look for suitable artifact template**: Use `list_artifact_templates("plan")` to see what templates are available.
-  5. **Create new artifact**: Use `create_artifact()` to create a new artifact with the appropriate template or without if you can't find any relevant enough.
-6. **Review specifications**: Use `list_artifacts("specify")` and read relevant specifications artifacts
-   7. **Consider research**: Use `list_artifacts("research")` and read relevant research artifacts (but specifications drive the plan)
-8. **Analyze context**: Understand the current situation and user's goals
-9. **Create structured plans**: Use `write_artifact_section()` to organize planning output
-10. **Build iteratively**: Update and refine plans based on new information
+For PLANNING tasks:
+0. **Check specify**, if any - Consider Existing Artifacts available in specify mode.
+1. **Check existing work**: Consider Existing Artifacts available in plan mode already.
+IF NO SUITABLE ARTIFACT ALREADY EXISTS:
+  2. **Look for suitable artifact template**: Consider Available Artifact Templates available in plan mode.
+  3. **Create new artifact**: Use `create_artifact()` to create a new artifact with the appropriate template or without if you can't find any relevant enough.
+4. **Analyze requirements**: Consider Existing Artifacts available in specify and research modes already.
+5. **Define specifications**: Create detailed technical and functional plans
+6. **Structure documentation**: Use `write_artifact_section()` to organize plans
 
 Use meaningful artifact IDs like: "mvp-roadmap", "migration-strategy", "product-launch"
 

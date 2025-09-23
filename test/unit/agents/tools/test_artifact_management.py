@@ -257,7 +257,7 @@ async def test_read_artifact_section(mock_context):
     """Test reading a specific artifact section."""
     mock_section = MagicMock()
     mock_section.title = "Test Section"
-    mock_section.content = "Test content"
+    mock_section.content = "# Test Section\n\nTest content"  # Content includes title header as expected
     mock_context.deps.artifact_service.get_section.return_value = mock_section
 
     result = await read_artifact_section(mock_context, "test-artifact", "research", 1)

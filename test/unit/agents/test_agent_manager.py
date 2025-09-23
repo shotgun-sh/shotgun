@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic_ai import Agent
@@ -30,6 +30,43 @@ def mock_agent_deps():
     file_tracker_mock.operations = []
     file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
     deps.file_tracker = file_tracker_mock
+
+    # Add additional fields needed by _create_merged_deps
+    llm_model_mock = MagicMock()
+    llm_model_mock.provider = "anthropic"  # Set a valid provider for token counting
+    deps.llm_model = llm_model_mock
+    deps.codebase_service = MagicMock()
+    deps.artifact_service = MagicMock()
+    deps.system_prompt_fn = MagicMock(return_value="Test system prompt")
+
+    # Ensure model_copy preserves the llm_model structure
+    def mock_model_copy(update=None):
+        """Mock model_copy that preserves llm_model structure."""
+        copy_mock = MagicMock(spec=AgentDeps)
+        # Copy all attributes from original
+        for attr_name in [
+            "interactive_mode",
+            "working_directory",
+            "max_iterations",
+            "queue",
+            "tasks",
+            "file_tracker",
+            "llm_model",
+            "codebase_service",
+            "artifact_service",
+            "system_prompt_fn",
+        ]:
+            setattr(copy_mock, attr_name, getattr(deps, attr_name))
+
+        # Apply updates if provided
+        if update:
+            for key, value in update.items():
+                setattr(copy_mock, key, value)
+
+        return copy_mock
+
+    deps.model_copy = mock_model_copy
+
     return deps
 
 
@@ -45,7 +82,9 @@ def mock_agents():
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_init(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -59,6 +98,10 @@ def test_agent_manager_init(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (
+        tasks_agent,
+        mock_agent_deps,
+    )  # Reuse tasks_agent mock
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -74,8 +117,9 @@ def test_agent_manager_init(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_init_no_deps(
-    mock_create_tasks, mock_create_plan, mock_create_research
+    mock_create_specify, mock_create_tasks, mock_create_plan, mock_create_research
 ):
     """Test AgentManager initialization without deps raises ValueError."""
     with pytest.raises(ValueError, match="AgentDeps must be provided"):
@@ -85,7 +129,9 @@ def test_agent_manager_init_no_deps(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_current_agent(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -98,6 +144,7 @@ def test_agent_manager_current_agent(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
     assert manager.current_agent == research_agent
@@ -112,7 +159,9 @@ def test_agent_manager_current_agent(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_get_agent(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -125,6 +174,7 @@ def test_agent_manager_get_agent(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps)
 
@@ -136,7 +186,9 @@ def test_agent_manager_get_agent(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_set_agent(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -149,6 +201,7 @@ def test_agent_manager_set_agent(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -167,7 +220,9 @@ def test_agent_manager_set_agent(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_set_agent_invalid(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -180,6 +235,7 @@ def test_agent_manager_set_agent_invalid(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps)
 
@@ -191,7 +247,9 @@ def test_agent_manager_set_agent_invalid(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 async def test_agent_manager_run(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -201,9 +259,20 @@ async def test_agent_manager_run(
     """Test run method."""
     research_agent, plan_agent, tasks_agent = mock_agents
 
-    mock_create_research.return_value = (research_agent, mock_agent_deps)
-    mock_create_plan.return_value = (plan_agent, mock_agent_deps)
-    mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    # Create separate deps for each agent with different system prompt functions
+    research_deps = MagicMock(spec=AgentDeps)
+    research_deps.system_prompt_fn = MagicMock(return_value="Research system prompt")
+
+    plan_deps = MagicMock(spec=AgentDeps)
+    plan_deps.system_prompt_fn = MagicMock(return_value="Plan system prompt")
+
+    tasks_deps = MagicMock(spec=AgentDeps)
+    tasks_deps.system_prompt_fn = MagicMock(return_value="Tasks system prompt")
+
+    mock_create_research.return_value = (research_agent, research_deps)
+    mock_create_plan.return_value = (plan_agent, plan_deps)
+    mock_create_tasks.return_value = (tasks_agent, tasks_deps)
+    mock_create_specify.return_value = (tasks_agent, tasks_deps)
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
@@ -219,14 +288,30 @@ async def test_agent_manager_run(
     result = await manager.run("test prompt")
 
     assert result == mock_result
-    research_agent.run.assert_called_once_with(
-        "test prompt",
-        deps=mock_agent_deps,
-        usage_limits=None,
-        message_history=[],
-        deferred_tool_results=None,
-        event_stream_handler=ANY,
-    )
+    # Verify the agent was called with the correct parameters
+    # Note: deps will be a merged copy, not the exact same object
+    research_agent.run.assert_called_once()
+    call_args = research_agent.run.call_args
+    assert call_args[0] == ("test prompt",)  # positional args
+    assert call_args[1]["usage_limits"] is None
+    # Verify system prompt was injected (message_history should have at least 1 system message)
+    message_history = call_args[1]["message_history"]
+    assert len(message_history) >= 1
+    # First message should be a system prompt
+    from pydantic_ai.messages import ModelRequest, SystemPromptPart
+
+    assert isinstance(message_history[0], ModelRequest)
+    assert len(message_history[0].parts) == 1
+    assert isinstance(message_history[0].parts[0], SystemPromptPart)
+    assert call_args[1]["deferred_tool_results"] is None
+    assert (
+        call_args[1]["event_stream_handler"] is not None
+    )  # Streaming should be enabled
+    # Verify that a merged deps object was passed (different from the original shared deps)
+    passed_deps = call_args[1]["deps"]
+    assert (
+        passed_deps is not mock_agent_deps
+    )  # Should be a merged copy, not the original
 
     # Verify message history was updated
     assert len(manager.ui_message_history) > 0
@@ -240,7 +325,9 @@ async def test_agent_manager_run(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 async def test_agent_manager_run_no_prompt(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -250,9 +337,20 @@ async def test_agent_manager_run_no_prompt(
     """Test run method without prompt."""
     research_agent, plan_agent, tasks_agent = mock_agents
 
-    mock_create_research.return_value = (research_agent, mock_agent_deps)
-    mock_create_plan.return_value = (plan_agent, mock_agent_deps)
-    mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    # Create separate deps for each agent with different system prompt functions
+    research_deps = MagicMock(spec=AgentDeps)
+    research_deps.system_prompt_fn = MagicMock(return_value="Research system prompt")
+
+    plan_deps = MagicMock(spec=AgentDeps)
+    plan_deps.system_prompt_fn = MagicMock(return_value="Plan system prompt")
+
+    tasks_deps = MagicMock(spec=AgentDeps)
+    tasks_deps.system_prompt_fn = MagicMock(return_value="Tasks system prompt")
+
+    mock_create_research.return_value = (research_agent, research_deps)
+    mock_create_plan.return_value = (plan_agent, plan_deps)
+    mock_create_tasks.return_value = (tasks_agent, tasks_deps)
+    mock_create_specify.return_value = (tasks_agent, tasks_deps)
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
@@ -276,7 +374,9 @@ async def test_agent_manager_run_no_prompt(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 async def test_agent_manager_run_with_custom_deps(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -289,6 +389,7 @@ async def test_agent_manager_run_with_custom_deps(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
@@ -302,12 +403,13 @@ async def test_agent_manager_run_with_custom_deps(
     manager.post_message = MagicMock()
 
     custom_deps = MagicMock(spec=AgentDeps)
-    # Add file_tracker mock to custom_deps
+    # Add required attributes for custom_deps
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
     file_tracker_mock.operations = []
     file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
     custom_deps.file_tracker = file_tracker_mock
+    custom_deps.system_prompt_fn = MagicMock(return_value="Custom system prompt")
     await manager.run("test", deps=custom_deps)
 
     # Should use custom deps instead of manager deps
@@ -319,7 +421,9 @@ async def test_agent_manager_run_with_custom_deps(
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
 def test_agent_manager_post_messages_updated(
+    mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
@@ -332,6 +436,7 @@ def test_agent_manager_post_messages_updated(
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
     manager.post_message = MagicMock()

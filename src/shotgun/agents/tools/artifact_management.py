@@ -347,14 +347,13 @@ async def read_artifact_section(
 
         section = service.get_section(artifact_id, mode, section_number)
 
-        # Return formatted content with title
-        formatted_content = f"# {section.title}\n\n{section.content}"
+        # Return section content (already contains title header from file storage)
         logger.debug(
             "📄 Read section %d with %d characters",
             section_number,
             len(section.content),
         )
-        return formatted_content
+        return section.content
 
     except Exception as e:
         error_msg = (

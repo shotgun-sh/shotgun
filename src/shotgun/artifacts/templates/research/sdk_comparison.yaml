@@ -15,16 +15,16 @@ sections:
         instructions: |
             # What is a good research.overview section?
 
-            •	Clarifies the technical need
-            •	Establishes scope and constraints
-            •	Aligns the team on evaluation criteria
-            •	Sets realistic timeline for decision
+            * Clarifies the technical need
+            * Establishes scope and constraints
+            * Aligns the team on evaluation criteria
+            * Sets realistic timeline for decision
 
             # Questions to ask yourself:
-            •	What problem are we trying to solve with this SDK/library?
-            •	What happens if we make the wrong choice?
-            •	What are our non-negotiable requirements?
-            •	Is there anything specific to our tech stack that constrains choices?
+            * What problem are we trying to solve with this SDK/library?
+            * What happens if we make the wrong choice?
+            * What are our non-negotiable requirements?
+            * Is there anything specific to our tech stack that constrains choices?
 
             # Includes:
               Research Objective: [One clear sentence stating what SDK/library type we need and why]
@@ -50,36 +50,36 @@ sections:
 
             Define technical and business requirements that will guide the evaluation.
 
-            •	Separates must-haves from nice-to-haves
-            •	Includes both functional and non-functional requirements
-            •	Considers team capabilities and constraints
+            * Separates must-haves from nice-to-haves
+            * Includes both functional and non-functional requirements
+            * Considers team capabilities and constraints
 
             # Questions to ask yourself:
-            •	What features are absolutely essential vs. "would be nice"?
-            •	What are our technical constraints (language, platform, licenses)?
-            •	What are our resource constraints (budget, team expertise)?
+            * What features are absolutely essential vs. "would be nice"?
+            * What are our technical constraints (language, platform, licenses)?
+            * What are our resource constraints (budget, team expertise)?
 
             # Includes:
               ## Functional Requirements
               Essential Features:
-                - [Core functionality needed]
-                - [Integration requirements]
-                - [Performance benchmarks]
+                * [Core functionality needed]
+                * [Integration requirements]
+                * [Performance benchmarks]
               
               Nice-to-Have Features:
-                - [Additional capabilities]
-                - [Future-proofing considerations]
+                * [Additional capabilities]
+                * [Future-proofing considerations]
               
               ## Non-Functional Requirements
               Technical Constraints:
-                - Language/Platform: [e.g., Must support TypeScript]
-                - Architecture: [e.g., Must work in serverless environment]
-                - Performance: [e.g., < 50ms latency for operations]
+                * Language/Platform: [e.g., Must support TypeScript]
+                * Architecture: [e.g., Must work in serverless environment]
+                * Performance: [e.g., < 50ms latency for operations]
               
               Business Constraints:
-                - License: [e.g., MIT or Apache 2.0 preferred]
-                - Cost: [e.g., Free for commercial use or < $X/month]
-                - Support: [e.g., Active community or paid support available]
+                * License: [e.g., MIT or Apache 2.0 preferred]
+                * Cost: [e.g., Free for commercial use or < $X/month]
+                * Support: [e.g., Active community or paid support available]
         depends_on:
             - "research.overview"
 
@@ -89,21 +89,21 @@ sections:
 
             Document the process and results of finding available options.
 
-            •	Shows comprehensive search methodology
-            •	Lists all viable candidates with brief descriptions
-            •	Explains why certain options were excluded early
+            * Shows comprehensive search methodology
+            * Lists all viable candidates with brief descriptions
+            * Explains why certain options were excluded early
 
             # Questions to ask yourself:
-            •	Where did we search? (GitHub, npm, package managers, forums)
-            •	What keywords and criteria did we use?
-            •	Are there any industry-standard or popular choices we're missing?
+            * Where did we search? (GitHub, npm, package managers, forums)
+            * What keywords and criteria did we use?
+            * Are there any industry-standard or popular choices we're missing?
 
             # Includes:
               ## Search Methodology
               Sources Consulted:
-                - [Package registries searched]
-                - [Community recommendations]
-                - [Industry reports/comparisons referenced]
+                * [Package registries searched]
+                * [Community recommendations]
+                * [Industry reports/comparisons referenced]
               
               ## Initial Candidates
 
@@ -115,8 +115,8 @@ sections:
 
               ## Early Eliminations
               Excluded Options:
-                - **[Library Name]**: [Reason for exclusion]
-                - **[Library Name]**: [Critical missing feature or constraint violation]
+                * **[Library Name]**: [Reason for exclusion]
+                * **[Library Name]**: [Critical missing feature or constraint violation]
 
         depends_on:
             - "research.requirements"
@@ -127,23 +127,23 @@ sections:
 
             Deep technical analysis of the top candidates.
 
-            •	Provides objective, measurable comparisons
-            •	Includes code examples and API comparisons
-            •	Evaluates developer experience and learning curve
+            * Provides objective, measurable comparisons
+            * Includes code examples and API comparisons
+            * Evaluates developer experience and learning curve
 
             # Questions to ask yourself:
-            •	How easy is it to implement our use case in each option?
-            •	What are the performance characteristics under our expected load?
-            •	How well does each option integrate with our existing stack?
+            * How easy is it to implement our use case in each option?
+            * What are the performance characteristics under our expected load?
+            * How well does each option integrate with our existing stack?
 
             # Includes:
               ## Evaluated Options (Top 3-5 candidates)
 
               ### **Option A: [Name]**
               Technical Architecture:
-                - Core design philosophy
-                - Key abstractions and patterns
-                - Dependencies and size
+                * Core design philosophy
+                * Key abstractions and patterns
+                * Dependencies and size
               
               Code Example:
               ```[language]
@@ -151,15 +151,15 @@ sections:
               ```
               
               Performance Metrics:
-                - Benchmark results
-                - Memory footprint
-                - Bundle size impact
+                * Benchmark results
+                * Memory footprint
+                * Bundle size impact
               
               Developer Experience:
-                - Setup complexity: [Rating]
-                - Documentation quality: [Rating]
-                - API design: [Rating]
-                - Debugging tools: [Rating]
+                * Setup complexity: [Rating]
+                * Documentation quality: [Rating]
+                * API design: [Rating]
+                * Debugging tools: [Rating]
 
               [Repeat for each candidate]
 
@@ -172,21 +172,21 @@ sections:
 
             Side-by-side comparison of all evaluation criteria.
 
-            •	Enables quick visual comparison
-            •	Uses consistent scoring methodology
-            •	Weights criteria by importance
+            * Enables quick visual comparison
+            * Uses consistent scoring methodology
+            * Weights criteria by importance
 
             # Questions to ask yourself:
-            •	Are we comparing apples to apples?
-            •	Is our scoring methodology clear and reproducible?
-            •	Have we weighted criteria appropriately for our use case?
+            * Are we comparing apples to apples?
+            * Is our scoring methodology clear and reproducible?
+            * Have we weighted criteria appropriately for our use case?
 
             # Includes:
               ## Scoring Methodology
-              - 🟢 Excellent (3 points): Exceeds requirements
-              - 🟡 Good (2 points): Meets requirements
-              - 🔴 Poor (1 point): Below requirements
-              - ❌ Missing (0 points): Doesn't support
+              * 🟢 Excellent (3 points): Exceeds requirements
+              * 🟡 Good (2 points): Meets requirements
+              * 🔴 Poor (1 point): Below requirements
+              * ❌ Missing (0 points): Doesn't support
 
               ## Feature Comparison
 
@@ -215,14 +215,14 @@ sections:
 
             Clear recommendation with thorough justification.
 
-            •	States the recommendation unambiguously
-            •	Provides clear rationale tied to requirements
-            •	Addresses concerns and mitigation strategies
+            * States the recommendation unambiguously
+            * Provides clear rationale tied to requirements
+            * Addresses concerns and mitigation strategies
 
             # Questions to ask yourself:
-            •	Will stakeholders understand why we chose this option?
-            •	Have we addressed all major concerns about our choice?
-            •	Is our decision reversible if needed?
+            * Will stakeholders understand why we chose this option?
+            * Have we addressed all major concerns about our choice?
+            * Is our decision reversible if needed?
 
             # Includes:
               ## Recommendation
@@ -236,12 +236,12 @@ sections:
               ## Detailed Justification
               
               ### Why [Selected] Over [Alternative A]
-              - [Specific technical advantage]
-              - [Business consideration]
-              - [Risk mitigation]
+              * [Specific technical advantage]
+              * [Business consideration]
+              * [Risk mitigation]
 
               ### Why [Selected] Over [Alternative B]
-              - [Comparison points]
+              * [Comparison points]
 
               ## Risk Mitigation Plan
 
@@ -250,7 +250,7 @@ sections:
               | [Specific risk] | [How we'll address it] | [Team/Person] |
 
               ## Dissenting Opinions
-              - [Any team concerns and how they were addressed]
+              * [Any team concerns and how they were addressed]
 
         depends_on:
             - "research.comparison_matrix"

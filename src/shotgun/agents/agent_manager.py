@@ -32,6 +32,7 @@ from .history.compaction import apply_persistent_compaction
 from .models import AgentDeps, AgentRuntimeOptions, FileOperation
 from .plan import create_plan_agent
 from .research import create_research_agent
+from .specify import create_specify_agent
 from .tasks import create_tasks_agent
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class AgentType(Enum):
     RESEARCH = "research"
     PLAN = "plan"
     TASKS = "tasks"
+    SPECIFY = "specify"
 
 
 class MessageHistoryUpdated(Message):
@@ -117,14 +119,17 @@ class AgentManager(Widget):
             tasks=self.deps.tasks,
         )
 
-        # Initialize all agents with the same deps
-        self.research_agent, _ = create_research_agent(
+        # Initialize all agents and store their specific deps
+        self.research_agent, self.research_deps = create_research_agent(
             agent_runtime_options=agent_runtime_options
         )
-        self.plan_agent, _ = create_plan_agent(
+        self.plan_agent, self.plan_deps = create_plan_agent(
             agent_runtime_options=agent_runtime_options
         )
-        self.tasks_agent, _ = create_tasks_agent(
+        self.tasks_agent, self.tasks_deps = create_tasks_agent(
+            agent_runtime_options=agent_runtime_options
+        )
+        self.specify_agent, self.specify_deps = create_specify_agent(
             agent_runtime_options=agent_runtime_options
         )
 
@@ -161,8 +166,51 @@ class AgentManager(Widget):
             AgentType.RESEARCH: self.research_agent,
             AgentType.PLAN: self.plan_agent,
             AgentType.TASKS: self.tasks_agent,
+            AgentType.SPECIFY: self.specify_agent,
         }
         return agent_map[agent_type]
+
+    def _get_agent_deps(self, agent_type: AgentType) -> AgentDeps:
+        """Get agent-specific deps by type.
+
+        Args:
+            agent_type: The type of agent to retrieve deps for.
+
+        Returns:
+            The agent-specific dependencies.
+        """
+        deps_map = {
+            AgentType.RESEARCH: self.research_deps,
+            AgentType.PLAN: self.plan_deps,
+            AgentType.TASKS: self.tasks_deps,
+            AgentType.SPECIFY: self.specify_deps,
+        }
+        return deps_map[agent_type]
+
+    def _create_merged_deps(self, agent_type: AgentType) -> AgentDeps:
+        """Create merged dependencies combining shared and agent-specific deps.
+
+        This preserves the agent's system_prompt_fn while using shared runtime state.
+
+        Args:
+            agent_type: The type of agent to create merged deps for.
+
+        Returns:
+            Merged AgentDeps with agent-specific system_prompt_fn.
+        """
+        agent_deps = self._get_agent_deps(agent_type)
+
+        # Ensure shared deps is not None (should be guaranteed by __init__)
+        if self.deps is None:
+            raise ValueError("Shared deps is None - this should not happen")
+
+        # Create new deps with shared runtime state but agent's system_prompt_fn
+        # Use a copy of the shared deps and update the system_prompt_fn
+        merged_deps = self.deps.model_copy(
+            update={"system_prompt_fn": agent_deps.system_prompt_fn}
+        )
+
+        return merged_deps
 
     def set_agent(self, agent_type: AgentType) -> None:
         """Set the current active agent.
@@ -204,9 +252,9 @@ class AgentManager(Widget):
         Returns:
             The agent run result.
         """
-        # Use manager's deps if not provided
+        # Use merged deps (shared state + agent-specific system prompt) if not provided
         if deps is None:
-            deps = self.deps
+            deps = self._create_merged_deps(self._current_agent_type)
 
         # Ensure deps is not None
         if deps is None:
@@ -216,7 +264,27 @@ class AgentManager(Widget):
             self.ui_message_history.append(ModelRequest.user_text_prompt(prompt))
         self._post_messages_updated()
 
-        # Run the agent with the shared message history
+        # Ensure system prompt is added to message history before running agent
+        from pydantic_ai.messages import SystemPromptPart
+
+        from shotgun.agents.common import add_system_prompt_message
+
+        # Start with persistent message history
+        message_history = self.message_history
+
+        # Check if the message history already has a system prompt
+        has_system_prompt = any(
+            hasattr(msg, "parts")
+            and any(isinstance(part, SystemPromptPart) for part in msg.parts)
+            for msg in message_history
+        )
+
+        # Always ensure we have a system prompt for the agent
+        # (compaction may remove it from persistent history, but agent needs it)
+        if not has_system_prompt:
+            message_history = await add_system_prompt_message(deps, message_history)
+
+        # Run the agent with streaming support (from origin/main)
         self._stream_state = _PartialStreamState()
 
         model_name = ""
@@ -233,7 +301,7 @@ class AgentManager(Widget):
                 prompt,
                 deps=deps,
                 usage_limits=usage_limits,
-                message_history=self.message_history,
+                message_history=message_history,
                 deferred_tool_results=deferred_tool_results,
                 event_stream_handler=self._handle_event_stream if not is_gpt5 else None,
                 **kwargs,

@@ -51,11 +51,6 @@ from .chat_screen.command_providers import (
 logger = logging.getLogger(__name__)
 
 
-def _dummy_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
-    """Dummy system prompt function for TUI chat interface."""
-    return "You are a helpful AI assistant."
-
-
 class PromptHistory:
     def __init__(self) -> None:
         self.prompts: list[str] = ["Hello there!"]
@@ -127,11 +122,13 @@ class ModeIndicator(Widget):
             AgentType.RESEARCH: "Research",
             AgentType.PLAN: "Planning",
             AgentType.TASKS: "Tasks",
+            AgentType.SPECIFY: "Specify",
         }
         mode_description = {
             AgentType.RESEARCH: "Research topics with web search and synthesize findings",
             AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
             AgentType.TASKS: "Generate specific, actionable tasks from research and plans",
+            AgentType.SPECIFY: "Create detailed specifications and requirements documents",
         }
 
         mode_title = mode_display.get(self.mode, self.mode.value.title())
@@ -310,6 +307,9 @@ class ChatScreen(Screen[None]):
         AgentType.TASKS: (
             "Request actionable work, e.g. break down tasks to wire OpenTelemetry into the API"
         ),
+        AgentType.SPECIFY: (
+            "Request detailed specifications, e.g. create a comprehensive spec for user authentication system"
+        ),
     }
 
     value = reactive("")
@@ -328,12 +328,20 @@ class ChatScreen(Screen[None]):
         codebase_service = get_codebase_service()
         artifact_service = get_artifact_service()
         self.codebase_sdk = CodebaseSDK()
+
+        # Create shared deps without system_prompt_fn (agents provide their own)
+        # We need a placeholder system_prompt_fn to satisfy the field requirement
+        def _placeholder_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
+            raise RuntimeError(
+                "This should not be called - agents provide their own system_prompt_fn"
+            )
+
         self.deps = AgentDeps(
             interactive_mode=True,
             llm_model=model_config,
             codebase_service=codebase_service,
             artifact_service=artifact_service,
-            system_prompt_fn=_dummy_system_prompt_fn,
+            system_prompt_fn=_placeholder_system_prompt_fn,
         )
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
         self.command_handler = CommandHandler()
@@ -343,6 +351,8 @@ class ChatScreen(Screen[None]):
         # Hide spinner initially
         self.query_one("#spinner").display = False
         self.call_later(self.check_if_codebase_is_indexed)
+        # Start the question listener worker to handle ask_user interactions
+        self.call_later(self.add_question_listener)
 
     @work
     async def check_if_codebase_is_indexed(self) -> None:
@@ -413,7 +423,7 @@ class ChatScreen(Screen[None]):
                 question_display.display = False
 
     def action_toggle_mode(self) -> None:
-        modes = [AgentType.RESEARCH, AgentType.PLAN, AgentType.TASKS]
+        modes = [AgentType.RESEARCH, AgentType.PLAN, AgentType.TASKS, AgentType.SPECIFY]
         self.mode = modes[(modes.index(self.mode) + 1) % len(modes)]
         self.agent_manager.set_agent(self.mode)
         # whoops it actually changes focus. Let's be brutal for now

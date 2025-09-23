@@ -14,7 +14,7 @@ def test_graph_schema_template_content():
     loader = PromptLoader()
     schema_content = loader.render("codebase/partials/graph_schema.j2")
 
-    assert "Node Labels and Their Key Properties" in schema_content
+    assert "# Codebase Graph Schema Definition" in schema_content
     assert "Project:" in schema_content
     assert "Package:" in schema_content
     assert "Module:" in schema_content
