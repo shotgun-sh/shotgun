@@ -12,7 +12,7 @@ updates:
       timezone: "America/New_York"
     open-pull-requests-limit: 3
     assignees:
-      - "scott"
+      - "scottfrasso"
     labels:
       - "dependencies"
       - "python"
@@ -35,7 +35,7 @@ updates:
       timezone: "America/New_York"
     open-pull-requests-limit: 3
     assignees:
-      - "scott"
+      - "scottfrasso"
     labels:
       - "dependencies"
       - "github-actions"
