@@ -27,6 +27,14 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+class CodebaseAlreadyIndexedError(Exception):
+    """Raised when a codebase is already indexed."""
+
+    def __init__(self, repo_path: str):
+        self.repo_path = repo_path
+        super().__init__(f"Codebase already indexed: {repo_path}")
+
+
 class CodebaseFileHandler(FileSystemEventHandler):
     """Handles file system events for code graph updates."""
 
@@ -339,9 +347,7 @@ class CodebaseGraphManager:
 
         # Check if graph already exists
         if graph_path.exists():
-            raise ValueError(
-                f"Graph already exists for {repo_path}. Use update_graph() to modify it."
-            )
+            raise CodebaseAlreadyIndexedError(repo_path)
 
         # Import the builder from local core module
         from shotgun.codebase.core import CodebaseIngestor

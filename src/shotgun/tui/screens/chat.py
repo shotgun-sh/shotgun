@@ -33,6 +33,7 @@ from shotgun.agents.models import (
     UserAnswer,
     UserQuestion,
 )
+from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.sdk.services import get_artifact_service, get_codebase_service
@@ -247,6 +248,12 @@ class CodebaseIndexScreen(ModalScreen[CodebaseIndexSelection | None]):
                     variant="primary",
                     disabled=True,
                 )
+
+    def on_mount(self) -> None:
+        name_input = self.query_one("#index-codebase-name", Input)
+        if not name_input.value and self.selected_path:
+            name_input.value = self.selected_path.name
+        self._update_confirm()
 
     def _update_confirm(self) -> None:
         confirm = self.query_one("#index-confirm", Button)
@@ -611,6 +618,11 @@ class ChatScreen(Screen[None]):
                 severity="information",
                 timeout=8,
             )
+
+            self.mount_hint(codebase_indexed_hint(selection.name))
+        except CodebaseAlreadyIndexedError as exc:
+            self.notify(str(exc), severity="warning")
+            return
         except InvalidPathError as exc:
             self.notify(str(exc), severity="error")
 
@@ -619,7 +631,6 @@ class ChatScreen(Screen[None]):
         finally:
             label.update("")
             label.refresh()
-            self.mount_hint(codebase_indexed_hint(selection.name))
 
     @work
     async def run_agent(self, message: str) -> None:
