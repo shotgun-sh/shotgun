@@ -53,6 +53,12 @@ class AgentModeProvider(Provider):
                 AgentType.RESEARCH,
             ),
             (
+                "Switch to Specify Mode",
+                "📝 Create detailed specifications and requirements documents",
+                lambda: self.set_mode(AgentType.SPECIFY),
+                AgentType.SPECIFY,
+            ),
+            (
                 "Switch to Plan Mode",
                 "📋 Create comprehensive, actionable plans with milestones",
                 lambda: self.set_mode(AgentType.PLAN),

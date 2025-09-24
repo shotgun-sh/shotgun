@@ -423,7 +423,7 @@ class ChatScreen(Screen[None]):
                 question_display.display = False
 
     def action_toggle_mode(self) -> None:
-        modes = [AgentType.RESEARCH, AgentType.PLAN, AgentType.TASKS, AgentType.SPECIFY]
+        modes = [AgentType.RESEARCH, AgentType.SPECIFY, AgentType.PLAN, AgentType.TASKS]
         self.mode = modes[(modes.index(self.mode) + 1) % len(modes)]
         self.agent_manager.set_agent(self.mode)
         # whoops it actually changes focus. Let's be brutal for now

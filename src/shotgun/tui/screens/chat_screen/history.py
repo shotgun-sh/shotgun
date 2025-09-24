@@ -1,3 +1,5 @@
+import json
+
 from pydantic_ai.messages import (
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
@@ -146,6 +148,19 @@ class AgentResponseWidget(Widget):
         return acc.strip()
 
     def _format_tool_call_part(self, part: ToolCallPart) -> str:
+        if part.tool_name == "ask_user":
+            if isinstance(part.args, str):
+                try:
+                    _args = json.loads(part.args) if part.args.strip() else {}
+                except json.JSONDecodeError:
+                    _args = {}
+            else:
+                _args = part.args
+
+            if isinstance(_args, dict) and "question" in _args:
+                return f"{_args['question']}"
+            else:
+                return "❓ "
         if part.tool_name == "write_artifact_section":
             if isinstance(part.args, dict) and "section_title" in part.args:
                 return f"{part.tool_name}({part.args['section_title']})"
