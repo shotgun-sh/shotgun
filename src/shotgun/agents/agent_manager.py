@@ -17,16 +17,22 @@ from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     AgentStreamEvent,
     FinalResultEvent,
+    FunctionToolCallEvent,
+    FunctionToolResultEvent,
     ModelMessage,
     ModelRequest,
     ModelResponse,
     ModelResponsePart,
     PartDeltaEvent,
     PartStartEvent,
+    SystemPromptPart,
+    ToolCallPart,
     ToolCallPartDelta,
 )
 from textual.message import Message
 from textual.widget import Widget
+
+from shotgun.agents.common import add_system_prompt_message
 
 from .history.compaction import apply_persistent_compaction
 from .models import AgentDeps, AgentRuntimeOptions, FileOperation
@@ -264,11 +270,6 @@ class AgentManager(Widget):
             self.ui_message_history.append(ModelRequest.user_text_prompt(prompt))
         self._post_messages_updated()
 
-        # Ensure system prompt is added to message history before running agent
-        from pydantic_ai.messages import SystemPromptPart
-
-        from shotgun.agents.common import add_system_prompt_message
-
         # Start with persistent message history
         message_history = self.message_history
 
@@ -389,19 +390,33 @@ class AgentManager(Widget):
                         state.latest_partial = partial_message
                         self._post_partial_message(partial_message, False)
 
+                elif isinstance(event, FunctionToolCallEvent):
+                    existing_call_idx = next(
+                        (
+                            i
+                            for i, part in enumerate(partial_parts)
+                            if isinstance(part, ToolCallPart)
+                            and part.tool_call_id == event.part.tool_call_id
+                        ),
+                        None,
+                    )
+                    if existing_call_idx is not None:
+                        partial_parts[existing_call_idx] = event.part
+                    else:
+                        partial_parts.append(event.part)
+                    partial_message = self._build_partial_response(partial_parts)
+                    if partial_message is not None:
+                        state.latest_partial = partial_message
+                        self._post_partial_message(partial_message, False)
+                elif isinstance(event, FunctionToolResultEvent):
+                    self.ui_message_history.append(ModelRequest(parts=[event.result]))
+                    self._post_messages_updated()  ## this is what the user responded with
                 elif isinstance(event, FinalResultEvent):
                     final_message = (
                         state.latest_partial
                         or self._build_partial_response(partial_parts)
                     )
-                    self._post_partial_message(final_message, True)
-                    state.latest_partial = None
-                    state.final_sent = True
-                    partial_parts.clear()
-                    self._stream_state = None
-                    break
-
-                # Ignore other AgentStreamEvent variants (e.g. tool call notifications) for partial UI updates.
+                    self._post_partial_message(final_message, False)
 
             except Exception:  # pragma: no cover - defensive logging
                 logger.exception(

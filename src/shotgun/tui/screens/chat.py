@@ -482,9 +482,14 @@ class ChatScreen(Screen[None]):
         if event.is_last:
             partial_response_widget.partial_response = None
 
+    def _clear_partial_response(self) -> None:
+        partial_response_widget = self.query_one(ChatHistory)
+        partial_response_widget.partial_response = None
+
     @on(MessageHistoryUpdated)
     def handle_message_history_updated(self, event: MessageHistoryUpdated) -> None:
         """Handle message history updates from the agent manager."""
+        self._clear_partial_response()
         self.messages = event.messages
 
         # If there are file operations, add a message showing the modified files
