@@ -21,11 +21,13 @@ No files currently exist in your allowed directories. You can create:
 {% endif %}
 
 {% if markdown_toc %}
-## Document Structure
+## Document Table of Contents - READ THE ENTIRE FILE TO UNDERSTAND MORE
 
-The current document contains the following sections:
 ```
 {{ markdown_toc }}
 ```
-Review these existing sections before adding new content to avoid duplication.
+
+**IMPORTANT**: The above shows ONLY the Table of Contents from prior stages in the pipeline. Review this context before asking questions or creating new content.
+{% else %}
+Review the existing documents above before adding new content to avoid duplication.
 {% endif %}

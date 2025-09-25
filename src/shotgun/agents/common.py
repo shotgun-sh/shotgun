@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from pydantic_ai import (
@@ -28,7 +29,7 @@ from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 from .history import token_limit_compactor
 from .history.compaction import apply_persistent_compaction
-from .models import AgentDeps, AgentRuntimeOptions
+from .models import AgentDeps, AgentRuntimeOptions, PipelineConfigEntry
 from .tools import (
     append_file,
     ask_user,
@@ -197,33 +198,24 @@ def create_base_agent(
     return agent, deps
 
 
-def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
-    """Extract table of contents from agent's markdown file.
+def _extract_file_toc_content(
+    file_path: Path, max_depth: int | None = None, max_chars: int = 500
+) -> str | None:
+    """Extract TOC from a single file with depth and character limits.
 
     Args:
-        agent_mode: The agent mode to extract TOC for
+        file_path: Path to the markdown file
+        max_depth: Maximum heading depth (1=#, 2=##, None=all)
+        max_chars: Maximum characters for the TOC
 
     Returns:
-        Formatted TOC string (up to 2000 chars) or None if not applicable
+        Formatted TOC string or None if file doesn't exist
     """
-    # Skip for EXPORT mode or no mode
-    if (
-        not agent_mode
-        or agent_mode == AgentType.EXPORT
-        or agent_mode not in AGENT_DIRECTORIES
-    ):
-        return None
-
-    base_path = get_shotgun_base_path()
-    md_file = AGENT_DIRECTORIES[agent_mode]
-    md_path = base_path / md_file
-
-    # Check if the markdown file exists
-    if not md_path.exists():
+    if not file_path.exists():
         return None
 
     try:
-        content = md_path.read_text(encoding="utf-8")
+        content = file_path.read_text(encoding="utf-8")
         lines = content.split("\n")
 
         # Extract headings
@@ -239,6 +231,10 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
                     else:
                         break
 
+                # Skip if exceeds max_depth
+                if max_depth and level > max_depth:
+                    continue
+
                 # Get the heading text (remove the # symbols and clean up)
                 heading_text = stripped[level:].strip()
                 if heading_text:
@@ -246,19 +242,108 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
                     indent = "  " * (level - 1)
                     toc_lines.append(f"{indent}{'#' * level} {heading_text}")
 
+                    # Check if we're approaching the character limit
+                    current_length = sum(len(line) + 1 for line in toc_lines)
+                    if current_length > max_chars:
+                        # Remove the last line and add ellipsis
+                        toc_lines.pop()
+                        if toc_lines:
+                            toc_lines.append("  ...")
+                        break
+
         if not toc_lines:
             return None
 
-        # Join and truncate to 2000 characters
-        toc = "\n".join(toc_lines)
-        if len(toc) > 2000:
-            toc = toc[:1997] + "..."
-
-        return toc
+        return "\n".join(toc_lines)
 
     except Exception as e:
-        logger.debug(f"Failed to extract TOC from {md_file}: {e}")
+        logger.debug(f"Failed to extract TOC from {file_path}: {e}")
         return None
+
+
+def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
+    """Extract TOCs from current and prior agents' files in the pipeline.
+
+    Shows full TOC of agent's own file and high-level summaries of prior agents'
+    files to maintain context awareness while keeping context window tight.
+
+    Args:
+        agent_mode: The agent mode to extract TOC for
+
+    Returns:
+        Formatted multi-file TOC string or None if not applicable
+    """
+    # Skip if no mode
+    if not agent_mode:
+        return None
+
+    # Define pipeline order and dependencies
+    pipeline_config: dict[AgentType, PipelineConfigEntry] = {
+        AgentType.RESEARCH: PipelineConfigEntry(
+            own_file="research.md",
+            prior_files=[],  # First in pipeline
+        ),
+        AgentType.SPECIFY: PipelineConfigEntry(
+            own_file="specification.md",
+            prior_files=["research.md"],
+        ),
+        AgentType.PLAN: PipelineConfigEntry(
+            own_file="plan.md",
+            prior_files=["research.md", "specification.md"],
+        ),
+        AgentType.TASKS: PipelineConfigEntry(
+            own_file="tasks.md",
+            prior_files=["research.md", "specification.md", "plan.md"],
+        ),
+        AgentType.EXPORT: PipelineConfigEntry(
+            own_file=None,  # Export uses directory
+            prior_files=["research.md", "specification.md", "plan.md", "tasks.md"],
+        ),
+    }
+
+    # Get configuration for current agent
+    if agent_mode not in pipeline_config:
+        return None
+
+    config = pipeline_config[agent_mode]
+    base_path = get_shotgun_base_path()
+    toc_sections: list[str] = []
+
+    # Extract TOCs from prior files (high-level only)
+    for prior_file in config.prior_files:
+        file_path = base_path / prior_file
+        # Only show # and ## headings from prior files, max 500 chars each
+        prior_toc = _extract_file_toc_content(file_path, max_depth=2, max_chars=500)
+        if prior_toc:
+            # Add section header
+            file_label = prior_file.replace(".md", "").replace("_", " ").title()
+            toc_sections.append(
+                f"=== Prior Context: {file_label} (summary) ===\n{prior_toc}"
+            )
+
+    # Extract TOC from own file (full detail)
+    if config.own_file:
+        own_path = base_path / config.own_file
+        own_toc = _extract_file_toc_content(own_path, max_depth=None, max_chars=2000)
+        if own_toc:
+            file_label = config.own_file.replace(".md", "").replace("_", " ").title()
+            # Put own file TOC at the beginning
+            toc_sections.insert(
+                0, f"=== Your Current Document: {file_label} ===\n{own_toc}"
+            )
+
+    # Combine all sections
+    if not toc_sections:
+        return None
+
+    combined_toc = "\n\n".join(toc_sections)
+
+    # Final truncation if needed (should rarely happen with our limits)
+    max_total = 3500  # Conservative total limit
+    if len(combined_toc) > max_total:
+        combined_toc = combined_toc[: max_total - 3] + "..."
+
+    return combined_toc
 
 
 def get_agent_existing_files(agent_mode: AgentType | None = None) -> list[str]:

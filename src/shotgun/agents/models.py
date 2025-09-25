@@ -27,6 +27,23 @@ class AgentType(StrEnum):
     EXPORT = "export"
 
 
+class PipelineConfigEntry(BaseModel):
+    """Configuration for each agent in the pipeline.
+
+    This model defines what files an agent can write to and what
+    files from prior agents it should read for context.
+    """
+
+    own_file: str | None = Field(
+        default=None,
+        description="The file this agent writes to (None for export agent)",
+    )
+    prior_files: list[str] = Field(
+        default_factory=list,
+        description="Files from prior agents in pipeline to read for context",
+    )
+
+
 class UserAnswer(BaseModel):
     """A answer from the user."""
 
