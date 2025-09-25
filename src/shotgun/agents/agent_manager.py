@@ -275,6 +275,8 @@ class AgentManager(Widget):
         # Start with persistent message history
         message_history = self.message_history
 
+        deps.agent_mode = self._current_agent_type
+
         # Add a system status message so the agent knows whats going on
         message_history = await add_system_status_message(deps, message_history)
 

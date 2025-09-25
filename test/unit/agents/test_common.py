@@ -33,6 +33,7 @@ def mock_deps():
     deps.queue = AsyncMock()
     deps.tasks = []
     deps.is_tui_context = False
+    deps.agent_mode = None  # Add agent_mode attribute
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -54,21 +55,31 @@ def mock_agent():
 async def test_add_system_status_message_empty_history(mock_deps):
     """Test add_system_status_message with empty message history."""
     with patch("shotgun.agents.common.prompt_loader") as mock_loader:
-        mock_loader.render.return_value = "System state content"
+        with patch("shotgun.agents.common.get_agent_existing_files") as mock_get_files:
+            with patch(
+                "shotgun.agents.common.extract_markdown_toc"
+            ) as mock_extract_toc:
+                mock_loader.render.return_value = "System state content"
+                mock_get_files.return_value = []
+                mock_extract_toc.return_value = None
 
-        result = await add_system_status_message(mock_deps)
+                result = await add_system_status_message(mock_deps)
 
-        assert len(result) == 1
-        assert isinstance(result[0], ModelRequest)
-        assert len(result[0].parts) == 1
-        assert isinstance(result[0].parts[0], SystemPromptPart)
-        assert result[0].parts[0].content == "System state content"
+                assert len(result) == 1
+                assert isinstance(result[0], ModelRequest)
+                assert len(result[0].parts) == 1
+                assert isinstance(result[0].parts[0], SystemPromptPart)
+                assert result[0].parts[0].content == "System state content"
 
-        mock_loader.render.assert_called_once_with(
-            "agents/state/system_state.j2",
-            codebase_understanding_graphs=["graph1", "graph2"],
-            is_tui_context=False,
-        )
+                mock_get_files.assert_called_once_with(None)
+                mock_extract_toc.assert_called_once_with(None)
+                mock_loader.render.assert_called_once_with(
+                    "agents/state/system_state.j2",
+                    codebase_understanding_graphs=["graph1", "graph2"],
+                    is_tui_context=False,
+                    existing_files=[],
+                    markdown_toc=None,
+                )
 
 
 @pytest.mark.asyncio
@@ -78,13 +89,19 @@ async def test_add_system_status_message_existing_history(mock_deps):
     existing_history = [existing_message]
 
     with patch("shotgun.agents.common.prompt_loader") as mock_loader:
-        mock_loader.render.return_value = "System state content"
+        with patch("shotgun.agents.common.get_agent_existing_files") as mock_get_files:
+            with patch(
+                "shotgun.agents.common.extract_markdown_toc"
+            ) as mock_extract_toc:
+                mock_loader.render.return_value = "System state content"
+                mock_get_files.return_value = []
+                mock_extract_toc.return_value = None
 
-        result = await add_system_status_message(mock_deps, existing_history)
+                result = await add_system_status_message(mock_deps, existing_history)
 
-        assert len(result) == 2
-        assert result[0] == existing_message  # Original message preserved
-        assert isinstance(result[1], ModelRequest)
+                assert len(result) == 2
+                assert result[0] == existing_message  # Original message preserved
+                assert isinstance(result[1], ModelRequest)
 
 
 @pytest.mark.asyncio

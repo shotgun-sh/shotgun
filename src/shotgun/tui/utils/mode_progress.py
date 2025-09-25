@@ -13,7 +13,7 @@ class ModeProgressChecker:
     # Minimum file size in characters to consider a mode as "started"
     MIN_CONTENT_SIZE = 20
 
-    # Map agent types to their corresponding files
+    # Map agent types to their corresponding files (in workflow order)
     MODE_FILES = {
         AgentType.RESEARCH: "research.md",
         AgentType.SPECIFY: "specification.md",

@@ -4,9 +4,28 @@
 
 ## Available Files
 
-The following files can be read or written:
+{% if existing_files %}
+The following files already exist in the .shotgun/ directory.
+Before doing a web search check the information information in these files before continuing.
+Your working files are:
+{% for file in existing_files %}
+- `{{ file }}`
+{% endfor %}
+{% else %}
+No files currently exist in your allowed directories. You can create:
 - `research.md` - Research findings and analysis
 - `plan.md` - Project plans and roadmaps
 - `tasks.md` - Task lists and management
 - `specification.md` - Technical specifications
 - `exports/` folder - For exported documents
+{% endif %}
+
+{% if markdown_toc %}
+## Document Structure
+
+The current document contains the following sections:
+```
+{{ markdown_toc }}
+```
+Review these existing sections before adding new content to avoid duplication.
+{% endif %}

@@ -21,9 +21,9 @@ class AgentType(StrEnum):
     """Enumeration for available agent types."""
 
     RESEARCH = "research"
+    SPECIFY = "specify"
     PLAN = "plan"
     TASKS = "tasks"
-    SPECIFY = "specify"
     EXPORT = "export"
 
 

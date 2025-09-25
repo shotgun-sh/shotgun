@@ -24,6 +24,7 @@ from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
+from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 from .history import token_limit_compactor
 from .history.compaction import apply_persistent_compaction
@@ -39,6 +40,7 @@ from .tools import (
     retrieve_code,
     write_file,
 )
+from .tools.file_management import AGENT_DIRECTORIES
 
 logger = get_logger(__name__)
 
@@ -62,10 +64,18 @@ async def add_system_status_message(
     message_history = message_history or []
     codebase_understanding_graphs = await deps.codebase_service.list_graphs()
 
+    # Get existing files for the agent
+    existing_files = get_agent_existing_files(deps.agent_mode)
+
+    # Extract table of contents from the agent's markdown file
+    markdown_toc = extract_markdown_toc(deps.agent_mode)
+
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
         is_tui_context=deps.is_tui_context,
+        existing_files=existing_files,
+        markdown_toc=markdown_toc,
     )
 
     message_history.append(
@@ -182,6 +192,130 @@ def create_base_agent(
 
     logger.debug("✅ Agent creation complete with codebase tools")
     return agent, deps
+
+
+def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
+    """Extract table of contents from agent's markdown file.
+
+    Args:
+        agent_mode: The agent mode to extract TOC for
+
+    Returns:
+        Formatted TOC string (up to 2000 chars) or None if not applicable
+    """
+    # Skip for EXPORT mode or no mode
+    if (
+        not agent_mode
+        or agent_mode == AgentType.EXPORT
+        or agent_mode not in AGENT_DIRECTORIES
+    ):
+        return None
+
+    base_path = get_shotgun_base_path()
+    md_file = AGENT_DIRECTORIES[agent_mode]
+    md_path = base_path / md_file
+
+    # Check if the markdown file exists
+    if not md_path.exists():
+        return None
+
+    try:
+        content = md_path.read_text(encoding="utf-8")
+        lines = content.split("\n")
+
+        # Extract headings
+        toc_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                # Count the heading level
+                level = 0
+                for char in stripped:
+                    if char == "#":
+                        level += 1
+                    else:
+                        break
+
+                # Get the heading text (remove the # symbols and clean up)
+                heading_text = stripped[level:].strip()
+                if heading_text:
+                    # Add indentation based on level
+                    indent = "  " * (level - 1)
+                    toc_lines.append(f"{indent}{'#' * level} {heading_text}")
+
+        if not toc_lines:
+            return None
+
+        # Join and truncate to 2000 characters
+        toc = "\n".join(toc_lines)
+        if len(toc) > 2000:
+            toc = toc[:1997] + "..."
+
+        return toc
+
+    except Exception as e:
+        logger.debug(f"Failed to extract TOC from {md_file}: {e}")
+        return None
+
+
+def get_agent_existing_files(agent_mode: AgentType | None = None) -> list[str]:
+    """Get list of existing files for the given agent mode.
+
+    Args:
+        agent_mode: The agent mode to check files for. If None, lists all files.
+
+    Returns:
+        List of existing file paths relative to .shotgun directory
+    """
+    base_path = get_shotgun_base_path()
+    existing_files = []
+
+    # If no agent mode, list all files in base path and first level subdirectories
+    if agent_mode is None:
+        # List files in the root .shotgun directory
+        for item in base_path.iterdir():
+            if item.is_file():
+                existing_files.append(item.name)
+            elif item.is_dir():
+                # List files in first-level subdirectories
+                for subitem in item.iterdir():
+                    if subitem.is_file():
+                        relative_path = subitem.relative_to(base_path)
+                        existing_files.append(str(relative_path))
+        return existing_files
+
+    # Handle specific agent modes
+    if agent_mode not in AGENT_DIRECTORIES:
+        return []
+
+    if agent_mode == AgentType.EXPORT:
+        # For export agent, list all files in exports directory
+        exports_dir = base_path / "exports"
+        if exports_dir.exists():
+            for file_path in exports_dir.rglob("*"):
+                if file_path.is_file():
+                    relative_path = file_path.relative_to(base_path)
+                    existing_files.append(str(relative_path))
+    else:
+        # For other agents, check both .md file and directory with same name
+        allowed_file = AGENT_DIRECTORIES[agent_mode]
+
+        # Check for the .md file
+        md_file_path = base_path / allowed_file
+        if md_file_path.exists():
+            existing_files.append(allowed_file)
+
+        # Check for directory with same base name (e.g., research/ for research.md)
+        base_name = allowed_file.replace(".md", "")
+        dir_path = base_path / base_name
+        if dir_path.exists() and dir_path.is_dir():
+            # List all files in the directory
+            for file_path in dir_path.rglob("*"):
+                if file_path.is_file():
+                    relative_path = file_path.relative_to(base_path)
+                    existing_files.append(str(relative_path))
+
+    return existing_files
 
 
 def build_agent_system_prompt(

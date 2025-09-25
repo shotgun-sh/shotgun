@@ -14,6 +14,15 @@ from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 logger = get_logger(__name__)
 
+# Map agent modes to their allowed directories/files (in workflow order)
+AGENT_DIRECTORIES = {
+    AgentType.RESEARCH: "research.md",
+    AgentType.SPECIFY: "specification.md",
+    AgentType.PLAN: "plan.md",
+    AgentType.TASKS: "tasks.md",
+    AgentType.EXPORT: "exports/",
+}
+
 
 def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> Path:
     """Validate and resolve a file path within the agent's scoped directory.
@@ -30,16 +39,7 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
     """
     base_path = get_shotgun_base_path()
 
-    # Map agent modes to their allowed directories
-    agent_directories = {
-        AgentType.RESEARCH: "research.md",
-        AgentType.PLAN: "plan.md",
-        AgentType.TASKS: "tasks.md",
-        AgentType.SPECIFY: "specification.md",
-        AgentType.EXPORT: "exports/",
-    }
-
-    if agent_mode and agent_mode in agent_directories:
+    if agent_mode and agent_mode in AGENT_DIRECTORIES:
         # For export mode, allow writing to any file in exports/ directory
         if agent_mode == AgentType.EXPORT:
             # Ensure the filename starts with exports/ or is being written to exports/
@@ -57,7 +57,7 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
                 ) from e
         else:
             # For other agents, only allow writing to their specific file
-            allowed_file = agent_directories[agent_mode]
+            allowed_file = AGENT_DIRECTORIES[agent_mode]
             if filename != allowed_file:
                 raise ValueError(
                     f"{agent_mode.value.capitalize()} agent can only write to '{allowed_file}'. "
