@@ -42,6 +42,7 @@ from shotgun.tui.screens.chat_screen.history import ChatHistory
 
 from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
+from ..utils.mode_progress import PlaceholderHints
 from .chat_screen.command_providers import (
     AgentModeProvider,
     CodebaseCommandProvider,
@@ -116,6 +117,7 @@ class ModeIndicator(Widget):
         """
         super().__init__()
         self.mode = mode
+        self.progress_checker = PlaceholderHints().progress_checker
 
     def render(self) -> str:
         """Render the mode indicator."""
@@ -137,7 +139,11 @@ class ModeIndicator(Widget):
         mode_title = mode_display.get(self.mode, self.mode.value.title())
         description = mode_description.get(self.mode, "")
 
-        return f"[bold $text-accent]{mode_title} mode[/][$foreground-muted] ({description})[/]"
+        # Check if mode has content
+        has_content = self.progress_checker.has_mode_content(self.mode)
+        status_icon = " ✓" if has_content else ""
+
+        return f"[bold $text-accent]{mode_title}{status_icon} mode[/][$foreground-muted] ({description})[/]"
 
 
 class FilteredDirectoryTree(DirectoryTree):
@@ -306,24 +312,6 @@ class ChatScreen(Screen[None]):
 
     COMMANDS = {AgentModeProvider, ProviderSetupProvider, CodebaseCommandProvider}
 
-    _PLACEHOLDER_BY_MODE: dict[AgentType, str] = {
-        AgentType.RESEARCH: (
-            "Ask for investigations, e.g. research strengths and weaknesses of PydanticAI vs its rivals"
-        ),
-        AgentType.PLAN: (
-            "Describe a goal to plan, e.g. draft a rollout plan for launching our Slack automation"
-        ),
-        AgentType.TASKS: (
-            "Request actionable work, e.g. break down tasks to wire OpenTelemetry into the API"
-        ),
-        AgentType.SPECIFY: (
-            "Request detailed specifications, e.g. create a comprehensive spec for user authentication system"
-        ),
-        AgentType.EXPORT: (
-            "Request export tasks, e.g. export research findings to Markdown or convert tasks to CSV"
-        ),
-    }
-
     value = reactive("")
     mode = reactive(AgentType.RESEARCH)
     history: PromptHistory = PromptHistory()
@@ -357,6 +345,7 @@ class ChatScreen(Screen[None]):
         )
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
         self.command_handler = CommandHandler()
+        self.placeholder_hints = PlaceholderHints()
 
     def on_mount(self) -> None:
         self.query_one(PromptInput).focus(scroll_visible=True)
@@ -407,7 +396,10 @@ class ChatScreen(Screen[None]):
             mode_indicator.refresh()
 
             prompt_input = self.query_one(PromptInput)
-            prompt_input.placeholder = self._placeholder_for_mode(new_mode)
+            # Force new hint selection when mode changes
+            prompt_input.placeholder = self._placeholder_for_mode(
+                new_mode, force_new=True
+            )
             prompt_input.refresh()
 
     def watch_working(self, is_working: bool) -> None:
@@ -503,6 +495,14 @@ class ChatScreen(Screen[None]):
         self._clear_partial_response()
         self.messages = event.messages
 
+        # Refresh placeholder and mode indicator in case artifacts were created
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.placeholder = self._placeholder_for_mode(self.mode)
+        prompt_input.refresh()
+
+        mode_indicator = self.query_one(ModeIndicator)
+        mode_indicator.refresh()
+
         # If there are file operations, add a message showing the modified files
         if event.file_operations:
             chat_history = self.query_one(ChatHistory)
@@ -577,9 +577,19 @@ class ChatScreen(Screen[None]):
         prompt_input = self.query_one(PromptInput)
         prompt_input.clear()
 
-    def _placeholder_for_mode(self, mode: AgentType) -> str:
-        """Return the placeholder text appropriate for the current mode."""
-        return self._PLACEHOLDER_BY_MODE.get(mode, "Type your message")
+    def _placeholder_for_mode(self, mode: AgentType, force_new: bool = False) -> str:
+        """Return the placeholder text appropriate for the current mode.
+
+        Args:
+            mode: The current agent mode.
+            force_new: If True, force selection of a new random hint.
+
+        Returns:
+            Dynamic placeholder hint based on mode and progress.
+        """
+        return self.placeholder_hints.get_placeholder_for_mode(
+            mode, force_new=force_new
+        )
 
     def index_codebase_command(self) -> None:
         start_path = Path.cwd()
