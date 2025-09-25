@@ -204,7 +204,6 @@ class AgentResponseWidget(Widget):
         self,
         part: ToolCallPart,
     ) -> str:
-        return "*Answer to continue*"
         if isinstance(part.args, str):
             try:
                 _args = json.loads(part.args) if part.args.strip() else {}
