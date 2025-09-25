@@ -281,7 +281,7 @@ jobs:
           fi
 
           # Escape for JSON and limit length
-          CHANGELOG=$(echo "$CHANGELOG" | head -20 | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          CHANGELOG=$(echo "$CHANGELOG" | head -20 | sed 's/"/\\"/g' | sed 's/`/\\`/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
