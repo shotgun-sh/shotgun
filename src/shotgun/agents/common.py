@@ -15,9 +15,7 @@ from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
-    ModelResponse,
     SystemPromptPart,
-    TextPart,
 )
 
 from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
@@ -79,13 +77,14 @@ async def add_system_status_message(
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
+        is_tui_context=deps.is_tui_context,
         **artifact_state,
     )
 
     message_history.append(
-        ModelResponse(
+        ModelRequest(
             parts=[
-                TextPart(content=system_state),
+                SystemPromptPart(content=system_state),
             ]
         )
     )

@@ -43,4 +43,4 @@ async def test_query_graph_no_service(mock_run_context):
 
     assert isinstance(result, QueryGraphResult)
     assert result.success is False
-    assert result.error and "No codebase service available" in result.error
+    assert result.error and "No codebase indexed" in result.error

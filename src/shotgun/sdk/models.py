@@ -15,7 +15,7 @@ class ListResult(BaseModel):
     def __str__(self) -> str:
         """Format list result as plain text table."""
         if not self.graphs:
-            return "No codebases found."
+            return "No indexed codebases found."
 
         lines = [
             f"{'ID':<12} {'Name':<30} {'Status':<10} {'Files':<8} {'Path'}",

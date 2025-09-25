@@ -34,7 +34,7 @@ async def retrieve_code(
             return CodeSnippetResult(
                 found=False,
                 qualified_name=qualified_name,
-                error="No codebase service available in context",
+                error="No codebase indexed",
             )
 
         # Use the existing code retrieval functionality

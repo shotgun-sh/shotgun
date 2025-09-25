@@ -31,7 +31,7 @@ async def query_graph(
             return QueryGraphResult(
                 success=False,
                 query=query,
-                error="No codebase service available in context",
+                error="No codebase indexed",
             )
 
         # Execute natural language query

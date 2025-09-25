@@ -24,6 +24,7 @@ def mock_agent_deps():
     deps.tasks = []
     deps.llm_model = MagicMock()
     deps.llm_model.name = "test-model"
+    deps.is_tui_context = False
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -55,6 +56,7 @@ def mock_agent_deps():
             "codebase_service",
             "artifact_service",
             "system_prompt_fn",
+            "is_tui_context",
         ]:
             setattr(copy_mock, attr_name, getattr(deps, attr_name))
 
@@ -259,6 +261,7 @@ def test_agent_manager_set_agent_invalid(
 
 
 @pytest.mark.asyncio
+@patch("shotgun.agents.agent_manager.add_system_status_message")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -270,6 +273,7 @@ async def test_agent_manager_run(
     mock_create_plan,
     mock_create_research,
     mock_create_export,
+    mock_add_system_status,
     mock_agent_deps,
     mock_agents,
 ):
@@ -297,6 +301,12 @@ async def test_agent_manager_run(
     mock_result.new_messages.return_value = [MagicMock()]
     mock_result.all_messages.return_value = [MagicMock(), MagicMock()]
     research_agent.run = AsyncMock(return_value=mock_result)
+
+    # Mock add_system_status_message to return the message history unchanged
+    async def mock_add_status(deps, history):
+        return history if history else []
+
+    mock_add_system_status.side_effect = mock_add_status
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -340,6 +350,7 @@ async def test_agent_manager_run(
 
 
 @pytest.mark.asyncio
+@patch("shotgun.agents.agent_manager.add_system_status_message")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -351,6 +362,7 @@ async def test_agent_manager_run_no_prompt(
     mock_create_plan,
     mock_create_research,
     mock_create_export,
+    mock_add_system_status,
     mock_agent_deps,
     mock_agents,
 ):
@@ -379,6 +391,12 @@ async def test_agent_manager_run_no_prompt(
     mock_result.all_messages.return_value = []
     research_agent.run = AsyncMock(return_value=mock_result)
 
+    # Mock add_system_status_message to return the message history unchanged
+    async def mock_add_status(deps, history):
+        return history if history else []
+
+    mock_add_system_status.side_effect = mock_add_status
+
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
     # Mock the post_message method
@@ -392,6 +410,7 @@ async def test_agent_manager_run_no_prompt(
 
 
 @pytest.mark.asyncio
+@patch("shotgun.agents.agent_manager.add_system_status_message")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
@@ -403,6 +422,7 @@ async def test_agent_manager_run_with_custom_deps(
     mock_create_tasks,
     mock_create_plan,
     mock_create_research,
+    mock_add_system_status,
     mock_agent_deps,
     mock_agents,
 ):
@@ -421,6 +441,12 @@ async def test_agent_manager_run_with_custom_deps(
     mock_result.all_messages.return_value = []
     research_agent.run = AsyncMock(return_value=mock_result)
 
+    # Mock add_system_status_message to return the message history unchanged
+    async def mock_add_status(deps, history):
+        return history if history else []
+
+    mock_add_system_status.side_effect = mock_add_status
+
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
     # Mock the post_message method
@@ -434,6 +460,9 @@ async def test_agent_manager_run_with_custom_deps(
     file_tracker_mock.format_summary = MagicMock(return_value="No files modified")
     custom_deps.file_tracker = file_tracker_mock
     custom_deps.system_prompt_fn = MagicMock(return_value="Custom system prompt")
+    custom_deps.is_tui_context = False
+    custom_deps.codebase_service = AsyncMock()
+    custom_deps.codebase_service.list_graphs.return_value = []
     await manager.run("test", deps=custom_deps)
 
     # Should use custom deps instead of manager deps

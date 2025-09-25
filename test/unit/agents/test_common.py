@@ -32,6 +32,7 @@ def mock_deps():
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt content")
     deps.queue = AsyncMock()
     deps.tasks = []
+    deps.is_tui_context = False
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -58,9 +59,9 @@ async def test_add_system_status_message_empty_history(mock_deps):
         result = await add_system_status_message(mock_deps)
 
         assert len(result) == 1
-        assert isinstance(result[0], ModelResponse)
+        assert isinstance(result[0], ModelRequest)
         assert len(result[0].parts) == 1
-        assert isinstance(result[0].parts[0], TextPart)
+        assert isinstance(result[0].parts[0], SystemPromptPart)
         assert result[0].parts[0].content == "System state content"
 
         from unittest.mock import ANY
@@ -68,6 +69,7 @@ async def test_add_system_status_message_empty_history(mock_deps):
         mock_loader.render.assert_called_once_with(
             "agents/state/system_state.j2",
             codebase_understanding_graphs=["graph1", "graph2"],
+            is_tui_context=False,
             available_templates=ANY,  # Template data structure can vary
             existing_artifacts=ANY,  # Artifact data structure can vary
             current_date=ANY,  # Current date string
@@ -87,7 +89,7 @@ async def test_add_system_status_message_existing_history(mock_deps):
 
         assert len(result) == 2
         assert result[0] == existing_message  # Original message preserved
-        assert isinstance(result[1], ModelResponse)
+        assert isinstance(result[1], ModelRequest)
 
 
 @pytest.mark.asyncio

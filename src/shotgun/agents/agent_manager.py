@@ -32,7 +32,7 @@ from pydantic_ai.messages import (
 from textual.message import Message
 from textual.widget import Widget
 
-from shotgun.agents.common import add_system_prompt_message
+from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
@@ -122,6 +122,7 @@ class AgentManager(Widget):
         agent_runtime_options = AgentRuntimeOptions(
             interactive_mode=self.deps.interactive_mode,
             working_directory=self.deps.working_directory,
+            is_tui_context=self.deps.is_tui_context,
             max_iterations=self.deps.max_iterations,
             queue=self.deps.queue,
             tasks=self.deps.tasks,
@@ -279,6 +280,9 @@ class AgentManager(Widget):
 
         # Start with persistent message history
         message_history = self.message_history
+
+        # Add a system status message so the agent knows whats going on
+        message_history = await add_system_status_message(deps, message_history)
 
         # Check if the message history already has a system prompt
         has_system_prompt = any(

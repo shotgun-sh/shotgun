@@ -87,7 +87,7 @@ async def codebase_shell(
                 success=False,
                 command=command,
                 args=args,
-                error="No codebase service available in context",
+                error="No codebase indexed",
             )
 
         # Security validation
@@ -129,7 +129,7 @@ async def codebase_shell(
                     success=False,
                     command=command,
                     args=args,
-                    error="No codebases available. Add a codebase first using graph management tools.",
+                    error="No codebase indexed. Index a codebase first.",
                 )
 
             # Select the appropriate graph

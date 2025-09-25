@@ -33,7 +33,7 @@ async def file_read(
             return FileReadResult(
                 success=False,
                 file_path=file_path,
-                error="No codebase service available in context",
+                error="No codebase indexed",
             )
 
         # Get the graph to find the repository path

@@ -10,6 +10,10 @@ You have access to the following codebase graphs:
 
 {% else -%}
 
-You have no access to codebase graphs. You can optionally ask the user to load a codebase if the user asked a codebase question.
+{% if is_tui_context -%}
+No codebase has been indexed yet. To enable code analysis, please tell the user to restart the TUI and follow the prompt to 'Index this codebase?' when it appears.
+{% else -%}
+No codebase has been indexed yet. If the user needs code analysis, ask them to index a codebase first.
+{% endif -%}
 
 {% endif %}

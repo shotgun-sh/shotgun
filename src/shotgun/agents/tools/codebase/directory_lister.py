@@ -33,7 +33,7 @@ async def directory_lister(
                 success=False,
                 directory=directory,
                 full_path="",
-                error="No codebase service available in context",
+                error="No codebase indexed",
             )
 
         # Get the graph to find the repository path

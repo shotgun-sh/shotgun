@@ -180,9 +180,11 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         with Container(id="index-prompt-dialog"):
-            yield Label("Index your codebase?", id="index-prompt-title")
+            yield Label("Index this codebase?", id="index-prompt-title")
             yield Static(
-                "We found project files but no index yet. Indexing enables smarter chat."
+                f"Would you like to index the codebase at:\n{Path.cwd()}\n\n"
+                "This is required for the agent to understand your code and answer "
+                "questions about it. Without indexing, the agent cannot analyze your codebase."
             )
             with Container(id="index-prompt-buttons"):
                 yield Button(
@@ -338,6 +340,7 @@ class ChatScreen(Screen[None]):
 
         self.deps = AgentDeps(
             interactive_mode=True,
+            is_tui_context=True,
             llm_model=model_config,
             codebase_service=codebase_service,
             artifact_service=artifact_service,

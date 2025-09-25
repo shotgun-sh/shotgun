@@ -60,6 +60,11 @@ class AgentRuntimeOptions(BaseModel):
         description="Working directory for agent operations",
     )
 
+    is_tui_context: bool = Field(
+        default=False,
+        description="Whether the agent is running in TUI context",
+    )
+
     max_iterations: int = Field(
         default=10,
         ge=1,

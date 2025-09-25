@@ -56,7 +56,7 @@ async def test_codebase_shell_no_graphs(mock_run_context, mock_codebase_service)
 
     assert isinstance(result, ShellCommandResult)
     assert result.success is False
-    assert result.error and "No codebases available" in result.error
+    assert result.error and "No codebase indexed" in result.error
 
 
 @pytest.mark.asyncio
