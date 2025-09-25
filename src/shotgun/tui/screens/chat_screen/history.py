@@ -187,6 +187,12 @@ class AgentResponseWidget(Widget):
     def _format_tool_call_part(self, part: ToolCallPart) -> str:
         if part.tool_name == "ask_user":
             return self._format_ask_user_part(part)
+        # write_file
+        if part.tool_name == "write_file" or part.tool_name == "append_file":
+            if isinstance(part.args, dict) and "filename" in part.args:
+                return f"{part.tool_name}({part.args['filename']})"
+            else:
+                return f"{part.tool_name}()"
         if part.tool_name == "write_artifact_section":
             if isinstance(part.args, dict) and "section_title" in part.args:
                 return f"{part.tool_name}({part.args['section_title']})"
