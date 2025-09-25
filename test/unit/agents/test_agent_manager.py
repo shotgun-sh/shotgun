@@ -7,9 +7,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic_ai import Agent
 from pydantic_ai.agent import AgentRunResult
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    SystemPromptPart,
+    TextPart,
+)
 
 from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
+from shotgun.agents.conversation_history import ConversationState
 from shotgun.agents.models import AgentDeps
 
 
@@ -525,3 +532,56 @@ def test_message_history_updated():
 
     assert event.messages == messages
     assert event.agent_type == AgentType.RESEARCH
+
+
+@patch("shotgun.agents.agent_manager.create_export_agent")
+@patch("shotgun.agents.agent_manager.create_research_agent")
+@patch("shotgun.agents.agent_manager.create_plan_agent")
+@patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
+def test_restore_conversation_state_filters_system_prompt(
+    mock_create_specify,
+    mock_create_tasks,
+    mock_create_plan,
+    mock_create_research,
+    mock_create_export,
+    mock_agent_deps,
+    mock_agents,
+):
+    """System messages should remain hidden from the UI after restore."""
+    research_agent, plan_agent, tasks_agent = mock_agents
+
+    mock_create_research.return_value = (research_agent, mock_agent_deps)
+    mock_create_plan.return_value = (plan_agent, mock_agent_deps)
+    mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_export.return_value = (tasks_agent, mock_agent_deps)
+
+    manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    system_message = ModelRequest(parts=[SystemPromptPart(content="sys")])
+    user_message = ModelRequest.user_text_prompt("Hi")
+    response_message = ModelResponse(parts=[TextPart(content="Hello")])
+
+    state = ConversationState(
+        agent_messages=[system_message, user_message, response_message],
+        agent_type="research",
+    )
+
+    manager.restore_conversation_state(state)
+
+    # Ensure system message remains available for subsequent runs
+    restored_first_message = manager.message_history[0]
+    assert any(
+        isinstance(part, SystemPromptPart)
+        for part in getattr(restored_first_message, "parts", [])
+    )
+
+    # UI history should exclude the system prompt entirely
+    assert len(manager.ui_message_history) == 2
+    assert all(
+        not any(
+            isinstance(part, SystemPromptPart) for part in getattr(msg, "parts", [])
+        )
+        for msg in manager.ui_message_history
+    )

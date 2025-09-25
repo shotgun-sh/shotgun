@@ -1,0 +1,216 @@
+"""Unit tests for conversation history persistence."""
+
+import json
+from datetime import datetime
+
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
+
+from shotgun.agents.conversation_history import (
+    ConversationHistory,
+    ConversationState,
+)
+from shotgun.agents.conversation_manager import ConversationManager
+
+
+def test_conversation_history_creation():
+    """Test ConversationHistory model creation."""
+    history = ConversationHistory()
+    assert history.version == 1
+    assert history.agent_history == []
+    assert history.last_agent_model == "research"
+    assert isinstance(history.updated_at, datetime)
+
+
+def test_conversation_history_with_agent_messages():
+    """Test ConversationHistory with agent messages."""
+    # Create some model messages
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Hello")]),
+        ModelResponse(parts=[TextPart(content="Hi there!")]),
+    ]
+
+    history = ConversationHistory(
+        last_agent_model="plan",
+    )
+    history.set_agent_messages(messages)
+
+    assert len(history.agent_history) == 2
+    assert history.last_agent_model == "plan"
+
+
+def test_agent_messages_serialization():
+    """Test serialization and deserialization of agent messages."""
+    # Create some model messages
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Test prompt")]),
+        ModelResponse(parts=[TextPart(content="Test response")]),
+    ]
+
+    history = ConversationHistory()
+    history.set_agent_messages(messages)
+
+    # Check that messages were serialized
+    assert len(history.agent_history) == 2
+    assert isinstance(history.agent_history[0], dict)
+
+    # Check deserialization
+    retrieved_messages = history.get_agent_messages()
+    assert len(retrieved_messages) == 2
+    assert isinstance(retrieved_messages[0], ModelRequest)
+    assert isinstance(retrieved_messages[1], ModelResponse)
+
+
+def test_conversation_history_json_serialization():
+    """Test ConversationHistory JSON serialization."""
+    history = ConversationHistory(
+        last_agent_model="tasks",
+    )
+
+    # Add agent messages
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Test")]),
+    ]
+    history.set_agent_messages(messages)
+
+    # Serialize to JSON
+    json_data = history.model_dump(mode="json")
+
+    # Verify structure
+    assert json_data["version"] == 1
+    assert json_data["last_agent_model"] == "tasks"
+    assert len(json_data["agent_history"]) == 1
+
+    # Verify it can be serialized to JSON string
+    json_str = json.dumps(json_data)
+    assert isinstance(json_str, str)
+
+
+def test_conversation_manager_save_load(tmp_path):
+    """Test ConversationManager save and load functionality."""
+    # Create a manager with custom path
+    conv_path = tmp_path / "test_conversation.json"
+    manager = ConversationManager(conversation_path=conv_path)
+
+    # Create and save a conversation
+    history = ConversationHistory(
+        last_agent_model="research",
+    )
+
+    # Add some agent messages
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Test message")]),
+    ]
+    history.set_agent_messages(messages)
+
+    manager.save(history)
+
+    # Verify file was created
+    assert conv_path.exists()
+
+    # Load the conversation
+    loaded_history = manager.load()
+    assert loaded_history is not None
+    assert len(loaded_history.agent_history) == 1
+    assert loaded_history.last_agent_model == "research"
+
+    # Verify we can get the messages back
+    loaded_messages = loaded_history.get_agent_messages()
+    assert len(loaded_messages) == 1
+    assert isinstance(loaded_messages[0], ModelRequest)
+
+
+def test_conversation_manager_nonexistent_file(tmp_path):
+    """Test ConversationManager with nonexistent file."""
+    conv_path = tmp_path / "nonexistent.json"
+    manager = ConversationManager(conversation_path=conv_path)
+
+    # Should return None for nonexistent file
+    loaded = manager.load()
+    assert loaded is None
+
+    # Check exists method
+    assert not manager.exists()
+
+
+def test_conversation_manager_clear(tmp_path):
+    """Test ConversationManager clear functionality."""
+    conv_path = tmp_path / "test_conversation.json"
+    manager = ConversationManager(conversation_path=conv_path)
+
+    # Save a conversation
+    history = ConversationHistory()
+    manager.save(history)
+    assert conv_path.exists()
+
+    # Clear the conversation
+    manager.clear()
+    assert not conv_path.exists()
+
+
+def test_conversation_manager_corrupt_file(tmp_path):
+    """Test ConversationManager with corrupt JSON file."""
+    conv_path = tmp_path / "corrupt.json"
+
+    # Create a corrupt JSON file
+    with open(conv_path, "w") as f:
+        f.write("{invalid json}")
+
+    manager = ConversationManager(conversation_path=conv_path)
+
+    # Should return None for corrupt file
+    loaded = manager.load()
+    assert loaded is None
+
+
+def test_conversation_history_version_compatibility():
+    """Test that conversation history maintains version compatibility."""
+    # Create history with specific version
+    history = ConversationHistory(version=1)
+    assert history.version == 1
+
+    # Serialize and deserialize
+    json_data = history.model_dump(mode="json")
+    loaded_history = ConversationHistory.model_validate(json_data)
+
+    assert loaded_history.version == 1
+
+
+def test_empty_agent_messages():
+    """Test handling of empty agent messages."""
+    history = ConversationHistory()
+
+    # Get empty agent messages
+    messages = history.get_agent_messages()
+    assert messages == []
+
+    # Set empty list
+    history.set_agent_messages([])
+    assert history.agent_history == []
+
+    messages = history.get_agent_messages()
+    assert messages == []
+
+
+def test_conversation_state_creation():
+    """Test ConversationState model creation."""
+    # Create some model messages
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Test prompt")]),
+        ModelResponse(parts=[TextPart(content="Test response")]),
+    ]
+
+    # Create ConversationState
+    state = ConversationState(
+        agent_messages=messages,
+        agent_type="research",
+    )
+
+    assert len(state.agent_messages) == 2
+    assert state.agent_type == "research"
+    assert isinstance(state.agent_messages[0], ModelRequest)
+    assert isinstance(state.agent_messages[1], ModelResponse)

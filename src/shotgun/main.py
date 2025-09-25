@@ -100,6 +100,14 @@ def main(
             help="Disable automatic update checks",
         ),
     ] = False,
+    continue_session: Annotated[
+        bool,
+        typer.Option(
+            "--continue",
+            "-c",
+            help="Continue previous TUI conversation",
+        ),
+    ] = False,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
@@ -112,7 +120,7 @@ def main(
 
     if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
         logger.debug("Launching shotgun TUI application")
-        tui_app.run(no_update_check=no_update_check)
+        tui_app.run(no_update_check=no_update_check, continue_session=continue_session)
 
         # Show update notification after TUI exits
         if _update_notification:

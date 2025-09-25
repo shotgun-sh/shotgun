@@ -26,6 +26,11 @@ from shotgun.agents.agent_manager import (
     PartialResponseMessage,
 )
 from shotgun.agents.config import get_provider_model
+from shotgun.agents.conversation_history import (
+    ConversationHistory,
+    ConversationState,
+)
+from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.agents.models import (
     AgentDeps,
     AgentType,
@@ -323,7 +328,7 @@ class ChatScreen(Screen[None]):
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
     partial_message: reactive[ModelMessage | None] = reactive(None)
 
-    def __init__(self) -> None:
+    def __init__(self, continue_session: bool = False) -> None:
         super().__init__()
         # Get the model configuration and services
         model_config = get_provider_model()
@@ -347,11 +352,18 @@ class ChatScreen(Screen[None]):
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
         self.command_handler = CommandHandler()
         self.placeholder_hints = PlaceholderHints()
+        self.conversation_manager = ConversationManager()
+        self.continue_session = continue_session
 
     def on_mount(self) -> None:
         self.query_one(PromptInput).focus(scroll_visible=True)
         # Hide spinner initially
         self.query_one("#spinner").display = False
+
+        # Load conversation history if --continue flag was provided
+        if self.continue_session and self.conversation_manager.exists():
+            self._load_conversation()
+
         self.call_later(self.check_if_codebase_is_indexed)
         # Start the question listener worker to handle ask_user interactions
         self.call_later(self.add_question_listener)
@@ -476,6 +488,10 @@ class ChatScreen(Screen[None]):
         if not chat_history.vertical_tail:
             return
         chat_history.vertical_tail.mount(Markdown(markdown))
+        # Scroll to bottom after mounting hint
+        chat_history.vertical_tail.call_after_refresh(
+            chat_history.vertical_tail.scroll_end, animate=False
+        )
 
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
@@ -686,8 +702,45 @@ class ChatScreen(Screen[None]):
         )
         self.working = False
 
+        # Save conversation after each interaction
+        self._save_conversation()
+
         prompt_input = self.query_one(PromptInput)
         prompt_input.focus()
+
+    def _save_conversation(self) -> None:
+        """Save the current conversation to persistent storage."""
+        # Get conversation state from agent manager
+        state = self.agent_manager.get_conversation_state()
+
+        # Create conversation history object
+        conversation = ConversationHistory(
+            last_agent_model=state.agent_type,
+        )
+        conversation.set_agent_messages(state.agent_messages)
+
+        # Save to file
+        self.conversation_manager.save(conversation)
+
+    def _load_conversation(self) -> None:
+        """Load conversation from persistent storage."""
+        conversation = self.conversation_manager.load()
+        if conversation is None:
+            return
+
+        # Restore agent state
+        agent_messages = conversation.get_agent_messages()
+
+        # Create ConversationState for restoration
+        state = ConversationState(
+            agent_messages=agent_messages,
+            agent_type=conversation.last_agent_model,
+        )
+
+        self.agent_manager.restore_conversation_state(state)
+
+        # Update the current mode
+        self.mode = AgentType(conversation.last_agent_model)
 
 
 def codebase_indexed_hint(codebase_name: str) -> str:

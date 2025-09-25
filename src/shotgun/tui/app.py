@@ -29,10 +29,13 @@ class ShotgunApp(App[None]):
     ]
     CSS_PATH = "styles.tcss"
 
-    def __init__(self, no_update_check: bool = False) -> None:
+    def __init__(
+        self, no_update_check: bool = False, continue_session: bool = False
+    ) -> None:
         super().__init__()
         self.config_manager: ConfigManager = get_config_manager()
         self.no_update_check = no_update_check
+        self.continue_session = continue_session
         self.update_notification: str | None = None
 
         # Start async update check
@@ -77,7 +80,8 @@ class ShotgunApp(App[None]):
 
         if isinstance(self.screen, ChatScreen):
             return
-        self.push_screen("chat")
+        # Pass continue_session flag to ChatScreen
+        self.push_screen(ChatScreen(continue_session=self.continue_session))
 
     def check_local_shotgun_directory_exists(self) -> bool:
         shotgun_dir = get_shotgun_base_path()
@@ -97,13 +101,14 @@ class ShotgunApp(App[None]):
         return []  # we don't want any system commands
 
 
-def run(no_update_check: bool = False) -> None:
+def run(no_update_check: bool = False, continue_session: bool = False) -> None:
     """Run the TUI application.
 
     Args:
         no_update_check: If True, disable automatic update checks.
+        continue_session: If True, continue from previous conversation.
     """
-    app = ShotgunApp(no_update_check=no_update_check)
+    app = ShotgunApp(no_update_check=no_update_check, continue_session=continue_session)
     app.run(inline_no_clear=True)
 
 

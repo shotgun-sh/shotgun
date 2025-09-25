@@ -1,9 +1,12 @@
 """Agent manager for coordinating multiple AI agents with shared message history."""
 
 import logging
-from collections.abc import AsyncIterable
-from dataclasses import dataclass, field
-from typing import Any, cast
+from collections.abc import AsyncIterable, Sequence
+from dataclasses import dataclass, field, is_dataclass, replace
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from shotgun.agents.conversation_history import ConversationState
 
 from pydantic_ai import (
     Agent,
@@ -20,6 +23,7 @@ from pydantic_ai.messages import (
     FunctionToolResultEvent,
     ModelMessage,
     ModelRequest,
+    ModelRequestPart,
     ModelResponse,
     ModelResponsePart,
     PartDeltaEvent,
@@ -453,6 +457,81 @@ class AgentManager(Widget):
                 file_operations=file_operations,
             )
         )
+
+    def _filter_system_prompts(
+        self, messages: list[ModelMessage]
+    ) -> list[ModelMessage]:
+        """Filter out system prompts from messages for UI display.
+
+        Args:
+            messages: List of messages that may contain system prompts
+
+        Returns:
+            List of messages without system prompt parts
+        """
+        from pydantic_ai.messages import SystemPromptPart
+
+        filtered_messages: list[ModelMessage] = []
+        for msg in messages:
+            parts: Sequence[ModelRequestPart] | Sequence[ModelResponsePart] | None = (
+                msg.parts if hasattr(msg, "parts") else None
+            )
+            if not parts:
+                filtered_messages.append(msg)
+                continue
+
+            non_system_parts = [
+                part for part in parts if not isinstance(part, SystemPromptPart)
+            ]
+
+            if not non_system_parts:
+                # Skip messages made up entirely of system prompt parts (e.g. system message)
+                continue
+
+            if len(non_system_parts) == len(parts):
+                # Nothing was filtered – keep original message
+                filtered_messages.append(msg)
+                continue
+
+            if is_dataclass(msg):
+                filtered_messages.append(
+                    # ignore types because of the convoluted Request | Response types
+                    replace(msg, parts=cast(Any, non_system_parts))
+                )
+            else:
+                filtered_messages.append(msg)
+        return filtered_messages
+
+    def get_conversation_state(self) -> "ConversationState":
+        """Get the current conversation state.
+
+        Returns:
+            ConversationState object containing UI and agent messages and current type
+        """
+        from shotgun.agents.conversation_history import ConversationState
+
+        return ConversationState(
+            agent_messages=self.message_history.copy(),
+            agent_type=self._current_agent_type.value,
+        )
+
+    def restore_conversation_state(self, state: "ConversationState") -> None:
+        """Restore conversation state from a saved state.
+
+        Args:
+            state: ConversationState object to restore
+        """
+        # Restore message history for agents (includes system prompts)
+        self.message_history = state.agent_messages.copy()
+
+        # Filter out system prompts for UI display
+        self.ui_message_history = self._filter_system_prompts(state.agent_messages)
+
+        # Restore agent type
+        self._current_agent_type = AgentType(state.agent_type)
+
+        # Notify listeners about the restored messages
+        self._post_messages_updated()
 
 
 # Re-export AgentType for backward compatibility
