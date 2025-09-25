@@ -62,8 +62,10 @@ class CommandHandler:
 
 **Agent Modes:**
 • **Research** - Research topics with web search and synthesize findings
+• **Specify** - Create detailed specifications and requirements documents
 • **Planning** - Create comprehensive, actionable plans with milestones
 • **Tasks** - Generate specific, actionable tasks from research and plans
+• **Export** - Export artifacts and findings to various formats
 
 **Usage:**
 Type your message and press Enter to chat with the AI. The AI will respond based on the current mode."""

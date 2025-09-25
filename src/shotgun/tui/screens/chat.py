@@ -124,12 +124,14 @@ class ModeIndicator(Widget):
             AgentType.PLAN: "Planning",
             AgentType.TASKS: "Tasks",
             AgentType.SPECIFY: "Specify",
+            AgentType.EXPORT: "Export",
         }
         mode_description = {
             AgentType.RESEARCH: "Research topics with web search and synthesize findings",
             AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
             AgentType.TASKS: "Generate specific, actionable tasks from research and plans",
             AgentType.SPECIFY: "Create detailed specifications and requirements documents",
+            AgentType.EXPORT: "Export artifacts and findings to various formats",
         }
 
         mode_title = mode_display.get(self.mode, self.mode.value.title())
@@ -317,6 +319,9 @@ class ChatScreen(Screen[None]):
         AgentType.SPECIFY: (
             "Request detailed specifications, e.g. create a comprehensive spec for user authentication system"
         ),
+        AgentType.EXPORT: (
+            "Request export tasks, e.g. export research findings to Markdown or convert tasks to CSV"
+        ),
     }
 
     value = reactive("")
@@ -430,7 +435,13 @@ class ChatScreen(Screen[None]):
                 question_display.display = False
 
     def action_toggle_mode(self) -> None:
-        modes = [AgentType.RESEARCH, AgentType.SPECIFY, AgentType.PLAN, AgentType.TASKS]
+        modes = [
+            AgentType.RESEARCH,
+            AgentType.SPECIFY,
+            AgentType.PLAN,
+            AgentType.TASKS,
+            AgentType.EXPORT,
+        ]
         self.mode = modes[(modes.index(self.mode) + 1) % len(modes)]
         self.agent_manager.set_agent(self.mode)
         # whoops it actually changes focus. Let's be brutal for now

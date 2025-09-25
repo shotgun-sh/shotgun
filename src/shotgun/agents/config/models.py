@@ -102,7 +102,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         name="claude-3-5-sonnet-latest",
         provider=ProviderType.ANTHROPIC,
         max_input_tokens=200_000,
-        max_output_tokens=20_000,
+        max_output_tokens=8_192,
     ),
     "gemini-2.5-pro": ModelSpec(
         name="gemini-2.5-pro",

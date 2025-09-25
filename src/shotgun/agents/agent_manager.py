@@ -34,6 +34,7 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message
 
+from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
 from .models import AgentDeps, AgentRuntimeOptions, FileOperation
 from .plan import create_plan_agent
@@ -51,6 +52,7 @@ class AgentType(Enum):
     PLAN = "plan"
     TASKS = "tasks"
     SPECIFY = "specify"
+    EXPORT = "export"
 
 
 class MessageHistoryUpdated(Message):
@@ -138,6 +140,9 @@ class AgentManager(Widget):
         self.specify_agent, self.specify_deps = create_specify_agent(
             agent_runtime_options=agent_runtime_options
         )
+        self.export_agent, self.export_deps = create_export_agent(
+            agent_runtime_options=agent_runtime_options
+        )
 
         # Track current active agent
         self._current_agent_type: AgentType = initial_type
@@ -173,6 +178,7 @@ class AgentManager(Widget):
             AgentType.PLAN: self.plan_agent,
             AgentType.TASKS: self.tasks_agent,
             AgentType.SPECIFY: self.specify_agent,
+            AgentType.EXPORT: self.export_agent,
         }
         return agent_map[agent_type]
 
@@ -190,6 +196,7 @@ class AgentManager(Widget):
             AgentType.PLAN: self.plan_deps,
             AgentType.TASKS: self.tasks_deps,
             AgentType.SPECIFY: self.specify_deps,
+            AgentType.EXPORT: self.export_deps,
         }
         return deps_map[agent_type]
 

@@ -31,6 +31,11 @@ class AgentModeProvider(Provider):
             help="🔬 Research topics with web search and synthesize findings",
         )
         yield DiscoveryHit(
+            "Switch to Specify Mode",
+            lambda: self.set_mode(AgentType.SPECIFY),
+            help="📝 Create detailed specifications and requirements documents",
+        )
+        yield DiscoveryHit(
             "Switch to Plan Mode",
             lambda: self.set_mode(AgentType.PLAN),
             help="📋 Create comprehensive, actionable plans with milestones",
@@ -39,6 +44,11 @@ class AgentModeProvider(Provider):
             "Switch to Tasks Mode",
             lambda: self.set_mode(AgentType.TASKS),
             help="✅ Generate specific, actionable tasks from research and plans",
+        )
+        yield DiscoveryHit(
+            "Switch to Export Mode",
+            lambda: self.set_mode(AgentType.EXPORT),
+            help="📤 Export artifacts and findings to various formats",
         )
 
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
@@ -69,6 +79,12 @@ class AgentModeProvider(Provider):
                 "✅ Generate specific, actionable tasks from research and plans",
                 lambda: self.set_mode(AgentType.TASKS),
                 AgentType.TASKS,
+            ),
+            (
+                "Switch to Export Mode",
+                "📤 Export artifacts and findings to various formats",
+                lambda: self.set_mode(AgentType.EXPORT),
+                AgentType.EXPORT,
             ),
         ]
 

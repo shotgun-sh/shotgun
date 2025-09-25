@@ -160,6 +160,7 @@ def create_base_agent(
         deps_type=AgentDeps,
         instrument=True,
         history_processors=[history_processor],
+        retries=3,  # Default retry count for tool calls and output validation
     )
 
     # System prompt function is stored in deps and will be called manually in run_agent
@@ -176,9 +177,9 @@ def create_base_agent(
         logger.debug("📞 Interactive mode enabled - ask_user tool registered")
 
     # Register common file management tools (always available)
-    agent.tool(read_file)
     agent.tool(write_file)
     agent.tool(append_file)
+    agent.tool(read_file)
 
     # Register artifact management tools (always available)
     agent.tool(create_artifact)

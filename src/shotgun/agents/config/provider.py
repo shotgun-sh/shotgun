@@ -4,12 +4,13 @@ import os
 
 from pydantic import SecretStr
 from pydantic_ai.models import Model
-from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.settings import ModelSettings
 
 from shotgun.logging_config import get_logger
 
@@ -47,18 +48,47 @@ def get_or_create_model(provider: ProviderType, model_name: str, api_key: str) -
         logger.debug("Creating new %s model instance: %s", provider.value, model_name)
 
         if provider == ProviderType.OPENAI:
+            # Get max_tokens from MODEL_SPECS to use full capacity
+            if model_name in MODEL_SPECS:
+                max_tokens = MODEL_SPECS[model_name].max_output_tokens
+            else:
+                max_tokens = 16_000  # Default for GPT models
+
             openai_provider = OpenAIProvider(api_key=api_key)
             _model_cache[cache_key] = OpenAIChatModel(
-                model_name, provider=openai_provider
+                model_name,
+                provider=openai_provider,
+                settings=ModelSettings(max_tokens=max_tokens),
             )
         elif provider == ProviderType.ANTHROPIC:
+            # Get max_tokens from MODEL_SPECS to use full capacity
+            if model_name in MODEL_SPECS:
+                max_tokens = MODEL_SPECS[model_name].max_output_tokens
+            else:
+                max_tokens = 32_000  # Default for Claude models
+
             anthropic_provider = AnthropicProvider(api_key=api_key)
             _model_cache[cache_key] = AnthropicModel(
-                model_name, provider=anthropic_provider
+                model_name,
+                provider=anthropic_provider,
+                settings=AnthropicModelSettings(
+                    max_tokens=max_tokens,
+                    timeout=600,  # 10 minutes timeout for large responses
+                ),
             )
         elif provider == ProviderType.GOOGLE:
+            # Get max_tokens from MODEL_SPECS to use full capacity
+            if model_name in MODEL_SPECS:
+                max_tokens = MODEL_SPECS[model_name].max_output_tokens
+            else:
+                max_tokens = 64_000  # Default for Gemini models
+
             google_provider = GoogleProvider(api_key=api_key)
-            _model_cache[cache_key] = GoogleModel(model_name, provider=google_provider)
+            _model_cache[cache_key] = GoogleModel(
+                model_name,
+                provider=google_provider,
+                settings=ModelSettings(max_tokens=max_tokens),
+            )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     else:

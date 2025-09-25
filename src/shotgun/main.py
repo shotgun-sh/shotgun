@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
-from shotgun.cli import codebase, config, plan, research, specify, tasks, update
+from shotgun.cli import codebase, config, export, plan, research, specify, tasks, update
 from shotgun.logging_config import configure_root_logger, get_logger
 from shotgun.posthog_telemetry import setup_posthog_observability
 from shotgun.sentry_telemetry import setup_sentry_observability
@@ -66,6 +66,7 @@ app.add_typer(research.app, name="research", help="Perform research with agentic
 app.add_typer(plan.app, name="plan", help="Generate structured plans")
 app.add_typer(specify.app, name="specify", help="Generate comprehensive specifications")
 app.add_typer(tasks.app, name="tasks", help="Generate task lists with agentic approach")
+app.add_typer(export.app, name="export", help="Export artifacts to various formats")
 app.add_typer(update.app, name="update", help="Check for and install updates")
 
 
