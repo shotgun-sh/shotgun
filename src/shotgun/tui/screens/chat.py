@@ -22,13 +22,13 @@ from textual.widgets import Button, DirectoryTree, Input, Label, Markdown, Stati
 
 from shotgun.agents.agent_manager import (
     AgentManager,
-    AgentType,
     MessageHistoryUpdated,
     PartialResponseMessage,
 )
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.models import (
     AgentDeps,
+    AgentType,
     FileOperationTracker,
     UserAnswer,
     UserQuestion,
@@ -36,7 +36,7 @@ from shotgun.agents.models import (
 from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
-from shotgun.sdk.services import get_artifact_service, get_codebase_service
+from shotgun.sdk.services import get_codebase_service
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 
@@ -328,7 +328,6 @@ class ChatScreen(Screen[None]):
         # Get the model configuration and services
         model_config = get_provider_model()
         codebase_service = get_codebase_service()
-        artifact_service = get_artifact_service()
         self.codebase_sdk = CodebaseSDK()
 
         # Create shared deps without system_prompt_fn (agents provide their own)
@@ -343,7 +342,6 @@ class ChatScreen(Screen[None]):
             is_tui_context=True,
             llm_model=model_config,
             codebase_service=codebase_service,
-            artifact_service=artifact_service,
             system_prompt_fn=_placeholder_system_prompt_fn,
         )
         self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
@@ -590,9 +588,7 @@ class ChatScreen(Screen[None]):
         Returns:
             Dynamic placeholder hint based on mode and progress.
         """
-        return self.placeholder_hints.get_placeholder_for_mode(
-            mode, force_new=force_new
-        )
+        return self.placeholder_hints.get_placeholder_for_mode(mode)
 
     def index_codebase_command(self) -> None:
         start_path = Path.cwd()

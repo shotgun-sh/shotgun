@@ -4,7 +4,7 @@ import os
 from asyncio import Future, Queue
 from collections.abc import Callable
 from datetime import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,8 +14,17 @@ from pydantic_ai import RunContext
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
-    from shotgun.artifacts.service import ArtifactService
     from shotgun.codebase.service import CodebaseService
+
+
+class AgentType(StrEnum):
+    """Enumeration for available agent types."""
+
+    RESEARCH = "research"
+    PLAN = "plan"
+    TASKS = "tasks"
+    SPECIFY = "specify"
+    EXPORT = "export"
 
 
 class UserAnswer(BaseModel):
@@ -224,10 +233,6 @@ class AgentDeps(AgentRuntimeOptions):
         description="Codebase service for code analysis tools",
     )
 
-    artifact_service: "ArtifactService" = Field(
-        description="Artifact service for managing structured artifacts",
-    )
-
     system_prompt_fn: Callable[[RunContext["AgentDeps"]], str] = Field(
         description="Function that generates the system prompt for this agent",
     )
@@ -237,10 +242,14 @@ class AgentDeps(AgentRuntimeOptions):
         description="Tracker for file operations during agent run",
     )
 
+    agent_mode: AgentType | None = Field(
+        default=None,
+        description="Current agent mode for file scoping",
+    )
+
 
 # Rebuild model to resolve forward references after imports are available
 try:
-    from shotgun.artifacts.service import ArtifactService
     from shotgun.codebase.service import CodebaseService
 
     AgentDeps.model_rebuild()

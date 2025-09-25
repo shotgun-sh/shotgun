@@ -101,23 +101,21 @@ class TestPromptTemplateIntegration:
             assert "USER INTERACTION IS DISABLED" in result
 
 
-class TestArtifactSystemIntegration:
-    """Test suite for artifact system integration with agents."""
+class TestFileManagementTools:
+    """Test suite for file management tools integration with agents."""
 
-    def test_artifact_tools_importable(self):
-        """Test that artifact tools are importable from common module."""
-        from shotgun.agents.common import (
-            create_artifact,
-            list_artifacts,
-            read_artifact,
-            write_artifact_section,
+    def test_file_tools_importable(self):
+        """Test that file management tools are importable."""
+        from shotgun.agents.tools.file_management import (
+            append_file,
+            read_file,
+            write_file,
         )
 
         # These functions should be importable and callable
-        assert callable(create_artifact)
-        assert callable(list_artifacts)
-        assert callable(read_artifact)
-        assert callable(write_artifact_section)
+        assert callable(read_file)
+        assert callable(write_file)
+        assert callable(append_file)
 
     def test_system_status_message_callable(self):
         """Test that system status message function is callable."""

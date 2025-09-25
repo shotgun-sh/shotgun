@@ -3,7 +3,6 @@
 import logging
 from collections.abc import AsyncIterable
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, cast
 
 from pydantic_ai import (
@@ -33,26 +32,17 @@ from textual.message import Message
 from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
+from shotgun.agents.models import AgentType, FileOperation
 
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
-from .models import AgentDeps, AgentRuntimeOptions, FileOperation
+from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .specify import create_specify_agent
 from .tasks import create_tasks_agent
 
 logger = logging.getLogger(__name__)
-
-
-class AgentType(Enum):
-    """Enumeration for available agent types (for Python < 3.11)."""
-
-    RESEARCH = "research"
-    PLAN = "plan"
-    TASKS = "tasks"
-    SPECIFY = "specify"
-    EXPORT = "export"
 
 
 class MessageHistoryUpdated(Message):
@@ -463,3 +453,12 @@ class AgentManager(Widget):
                 file_operations=file_operations,
             )
         )
+
+
+# Re-export AgentType for backward compatibility
+__all__ = [
+    "AgentManager",
+    "AgentType",
+    "MessageHistoryUpdated",
+    "PartialResponseMessage",
+]

@@ -3,16 +3,24 @@
 import random
 from pathlib import Path
 
-from shotgun.agents.agent_manager import AgentType
-from shotgun.artifacts.models import AgentMode
+from shotgun.agents.models import AgentType
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 
 class ModeProgressChecker:
-    """Checks progress across different agent modes based on .shotgun directory contents."""
+    """Checks progress across different agent modes based on file contents."""
 
     # Minimum file size in characters to consider a mode as "started"
     MIN_CONTENT_SIZE = 20
+
+    # Map agent types to their corresponding files
+    MODE_FILES = {
+        AgentType.RESEARCH: "research.md",
+        AgentType.SPECIFY: "specification.md",
+        AgentType.PLAN: "plan.md",
+        AgentType.TASKS: "tasks.md",
+        AgentType.EXPORT: "exports/",  # Export mode creates files in exports folder
+    }
 
     def __init__(self, base_path: Path | None = None):
         """Initialize the progress checker.
@@ -22,34 +30,46 @@ class ModeProgressChecker:
         """
         self.base_path = base_path or get_shotgun_base_path()
 
-    def has_mode_content(self, mode: AgentType | AgentMode) -> bool:
-        """Check if a mode directory has meaningful content.
+    def has_mode_content(self, mode: AgentType) -> bool:
+        """Check if a mode has meaningful content.
 
         Args:
             mode: The agent mode to check.
 
         Returns:
-            True if the mode has at least one file with >20 characters.
+            True if the mode has a file with >20 characters.
         """
-        mode_value = mode.value if hasattr(mode, "value") else str(mode)
-        mode_path = self.base_path / mode_value
-
-        if not mode_path.exists() or not mode_path.is_dir():
+        if mode not in self.MODE_FILES:
             return False
 
-        # Check all subdirectories and files
-        for item in mode_path.rglob("*"):
-            if item.is_file() and not item.name.startswith("."):
-                try:
-                    content = item.read_text(encoding="utf-8")
-                    # Check if file has meaningful content
-                    if len(content.strip()) > self.MIN_CONTENT_SIZE:
-                        return True
-                except (OSError, UnicodeDecodeError):
-                    # Skip files that can't be read
-                    continue
+        file_or_dir = self.MODE_FILES[mode]
 
-        return False
+        # Special handling for export mode (checks directory)
+        if mode == AgentType.EXPORT:
+            export_path = self.base_path / file_or_dir
+            if export_path.exists() and export_path.is_dir():
+                # Check if any files exist in exports directory
+                for item in export_path.glob("*"):
+                    if item.is_file() and not item.name.startswith("."):
+                        try:
+                            content = item.read_text(encoding="utf-8")
+                            if len(content.strip()) > self.MIN_CONTENT_SIZE:
+                                return True
+                        except (OSError, UnicodeDecodeError):
+                            continue
+            return False
+
+        # Check single file for other modes
+        file_path = self.base_path / file_or_dir
+        if not file_path.exists() or not file_path.is_file():
+            return False
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            # Check if file has meaningful content
+            return len(content.strip()) > self.MIN_CONTENT_SIZE
+        except (OSError, UnicodeDecodeError):
+            return False
 
     def get_next_suggested_mode(self, current_mode: AgentType) -> AgentType | None:
         """Get the next suggested mode based on current progress.
@@ -128,97 +148,110 @@ class PlaceholderHints:
         # Tasks mode
         AgentType.TASKS: {
             False: [
-                "Create actionable tasks and work items (SHIFT+TAB to switch modes)",
-                "Define your task list and action items (SHIFT+TAB to explore modes)",
-                "Task creation time - build your work breakdown (SHIFT+TAB for mode selection)",
-                "The task forge awaits - create doable chunks of work (SHIFT+TAB to change modes)",
-                " ⚡ Task mode activated! Let's define what needs doing (SHIFT+TAB for mode journey)",
+                "Break down your project into actionable tasks (SHIFT+TAB for modes)",
+                "Task creation time! Define your implementation steps (SHIFT+TAB to switch)",
+                "Ready to get tactical? Create your task list (SHIFT+TAB for mode options)",
+                "Task command center: Organize your work items (SHIFT+TAB to navigate)",
+                " ✅ Task mode activated! Break it down into bite-sized pieces (SHIFT+TAB)",
             ],
             True: [
-                "Tasks complete! SHIFT+TAB to Export mode",
-                "Task list ready! Time to export (SHIFT+TAB to Export)",
-                "Work items defined! Export your artifacts (SHIFT+TAB to Export mode)",
-                "Tasks done! Ship them out (SHIFT+TAB for Export mode)",
-                " 🎉 Tasks complete! Advance to Export mode (SHIFT+TAB)",
+                "Tasks defined! Ready to export or cycle back (SHIFT+TAB)",
+                "Task list complete! Export your work (SHIFT+TAB to Export)",
+                "All tasks created! Time to export (SHIFT+TAB for Export mode)",
+                "Implementation plan ready! Export everything (SHIFT+TAB to Export)",
+                " 🎊 Tasks complete! Export your masterpiece (SHIFT+TAB)",
             ],
         },
         # Export mode
         AgentType.EXPORT: {
             False: [
-                "Export artifacts to Claude Code, Cursor, or other tools (SHIFT+TAB to switch modes)",
-                "Ready to export! Send work to your favorite IDE (SHIFT+TAB to navigate modes)",
-                "Export central - Ship artifacts to dev tools (SHIFT+TAB for mode options)",
-                "Time to set your work free! Export anywhere (SHIFT+TAB to change modes)",
-                " 🚢 Launch pad ready! Blast artifacts to Claude Code & beyond (SHIFT+TAB for mode menu)",
+                "Export your complete project documentation (SHIFT+TAB for modes)",
+                "Ready to package everything? Export time! (SHIFT+TAB to switch)",
+                "Export station: Generate deliverables (SHIFT+TAB for mode menu)",
+                "Time to share your work! Export documents (SHIFT+TAB to navigate)",
+                " 📦 Export mode! Package and share your creation (SHIFT+TAB)",
             ],
             True: [
-                "Exports complete! SHIFT+TAB to start new Research cycle",
-                "Artifacts exported! Begin fresh research (SHIFT+TAB to Research mode)",
-                "Export done! Start a new journey (SHIFT+TAB for Research)",
-                "Work shipped! New research awaits (SHIFT+TAB to Research mode)",
-                " 🎊 Export complete! Loop back to Research (SHIFT+TAB)",
+                "Exported! Start new research or continue refining (SHIFT+TAB)",
+                "Export complete! New cycle begins (SHIFT+TAB to Research)",
+                "All exported! Ready for another round (SHIFT+TAB for Research)",
+                "Documents exported! Start fresh (SHIFT+TAB to Research mode)",
+                " 🎉 Export complete! Begin a new adventure (SHIFT+TAB)",
             ],
         },
-        # Plan mode (special case - not in main flow)
+        # Plan mode
         AgentType.PLAN: {
             False: [
-                "Create comprehensive plans with milestones (SHIFT+TAB to switch modes)",
-                "Plan your project roadmap and milestones (SHIFT+TAB to explore modes)",
-                "Strategic planning mode - design your journey (SHIFT+TAB for mode options)",
-                "The planning parlor - where ideas become roadmaps (SHIFT+TAB to navigate)",
-                " 📅 Planning paradise! Chart your course to success (SHIFT+TAB for modes)",
+                "Create a strategic plan for your project (SHIFT+TAB for modes)",
+                "Planning phase: Map out your roadmap (SHIFT+TAB to switch)",
+                "Time to strategize! Create your project plan (SHIFT+TAB for options)",
+                "Plan your approach and milestones (SHIFT+TAB to navigate)",
+                " 🗺️ Plan mode! Chart your course to success (SHIFT+TAB)",
             ],
             True: [
-                "Plan complete! SHIFT+TAB to create Tasks",
-                "Roadmap ready! Time for tasks (SHIFT+TAB to Tasks mode)",
-                "Planning done! Break it down to tasks (SHIFT+TAB to Tasks)",
-                "Strategy set! Move to task creation (SHIFT+TAB for Tasks mode)",
-                " 🗺️ Plan complete! Advance to Tasks mode (SHIFT+TAB)",
+                "Plan complete! Move to Tasks mode (SHIFT+TAB)",
+                "Strategy ready! Time for tasks (SHIFT+TAB to Tasks mode)",
+                "Roadmap done! Create task list (SHIFT+TAB for Tasks)",
+                "Planning complete! Break into tasks (SHIFT+TAB to Tasks)",
+                " ⚡ Plan ready! Advance to Tasks mode (SHIFT+TAB)",
             ],
         },
     }
 
     def __init__(self, base_path: Path | None = None):
-        """Initialize the placeholder hints manager.
+        """Initialize placeholder hints with progress checker.
 
         Args:
-            base_path: Base path for .shotgun directory.
+            base_path: Base path for checking progress. Defaults to current directory.
         """
         self.progress_checker = ModeProgressChecker(base_path)
-        self._last_hints: dict[str, str] = {}  # Cache last selected hint per mode
+        self._cached_hints: dict[tuple[AgentType, bool], str] = {}
+        self._hint_indices: dict[tuple[AgentType, bool], int] = {}
 
-    def get_placeholder_for_mode(self, mode: AgentType, force_new: bool = False) -> str:
-        """Get a random placeholder hint for the given mode based on progress.
+    def get_hint(self, current_mode: AgentType, force_refresh: bool = False) -> str:
+        """Get a dynamic hint based on current mode and progress.
 
         Args:
-            mode: The current agent mode.
-            force_new: If True, always select a new random hint.
+            current_mode: The current agent mode.
+            force_refresh: Force recalculation of progress state.
 
         Returns:
-            A randomly selected placeholder hint appropriate for the mode and progress.
+            A contextual hint string for the placeholder.
         """
+        # Default hint if mode not configured
+        if current_mode not in self.HINTS:
+            return f"Enter your {current_mode.value} mode prompt (SHIFT+TAB to switch modes)"
+
         # Determine if mode has content
-        has_content = self.progress_checker.has_mode_content(mode)
+        has_content = self.progress_checker.has_mode_content(current_mode)
 
-        # Get hints for this mode and state
-        mode_hints = self.HINTS.get(mode, {})
-        state_hints = mode_hints.get(has_content, [])
+        # Get hint variations for this mode and state
+        hints_list = self.HINTS[current_mode][has_content]
 
-        if not state_hints:
-            # Fallback if mode not configured
-            return (
-                f"Type your message for {mode.value} mode (SHIFT+TAB to switch modes)"
-            )
+        # Cache key for this mode and state
+        cache_key = (current_mode, has_content)
 
-        # Cache key for this mode/state combination
-        cache_key = f"{mode.value}_{has_content}"
+        # Force refresh or first time
+        if force_refresh or cache_key not in self._cached_hints:
+            # Initialize index for this cache key if not exists
+            if cache_key not in self._hint_indices:
+                self._hint_indices[cache_key] = random.randint(0, len(hints_list) - 1)  # noqa: S311
 
-        # If not forcing new and we have a cached hint, return it
-        if not force_new and cache_key in self._last_hints:
-            return self._last_hints[cache_key]
+            # Get hint at current index
+            hint_index = self._hint_indices[cache_key]
+            self._cached_hints[cache_key] = hints_list[hint_index]
 
-        # Select a random hint
-        hint = random.choice(state_hints)  # noqa: S311 - random is fine for UI hints
-        self._last_hints[cache_key] = hint
+        return self._cached_hints[cache_key]
 
-        return hint
+    def get_placeholder_for_mode(self, current_mode: AgentType) -> str:
+        """Get placeholder text for a given mode.
+
+        This is an alias for get_hint() to maintain compatibility.
+
+        Args:
+            current_mode: The current agent mode.
+
+        Returns:
+            A contextual hint string for the placeholder.
+        """
+        return self.get_hint(current_mode)

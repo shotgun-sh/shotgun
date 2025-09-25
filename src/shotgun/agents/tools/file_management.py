@@ -8,11 +8,75 @@ from typing import Literal
 
 from pydantic_ai import RunContext
 
-from shotgun.agents.models import AgentDeps, FileOperationType
+from shotgun.agents.models import AgentDeps, AgentType, FileOperationType
 from shotgun.logging_config import get_logger
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 logger = get_logger(__name__)
+
+
+def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> Path:
+    """Validate and resolve a file path within the agent's scoped directory.
+
+    Args:
+        filename: Relative filename
+        agent_mode: The current agent mode
+
+    Returns:
+        Absolute path to the file within the agent's scoped directory
+
+    Raises:
+        ValueError: If the path attempts to access files outside the agent's scope
+    """
+    base_path = get_shotgun_base_path()
+
+    # Map agent modes to their allowed directories
+    agent_directories = {
+        AgentType.RESEARCH: "research.md",
+        AgentType.PLAN: "plan.md",
+        AgentType.TASKS: "tasks.md",
+        AgentType.SPECIFY: "specification.md",
+        AgentType.EXPORT: "exports/",
+    }
+
+    if agent_mode and agent_mode in agent_directories:
+        # For export mode, allow writing to any file in exports/ directory
+        if agent_mode == AgentType.EXPORT:
+            # Ensure the filename starts with exports/ or is being written to exports/
+            if not filename.startswith("exports/"):
+                filename = f"exports/{filename}"
+            full_path = (base_path / filename).resolve()
+
+            # Ensure it's within .shotgun/exports/
+            exports_dir = base_path / "exports"
+            try:
+                full_path.relative_to(exports_dir.resolve())
+            except ValueError as e:
+                raise ValueError(
+                    f"Export agent can only write to exports/ directory. Path '{filename}' is not allowed"
+                ) from e
+        else:
+            # For other agents, only allow writing to their specific file
+            allowed_file = agent_directories[agent_mode]
+            if filename != allowed_file:
+                raise ValueError(
+                    f"{agent_mode.value.capitalize()} agent can only write to '{allowed_file}'. "
+                    f"Attempted to write to '{filename}'"
+                )
+            full_path = (base_path / filename).resolve()
+    else:
+        # No agent mode specified, fall back to old validation
+        full_path = (base_path / filename).resolve()
+
+    # Ensure the resolved path is within the .shotgun directory
+    try:
+        full_path.relative_to(base_path.resolve())
+    except ValueError as e:
+        raise ValueError(
+            f"Access denied: Path '{filename}' is outside .shotgun directory"
+        ) from e
+
+    return full_path
 
 
 def _validate_shotgun_path(filename: str) -> Path:
@@ -99,7 +163,8 @@ async def write_file(
         raise ValueError(f"Invalid mode '{mode}'. Use 'w' for write or 'a' for append")
 
     try:
-        file_path = _validate_shotgun_path(filename)
+        # Use agent-scoped validation for write operations
+        file_path = _validate_agent_scoped_path(filename, ctx.deps.agent_mode)
 
         # Determine operation type
         if mode == "a":

@@ -19,7 +19,7 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentRuntimeOptions
+from .models import AgentDeps, AgentRuntimeOptions, AgentType
 
 logger = get_logger(__name__)
 
@@ -46,6 +46,7 @@ def create_plan_agent(
         load_codebase_understanding_tools=True,
         additional_tools=None,
         provider=provider,
+        agent_mode=AgentType.PLAN,
     )
     return agent, deps
 

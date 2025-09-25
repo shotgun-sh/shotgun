@@ -19,7 +19,7 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentRuntimeOptions
+from .models import AgentDeps, AgentRuntimeOptions, AgentType
 
 logger = get_logger(__name__)
 
@@ -41,7 +41,10 @@ def create_tasks_agent(
     system_prompt_fn = partial(build_agent_system_prompt, "tasks")
 
     agent, deps = create_base_agent(
-        system_prompt_fn, agent_runtime_options, provider=provider
+        system_prompt_fn,
+        agent_runtime_options,
+        provider=provider,
+        agent_mode=AgentType.TASKS,
     )
     return agent, deps
 

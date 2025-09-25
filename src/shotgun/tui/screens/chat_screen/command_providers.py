@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 from textual.command import DiscoveryHit, Hit, Provider
 
-from shotgun.agents.agent_manager import AgentType
+from shotgun.agents.models import AgentType
 from shotgun.codebase.models import CodebaseGraph
 
 if TYPE_CHECKING:

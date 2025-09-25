@@ -21,7 +21,7 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentRuntimeOptions
+from .models import AgentDeps, AgentRuntimeOptions, AgentType
 from .tools import get_available_web_search_tools
 
 logger = get_logger(__name__)
@@ -60,6 +60,7 @@ def create_research_agent(
         load_codebase_understanding_tools=True,
         additional_tools=web_search_tools,
         provider=provider,
+        agent_mode=AgentType.RESEARCH,
     )
     return agent, deps
 

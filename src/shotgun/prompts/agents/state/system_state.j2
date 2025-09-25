@@ -1,9 +1,12 @@
-{% if current_date %}
 ## System Status
 
-Today's date: {{ current_date }}
-
-{% endif %}
 {% include 'agents/state/codebase/codebase_graphs_available.j2' %}
-{% include 'agents/state/existing_artifacts_available.j2' %}
-{% include 'agents/state/artifact_templates_available.j2' %}
+
+## Available Files
+
+The following files can be read or written:
+- `research.md` - Research findings and analysis
+- `plan.md` - Project plans and roadmaps
+- `tasks.md` - Task lists and management
+- `specification.md` - Technical specifications
+- `exports/` folder - For exported documents

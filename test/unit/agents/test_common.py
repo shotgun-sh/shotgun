@@ -64,15 +64,10 @@ async def test_add_system_status_message_empty_history(mock_deps):
         assert isinstance(result[0].parts[0], SystemPromptPart)
         assert result[0].parts[0].content == "System state content"
 
-        from unittest.mock import ANY
-
         mock_loader.render.assert_called_once_with(
             "agents/state/system_state.j2",
             codebase_understanding_graphs=["graph1", "graph2"],
             is_tui_context=False,
-            available_templates=ANY,  # Template data structure can vary
-            existing_artifacts=ANY,  # Artifact data structure can vary
-            current_date=ANY,  # Current date string
         )
 
 

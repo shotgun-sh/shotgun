@@ -123,7 +123,7 @@ The update command automatically detects and uses the appropriate method:
 
 ### Requirements
 
-- **Python 3.10+** (3.13 recommended)
+- **Python 3.11+** (3.13 recommended)
 - **uv** - Fast Python package installer and resolver
 - **actionlint** (optional) - For GitHub Actions workflow validation
 
@@ -235,17 +235,17 @@ go install github.com/rhysd/actionlint/cmd/actionlint@latest
 
 ### Python Version Management
 
-The project supports **Python 3.10+**. The `.python-version` file specifies Python 3.10 to ensure development against the minimum supported version.
+The project supports **Python 3.11+**. The `.python-version` file specifies Python 3.11 to ensure development against the minimum supported version.
 
 If using **pyenv**:
 ```bash
-pyenv install 3.10.16  # or latest 3.10.x
+pyenv install 3.11
 ```
 
 If using **uv** (recommended):
 ```bash
-uv python install 3.10
-uv sync --python 3.10
+uv python install 3.11
+uv sync --python 3.11
 ```
 
 ### Commit Message Convention
@@ -296,7 +296,7 @@ uv run cz commit
 
 GitHub Actions automatically:
 - Runs on pull requests and pushes to main
-- Tests with Python 3.10
+- Tests with Python 3.11
 - Validates code with ruff, ruff-format, and mypy
 - Ensures all checks pass before merge
 

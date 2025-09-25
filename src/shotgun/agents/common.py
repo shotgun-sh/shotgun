@@ -19,9 +19,10 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
+from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
-from shotgun.sdk.services import get_artifact_service, get_codebase_service
+from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
 
 from .history import token_limit_compactor
@@ -37,14 +38,6 @@ from .tools import (
     read_file,
     retrieve_code,
     write_file,
-)
-from .tools.artifact_management import (
-    create_artifact,
-    list_artifact_templates,
-    list_artifacts,
-    read_artifact,
-    read_artifact_section,
-    write_artifact_section,
 )
 
 logger = get_logger(__name__)
@@ -69,16 +62,10 @@ async def add_system_status_message(
     message_history = message_history or []
     codebase_understanding_graphs = await deps.codebase_service.list_graphs()
 
-    # Collect artifact state information
-    from .artifact_state import collect_artifact_state
-
-    artifact_state = collect_artifact_state()
-
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
         is_tui_context=deps.is_tui_context,
-        **artifact_state,
     )
 
     message_history.append(
@@ -97,14 +84,17 @@ def create_base_agent(
     load_codebase_understanding_tools: bool = True,
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
+    agent_mode: AgentType | None = None,
 ) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
     """Create a base agent with common configuration.
 
     Args:
         system_prompt_fn: Function that will be decorated as system_prompt
         agent_runtime_options: Agent runtime options for the agent
+        load_codebase_understanding_tools: Whether to load codebase understanding tools
         additional_tools: Optional list of additional tools
         provider: Optional provider override. If None, uses configured default
+        agent_mode: The mode of the agent (research, plan, tasks, specify, export)
 
     Returns:
         Tuple of (Configured Pydantic AI agent, Agent dependencies)
@@ -126,13 +116,12 @@ def create_base_agent(
 
         # Create deps with model config and services
         codebase_service = get_codebase_service()
-        artifact_service = get_artifact_service()
         deps = AgentDeps(
             **agent_runtime_options.model_dump(),
             llm_model=model_config,
             codebase_service=codebase_service,
-            artifact_service=artifact_service,
             system_prompt_fn=system_prompt_fn,
+            agent_mode=agent_mode,
         )
 
     except Exception as e:
@@ -180,14 +169,6 @@ def create_base_agent(
     agent.tool(append_file)
     agent.tool(read_file)
 
-    # Register artifact management tools (always available)
-    agent.tool(create_artifact)
-    agent.tool(list_artifacts)
-    agent.tool(list_artifact_templates)
-    agent.tool(read_artifact)
-    agent.tool(read_artifact_section)
-    agent.tool(write_artifact_section)
-
     # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:
         agent.tool(query_graph)
@@ -199,7 +180,7 @@ def create_base_agent(
     else:
         logger.debug("🚫🧠 Codebase understanding tools not registered")
 
-    logger.debug("✅ Agent creation complete with artifact and codebase tools")
+    logger.debug("✅ Agent creation complete with codebase tools")
     return agent, deps
 
 
