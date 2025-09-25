@@ -37,6 +37,7 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.models import AgentType, FileOperation
+from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
@@ -54,7 +55,7 @@ class MessageHistoryUpdated(Message):
 
     def __init__(
         self,
-        messages: list[ModelMessage],
+        messages: list[ModelMessage | HintMessage],
         agent_type: AgentType,
         file_operations: list[FileOperation] | None = None,
     ) -> None:
@@ -143,7 +144,7 @@ class AgentManager(Widget):
         self._current_agent_type: AgentType = initial_type
 
         # Maintain shared message history
-        self.ui_message_history: list[ModelMessage] = []
+        self.ui_message_history: list[ModelMessage | HintMessage] = []
         self.message_history: list[ModelMessage] = []
         self.recently_change_files: list[FileOperation] = []
         self._stream_state: _PartialStreamState | None = None
@@ -461,8 +462,8 @@ class AgentManager(Widget):
         )
 
     def _filter_system_prompts(
-        self, messages: list[ModelMessage]
-    ) -> list[ModelMessage]:
+        self, messages: list[ModelMessage | HintMessage]
+    ) -> list[ModelMessage | HintMessage]:
         """Filter out system prompts from messages for UI display.
 
         Args:
@@ -473,8 +474,12 @@ class AgentManager(Widget):
         """
         from pydantic_ai.messages import SystemPromptPart
 
-        filtered_messages: list[ModelMessage] = []
+        filtered_messages: list[ModelMessage | HintMessage] = []
         for msg in messages:
+            if isinstance(msg, HintMessage):
+                filtered_messages.append(msg)
+                continue
+
             parts: Sequence[ModelRequestPart] | Sequence[ModelResponsePart] | None = (
                 msg.parts if hasattr(msg, "parts") else None
             )
@@ -514,6 +519,7 @@ class AgentManager(Widget):
 
         return ConversationState(
             agent_messages=self.message_history.copy(),
+            ui_messages=self.ui_message_history.copy(),
             agent_type=self._current_agent_type.value,
         )
 
@@ -524,15 +530,25 @@ class AgentManager(Widget):
             state: ConversationState object to restore
         """
         # Restore message history for agents (includes system prompts)
-        self.message_history = state.agent_messages.copy()
+        non_hint_messages = [
+            msg for msg in state.agent_messages if not isinstance(msg, HintMessage)
+        ]
+        self.message_history = non_hint_messages
 
-        # Filter out system prompts for UI display
-        self.ui_message_history = self._filter_system_prompts(state.agent_messages)
+        # Filter out system prompts for UI display while keeping hints
+        ui_source = state.ui_messages or cast(
+            list[ModelMessage | HintMessage], state.agent_messages
+        )
+        self.ui_message_history = self._filter_system_prompts(ui_source)
 
         # Restore agent type
         self._current_agent_type = AgentType(state.agent_type)
 
         # Notify listeners about the restored messages
+        self._post_messages_updated()
+
+    def add_hint_message(self, message: HintMessage) -> None:
+        self.ui_message_history.append(message)
         self._post_messages_updated()
 
 

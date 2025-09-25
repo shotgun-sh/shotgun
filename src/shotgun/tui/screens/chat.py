@@ -43,6 +43,7 @@ from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.sdk.services import get_codebase_service
 from shotgun.tui.commands import CommandHandler
+from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 
 from ..components.prompt_input import PromptInput
@@ -322,7 +323,7 @@ class ChatScreen(Screen[None]):
     value = reactive("")
     mode = reactive(AgentType.RESEARCH)
     history: PromptHistory = PromptHistory()
-    messages = reactive(list[ModelMessage]())
+    messages = reactive(list[ModelMessage | HintMessage]())
     working = reactive(False)
     question: reactive[UserQuestion | None] = reactive(None)
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
@@ -375,7 +376,7 @@ class ChatScreen(Screen[None]):
             dir.is_dir() and dir.name in ["__pycache__", ".git", ".shotgun"]
             for dir in cur_dir.iterdir()
         )
-        if is_empty:
+        if is_empty or self.continue_session:
             return
 
         # Check if the current directory has any accessible codebases
@@ -417,7 +418,7 @@ class ChatScreen(Screen[None]):
             spinner.set_classes("" if is_working else "hidden")
             spinner.display = is_working
 
-    def watch_messages(self, messages: list[ModelMessage]) -> None:
+    def watch_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the chat history when messages change."""
         if self.is_mounted:
             chat_history = self.query_one(ChatHistory)
@@ -479,14 +480,8 @@ class ChatScreen(Screen[None]):
                     yield Static("", id="indexing-job-display")
 
     def mount_hint(self, markdown: str) -> None:
-        chat_history = self.query_one(ChatHistory)
-        if not chat_history.vertical_tail:
-            return
-        chat_history.vertical_tail.mount(Markdown(markdown))
-        # Scroll to bottom after mounting hint
-        chat_history.vertical_tail.call_after_refresh(
-            chat_history.vertical_tail.scroll_end, animate=False
-        )
+        hint = HintMessage(message=markdown)
+        self.agent_manager.add_hint_message(hint)
 
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
@@ -543,9 +538,7 @@ class ChatScreen(Screen[None]):
                                 f"📁 Modified {num_files} files in: `{path_obj.parent}`"
                             )
 
-                    # Add this as a simple markdown widget
-                    file_info_widget = Markdown(message)
-                    chat_history.vertical_tail.mount(file_info_widget)
+                    self.mount_hint(message)
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:
@@ -730,6 +723,7 @@ class ChatScreen(Screen[None]):
             last_agent_model=state.agent_type,
         )
         conversation.set_agent_messages(state.agent_messages)
+        conversation.set_ui_messages(state.ui_messages)
 
         # Save to file
         self.conversation_manager.save(conversation)
@@ -742,10 +736,12 @@ class ChatScreen(Screen[None]):
 
         # Restore agent state
         agent_messages = conversation.get_agent_messages()
+        ui_messages = conversation.get_ui_messages()
 
         # Create ConversationState for restoration
         state = ConversationState(
             agent_messages=agent_messages,
+            ui_messages=ui_messages,
             agent_type=conversation.last_agent_model,
         )
 

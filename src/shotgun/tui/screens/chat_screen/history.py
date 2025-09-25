@@ -19,6 +19,7 @@ from textual.widget import Widget
 from textual.widgets import Markdown
 
 from shotgun.tui.components.vertical_tail import VerticalTail
+from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessageWidget
 
 
 class PartialResponseWidget(Widget):  # TODO: doesn't work lol
@@ -75,16 +76,19 @@ class ChatHistory(Widget):
 
     def __init__(self) -> None:
         super().__init__()
-        self.items: list[ModelMessage] = []
+        self.items: list[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
         self.partial_response = None
 
     def compose(self) -> ComposeResult:
         self.vertical_tail = VerticalTail()
+
         with self.vertical_tail:
             for item in self.items:
                 if isinstance(item, ModelRequest):
                     yield UserQuestionWidget(item)
+                elif isinstance(item, HintMessage):
+                    yield HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
                     yield AgentResponseWidget(item)
             yield PartialResponseWidget(self.partial_response).data_bind(
@@ -94,7 +98,7 @@ class ChatHistory(Widget):
     def watch_partial_response(self, _partial_response: ModelMessage | None) -> None:
         self.call_after_refresh(self.autoscroll)
 
-    def update_messages(self, messages: list[ModelMessage]) -> None:
+    def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the displayed messages without recomposing."""
         if not self.vertical_tail:
             return

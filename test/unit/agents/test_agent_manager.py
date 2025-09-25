@@ -18,6 +18,7 @@ from pydantic_ai.messages import (
 from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
 from shotgun.agents.conversation_history import ConversationState
 from shotgun.agents.models import AgentDeps
+from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 
 @pytest.fixture
@@ -562,9 +563,11 @@ def test_restore_conversation_state_filters_system_prompt(
     system_message = ModelRequest(parts=[SystemPromptPart(content="sys")])
     user_message = ModelRequest.user_text_prompt("Hi")
     response_message = ModelResponse(parts=[TextPart(content="Hello")])
+    hint_message = HintMessage(message="Remember to sync docs")
 
     state = ConversationState(
         agent_messages=[system_message, user_message, response_message],
+        ui_messages=[system_message, user_message, response_message, hint_message],
         agent_type="research",
     )
 
@@ -578,10 +581,15 @@ def test_restore_conversation_state_filters_system_prompt(
     )
 
     # UI history should exclude the system prompt entirely
-    assert len(manager.ui_message_history) == 2
+    assert len(manager.ui_message_history) == 3
+    assert any(isinstance(msg, HintMessage) for msg in manager.ui_message_history)
     assert all(
         not any(
             isinstance(part, SystemPromptPart) for part in getattr(msg, "parts", [])
         )
         for msg in manager.ui_message_history
+        if not isinstance(msg, HintMessage)
     )
+
+    # Hint messages should not appear in the agent message history
+    assert all(not isinstance(msg, HintMessage) for msg in manager.message_history)

@@ -15,6 +15,7 @@ from shotgun.agents.conversation_history import (
     ConversationState,
 )
 from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 
 def test_conversation_history_creation():
@@ -22,6 +23,7 @@ def test_conversation_history_creation():
     history = ConversationHistory()
     assert history.version == 1
     assert history.agent_history == []
+    assert history.ui_history == []
     assert history.last_agent_model == "research"
     assert isinstance(history.updated_at, datetime)
 
@@ -84,6 +86,7 @@ def test_conversation_history_json_serialization():
     assert json_data["version"] == 1
     assert json_data["last_agent_model"] == "tasks"
     assert len(json_data["agent_history"]) == 1
+    assert "ui_history" in json_data
 
     # Verify it can be serialized to JSON string
     json_str = json.dumps(json_data)
@@ -106,6 +109,8 @@ def test_conversation_manager_save_load(tmp_path):
         ModelRequest(parts=[UserPromptPart(content="Test message")]),
     ]
     history.set_agent_messages(messages)
+    hint_messages = [HintMessage(message="Remember to add docs")]
+    history.set_ui_messages(messages + hint_messages)
 
     manager.save(history)
 
@@ -122,6 +127,11 @@ def test_conversation_manager_save_load(tmp_path):
     loaded_messages = loaded_history.get_agent_messages()
     assert len(loaded_messages) == 1
     assert isinstance(loaded_messages[0], ModelRequest)
+
+    loaded_ui_messages = loaded_history.get_ui_messages()
+    assert len(loaded_ui_messages) == 2
+    assert isinstance(loaded_ui_messages[0], ModelRequest)
+    assert isinstance(loaded_ui_messages[1], HintMessage)
 
 
 def test_conversation_manager_nonexistent_file(tmp_path):
@@ -214,3 +224,27 @@ def test_conversation_state_creation():
     assert state.agent_type == "research"
     assert isinstance(state.agent_messages[0], ModelRequest)
     assert isinstance(state.agent_messages[1], ModelResponse)
+    assert state.ui_messages == []
+
+
+def test_conversation_history_ui_messages_with_hints():
+    """UI messages should round-trip with hint messages preserved."""
+
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Prompt")]),
+        ModelResponse(parts=[TextPart(content="Answer")]),
+        HintMessage(message="Useful tip"),
+    ]
+
+    history = ConversationHistory()
+    history.set_ui_messages(messages)
+
+    stored = history.ui_history
+    assert len(stored) == 3
+    assert stored[-1]["message_type"] == "hint"
+
+    retrieved = history.get_ui_messages()
+    assert len(retrieved) == 3
+    assert isinstance(retrieved[0], ModelRequest)
+    assert isinstance(retrieved[1], ModelResponse)
+    assert isinstance(retrieved[2], HintMessage)
