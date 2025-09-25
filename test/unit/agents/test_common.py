@@ -29,6 +29,7 @@ def mock_deps():
     deps.interactive_mode = True
     deps.codebase_service = AsyncMock()
     deps.codebase_service.list_graphs.return_value = ["graph1", "graph2"]
+    deps.codebase_service.list_graphs_for_directory.return_value = ["graph1", "graph2"]
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt content")
     deps.queue = AsyncMock()
     deps.tasks = []

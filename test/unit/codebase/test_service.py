@@ -153,7 +153,9 @@ async def test_create_graph_with_string_path():
             assert created_graph.graph_id == "new-graph-id"
             assert created_graph.name == graph_name
             assert created_graph.repo_path == repo_path
-            mock_manager.build_graph.assert_called_once_with(repo_path, graph_name)
+            mock_manager.build_graph.assert_called_once_with(
+                repo_path, graph_name, indexed_from_cwd=None
+            )
 
 
 @pytest.mark.asyncio
@@ -187,7 +189,9 @@ async def test_create_graph_with_path_object():
             created_graph = await service.create_graph(repo_path, graph_name)
 
             assert created_graph.name == graph_name
-            mock_manager.build_graph.assert_called_once_with(str(repo_path), graph_name)
+            mock_manager.build_graph.assert_called_once_with(
+                str(repo_path), graph_name, indexed_from_cwd=None
+            )
 
 
 @pytest.mark.asyncio

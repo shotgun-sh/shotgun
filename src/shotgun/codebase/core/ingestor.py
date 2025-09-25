@@ -54,7 +54,7 @@ class Ingestor:
 
         # Node tables
         node_schemas = [
-            "CREATE NODE TABLE Project(name STRING PRIMARY KEY, repo_path STRING, graph_id STRING, created_at INT64, updated_at INT64, schema_version STRING, build_options STRING, node_count INT64, relationship_count INT64, stats_updated_at INT64, status STRING, current_operation_id STRING, last_operation STRING)",
+            "CREATE NODE TABLE Project(name STRING PRIMARY KEY, repo_path STRING, graph_id STRING, created_at INT64, updated_at INT64, schema_version STRING, build_options STRING, node_count INT64, relationship_count INT64, stats_updated_at INT64, status STRING, current_operation_id STRING, last_operation STRING, indexed_from_cwds STRING)",
             "CREATE NODE TABLE Package(qualified_name STRING PRIMARY KEY, name STRING, path STRING)",
             "CREATE NODE TABLE Folder(path STRING PRIMARY KEY, name STRING)",
             "CREATE NODE TABLE File(path STRING PRIMARY KEY, name STRING, extension STRING)",

@@ -36,17 +36,57 @@ class CodebaseService:
         """
         return await self.manager.list_graphs()
 
-    async def create_graph(self, repo_path: str | Path, name: str) -> CodebaseGraph:
+    async def list_graphs_for_directory(
+        self, directory: Path | str | None = None
+    ) -> list[CodebaseGraph]:
+        """List graphs that match a specific directory.
+
+        Args:
+            directory: Directory to filter by. If None, uses current working directory.
+
+        Returns:
+            List of CodebaseGraph objects accessible from the specified directory
+        """
+        from pathlib import Path
+
+        if directory is None:
+            directory = Path.cwd()
+        elif isinstance(directory, str):
+            directory = Path(directory)
+
+        # Resolve to absolute path for comparison
+        target_path = str(directory.resolve())
+
+        # Get all graphs and filter by those accessible from this directory
+        all_graphs = await self.manager.list_graphs()
+        filtered_graphs = []
+
+        for graph in all_graphs:
+            # If indexed_from_cwds is empty, it's globally accessible (backward compatibility)
+            if not graph.indexed_from_cwds:
+                filtered_graphs.append(graph)
+            # Otherwise, check if current directory is in the allowed list
+            elif target_path in graph.indexed_from_cwds:
+                filtered_graphs.append(graph)
+
+        return filtered_graphs
+
+    async def create_graph(
+        self, repo_path: str | Path, name: str, indexed_from_cwd: str | None = None
+    ) -> CodebaseGraph:
         """Create and index a new graph from a repository.
 
         Args:
             repo_path: Path to the repository to index
             name: Human-readable name for the graph
+            indexed_from_cwd: Working directory from which indexing was initiated
 
         Returns:
             The created CodebaseGraph
         """
-        return await self.manager.build_graph(str(repo_path), name)
+        return await self.manager.build_graph(
+            str(repo_path), name, indexed_from_cwd=indexed_from_cwd
+        )
 
     async def get_graph(self, graph_id: str) -> CodebaseGraph | None:
         """Get graph metadata by ID.
@@ -58,6 +98,24 @@ class CodebaseService:
             CodebaseGraph object or None if not found
         """
         return await self.manager.get_graph(graph_id)
+
+    async def add_cwd_access(self, graph_id: str, cwd: str | None = None) -> None:
+        """Add a working directory to a graph's access list.
+
+        Args:
+            graph_id: Graph ID to update
+            cwd: Working directory to add. If None, uses current working directory.
+        """
+        await self.manager.add_cwd_access(graph_id, cwd)
+
+    async def remove_cwd_access(self, graph_id: str, cwd: str) -> None:
+        """Remove a working directory from a graph's access list.
+
+        Args:
+            graph_id: Graph ID to update
+            cwd: Working directory to remove
+        """
+        await self.manager.remove_cwd_access(graph_id, cwd)
 
     async def delete_graph(self, graph_id: str) -> None:
         """Delete a graph and its data.

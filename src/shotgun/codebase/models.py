@@ -73,6 +73,10 @@ class CodebaseGraph(BaseModel):
     current_operation_id: str | None = Field(
         None, description="ID of current in-progress operation"
     )
+    indexed_from_cwds: list[str] = Field(
+        default_factory=list,
+        description="List of working directories from which this graph is accessible. Empty list means globally accessible.",
+    )
 
 
 class QueryResult(BaseModel):

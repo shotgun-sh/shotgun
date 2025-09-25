@@ -252,6 +252,7 @@ class CodebaseGraphManager:
         name: str,
         languages: list[str] | None,
         exclude_patterns: list[str] | None,
+        indexed_from_cwd: str | None = None,
     ) -> None:
         """Initialize the graph database and create initial metadata.
 
@@ -294,7 +295,8 @@ class CodebaseGraphManager:
                 last_operation: $last_operation,
                 node_count: 0,
                 relationship_count: 0,
-                stats_updated_at: $stats_updated_at
+                stats_updated_at: $stats_updated_at,
+                indexed_from_cwds: $indexed_from_cwds
             })
             """,
             {
@@ -311,6 +313,9 @@ class CodebaseGraphManager:
                 "current_operation_id": None,
                 "last_operation": None,
                 "stats_updated_at": int(time.time()),
+                "indexed_from_cwds": json.dumps(
+                    [indexed_from_cwd] if indexed_from_cwd else []
+                ),
             },
         )
 
@@ -323,6 +328,7 @@ class CodebaseGraphManager:
         name: str | None = None,
         languages: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
+        indexed_from_cwd: str | None = None,
     ) -> CodebaseGraph:
         """Build a new code knowledge graph.
 
@@ -397,7 +403,8 @@ class CodebaseGraphManager:
                 created_at: $created_at,
                 updated_at: $updated_at,
                 schema_version: $schema_version,
-                build_options: $build_options
+                build_options: $build_options,
+                indexed_from_cwds: $indexed_from_cwds
             })
             """,
             {
@@ -409,6 +416,9 @@ class CodebaseGraphManager:
                 "schema_version": "1.0.0",
                 "build_options": json.dumps(
                     {"languages": languages, "exclude_patterns": exclude_patterns}
+                ),
+                "indexed_from_cwds": json.dumps(
+                    [indexed_from_cwd] if indexed_from_cwd else []
                 ),
             },
         )
@@ -475,6 +485,7 @@ class CodebaseGraphManager:
             status=GraphStatus.READY,
             last_operation=None,
             current_operation_id=None,
+            indexed_from_cwds=[indexed_from_cwd] if indexed_from_cwd else [],
         )
 
         # Update status to READY
@@ -1145,6 +1156,15 @@ class CodebaseGraphManager:
                     logger.debug(f"Failed to parse last operation stats: {e}")
                     last_operation = None
 
+            # Parse indexed_from_cwds - handle backward compatibility
+            indexed_from_cwds_json = project.get("indexed_from_cwds", "[]")
+            try:
+                indexed_from_cwds = (
+                    json.loads(indexed_from_cwds_json) if indexed_from_cwds_json else []
+                )
+            except (json.JSONDecodeError, TypeError):
+                indexed_from_cwds = []
+
             return CodebaseGraph(
                 graph_id=graph_id,
                 repo_path=project.get("repo_path", ""),
@@ -1165,6 +1185,7 @@ class CodebaseGraphManager:
                 status=status,
                 last_operation=last_operation,
                 current_operation_id=project.get("current_operation_id"),
+                indexed_from_cwds=indexed_from_cwds,
             )
         except Exception as e:
             logger.error(
@@ -1189,6 +1210,83 @@ class CodebaseGraphManager:
                     graphs.append(graph)
 
         return sorted(graphs, key=lambda g: g.updated_at, reverse=True)
+
+    async def add_cwd_access(self, graph_id: str, cwd: str | None = None) -> None:
+        """Add a working directory to a graph's access list.
+
+        Args:
+            graph_id: Graph ID to update
+            cwd: Working directory to add. If None, uses current working directory.
+        """
+        from pathlib import Path
+
+        if cwd is None:
+            cwd = str(Path.cwd().resolve())
+        else:
+            cwd = str(Path(cwd).resolve())
+
+        # Get current graph
+        graph = await self.get_graph(graph_id)
+        if not graph:
+            raise ValueError(f"Graph {graph_id} not found")
+
+        # Get current list
+        current_cwds = graph.indexed_from_cwds.copy()
+
+        # Add new CWD if not already present
+        if cwd not in current_cwds:
+            current_cwds.append(cwd)
+
+            # Update in database
+            await self._execute_query(
+                graph_id,
+                """
+                MATCH (p:Project {graph_id: $graph_id})
+                SET p.indexed_from_cwds = $indexed_from_cwds
+                """,
+                {
+                    "graph_id": graph_id,
+                    "indexed_from_cwds": json.dumps(current_cwds),
+                },
+            )
+            logger.info(f"Added CWD access for {cwd} to graph {graph_id}")
+
+    async def remove_cwd_access(self, graph_id: str, cwd: str) -> None:
+        """Remove a working directory from a graph's access list.
+
+        Args:
+            graph_id: Graph ID to update
+            cwd: Working directory to remove
+        """
+        from pathlib import Path
+
+        cwd = str(Path(cwd).resolve())
+
+        # Get current graph
+        graph = await self.get_graph(graph_id)
+        if not graph:
+            raise ValueError(f"Graph {graph_id} not found")
+
+        # Get current list
+        current_cwds = graph.indexed_from_cwds.copy()
+
+        # Remove CWD if present
+        if cwd in current_cwds:
+            current_cwds.remove(cwd)
+
+            # Update in database
+            await self._execute_query(
+                graph_id,
+                """
+                MATCH (p:Project {graph_id: $graph_id})
+                SET p.indexed_from_cwds = $indexed_from_cwds
+                """,
+                {
+                    "graph_id": graph_id,
+                    "indexed_from_cwds": json.dumps(current_cwds),
+                },
+            )
+            logger.info(f"Removed CWD access for {cwd} from graph {graph_id}")
 
     async def delete_graph(self, graph_id: str) -> None:
         """Delete a graph.
@@ -1365,6 +1463,7 @@ class CodebaseGraphManager:
         name: str,
         languages: list[str] | None,
         exclude_patterns: list[str] | None,
+        indexed_from_cwd: str | None = None,
     ) -> CodebaseGraph:
         """Internal implementation of graph building (runs in background)."""
         operation_id = str(uuid.uuid4())
@@ -1388,7 +1487,7 @@ class CodebaseGraphManager:
 
             # Do the actual build work
             graph = await self._do_build_graph(
-                graph_id, repo_path, name, languages, exclude_patterns
+                graph_id, repo_path, name, languages, exclude_patterns, indexed_from_cwd
             )
 
             # Update operation stats
@@ -1436,6 +1535,7 @@ class CodebaseGraphManager:
         name: str,
         languages: list[str] | None,
         exclude_patterns: list[str] | None,
+        indexed_from_cwd: str | None = None,
     ) -> CodebaseGraph:
         """Execute the actual graph building logic (extracted from original build_graph)."""
         # The database and Project node already exist from _initialize_graph_metadata
@@ -1515,6 +1615,7 @@ class CodebaseGraphManager:
         name: str | None = None,
         languages: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
+        indexed_from_cwd: str | None = None,
     ) -> str:
         """Start building a new code knowledge graph asynchronously.
 
@@ -1547,12 +1648,13 @@ class CodebaseGraphManager:
             name=name,
             languages=languages,
             exclude_patterns=exclude_patterns,
+            indexed_from_cwd=indexed_from_cwd,
         )
 
         # Start the build operation in background
         task = asyncio.create_task(
             self._build_graph_impl(
-                graph_id, repo_path, name, languages, exclude_patterns
+                graph_id, repo_path, name, languages, exclude_patterns, indexed_from_cwd
             )
         )
         self._operations[graph_id] = task

@@ -43,12 +43,30 @@ class CodebaseSDK:
         graphs = await self.service.list_graphs()
         return ListResult(graphs=graphs)
 
-    async def index_codebase(self, path: Path, name: str) -> IndexResult:
+    async def list_codebases_for_directory(
+        self, directory: Path | None = None
+    ) -> ListResult:
+        """List codebases accessible from a specific directory.
+
+        Args:
+            directory: Directory to filter by. If None, uses current working directory.
+
+        Returns:
+            ListResult containing filtered list of codebases
+        """
+        graphs = await self.service.list_graphs_for_directory(directory)
+        return ListResult(graphs=graphs)
+
+    async def index_codebase(
+        self, path: Path, name: str, indexed_from_cwd: str | None = None
+    ) -> IndexResult:
         """Index a new codebase.
 
         Args:
             path: Path to the repository to index
             name: Human-readable name for the codebase
+            indexed_from_cwd: Working directory from which indexing was initiated.
+                            If None, uses current working directory.
 
         Returns:
             IndexResult with indexing details
@@ -60,7 +78,13 @@ class CodebaseSDK:
         if not resolved_path.exists():
             raise InvalidPathError(f"Path does not exist: {resolved_path}")
 
-        graph = await self.service.create_graph(resolved_path, name)
+        # Default to current working directory if not specified
+        if indexed_from_cwd is None:
+            indexed_from_cwd = str(Path.cwd().resolve())
+
+        graph = await self.service.create_graph(
+            resolved_path, name, indexed_from_cwd=indexed_from_cwd
+        )
         file_count = sum(graph.language_stats.values()) if graph.language_stats else 0
 
         return IndexResult(

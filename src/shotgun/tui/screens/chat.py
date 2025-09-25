@@ -378,16 +378,11 @@ class ChatScreen(Screen[None]):
         if is_empty:
             return
 
-        # find at least one codebase that is indexed in the current directory
-        directory_indexed = next(
-            (
-                dir
-                for dir in (await self.codebase_sdk.list_codebases()).graphs
-                if cur_dir.is_relative_to(Path(dir.repo_path).resolve())
-            ),
-            None,
-        )
-        if directory_indexed:
+        # Check if the current directory has any accessible codebases
+        accessible_graphs = (
+            await self.codebase_sdk.list_codebases_for_directory()
+        ).graphs
+        if accessible_graphs:
             self.mount_hint(help_text_with_codebase())
             return
 
@@ -651,8 +646,18 @@ class ChatScreen(Screen[None]):
         )
         label.refresh()
         try:
+            # Pass the current working directory as the indexed_from_cwd
+            logger.debug(
+                f"Starting indexing - repo_path: {selection.repo_path}, "
+                f"name: {selection.name}, cwd: {Path.cwd().resolve()}"
+            )
             result = await self.codebase_sdk.index_codebase(
-                selection.repo_path, selection.name
+                selection.repo_path,
+                selection.name,
+                indexed_from_cwd=str(Path.cwd().resolve()),
+            )
+            logger.info(
+                f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
             )
             self.notify(
                 f"Indexed codebase '{result.name}' (ID: {result.graph_id})",
@@ -662,12 +667,19 @@ class ChatScreen(Screen[None]):
 
             self.mount_hint(codebase_indexed_hint(selection.name))
         except CodebaseAlreadyIndexedError as exc:
+            logger.warning(f"Codebase already indexed: {exc}")
             self.notify(str(exc), severity="warning")
             return
         except InvalidPathError as exc:
+            logger.error(f"Invalid path error: {exc}")
             self.notify(str(exc), severity="error")
 
         except Exception as exc:  # pragma: no cover - defensive UI path
+            # Log full exception details with stack trace
+            logger.exception(
+                f"Failed to index codebase - repo_path: {selection.repo_path}, "
+                f"name: {selection.name}, error: {exc}"
+            )
             self.notify(f"Failed to index codebase: {exc}", severity="error")
         finally:
             label.update("")

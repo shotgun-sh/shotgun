@@ -62,7 +62,10 @@ async def add_system_status_message(
         Updated message history with system status message prepended
     """
     message_history = message_history or []
-    codebase_understanding_graphs = await deps.codebase_service.list_graphs()
+    # Only show graphs for the current working directory
+    codebase_understanding_graphs = (
+        await deps.codebase_service.list_graphs_for_directory()
+    )
 
     # Get existing files for the agent
     existing_files = get_agent_existing_files(deps.agent_mode)
