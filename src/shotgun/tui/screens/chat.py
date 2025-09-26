@@ -2,6 +2,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from pydantic_ai import DeferredToolResults, RunContext
 from pydantic_ai.messages import (
@@ -487,10 +488,12 @@ class ChatScreen(Screen[None]):
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
         self.partial_message = event.message
 
-        partial_response_widget = self.query_one(ChatHistory)
-        partial_response_widget.partial_response = self.partial_message
-        if event.is_last:
-            partial_response_widget.partial_response = None
+        history = self.query_one(ChatHistory)
+        history.update_messages(
+            self.messages + cast(list[ModelMessage | HintMessage], event.messages)
+        )
+
+        history.partial_response = self.partial_message
 
     def _clear_partial_response(self) -> None:
         partial_response_widget = self.query_one(ChatHistory)

@@ -76,20 +76,25 @@ class MessageHistoryUpdated(Message):
 class PartialResponseMessage(Message):
     """Event posted when a partial response is received."""
 
-    def __init__(self, message: ModelResponse | None, is_last: bool) -> None:
+    def __init__(
+        self,
+        message: ModelResponse | None,
+        messages: list[ModelMessage],
+        is_last: bool,
+    ) -> None:
         """Initialize the partial response message."""
         super().__init__()
         self.message = message
+        self.messages = messages
         self.is_last = is_last
 
 
 @dataclass(slots=True)
 class _PartialStreamState:
-    """Tracks partial response parts while streaming a single agent run."""
+    """Tracks streamed messages while handling a single agent run."""
 
-    parts: list[ModelResponsePart | ToolCallPartDelta] = field(default_factory=list)
-    latest_partial: ModelResponse | None = None
-    final_sent: bool = False
+    messages: list[ModelRequest | ModelResponse] = field(default_factory=list)
+    current_response: ModelResponse | None = None
 
 
 class AgentManager(Widget):
@@ -272,6 +277,7 @@ class AgentManager(Widget):
 
         # Clear file tracker before each run to track only this run's operations
         deps.file_tracker.clear()
+        original_messages = self.ui_message_history.copy()
 
         if prompt:
             self.ui_message_history.append(ModelRequest.user_text_prompt(prompt))
@@ -357,15 +363,21 @@ class AgentManager(Widget):
             )
         finally:
             # If the stream ended unexpectedly without a final result, clear accumulated state.
-            if self._stream_state is not None and not self._stream_state.final_sent:
-                partial_message = self._build_partial_response(self._stream_state.parts)
-                if partial_message is not None:
-                    self._post_partial_message(partial_message, True)
+            # state = self._stream_state
+            # if state is not None:
+            #     pending_response = state.current_response
+            #     if pending_response is not None:
+            #         already_recorded = (
+            #             bool(state.messages) and state.messages[-1] is pending_response
+            #         )
+            #         if not already_recorded:
+            #             self._post_partial_message(pending_response, True)
+            #             state.messages.append(pending_response)
             self._stream_state = None
 
-        self.ui_message_history = self.ui_message_history + [
-            mes for mes in result.new_messages() if not isinstance(mes, ModelRequest)
-        ]
+        self.ui_message_history = original_messages + cast(
+            list[ModelRequest | ModelResponse | HintMessage], result.new_messages()
+        )
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
@@ -390,7 +402,13 @@ class AgentManager(Widget):
         if state is None:
             state = self._stream_state = _PartialStreamState()
 
-        partial_parts = state.parts
+        if state.current_response is not None:
+            partial_parts: list[ModelResponsePart | ToolCallPartDelta] = list(
+                state.current_response.parts
+                # cast(Sequence[ModelResponsePart], state.current_response.parts)
+            )
+        else:
+            partial_parts = []
 
         async for event in stream:
             try:
@@ -409,8 +427,8 @@ class AgentManager(Widget):
 
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
-                        state.latest_partial = partial_message
-                        self._post_partial_message(partial_message, False)
+                        state.current_response = partial_message
+                        self._post_partial_message(False)
 
                 elif isinstance(event, PartDeltaEvent):
                     index = event.index
@@ -435,8 +453,8 @@ class AgentManager(Widget):
 
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
-                        state.latest_partial = partial_message
-                        self._post_partial_message(partial_message, False)
+                        state.current_response = partial_message
+                        self._post_partial_message(False)
 
                 elif isinstance(event, FunctionToolCallEvent):
                     existing_call_idx = next(
@@ -448,28 +466,53 @@ class AgentManager(Widget):
                         ),
                         None,
                     )
+
                     if existing_call_idx is not None:
                         partial_parts[existing_call_idx] = event.part
+                    elif state.messages:
+                        existing_call_idx = next(
+                            (
+                                i
+                                for i, part in enumerate(state.messages[-1].parts)
+                                if isinstance(part, ToolCallPart)
+                                and part.tool_call_id == event.part.tool_call_id
+                            ),
+                            None,
+                        )
                     else:
                         partial_parts.append(event.part)
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
-                        state.latest_partial = partial_message
-                        self._post_partial_message(partial_message, False)
+                        state.current_response = partial_message
+                        self._post_partial_message(False)
                 elif isinstance(event, FunctionToolResultEvent):
-                    self.ui_message_history.append(ModelRequest(parts=[event.result]))
-                    self._post_messages_updated()  ## this is what the user responded with
-                elif isinstance(event, FinalResultEvent):
-                    final_message = (
-                        state.latest_partial
-                        or self._build_partial_response(partial_parts)
-                    )
-                    self._post_partial_message(final_message, False)
+                    request_message = ModelRequest(parts=[event.result])
+                    state.messages.append(request_message)
+                    if (
+                        event.result.tool_name == "ask_user"
+                    ):  # special handling to ask_user, because deferred tool results mean we missed the user response
+                        self.ui_message_history.append(request_message)
+                        self._post_messages_updated()
+                    ## this is what the user responded with
+                    self._post_partial_message(is_last=False)
 
+                elif isinstance(event, FinalResultEvent):
+                    pass
             except Exception:  # pragma: no cover - defensive logging
                 logger.exception(
                     "Error while handling agent stream event", extra={"event": event}
                 )
+
+        final_message = state.current_response or self._build_partial_response(
+            partial_parts
+        )
+        if final_message is not None:
+            state.current_response = final_message
+            if final_message not in state.messages:
+                state.messages.append(final_message)
+            state.current_response = None
+            self._post_partial_message(True)
+        state.current_response = None
 
     def _build_partial_response(
         self, parts: list[ModelResponsePart | ToolCallPartDelta]
@@ -483,11 +526,20 @@ class AgentManager(Widget):
             return None
         return ModelResponse(parts=list(completed_parts))
 
-    def _post_partial_message(
-        self, message: ModelResponse | None, is_last: bool
-    ) -> None:
+    def _post_partial_message(self, is_last: bool) -> None:
         """Post a partial message to the UI."""
-        self.post_message(PartialResponseMessage(message, is_last))
+        if self._stream_state is None:
+            return
+        self.post_message(
+            PartialResponseMessage(
+                self._stream_state.current_response
+                if self._stream_state.current_response
+                not in self._stream_state.messages
+                else None,
+                self._stream_state.messages,
+                is_last,
+            )
+        )
 
     def _post_messages_updated(
         self, file_operations: list[FileOperation] | None = None

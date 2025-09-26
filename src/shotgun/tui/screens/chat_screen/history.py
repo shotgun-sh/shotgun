@@ -12,6 +12,7 @@ from pydantic_ai.messages import (
     ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
 from textual.app import ComposeResult
 from textual.reactive import reactive
@@ -39,6 +40,7 @@ class PartialResponseWidget(Widget):  # TODO: doesn't work lol
         self.item = item
 
     def compose(self) -> ComposeResult:
+        yield Markdown(markdown="**partial response**")
         if self.item is None:
             pass
         elif self.item.kind == "response":
@@ -76,7 +78,7 @@ class ChatHistory(Widget):
 
     def __init__(self) -> None:
         super().__init__()
-        self.items: list[ModelMessage | HintMessage] = []
+        self.items: Sequence[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
         self.partial_response = None
 
@@ -94,9 +96,7 @@ class ChatHistory(Widget):
             yield PartialResponseWidget(self.partial_response).data_bind(
                 item=ChatHistory.partial_response
             )
-
-    def watch_partial_response(self, _partial_response: ModelMessage | None) -> None:
-        self.call_after_refresh(self.autoscroll)
+        self.call_later(self.autoscroll)
 
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the displayed messages without recomposing."""
@@ -105,12 +105,11 @@ class ChatHistory(Widget):
 
         self.items = messages
         self.refresh(recompose=True)
-
-        self.autoscroll()
+        self.call_later(self.autoscroll)
 
     def autoscroll(self) -> None:
         if self.vertical_tail:
-            self.vertical_tail.scroll_end(animate=False)
+            self.vertical_tail.scroll_end(animate=False, immediate=False, force=True)
 
 
 class UserQuestionWidget(Widget):
@@ -123,23 +122,23 @@ class UserQuestionWidget(Widget):
         if self.item is None:
             yield Markdown(markdown="")
         else:
-            prompt = "".join(
-                str(part.content) for part in self.item.parts if part.content
-            )
-            yield Markdown(markdown=f"**>** {prompt}")
+            prompt = self.format_prompt_parts(self.item.parts)
+            yield Markdown(markdown=prompt)
 
     def format_prompt_parts(self, parts: Sequence[ModelRequestPart]) -> str:
         acc = ""
         for part in parts:
-            if isinstance(part, TextPart):
+            if isinstance(part, UserPromptPart):
                 acc += (
                     f"**>** {part.content if isinstance(part.content, str) else ''}\n\n"
                 )
-            elif isinstance(part, ToolCallPart):
+            elif isinstance(part, ToolReturnPart):
                 if part.tool_name == "ask_user" and isinstance(part.content, dict):
                     acc += f"**>** {part.content['answer']}\n\n"
                 else:
-                    acc += "∟ finished\n\n"  # let's not show anything yet
+                    acc += "  ∟ finished\n\n"  # let's not show anything yet
+            elif isinstance(part, UserPromptPart):
+                acc += f"**>** {part.content}\n\n"
         return acc
 
 
@@ -161,18 +160,12 @@ class AgentResponseWidget(Widget):
             return ""
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                acc += part.content + "\n\n"
+                acc += f"{part.content}\n\n"
             elif isinstance(part, ToolCallPart):
                 parts_str = self._format_tool_call_part(part)
-                acc += parts_str + "\n\n"
-            elif isinstance(part, ToolReturnPart):
-                acc += (
-                    f"tool ({part.tool_name}) return: "
-                    + self._format_tool_return_call_part(part)
-                    + "\n\n"
-                )
+                acc += f"{part.tool_name}: " + parts_str + "\n\n"
             elif isinstance(part, BuiltinToolCallPart):
-                acc += f"builtin tool ({part.tool_name}): {part.args}\n\n"
+                acc += f"{part.tool_name}({part.args})\n\n"
             elif isinstance(part, BuiltinToolReturnPart):
                 acc += f"builtin tool ({part.tool_name}) return: {part.content}\n\n"
             elif isinstance(part, ThinkingPart):
@@ -226,10 +219,3 @@ class AgentResponseWidget(Widget):
             return f"{_args['question']}"
         else:
             return "❓ "
-
-    def _format_tool_return_call_part(self, part: ToolReturnPart) -> str:
-        content = part.content
-        if part.tool_name == "ask_user":
-            response = content.get("answer", "") if isinstance(content, dict) else ""
-            return f"**⏺** {response}"
-        return f"∟ {content}"
