@@ -1,5 +1,14 @@
 """Main CLI application for shotgun."""
 
+import logging
+
+# CRITICAL: Add NullHandler to root logger before ANY other imports.
+# This prevents Python from automatically adding a StreamHandler when
+# WARNING/ERROR messages are logged by modules during import.
+# DO NOT MOVE THIS BELOW OTHER IMPORTS.
+logging.getLogger().addHandler(logging.NullHandler())
+
+# ruff: noqa: E402 (module import not at top - intentionally after NullHandler setup)
 from typing import Annotated
 
 import typer

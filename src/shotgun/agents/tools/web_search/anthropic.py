@@ -90,16 +90,13 @@ def anthropic_web_search_tool(query: str) -> str:
 
 def main() -> None:
     """Main function for testing the Anthropic web search tool."""
-    import logging
     import os
     import sys
 
-    # Set up basic console logging for testing
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        stream=sys.stdout,
-    )
+    from shotgun.logging_config import setup_logger
+
+    # Use project's logging configuration instead of basicConfig
+    setup_logger(__name__)
 
     if len(sys.argv) < 2:
         print(

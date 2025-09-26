@@ -1,9 +1,11 @@
 """Sentry observability setup for Shotgun."""
 
-import logging
 import os
 
-logger = logging.getLogger(__name__)
+from shotgun.logging_config import get_early_logger
+
+# Use early logger to prevent automatic StreamHandler creation
+logger = get_early_logger(__name__)
 
 
 def setup_sentry_observability() -> bool:

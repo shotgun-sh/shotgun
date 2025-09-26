@@ -1,11 +1,12 @@
 """Observability setup for Logfire."""
 
-import logging
 import os
 
+from shotgun.logging_config import get_early_logger
 from shotgun.utils.env_utils import is_falsy, is_truthy
 
-logger = logging.getLogger(__name__)
+# Use early logger to prevent automatic StreamHandler creation
+logger = get_early_logger(__name__)
 
 
 def setup_logfire_observability() -> bool:

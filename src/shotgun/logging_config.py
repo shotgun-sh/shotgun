@@ -158,6 +158,27 @@ def setup_logger(
     return logger
 
 
+def get_early_logger(name: str) -> logging.Logger:
+    """Get a logger with NullHandler for early initialization.
+
+    Use this for loggers created at module import time, before
+    configure_root_logger() is called. The NullHandler prevents
+    Python from automatically adding a StreamHandler when WARNING
+    or ERROR messages are logged.
+
+    Args:
+        name: Logger name (typically __name__)
+
+    Returns:
+        Logger with NullHandler attached
+    """
+    logger = logging.getLogger(name)
+    # Only add NullHandler if no handlers exist
+    if not logger.handlers:
+        logger.addHandler(logging.NullHandler())
+    return logger
+
+
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance with default configuration.
 
