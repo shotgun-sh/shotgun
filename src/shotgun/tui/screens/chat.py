@@ -760,6 +760,7 @@ def codebase_indexed_hint(codebase_name: str) -> str:
 
 def help_text_with_codebase() -> str:
     return (
+        "Howdy! Welcome to Shotgun - the context tool for software engineering. \n\nYou can research, build specs, plan, create tasks, and export context to your favorite code-gen agents.\n\n"
         "I can help with:\n\n"
         "- Speccing out a new feature\n"
         "- Onboarding you onto this project\n"
@@ -770,6 +771,7 @@ def help_text_with_codebase() -> str:
 
 def help_text_empty_dir() -> str:
     return (
+        "Howdy! Welcome to Shotgun - the context tool for software engineering.\n\nYou can research, build specs, plan, create tasks, and export context to your favorite code-gen agents.\n\n"
         "What would you like to build? Here are some examples:\n\n"
         "- Research FastAPI vs Django\n"
         "- Plan my new web app using React\n"
