@@ -36,6 +36,8 @@ async def llm_cypher_prompt(system_prompt: str, user_prompt: str) -> str:
     """
     model_config = get_provider_model()
     # Use shotgun wrapper to maximize response quality for codebase queries
+    # Limit max_tokens to 2000 for Cypher queries (they're typically 50-200 tokens)
+    # This prevents Anthropic SDK from requiring streaming for longer token limits
     query_cypher_response = await shotgun_model_request(
         model_config=model_config,
         messages=[
@@ -46,6 +48,7 @@ async def llm_cypher_prompt(system_prompt: str, user_prompt: str) -> str:
                 ]
             ),
         ],
+        max_tokens=2000,  # Cypher queries are short, 2000 tokens is plenty
     )
 
     if not query_cypher_response.parts or not query_cypher_response.parts[0]:

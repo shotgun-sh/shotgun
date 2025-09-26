@@ -312,6 +312,13 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
+                  "text": "<!channel> New development release is available!\n\n<@U07EGE0FPT5> - A new Shotgun development version has been deployed! 🎉"
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
                   "text": "*Installation:*\n\`\`\`\npipx install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh\n\`\`\`"
                 }
               },
@@ -363,6 +370,13 @@ jobs:
                   "type": "plain_text",
                   "text": "🚀 Shotgun Stable Release: v${VERSION}",
                   "emoji": true
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "<!channel> New stable release is now available!\n\n<@U07EGE0FPT5> - A new stable version of Shotgun has been released! 🚀"
                 }
               },
               {
