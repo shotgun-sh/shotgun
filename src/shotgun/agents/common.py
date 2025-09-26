@@ -16,7 +16,6 @@ from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
-    SystemPromptPart,
 )
 
 from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
@@ -29,6 +28,7 @@ from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 from .history import token_limit_compactor
 from .history.compaction import apply_persistent_compaction
+from .messages import AgentSystemPrompt, SystemStatusPrompt
 from .models import AgentDeps, AgentRuntimeOptions, PipelineConfigEntry
 from .tools import (
     append_file,
@@ -85,7 +85,7 @@ async def add_system_status_message(
     message_history.append(
         ModelRequest(
             parts=[
-                SystemPromptPart(content=system_state),
+                SystemStatusPrompt(content=system_state),
             ]
         )
     )
@@ -315,10 +315,9 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
         # Only show # and ## headings from prior files, max 500 chars each
         prior_toc = _extract_file_toc_content(file_path, max_depth=2, max_chars=500)
         if prior_toc:
-            # Add section header
-            file_label = prior_file.replace(".md", "").replace("_", " ").title()
+            # Add section with XML tags
             toc_sections.append(
-                f"=== Prior Context: {file_label} (summary) ===\n{prior_toc}"
+                f'<TABLE_OF_CONTENTS file_name="{prior_file}">\n{prior_toc}\n</TABLE_OF_CONTENTS>'
             )
 
     # Extract TOC from own file (full detail)
@@ -326,10 +325,10 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
         own_path = base_path / config.own_file
         own_toc = _extract_file_toc_content(own_path, max_depth=None, max_chars=2000)
         if own_toc:
-            file_label = config.own_file.replace(".md", "").replace("_", " ").title()
-            # Put own file TOC at the beginning
+            # Put own file TOC at the beginning with XML tags
             toc_sections.insert(
-                0, f"=== Your Current Document: {file_label} ===\n{own_toc}"
+                0,
+                f'<TABLE_OF_CONTENTS file_name="{config.own_file}">\n{own_toc}\n</TABLE_OF_CONTENTS>',
             )
 
     # Combine all sections
@@ -484,7 +483,9 @@ async def add_system_prompt_message(
 
     # Create system message and prepend to message history
     system_message = ModelRequest(
-        parts=[SystemPromptPart(content=system_prompt_content)]
+        parts=[
+            AgentSystemPrompt(content=system_prompt_content, agent_mode=deps.agent_mode)
+        ]
     )
     message_history.insert(0, system_message)
     logger.debug("✅ System prompt prepended as first message")

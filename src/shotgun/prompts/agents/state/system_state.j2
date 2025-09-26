@@ -5,8 +5,8 @@
 ## Available Files
 
 {% if existing_files %}
-The following files already exist in the .shotgun/ directory.
-Before doing a web search check the information information in these files before continuing.
+The following files already exist.
+Before doing a web search check the information in these files before continuing.
 Your working files are:
 {% for file in existing_files %}
 - `{{ file }}`
@@ -23,9 +23,7 @@ No files currently exist in your allowed directories. You can create:
 {% if markdown_toc %}
 ## Document Table of Contents - READ THE ENTIRE FILE TO UNDERSTAND MORE
 
-```
 {{ markdown_toc }}
-```
 
 **IMPORTANT**: The above shows ONLY the Table of Contents from prior stages in the pipeline. Review this context before asking questions or creating new content.
 {% else %}

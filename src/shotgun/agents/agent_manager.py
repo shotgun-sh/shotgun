@@ -41,6 +41,7 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
+from .messages import AgentSystemPrompt
 from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
@@ -269,6 +270,9 @@ class AgentManager(Widget):
         if deps is None:
             raise ValueError("AgentDeps must be provided")
 
+        # Clear file tracker before each run to track only this run's operations
+        deps.file_tracker.clear()
+
         if prompt:
             self.ui_message_history.append(ModelRequest.user_text_prompt(prompt))
         self._post_messages_updated()
@@ -278,15 +282,51 @@ class AgentManager(Widget):
 
         deps.agent_mode = self._current_agent_type
 
+        # Filter out system prompts from other agent types
+        from pydantic_ai.messages import ModelRequestPart
+
+        filtered_history: list[ModelMessage] = []
+        for message in message_history:
+            # Keep all non-ModelRequest messages as-is
+            if not isinstance(message, ModelRequest):
+                filtered_history.append(message)
+                continue
+
+            # Filter out AgentSystemPrompts from other agent types
+            filtered_parts: list[ModelRequestPart] = []
+            for part in message.parts:
+                # Keep non-AgentSystemPrompt parts
+                if not isinstance(part, AgentSystemPrompt):
+                    filtered_parts.append(part)
+                    continue
+
+                # Only keep system prompts from the same agent type
+                if part.agent_mode == deps.agent_mode:
+                    filtered_parts.append(part)
+
+            # Only add the message if it has parts remaining
+            if filtered_parts:
+                filtered_history.append(ModelRequest(parts=filtered_parts))
+
+        message_history = filtered_history
+
         # Add a system status message so the agent knows whats going on
         message_history = await add_system_status_message(deps, message_history)
 
-        # Check if the message history already has a system prompt
-        has_system_prompt = any(
-            hasattr(msg, "parts")
-            and any(isinstance(part, SystemPromptPart) for part in msg.parts)
-            for msg in message_history
-        )
+        # Check if the message history already has a system prompt from the same agent type
+        has_system_prompt = False
+        for message in message_history:
+            if not isinstance(message, ModelRequest):
+                continue
+
+            for part in message.parts:
+                if not isinstance(part, AgentSystemPrompt):
+                    continue
+
+                # Check if it's from the same agent type
+                if part.agent_mode == deps.agent_mode:
+                    has_system_prompt = True
+                    break
 
         # Always ensure we have a system prompt for the agent
         # (compaction may remove it from persistent history, but agent needs it)
@@ -472,8 +512,6 @@ class AgentManager(Widget):
         Returns:
             List of messages without system prompt parts
         """
-        from pydantic_ai.messages import SystemPromptPart
-
         filtered_messages: list[ModelMessage | HintMessage] = []
         for msg in messages:
             if isinstance(msg, HintMessage):

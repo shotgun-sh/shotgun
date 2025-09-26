@@ -6,12 +6,12 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    SystemPromptPart,
     TextPart,
     UserPromptPart,
 )
 
 from shotgun.agents.config.models import shotgun_model_request
+from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
@@ -20,8 +20,9 @@ from .constants import SUMMARY_MARKER, TOKEN_LIMIT_RATIO
 from .context_extraction import extract_context_from_messages
 from .history_building import ensure_ends_with_model_request
 from .message_utils import (
+    get_agent_system_prompt,
     get_first_user_request,
-    get_system_prompt,
+    get_latest_system_status,
 )
 from .token_estimation import (
     calculate_max_summarization_tokens as _calculate_max_summarization_tokens,
@@ -274,14 +275,18 @@ async def token_limit_compactor(
         new_summary_part = create_marked_summary_part(summary_response)
 
         # Extract essential context from messages before the last summary (if any)
-        system_prompt = ""
+        agent_prompt = ""
+        system_status = ""
         first_user_prompt = ""
         if last_summary_index > 0:
-            # Get system and first user from original conversation
-            system_prompt = get_system_prompt(messages[:last_summary_index]) or ""
+            # Get agent system prompt and first user from original conversation
+            agent_prompt = get_agent_system_prompt(messages[:last_summary_index]) or ""
             first_user_prompt = (
                 get_first_user_request(messages[:last_summary_index]) or ""
             )
+
+        # Get the latest system status from all messages
+        system_status = get_latest_system_status(messages) or ""
 
         # Create the updated summary message
         updated_summary_message = ModelResponse(parts=[new_summary_part])
@@ -289,16 +294,20 @@ async def token_limit_compactor(
         # Build final compacted history with CLEAN structure
         compacted_messages: list[ModelMessage] = []
 
-        # Only add system/user context if it exists and is meaningful
-        if system_prompt or first_user_prompt:
-            compacted_messages.append(
-                ModelRequest(
-                    parts=[
-                        SystemPromptPart(content=system_prompt),
-                        UserPromptPart(content=first_user_prompt),
-                    ]
-                )
-            )
+        # Build parts for the initial request
+        from pydantic_ai.messages import ModelRequestPart
+
+        parts: list[ModelRequestPart] = []
+        if agent_prompt:
+            parts.append(AgentSystemPrompt(content=agent_prompt))
+        if system_status:
+            parts.append(SystemStatusPrompt(content=system_status))
+        if first_user_prompt:
+            parts.append(UserPromptPart(content=first_user_prompt))
+
+        # Only add if we have at least one part
+        if parts:
+            compacted_messages.append(ModelRequest(parts=parts))
 
         # Add the summary
         compacted_messages.append(updated_summary_message)
@@ -390,19 +399,26 @@ async def _full_compaction(
     marked_summary_part = create_marked_summary_part(summary_response)
 
     # Build compacted history structure
-    system_prompt = get_system_prompt(messages) or ""
+    agent_prompt = get_agent_system_prompt(messages) or ""
+    system_status = get_latest_system_status(messages) or ""
     user_prompt = get_first_user_request(messages) or ""
 
+    # Build parts for the initial request
+    from pydantic_ai.messages import ModelRequestPart
+
+    parts: list[ModelRequestPart] = []
+    if agent_prompt:
+        parts.append(AgentSystemPrompt(content=agent_prompt))
+    if system_status:
+        parts.append(SystemStatusPrompt(content=system_status))
+    if user_prompt:
+        parts.append(UserPromptPart(content=user_prompt))
+
     # Create base structure
-    compacted_messages: list[ModelMessage] = [
-        ModelRequest(
-            parts=[
-                SystemPromptPart(content=system_prompt),
-                UserPromptPart(content=user_prompt),
-            ]
-        ),
-        ModelResponse(parts=[marked_summary_part]),
-    ]
+    compacted_messages: list[ModelMessage] = []
+    if parts:
+        compacted_messages.append(ModelRequest(parts=parts))
+    compacted_messages.append(ModelResponse(parts=[marked_summary_part]))
 
     # Ensure history ends with ModelRequest for PydanticAI compatibility
     compacted_messages = ensure_ends_with_model_request(compacted_messages, messages)

@@ -20,7 +20,15 @@ AGENT_DIRECTORIES = {
     AgentType.SPECIFY: "specification.md",
     AgentType.PLAN: "plan.md",
     AgentType.TASKS: "tasks.md",
-    AgentType.EXPORT: "exports/",
+    AgentType.EXPORT: "*",  # Export agent can write anywhere except protected files
+}
+
+# Files protected from export agent modifications
+PROTECTED_AGENT_FILES = {
+    "research.md",
+    "specification.md",
+    "plan.md",
+    "tasks.md",
 }
 
 
@@ -40,21 +48,17 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
     base_path = get_shotgun_base_path()
 
     if agent_mode and agent_mode in AGENT_DIRECTORIES:
-        # For export mode, allow writing to any file in exports/ directory
+        # For export mode, allow writing to any file except protected agent files
         if agent_mode == AgentType.EXPORT:
-            # Ensure the filename starts with exports/ or is being written to exports/
-            if not filename.startswith("exports/"):
-                filename = f"exports/{filename}"
-            full_path = (base_path / filename).resolve()
-
-            # Ensure it's within .shotgun/exports/
-            exports_dir = base_path / "exports"
-            try:
-                full_path.relative_to(exports_dir.resolve())
-            except ValueError as e:
+            # Check if trying to write to a protected file
+            if filename in PROTECTED_AGENT_FILES:
                 raise ValueError(
-                    f"Export agent can only write to exports/ directory. Path '{filename}' is not allowed"
-                ) from e
+                    f"Export agent cannot write to protected file '{filename}'. "
+                    f"Protected files are: {', '.join(sorted(PROTECTED_AGENT_FILES))}"
+                )
+
+            # Allow writing anywhere else in .shotgun directory
+            full_path = (base_path / filename).resolve()
         else:
             # For other agents, only allow writing to their specific file
             allowed_file = AGENT_DIRECTORIES[agent_mode]

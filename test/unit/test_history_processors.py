@@ -155,8 +155,14 @@ class TestTokenLimitCompactor:
             assert isinstance(result[-1], ModelRequest)
 
             # Verify system and user prompts are preserved in first request
+            from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
+
             request_parts = result[0].parts
-            assert any(isinstance(p, SystemPromptPart) for p in request_parts)
+            # Check for either generic SystemPromptPart or our specific subclasses
+            assert any(
+                isinstance(p, (SystemPromptPart, AgentSystemPrompt, SystemStatusPrompt))
+                for p in request_parts
+            )
             assert any(isinstance(p, UserPromptPart) for p in request_parts)
 
     @pytest.mark.asyncio
