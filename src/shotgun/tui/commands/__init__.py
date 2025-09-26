@@ -55,17 +55,18 @@ class CommandHandler:
 • `/help` - Show this help message
 
 **Keyboard Shortcuts:**
-• `Enter` - Send message
-• `Ctrl+P` - Open command palette
-• `Shift+Tab` - Cycle agent modes
-• `Ctrl+C` - Quit application
+
+* `Enter` - Send message
+* `Ctrl+P` - Open command palette
+* `Shift+Tab` - Cycle agent modes
+* `Ctrl+C` - Quit application
 
 **Agent Modes:**
-• **Research** - Research topics with web search and synthesize findings
-• **Specify** - Create detailed specifications and requirements documents
-• **Planning** - Create comprehensive, actionable plans with milestones
-• **Tasks** - Generate specific, actionable tasks from research and plans
-• **Export** - Export artifacts and findings to various formats
+* **Research** - Research topics with web search and synthesize findings
+* **Specify** - Create detailed specifications and requirements documents
+* **Planning** - Create comprehensive, actionable plans with milestones
+* **Tasks** - Generate specific, actionable tasks from research and plans
+* **Export** - Export artifacts and findings to various formats
 
 **Usage:**
 Type your message and press Enter to chat with the AI. The AI will respond based on the current mode."""
