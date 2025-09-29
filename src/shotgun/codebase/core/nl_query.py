@@ -4,15 +4,13 @@ import time
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from pydantic_ai.messages import (
-    ModelRequest,
-    SystemPromptPart,
-    TextPart,
-    UserPromptPart,
-)
+from pydantic_ai import Agent
 
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.config.models import shotgun_model_request
+from shotgun.codebase.core.cypher_models import (
+    CypherGenerationNotPossibleError,
+    CypherGenerationResponse,
+)
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 
@@ -25,42 +23,52 @@ logger = get_logger(__name__)
 prompt_loader = PromptLoader()
 
 
-async def llm_cypher_prompt(system_prompt: str, user_prompt: str) -> str:
-    """Generate a Cypher query from a natural language prompt using the configured LLM provider.
+async def llm_cypher_prompt(
+    system_prompt: str, user_prompt: str
+) -> CypherGenerationResponse:
+    """Generate a Cypher query from a natural language prompt using structured output.
 
     Args:
         system_prompt: The system prompt defining the behavior and context for the LLM
         user_prompt: The user's natural language query
     Returns:
-        The generated Cypher query as a string
+        CypherGenerationResponse with cypher_query, can_generate flag, and reason if not
     """
     model_config = get_provider_model()
-    # Use shotgun wrapper to maximize response quality for codebase queries
-    # Limit max_tokens to 2000 for Cypher queries (they're typically 50-200 tokens)
-    # This prevents Anthropic SDK from requiring streaming for longer token limits
-    query_cypher_response = await shotgun_model_request(
-        model_config=model_config,
-        messages=[
-            ModelRequest(
-                parts=[
-                    SystemPromptPart(content=system_prompt),
-                    UserPromptPart(content=user_prompt),
-                ]
-            ),
-        ],
-        max_tokens=2000,  # Cypher queries are short, 2000 tokens is plenty
+
+    # Create an agent with structured output for Cypher generation
+    cypher_agent = Agent(
+        model=model_config.model_instance,
+        output_type=CypherGenerationResponse,
+        retries=2,
     )
 
-    if not query_cypher_response.parts or not query_cypher_response.parts[0]:
-        raise ValueError("Empty response from LLM")
+    # Combine system and user prompts
+    combined_prompt = f"{system_prompt}\n\nUser Query: {user_prompt}"
 
-    message_part = query_cypher_response.parts[0]
-    if not isinstance(message_part, TextPart):
-        raise ValueError("Unexpected response part type from LLM")
-    cypher_query = str(message_part.content)
-    if not cypher_query:
-        raise ValueError("Empty content in LLM response")
-    return cypher_query
+    try:
+        # Run the agent to get structured response
+        result = await cypher_agent.run(combined_prompt)
+        response = result.output
+
+        # Log the structured response for debugging
+        logger.debug(
+            "Cypher generation response - can_generate: %s, query: %s, reason: %s",
+            response.can_generate_valid_cypher,
+            response.cypher_query[:50] if response.cypher_query else None,
+            response.reason_cannot_generate,
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error("Failed to generate Cypher query with structured output: %s", e)
+        # Return a failure response
+        return CypherGenerationResponse(
+            cypher_query=None,
+            can_generate_valid_cypher=False,
+            reason_cannot_generate=f"LLM error: {str(e)}",
+        )
 
 
 async def generate_cypher(natural_language_query: str) -> str:
@@ -71,6 +79,10 @@ async def generate_cypher(natural_language_query: str) -> str:
 
     Returns:
         Generated Cypher query
+
+    Raises:
+        CypherGenerationNotPossibleError: If the query cannot be converted to Cypher
+        RuntimeError: If there's an error during generation
     """
     # Get current time for context
     current_timestamp = int(time.time())
@@ -88,8 +100,30 @@ async def generate_cypher(natural_language_query: str) -> str:
     )
 
     try:
-        cypher_query = await llm_cypher_prompt(system_prompt, enhanced_query)
-        cleaned_query = clean_cypher_response(cypher_query)
+        response = await llm_cypher_prompt(system_prompt, enhanced_query)
+
+        # Check if the LLM could generate a valid Cypher query
+        if not response.can_generate_valid_cypher:
+            logger.info(
+                "Cannot generate Cypher for query '%s': %s",
+                natural_language_query,
+                response.reason_cannot_generate,
+            )
+            raise CypherGenerationNotPossibleError(
+                response.reason_cannot_generate or "Query cannot be converted to Cypher"
+            )
+
+        if not response.cypher_query:
+            raise ValueError("LLM indicated success but provided no query")
+
+        cleaned_query = clean_cypher_response(response.cypher_query)
+
+        # Validate Cypher keywords
+        is_valid, validation_error = validate_cypher_keywords(cleaned_query)
+        if not is_valid:
+            logger.warning(f"Generated query has invalid syntax: {validation_error}")
+            logger.warning(f"Problematic query: {cleaned_query}")
+            raise ValueError(f"Generated query validation failed: {validation_error}")
 
         # Validate UNION ALL queries
         is_valid, validation_error = validate_union_query(cleaned_query)
@@ -100,6 +134,8 @@ async def generate_cypher(natural_language_query: str) -> str:
 
         return cleaned_query
 
+    except CypherGenerationNotPossibleError:
+        raise  # Re-raise as-is
     except Exception as e:
         raise RuntimeError(f"Failed to generate Cypher query: {e}") from e
 
@@ -170,8 +206,31 @@ MATCH (f:Function) RETURN f.name, f.qualified_name  // WRONG: missing third colu
             base_system_prompt=prompt_loader.render("codebase/cypher_system.j2"),
         )
 
-        cypher_query = await llm_cypher_prompt(enhanced_system_prompt, enhanced_query)
-        cleaned_query = clean_cypher_response(cypher_query)
+        response = await llm_cypher_prompt(enhanced_system_prompt, enhanced_query)
+
+        # Check if the LLM could generate a valid Cypher query
+        if not response.can_generate_valid_cypher:
+            logger.info(
+                "Cannot generate Cypher for retry query '%s': %s",
+                natural_language_query,
+                response.reason_cannot_generate,
+            )
+            raise CypherGenerationNotPossibleError(
+                response.reason_cannot_generate
+                or "Query cannot be converted to Cypher even with error context"
+            )
+
+        if not response.cypher_query:
+            raise ValueError("LLM indicated success but provided no query on retry")
+
+        cleaned_query = clean_cypher_response(response.cypher_query)
+
+        # Validate Cypher keywords
+        is_valid, validation_error = validate_cypher_keywords(cleaned_query)
+        if not is_valid:
+            logger.warning(f"Generated query has invalid syntax: {validation_error}")
+            logger.warning(f"Problematic query: {cleaned_query}")
+            raise ValueError(f"Generated query validation failed: {validation_error}")
 
         # Validate UNION ALL queries
         is_valid, validation_error = validate_union_query(cleaned_query)
@@ -182,6 +241,8 @@ MATCH (f:Function) RETURN f.name, f.qualified_name  // WRONG: missing third colu
 
         return cleaned_query
 
+    except CypherGenerationNotPossibleError:
+        raise  # Re-raise as-is
     except Exception as e:
         raise RuntimeError(
             f"Failed to generate Cypher query with error context: {e}"
@@ -202,6 +263,10 @@ async def generate_cypher_openai_async(
 
     Returns:
         Generated Cypher query
+
+    Raises:
+        CypherGenerationNotPossibleError: If the query cannot be converted to Cypher
+        RuntimeError: If there's an error during generation
     """
     # Get current time for context
     current_timestamp = int(time.time())
@@ -219,9 +284,26 @@ async def generate_cypher_openai_async(
     )
 
     try:
-        cypher_query = await llm_cypher_prompt(system_prompt, enhanced_query)
-        return clean_cypher_response(cypher_query)
+        response = await llm_cypher_prompt(system_prompt, enhanced_query)
 
+        # Check if the LLM could generate a valid Cypher query
+        if not response.can_generate_valid_cypher:
+            logger.info(
+                "Cannot generate Cypher for query '%s': %s",
+                natural_language_query,
+                response.reason_cannot_generate,
+            )
+            raise CypherGenerationNotPossibleError(
+                response.reason_cannot_generate or "Query cannot be converted to Cypher"
+            )
+
+        if not response.cypher_query:
+            raise ValueError("LLM indicated success but provided no query")
+
+        return clean_cypher_response(response.cypher_query)
+
+    except CypherGenerationNotPossibleError:
+        raise  # Re-raise as-is
     except Exception as e:
         logger.error(f"OpenAI API error: {e}")
         raise RuntimeError(f"Failed to generate Cypher query: {e}") from e
@@ -284,6 +366,65 @@ def validate_union_query(cypher_query: str) -> tuple[bool, str]:
                 False,
                 f"UNION ALL part {part_idx + 1} has {len(columns)} columns, expected {first_count}. First part columns: {first_columns}, this part: {columns}",
             )
+
+    return True, ""
+
+
+def validate_cypher_keywords(query: str) -> tuple[bool, str]:
+    """Validate that a query starts with valid Kuzu Cypher keywords.
+
+    Args:
+        query: The Cypher query to validate
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Valid Kuzu Cypher starting keywords based on parser expectations
+    valid_cypher_keywords = {
+        "ALTER",
+        "ATTACH",
+        "BEGIN",
+        "CALL",
+        "CHECKPOINT",
+        "COMMENT",
+        "COMMIT",
+        "COPY",
+        "CREATE",
+        "DELETE",
+        "DETACH",
+        "DROP",
+        "EXPLAIN",
+        "EXPORT",
+        "FORCE",
+        "IMPORT",
+        "INSTALL",
+        "LOAD",
+        "MATCH",
+        "MERGE",
+        "OPTIONAL",
+        "PROFILE",
+        "RETURN",
+        "ROLLBACK",
+        "SET",
+        "UNWIND",
+        "UNINSTALL",
+        "UPDATE",
+        "USE",
+        "WITH",
+    }
+
+    query = query.strip()
+    if not query:
+        return False, "Empty query"
+
+    # Get the first word
+    first_word = query.upper().split()[0] if query else ""
+
+    if first_word not in valid_cypher_keywords:
+        return (
+            False,
+            f"Query doesn't start with valid Cypher keyword. Found: '{first_word}'",
+        )
 
     return True, ""
 

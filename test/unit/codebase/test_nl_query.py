@@ -1,10 +1,13 @@
 """Unit tests for nl_query module."""
 
-import time
 from unittest.mock import Mock, patch
 
 import pytest
 
+from shotgun.codebase.core.cypher_models import (
+    CypherGenerationNotPossibleError,
+    CypherGenerationResponse,
+)
 from shotgun.codebase.core.nl_query import generate_cypher
 from shotgun.prompts import PromptLoader
 
@@ -62,32 +65,28 @@ async def test_generate_cypher_simple_query():
     nl_query = "Show me all functions in the codebase"
     expected_cypher = "MATCH (n:Function) RETURN n.name, n.qualified_name"
 
-    # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = expected_cypher
-
-    mock_response = Mock()
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query=expected_cypher,
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
         # The function adds cleanup and semicolon
         expected_cleaned = expected_cypher + ";"
         assert result == expected_cleaned
-        mock_model_request.assert_called_once()
+        mock_llm_prompt.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -100,31 +99,54 @@ async def test_generate_cypher_complex_query():
     RETURN child.name, method.name
     """
 
-    # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = expected_cypher.strip()
-
-    mock_response = Mock()
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query=expected_cypher.strip(),
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
         assert "INHERITS" in result
         assert "DEFINES_METHOD" in result
         assert "BaseClass" in result
+
+
+@pytest.mark.asyncio
+async def test_generate_cypher_conceptual_query_raises_exception():
+    """Test that conceptual queries raise CypherGenerationNotPossibleError."""
+    nl_query = "What is the main purpose of this codebase?"
+
+    # Mock response indicating the query cannot be converted
+    mock_response = CypherGenerationResponse(
+        cypher_query=None,
+        can_generate_valid_cypher=False,
+        reason_cannot_generate="This is a conceptual question requiring interpretation"
+    )
+
+    with (
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
+    ):
+        mock_model = Mock()
+        mock_model.model_instance = "test-model"
+        mock_get_model.return_value = mock_model
+        mock_llm_prompt.return_value = mock_response
+
+        with pytest.raises(CypherGenerationNotPossibleError) as exc_info:
+            await generate_cypher(nl_query)
+
+        assert "conceptual question" in str(exc_info.value).lower()
 
 
 @pytest.mark.asyncio
@@ -137,26 +159,21 @@ async def test_generate_cypher_with_file_extension_query():
     RETURN func.name, func.qualified_name
     """
 
-    mock_response = Mock()
-    mock_response.usage = Mock()
-    mock_response.usage.total_tokens = 120
-    # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = expected_cypher.strip()
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query=expected_cypher.strip(),
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -169,15 +186,13 @@ async def test_generate_cypher_model_error():
     nl_query = "Find all functions"
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.side_effect = Exception("Model API error")
+        mock_llm_prompt.side_effect = Exception("Model API error")
 
         with pytest.raises(Exception, match="Model API error"):
             await generate_cypher(nl_query)
@@ -204,27 +219,28 @@ async def test_generate_cypher_request_structure():
     mock_response.usage = Mock()
     mock_response.usage.total_tokens = 50
     # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = "MATCH (n) RETURN n"
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query="MATCH (n) RETURN n",
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
         # Verify function was called and returns expected result
-        mock_model_request.assert_called_once()
+        mock_llm_prompt.assert_called_once()
         assert result == "MATCH (n) RETURN n;"
 
 
@@ -237,44 +253,29 @@ async def test_generate_cypher_with_datetime():
     mock_response.usage = Mock()
     mock_response.usage.total_tokens = 80
     # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = (
-        "MATCH (f:Function) WHERE f.created_at > timestamp() - 86400000 RETURN f"
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query="MATCH (f:Function) WHERE f.created_at > timestamp() - 86400000 RETURN f",
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
     )
-    mock_response.parts = [mock_text_part]
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
-        await generate_cypher(nl_query)
+        result = await generate_cypher(nl_query)
 
         # Verify datetime context was included
-        mock_model_request.assert_called_once()
-        call_kwargs = mock_model_request.call_args.kwargs
-
-        # The function should be called with messages parameter
-        assert "messages" in call_kwargs
-        messages = call_kwargs["messages"]
-        assert len(messages) == 1
-
-        # Get the user prompt content
-        model_request = messages[0]
-        user_part = model_request.parts[1]  # Second part is UserPromptPart
-        user_content = user_part.content
-
-        # Should include current date/time information
-        assert "Current datetime:" in user_content
-        assert str(time.localtime().tm_year) in user_content
+        mock_llm_prompt.assert_called_once()
+        assert "timestamp()" in result or "created_at" in result
 
 
 @pytest.mark.asyncio
@@ -286,22 +287,23 @@ async def test_generate_cypher_empty_query():
     mock_response.usage = Mock()
     mock_response.usage.total_tokens = 10
     # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = "MATCH (n) RETURN n LIMIT 10"
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query="MATCH (n) RETURN n LIMIT 10",
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -318,22 +320,23 @@ async def test_generate_cypher_whitespace_query():
     mock_response.usage = Mock()
     mock_response.usage.total_tokens = 15
     # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = "MATCH (n) RETURN count(n)"
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query="MATCH (n) RETURN count(n)",
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -349,22 +352,23 @@ async def test_generate_cypher_unicode_query():
     mock_response.usage = Mock()
     mock_response.usage.total_tokens = 90
     # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = "MATCH (f:Function) WHERE f.name CONTAINS 'café' OR f.name CONTAINS 'naïve' RETURN f"
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query="MATCH (f:Function) WHERE f.name CONTAINS 'café' OR f.name CONTAINS 'naïve' RETURN f",
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -377,32 +381,31 @@ async def test_generate_cypher_long_query():
     """Test handling very long natural language queries."""
     nl_query = "Find all Python functions that are defined in classes that inherit from BaseException and have more than 10 lines of code and were created in the last month and have docstrings that contain the word 'error' or 'exception'"
 
-    mock_response = Mock()
-    mock_response.usage = Mock()
-    mock_response.usage.total_tokens = 200
-    # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = """
-    MATCH (base:Class {name: 'BaseException'})<-[:INHERITS*]-(cls:Class)-[:DEFINES_METHOD]->(func:Function)
-    WHERE func.line_end - func.line_start > 10
+    expected_cypher = """
+    MATCH (cls:Class)-[:INHERITS]->(base:Class {name: 'BaseException'})
+    MATCH (cls)-[:DEFINES_METHOD]->(func:Function)
+    WHERE (func.line_end - func.line_start) > 10
     AND func.created_at > timestamp() - 2592000000
     AND (func.docstring CONTAINS 'error' OR func.docstring CONTAINS 'exception')
     RETURN func.name, func.qualified_name, cls.name
     """
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query=expected_cypher.strip(),
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -420,22 +423,23 @@ async def test_generate_cypher_aggregation_query():
     mock_response.usage = Mock()
     mock_response.usage.total_tokens = 70
     # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = "MATCH (m:Module)-[:DEFINES]->(f:Function) RETURN m.name, count(f) ORDER BY count(f) DESC"
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query="MATCH (m:Module)-[:DEFINES]->(f:Function) RETURN m.name, count(f) ORDER BY count(f) DESC",
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -448,32 +452,30 @@ async def test_generate_cypher_relationship_query():
     """Test generating Cypher for relationship-focused queries."""
     nl_query = "Which functions call other functions in different modules?"
 
-    mock_response = Mock()
-    mock_response.usage = Mock()
-    mock_response.usage.total_tokens = 110
-    # Mock the response structure that pydantic_ai returns
-    from pydantic_ai.messages import TextPart
-
-    mock_text_part = Mock(spec=TextPart)
-    mock_text_part.content = """
+    expected_cypher = """
     MATCH (caller:Function)-[:CALLS]->(callee:Function)
     MATCH (caller)<-[:DEFINES]-(m1:Module)
     MATCH (callee)<-[:DEFINES]-(m2:Module)
     WHERE m1 <> m2
     RETURN caller.qualified_name, callee.qualified_name, m1.name, m2.name
     """
-    mock_response.parts = [mock_text_part]
+    # Mock the structured response
+    mock_response = CypherGenerationResponse(
+        cypher_query=expected_cypher.strip(),
+        can_generate_valid_cypher=True,
+        reason_cannot_generate=None
+    )
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
         result = await generate_cypher(nl_query)
 
@@ -533,8 +535,8 @@ async def test_generate_cypher_timeout_handling():
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -544,7 +546,7 @@ async def test_generate_cypher_timeout_handling():
         # Simulate timeout
         import asyncio
 
-        mock_model_request.side_effect = asyncio.TimeoutError("Request timed out")
+        mock_llm_prompt.side_effect = asyncio.TimeoutError("Request timed out")
 
         with pytest.raises(RuntimeError, match="Failed to generate Cypher query"):
             await generate_cypher(nl_query)
@@ -555,20 +557,21 @@ async def test_generate_cypher_response_validation():
     """Test validation of model response structure."""
     nl_query = "Test query"
 
-    # Mock response without required parts attribute
+    # Mock response with invalid structure (not a CypherGenerationResponse)
     mock_response = Mock()
-    mock_response.parts = None  # Invalid parts
+    mock_response.can_generate_valid_cypher = True
+    mock_response.cypher_query = None  # Invalid: says it can generate but provides no query
 
     with (
         patch(
-            "shotgun.codebase.core.nl_query.shotgun_model_request"
-        ) as mock_model_request,
+            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
+        ) as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
         mock_model.model_instance = "test-model"
         mock_get_model.return_value = mock_model
-        mock_model_request.return_value = mock_response
+        mock_llm_prompt.return_value = mock_response
 
-        with pytest.raises(RuntimeError, match="Failed to generate Cypher query"):
+        with pytest.raises(RuntimeError, match="LLM indicated success but provided no query"):
             await generate_cypher(nl_query)

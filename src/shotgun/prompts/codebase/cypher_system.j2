@@ -25,4 +25,18 @@ Your goal is to return appropriate properties for each node type. Common propert
 {% include 'codebase/partials/temporal_context.j2' %}
 
 **6. Output Format**
-Provide only the Cypher query.
+You must return a structured JSON response with the following fields:
+- `cypher_query`: The generated Cypher query string (or null if not possible)
+- `can_generate_valid_cypher`: Boolean indicating if a valid Cypher query can be generated
+- `reason_cannot_generate`: String explaining why generation isn't possible (or null if successful)
+
+**IMPORTANT:** Some queries cannot be expressed in Cypher:
+- Conceptual questions requiring interpretation (e.g., "What is the main purpose of this codebase?")
+- Questions about code quality or best practices
+- Questions requiring semantic understanding beyond structure
+
+For these, set `can_generate_valid_cypher` to false and provide a clear explanation in `reason_cannot_generate`.
+
+Examples:
+- Query: "Show all classes" → can_generate_valid_cypher: true, cypher_query: "MATCH (c:Class) RETURN c.name, c.qualified_name;"
+- Query: "What is the main purpose of this codebase?" → can_generate_valid_cypher: false, reason_cannot_generate: "This is a conceptual question requiring interpretation and analysis of the code's overall design and intent, rather than a structural query about specific code elements."

@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from shotgun.codebase.core.cypher_models import CypherGenerationNotPossibleError
 from shotgun.codebase.core.manager import CodebaseGraphManager
 from shotgun.codebase.core.nl_query import generate_cypher
 from shotgun.codebase.models import CodebaseGraph, QueryResult, QueryType
@@ -188,6 +189,22 @@ class CodebaseService:
                 execution_time_ms=execution_time,
                 success=True,
                 error=None,
+            )
+
+        except CypherGenerationNotPossibleError as e:
+            # Handle queries that cannot be converted to Cypher
+            execution_time = (time.time() - start_time) * 1000
+            logger.info(f"Query cannot be converted to Cypher: {e.reason}")
+
+            return QueryResult(
+                query=query,
+                cypher_query=None,
+                results=[],
+                column_names=[],
+                row_count=0,
+                execution_time_ms=execution_time,
+                success=False,
+                error=f"This query cannot be converted to Cypher: {e.reason}",
             )
 
         except Exception as e:
