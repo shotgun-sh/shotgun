@@ -362,17 +362,6 @@ class AgentManager(Widget):
                 **kwargs,
             )
         finally:
-            # If the stream ended unexpectedly without a final result, clear accumulated state.
-            # state = self._stream_state
-            # if state is not None:
-            #     pending_response = state.current_response
-            #     if pending_response is not None:
-            #         already_recorded = (
-            #             bool(state.messages) and state.messages[-1] is pending_response
-            #         )
-            #         if not already_recorded:
-            #             self._post_partial_message(pending_response, True)
-            #             state.messages.append(pending_response)
             self._stream_state = None
 
         self.ui_message_history = original_messages + cast(

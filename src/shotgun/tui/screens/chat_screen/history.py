@@ -136,7 +136,8 @@ class UserQuestionWidget(Widget):
                 if part.tool_name == "ask_user" and isinstance(part.content, dict):
                     acc += f"**>** {part.content['answer']}\n\n"
                 else:
-                    acc += "  ∟ finished\n\n"  # let's not show anything yet
+                    # acc += "  ∟ finished\n\n"  # let's not show anything yet
+                    pass
             elif isinstance(part, UserPromptPart):
                 acc += f"**>** {part.content}\n\n"
         return acc
@@ -152,7 +153,7 @@ class AgentResponseWidget(Widget):
         if self.item is None:
             yield Markdown(markdown="")
         else:
-            yield Markdown(markdown=f"**⏺** {self.compute_output()}")
+            yield Markdown(markdown=self.compute_output())
 
     def compute_output(self) -> str:
         acc = ""
@@ -160,10 +161,10 @@ class AgentResponseWidget(Widget):
             return ""
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                acc += f"{part.content}\n\n"
+                acc += f"**⏺** {part.content}\n\n"
             elif isinstance(part, ToolCallPart):
                 parts_str = self._format_tool_call_part(part)
-                acc += f"{part.tool_name}: " + parts_str + "\n\n"
+                acc += parts_str + "\n\n"
             elif isinstance(part, BuiltinToolCallPart):
                 acc += f"{part.tool_name}({part.args})\n\n"
             elif isinstance(part, BuiltinToolReturnPart):
