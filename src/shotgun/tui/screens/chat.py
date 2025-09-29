@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from pydantic_ai.messages import (
     TextPart,
     UserPromptPart,
 )
-from textual import on, work
+from textual import events, on, work
 from textual.app import ComposeResult
 from textual.command import CommandPalette
 from textual.containers import Container, Grid
@@ -102,8 +103,20 @@ class StatusBar(Widget):
         }
     """
 
+    def __init__(self, working: bool = False) -> None:
+        """Initialize the status bar.
+
+        Args:
+            working: Whether an agent is currently working.
+        """
+        super().__init__()
+        self.working = working
+
     def render(self) -> str:
-        return """[$foreground-muted][bold $text]enter[/] to send • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
+        if self.working:
+            return """[$foreground-muted][bold $text]esc[/] to stop • [bold $text]enter[/] to send • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
+        else:
+            return """[$foreground-muted][bold $text]enter[/] to send • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
 
 
 class ModeIndicator(Widget):
@@ -329,6 +342,7 @@ class ChatScreen(Screen[None]):
     question: reactive[UserQuestion | None] = reactive(None)
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
     partial_message: reactive[ModelMessage | None] = reactive(None)
+    _current_worker = None  # Track the current running worker for cancellation
 
     def __init__(self, continue_session: bool = False) -> None:
         super().__init__()
@@ -369,6 +383,18 @@ class ChatScreen(Screen[None]):
         self.call_later(self.check_if_codebase_is_indexed)
         # Start the question listener worker to handle ask_user interactions
         self.call_later(self.add_question_listener)
+
+    async def on_key(self, event: events.Key) -> None:
+        """Handle key presses for cancellation."""
+        # If escape is pressed while agent is working, cancel the operation
+        if event.key == "escape" and self.working and self._current_worker:
+            # Cancel the running agent worker
+            self._current_worker.cancel()
+            # Show cancellation message
+            self.mount_hint("⚠️ Cancelling operation...")
+            # Re-enable the input
+            prompt_input = self.query_one(PromptInput)
+            prompt_input.focus()
 
     @work
     async def check_if_codebase_is_indexed(self) -> None:
@@ -418,6 +444,11 @@ class ChatScreen(Screen[None]):
             spinner = self.query_one("#spinner")
             spinner.set_classes("" if is_working else "hidden")
             spinner.display = is_working
+
+            # Update the status bar to show/hide "ESC to stop"
+            status_bar = self.query_one(StatusBar)
+            status_bar.working = is_working
+            status_bar.refresh()
 
     def watch_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the chat history when messages change."""
@@ -469,7 +500,7 @@ class ChatScreen(Screen[None]):
                     id="spinner",
                     classes="" if self.working else "hidden",
                 )
-                yield StatusBar()
+                yield StatusBar(working=self.working)
                 yield PromptInput(
                     text=self.value,
                     highlight_cursor_line=False,
@@ -687,6 +718,11 @@ class ChatScreen(Screen[None]):
         prompt = None
         self.working = True
 
+        # Store the worker so we can cancel it if needed
+        from textual.worker import get_current_worker
+
+        self._current_worker = get_current_worker()
+
         if self.question:
             # This is a response to a question from the agent
             self.question.result.set_result(
@@ -704,11 +740,17 @@ class ChatScreen(Screen[None]):
             # This is a new user prompt
             prompt = message
 
-        await self.agent_manager.run(
-            prompt=prompt,
-            deferred_tool_results=deferred_tool_results,
-        )
-        self.working = False
+        try:
+            await self.agent_manager.run(
+                prompt=prompt,
+                deferred_tool_results=deferred_tool_results,
+            )
+        except asyncio.CancelledError:
+            # Handle cancellation gracefully - DO NOT re-raise
+            self.mount_hint("⚠️ Operation cancelled by user")
+        finally:
+            self.working = False
+            self._current_worker = None
 
         # Save conversation after each interaction
         self._save_conversation()
