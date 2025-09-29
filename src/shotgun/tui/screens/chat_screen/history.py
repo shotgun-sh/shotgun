@@ -1,5 +1,5 @@
 import json
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 
 from pydantic_ai.messages import (
     BuiltinToolCallPart,
@@ -19,6 +19,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Markdown
 
+from shotgun.agents.models import UserAnswer
 from shotgun.tui.components.vertical_tail import VerticalTail
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessageWidget
 
@@ -86,7 +87,7 @@ class ChatHistory(Widget):
         self.vertical_tail = VerticalTail()
 
         with self.vertical_tail:
-            for item in self.items:
+            for item in self.filtered_items():
                 if isinstance(item, ModelRequest):
                     yield UserQuestionWidget(item)
                 elif isinstance(item, HintMessage):
@@ -97,6 +98,44 @@ class ChatHistory(Widget):
                 item=ChatHistory.partial_response
             )
         self.call_later(self.autoscroll)
+
+    def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
+        for idx, next_item in enumerate(self.items):
+            prev_item = self.items[idx - 1] if idx > 0 else None
+
+            if isinstance(prev_item, ModelRequest) and isinstance(
+                next_item, ModelResponse
+            ):
+                ask_user_tool_response_part = next(
+                    (
+                        part
+                        for part in prev_item.parts
+                        if isinstance(part, ToolReturnPart)
+                        and part.tool_name == "ask_user"
+                    ),
+                    None,
+                )
+
+                ask_user_part = next(
+                    (
+                        part
+                        for part in next_item.parts
+                        if isinstance(part, ToolCallPart)
+                        and part.tool_name == "ask_user"
+                    ),
+                    None,
+                )
+
+                if not ask_user_part or not ask_user_tool_response_part:
+                    yield next_item
+                    continue
+                if (
+                    ask_user_tool_response_part.tool_call_id
+                    == ask_user_part.tool_call_id
+                ):
+                    continue  # don't emit tool call that happens after tool response
+
+            yield next_item
 
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the displayed messages without recomposing."""
@@ -133,8 +172,8 @@ class UserQuestionWidget(Widget):
                     f"**>** {part.content if isinstance(part.content, str) else ''}\n\n"
                 )
             elif isinstance(part, ToolReturnPart):
-                if part.tool_name == "ask_user" and isinstance(part.content, dict):
-                    acc += f"**>** {part.content['answer']}\n\n"
+                if part.tool_name == "ask_user":
+                    acc += f"**>** {part.content.answer if isinstance(part.content, UserAnswer) else part.content['answer']}\n\n"
                 else:
                     # acc += "  ∟ finished\n\n"  # let's not show anything yet
                     pass

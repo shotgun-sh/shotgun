@@ -277,6 +277,8 @@ class AgentManager(Widget):
 
         # Clear file tracker before each run to track only this run's operations
         deps.file_tracker.clear()
+        # preprocess messages; maybe we need to include the user answer in the message history
+
         original_messages = self.ui_message_history.copy()
 
         if prompt:
@@ -477,11 +479,6 @@ class AgentManager(Widget):
                 elif isinstance(event, FunctionToolResultEvent):
                     request_message = ModelRequest(parts=[event.result])
                     state.messages.append(request_message)
-                    if (
-                        event.result.tool_name == "ask_user"
-                    ):  # special handling to ask_user, because deferred tool results mean we missed the user response
-                        self.ui_message_history.append(request_message)
-                        self._post_messages_updated()
                     ## this is what the user responded with
                     self._post_partial_message(is_last=False)
 
