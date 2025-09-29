@@ -9,7 +9,7 @@ from shotgun.agents.config import ConfigManager, get_config_manager
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.splash import SplashScreen
 from shotgun.utils.file_system_utils import get_shotgun_base_path
-from shotgun.utils.update_checker import check_for_updates_async
+from shotgun.utils.update_checker import perform_auto_update_async
 
 from .screens.chat import ChatScreen
 from .screens.directory_setup import DirectorySetupScreen
@@ -36,16 +36,10 @@ class ShotgunApp(App[None]):
         self.config_manager: ConfigManager = get_config_manager()
         self.no_update_check = no_update_check
         self.continue_session = continue_session
-        self.update_notification: str | None = None
 
-        # Start async update check
+        # Start async update check and install
         if not no_update_check:
-            check_for_updates_async(callback=self._update_callback)
-
-    def _update_callback(self, notification: str) -> None:
-        """Store update notification to show later."""
-        self.update_notification = notification
-        logger.debug(f"Update notification received: {notification}")
+            perform_auto_update_async(no_update_check=no_update_check)
 
     def on_mount(self) -> None:
         self.theme = "gruvbox"
@@ -88,13 +82,7 @@ class ShotgunApp(App[None]):
         return shotgun_dir.exists() and shotgun_dir.is_dir()
 
     async def action_quit(self) -> None:
-        """Override quit action to show update notification."""
-        if self.update_notification:
-            # Show notification before quitting
-            from rich.console import Console
-
-            console = Console()
-            console.print(f"\n[cyan]{self.update_notification}[/cyan]", style="bold")
+        """Quit the application."""
         self.exit()
 
     def get_system_commands(self, screen: Screen[Any]) -> Iterable[SystemCommand]:
