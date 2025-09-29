@@ -2,7 +2,6 @@
 
 # Field names
 API_KEY_FIELD = "api_key"
-MODEL_NAME_FIELD = "model_name"
 DEFAULT_PROVIDER_FIELD = "default_provider"
 USER_ID_FIELD = "user_id"
 CONFIG_VERSION_FIELD = "config_version"

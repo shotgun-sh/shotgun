@@ -117,21 +117,18 @@ class OpenAIConfig(BaseModel):
     """Configuration for OpenAI provider."""
 
     api_key: SecretStr | None = None
-    model_name: str = "gpt-5"
 
 
 class AnthropicConfig(BaseModel):
     """Configuration for Anthropic provider."""
 
     api_key: SecretStr | None = None
-    model_name: str = "claude-opus-4-1"
 
 
 class GoogleConfig(BaseModel):
     """Configuration for Google provider."""
 
     api_key: SecretStr | None = None
-    model_name: str = "gemini-2.5-pro"
 
 
 class ShotgunConfig(BaseModel):

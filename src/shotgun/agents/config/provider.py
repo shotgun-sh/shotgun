@@ -127,8 +127,8 @@ def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
                 f"OpenAI API key not configured. Set via environment variable {OPENAI_API_KEY_ENV} or config."
             )
 
-        # Get model spec
-        model_name = config.openai.model_name
+        # Get model spec - hardcoded to gpt-5
+        model_name = "gpt-5"
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name}' not found")
         spec = MODEL_SPECS[model_name]
@@ -149,8 +149,8 @@ def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
                 f"Anthropic API key not configured. Set via environment variable {ANTHROPIC_API_KEY_ENV} or config."
             )
 
-        # Get model spec
-        model_name = config.anthropic.model_name
+        # Get model spec - hardcoded to claude-opus-4-1
+        model_name = "claude-opus-4-1"
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name}' not found")
         spec = MODEL_SPECS[model_name]
@@ -171,8 +171,8 @@ def get_provider_model(provider: ProviderType | None = None) -> ModelConfig:
                 f"Gemini API key not configured. Set via environment variable {GEMINI_API_KEY_ENV} or config."
             )
 
-        # Get model spec
-        model_name = config.google.model_name
+        # Get model spec - hardcoded to gemini-2.5-pro
+        model_name = "gemini-2.5-pro"
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name}' not found")
         spec = MODEL_SPECS[model_name]
