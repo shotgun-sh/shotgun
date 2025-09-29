@@ -411,13 +411,15 @@ class ChatScreen(Screen[None]):
             await self.codebase_sdk.list_codebases_for_directory()
         ).graphs
         if accessible_graphs:
-            self.mount_hint(help_text_with_codebase())
+            self.mount_hint(help_text_with_codebase(already_indexed=True))
             return
 
         should_index = await self.app.push_screen_wait(CodebaseIndexPromptScreen())
         if not should_index:
             self.mount_hint(help_text_empty_dir())
             return
+
+        self.mount_hint(help_text_with_codebase(already_indexed=False))
 
         self.index_codebase_command()
 
@@ -692,7 +694,6 @@ class ChatScreen(Screen[None]):
                 timeout=8,
             )
 
-            self.mount_hint(codebase_indexed_hint(selection.name))
         except CodebaseAlreadyIndexedError as exc:
             logger.warning(f"Codebase already indexed: {exc}")
             self.notify(str(exc), severity="warning")
@@ -796,17 +797,10 @@ class ChatScreen(Screen[None]):
         self.mode = AgentType(conversation.last_agent_model)
 
 
-def codebase_indexed_hint(codebase_name: str) -> str:
-    return (
-        f"Codebase **{codebase_name}** indexed successfully. You can now use it in your chat.\n\n"
-        + help_text_with_codebase()
-    )
-
-
-def help_text_with_codebase() -> str:
+def help_text_with_codebase(already_indexed: bool = False) -> str:
     return (
         "Howdy! Welcome to Shotgun - the context tool for software engineering. \n\nYou can research, build specs, plan, create tasks, and export context to your favorite code-gen agents.\n\n"
-        "I can help with:\n\n"
+        f"{'' if already_indexed else 'Once your codebase is indexed, '}I can help with:\n\n"
         "- Speccing out a new feature\n"
         "- Onboarding you onto this project\n"
         "- Helping with a refactor spec\n"
