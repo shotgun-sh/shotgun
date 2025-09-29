@@ -14,6 +14,7 @@ from shotgun.agents.config.models import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 from shotgun.prompts import PromptLoader
 
 from .constants import SUMMARY_MARKER, TOKEN_LIMIT_RATIO
@@ -179,6 +180,10 @@ async def token_limit_compactor(
             "Post-summary conversation exceeds threshold, performing incremental compaction"
         )
 
+        # Track compaction event
+        messages_before = len(messages)
+        tokens_before = post_summary_tokens
+
         # Extract existing summary content
         summary_message = messages[last_summary_index]
         existing_summary_part = None
@@ -320,6 +325,31 @@ async def token_limit_compactor(
         logger.debug(
             f"Incremental compaction complete: {len(messages)} -> {len(compacted_messages)} messages"
         )
+
+        # Track compaction completion
+        messages_after = len(compacted_messages)
+        tokens_after = estimate_tokens_from_messages(compacted_messages, deps.llm_model)
+        reduction_percentage = (
+            ((messages_before - messages_after) / messages_before * 100)
+            if messages_before > 0
+            else 0
+        )
+
+        track_event(
+            "context_compaction_triggered",
+            {
+                "compaction_type": "incremental",
+                "messages_before": messages_before,
+                "messages_after": messages_after,
+                "tokens_before": tokens_before,
+                "tokens_after": tokens_after,
+                "reduction_percentage": round(reduction_percentage, 2),
+                "agent_mode": deps.agent_mode.value
+                if hasattr(deps, "agent_mode") and deps.agent_mode
+                else "unknown",
+            },
+        )
+
         return compacted_messages
 
     else:
@@ -422,5 +452,26 @@ async def _full_compaction(
 
     # Ensure history ends with ModelRequest for PydanticAI compatibility
     compacted_messages = ensure_ends_with_model_request(compacted_messages, messages)
+
+    # Track full compaction event
+    messages_before = len(messages)
+    messages_after = len(compacted_messages)
+    tokens_before = current_tokens  # Already calculated above
+    tokens_after = summary_usage.output_tokens if summary_usage else 0
+
+    track_event(
+        "context_compaction_triggered",
+        {
+            "compaction_type": "full",
+            "messages_before": messages_before,
+            "messages_after": messages_after,
+            "tokens_before": tokens_before,
+            "tokens_after": tokens_after,
+            "reduction_percentage": round(reduction_percentage, 2),
+            "agent_mode": deps.agent_mode.value
+            if hasattr(deps, "agent_mode") and deps.agent_mode
+            else "unknown",
+        },
+    )
 
     return compacted_messages

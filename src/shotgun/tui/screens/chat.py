@@ -41,6 +41,7 @@ from shotgun.agents.models import (
     UserQuestion,
 )
 from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
+from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.sdk.services import get_codebase_service
@@ -388,6 +389,14 @@ class ChatScreen(Screen[None]):
         """Handle key presses for cancellation."""
         # If escape is pressed while agent is working, cancel the operation
         if event.key == "escape" and self.working and self._current_worker:
+            # Track ESC cancellation event
+            track_event(
+                "agent_cancelled_escape",
+                {
+                    "agent_mode": self.mode.value,
+                },
+            )
+
             # Cancel the running agent worker
             self._current_worker.cancel()
             # Show cancellation message

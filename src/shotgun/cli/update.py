@@ -6,8 +6,10 @@ import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from shotgun import __version__
 from shotgun.logging_config import get_logger
 from shotgun.utils.update_checker import (
+    compare_versions,
     detect_installation_method,
     get_latest_version,
     is_dev_version,
@@ -69,9 +71,6 @@ def update(
                     "[red]✗[/red] Failed to check for updates", style="bold red"
                 )
                 raise typer.Exit(1)
-
-        from shotgun import __version__
-        from shotgun.utils.update_checker import compare_versions
 
         if compare_versions(__version__, latest):
             console.print(

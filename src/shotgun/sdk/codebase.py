@@ -5,6 +5,9 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from shotgun.codebase.models import CodebaseGraph, QueryType
+from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
+from shotgun.utils.source_detection import detect_source
 
 from .exceptions import CodebaseNotFoundError, InvalidPathError
 from .models import (
@@ -16,6 +19,8 @@ from .models import (
     ReindexResult,
 )
 from .services import get_codebase_service
+
+logger = get_logger(__name__)
 
 
 class CodebaseSDK:
@@ -86,6 +91,28 @@ class CodebaseSDK:
             resolved_path, name, indexed_from_cwd=indexed_from_cwd
         )
         file_count = sum(graph.language_stats.values()) if graph.language_stats else 0
+
+        # Track codebase indexing event
+        # Detect if called from TUI by checking the call stack
+        source = detect_source()
+
+        logger.debug(
+            "Tracking codebase_indexed event: file_count=%d, node_count=%d, relationship_count=%d, source=%s",
+            file_count,
+            graph.node_count,
+            graph.relationship_count,
+            source,
+        )
+
+        track_event(
+            "codebase_indexed",
+            {
+                "file_count": file_count,
+                "node_count": graph.node_count,
+                "relationship_count": graph.relationship_count,
+                "source": source,
+            },
+        )
 
         return IndexResult(
             graph_id=graph.graph_id,
@@ -211,6 +238,28 @@ class CodebaseSDK:
             raise CodebaseNotFoundError(f"Graph not found: {graph_id}")
 
         stats = await self.service.reindex_graph(graph_id)
+
+        # Track codebase reindexing event
+        # Detect if called from TUI by checking the call stack
+        source = detect_source()
+
+        logger.debug(
+            "Tracking codebase_reindexed event: nodes_added=%d, nodes_removed=%d, source=%s",
+            stats.get("nodes_added", 0),
+            stats.get("nodes_removed", 0),
+            source,
+        )
+
+        track_event(
+            "codebase_reindexed",
+            {
+                "nodes_added": stats.get("nodes_added", 0),
+                "nodes_removed": stats.get("nodes_removed", 0),
+                "relationships_added": stats.get("relationships_added", 0),
+                "relationships_removed": stats.get("relationships_removed", 0),
+                "source": source,
+            },
+        )
 
         return ReindexResult(
             graph_id=graph_id,

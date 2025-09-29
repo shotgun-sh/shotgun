@@ -37,7 +37,9 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.models import AgentType, FileOperation
+from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+from shotgun.utils.source_detection import detect_source
 
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
@@ -351,6 +353,17 @@ class AgentManager(Widget):
             "gpt-5" in model_name.lower()
         )
 
+        # Track message send event
+        event_name = f"message_send_{self._current_agent_type.value}"
+        track_event(
+            event_name,
+            {
+                "has_prompt": prompt is not None,
+                "has_deferred_results": deferred_tool_results is not None,
+                "model_name": model_name,
+            },
+        )
+
         try:
             result: AgentRunResult[
                 str | DeferredToolRequests
@@ -448,6 +461,22 @@ class AgentManager(Widget):
                         self._post_partial_message(False)
 
                 elif isinstance(event, FunctionToolCallEvent):
+                    # Track tool call event
+
+                    # Detect source from call stack
+                    source = detect_source()
+
+                    track_event(
+                        "tool_called",
+                        {
+                            "tool_name": event.part.tool_name,
+                            "agent_mode": self._current_agent_type.value
+                            if self._current_agent_type
+                            else "unknown",
+                            "source": source,
+                        },
+                    )
+
                     existing_call_idx = next(
                         (
                             i
@@ -477,6 +506,24 @@ class AgentManager(Widget):
                         state.current_response = partial_message
                         self._post_partial_message(False)
                 elif isinstance(event, FunctionToolResultEvent):
+                    # Track tool completion event
+
+                    # Detect source from call stack
+                    source = detect_source()
+
+                    track_event(
+                        "tool_completed",
+                        {
+                            "tool_name": event.result.tool_name
+                            if hasattr(event.result, "tool_name")
+                            else "unknown",
+                            "agent_mode": self._current_agent_type.value
+                            if self._current_agent_type
+                            else "unknown",
+                            "source": source,
+                        },
+                    )
+
                     request_message = ModelRequest(parts=[event.result])
                     state.messages.append(request_message)
                     ## this is what the user responded with

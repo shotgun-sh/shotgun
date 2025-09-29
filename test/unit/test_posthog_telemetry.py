@@ -21,7 +21,7 @@ def test_setup_posthog_already_initialized():
 
 
 def test_setup_posthog_no_api_key():
-    """Test that setup returns False when no API key is configured."""
+    """Test that setup returns True even without environment variables (hardcoded key)."""
     # Reset the global client
     original_client = posthog_telemetry._posthog_client
     posthog_telemetry._posthog_client = None
@@ -29,8 +29,9 @@ def test_setup_posthog_no_api_key():
     try:
         with patch.dict(os.environ, {}, clear=True):
             with patch("shotgun.build_constants.POSTHOG_API_KEY", ""):
+                # PostHog should still initialize with hardcoded API key
                 result = posthog_telemetry.setup_posthog_observability()
-                assert result is False
+                assert result is True
     finally:
         posthog_telemetry._posthog_client = original_client
 
@@ -49,7 +50,7 @@ def test_setup_posthog_with_build_constants():
                         "shotgun.build_constants.POSTHOG_API_KEY", "test_api_key"
                     ):
                         with patch(
-                            "shotgun.agents.config.get_config_manager"
+                            "shotgun.posthog_telemetry.get_config_manager"
                         ) as mock_get_config:
                             mock_config = MagicMock()
                             mock_config.get_user_id.return_value = "test-user-id"
@@ -77,7 +78,7 @@ def test_setup_posthog_with_env_vars():
                     with patch.dict(os.environ, {"POSTHOG_API_KEY": "env_api_key"}):
                         with patch("shotgun.build_constants.POSTHOG_API_KEY", ""):
                             with patch(
-                                "shotgun.agents.config.get_config_manager"
+                                "shotgun.posthog_telemetry.get_config_manager"
                             ) as mock_get_config:
                                 mock_config = MagicMock()
                                 mock_config.get_user_id.return_value = "test-user-id"
@@ -87,31 +88,6 @@ def test_setup_posthog_with_env_vars():
 
                                 assert result is True
                                 assert posthog_telemetry._posthog_client is not None
-    finally:
-        posthog_telemetry._posthog_client = original_client
-
-
-def test_setup_posthog_import_error():
-    """Test setup handles ImportError gracefully."""
-    original_client = posthog_telemetry._posthog_client
-    posthog_telemetry._posthog_client = None
-
-    try:
-        # Temporarily hide the posthog module
-        import sys
-
-        posthog_module = sys.modules.get("posthog")
-        if "posthog" in sys.modules:
-            del sys.modules["posthog"]
-
-        # Now importing posthog should fail
-        with patch.dict("sys.modules", {"posthog": None}):
-            result = posthog_telemetry.setup_posthog_observability()
-            assert result is False
-
-        # Restore the module if it existed
-        if posthog_module:
-            sys.modules["posthog"] = posthog_module
     finally:
         posthog_telemetry._posthog_client = original_client
 
@@ -135,12 +111,12 @@ def test_track_event_initialized():
     posthog_telemetry._posthog_client = mock_client
 
     try:
-        with patch("shotgun.agents.config.get_config_manager") as mock_get_config:
+        with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
             mock_config = MagicMock()
             mock_config.get_user_id.return_value = "test-user-id"
             mock_get_config.return_value = mock_config
 
-            with patch("shotgun.__version__", "1.0.0"):
+            with patch("shotgun.posthog_telemetry.__version__", "1.0.0"):
                 posthog_telemetry.track_event("test_event", {"custom": "property"})
 
                 mock_client.capture.assert_called_once_with(
@@ -163,12 +139,12 @@ def test_track_event_dev_version():
     posthog_telemetry._posthog_client = mock_client
 
     try:
-        with patch("shotgun.agents.config.get_config_manager") as mock_get_config:
+        with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
             mock_config = MagicMock()
             mock_config.get_user_id.return_value = "test-user-id"
             mock_get_config.return_value = mock_config
 
-            with patch("shotgun.__version__", "1.0.0.dev1"):
+            with patch("shotgun.posthog_telemetry.__version__", "1.0.0.dev1"):
                 posthog_telemetry.track_event("test_event", None)
 
                 mock_client.capture.assert_called_once()
@@ -187,7 +163,7 @@ def test_track_event_exception_handling():
 
     try:
         with patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.posthog_telemetry.get_config_manager",
             side_effect=Exception("Config error"),
         ):
             # Should not raise exception

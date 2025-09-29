@@ -5,6 +5,7 @@ from pydantic_ai.usage import RequestUsage
 
 from shotgun.agents.models import AgentDeps
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 from .token_estimation import estimate_tokens_from_messages
 
@@ -56,6 +57,20 @@ async def apply_persistent_compaction(
             logger.debug(
                 f"Persistent compaction applied: {original_size} → {compacted_size} messages "
                 f"({reduction_pct:.1f}% reduction)"
+            )
+
+            # Track persistent compaction event
+            track_event(
+                "persistent_compaction_applied",
+                {
+                    "messages_before": original_size,
+                    "messages_after": compacted_size,
+                    "tokens_before": estimated_tokens,
+                    "reduction_percentage": round(reduction_pct, 2),
+                    "agent_mode": deps.agent_mode.value
+                    if hasattr(deps, "agent_mode") and deps.agent_mode
+                    else "unknown",
+                },
             )
         else:
             logger.debug(

@@ -1,8 +1,11 @@
 """PostHog analytics setup for Shotgun."""
 
-import os
 from typing import Any
 
+import posthog
+
+from shotgun import __version__
+from shotgun.agents.config import get_config_manager
 from shotgun.logging_config import get_early_logger
 
 # Use early logger to prevent automatic StreamHandler creation
@@ -21,41 +24,15 @@ def setup_posthog_observability() -> bool:
     global _posthog_client
 
     try:
-        import posthog
-
         # Check if PostHog is already initialized
         if _posthog_client is not None:
             logger.debug("PostHog is already initialized, skipping")
             return True
 
-        # Try to get API key from build constants first (production builds)
-        api_key = None
+        # Hardcoded PostHog configuration
+        api_key = "phc_KKnChzZUKeNqZDOTJ6soCBWNQSx3vjiULdwTR9H5Mcr"
 
-        try:
-            from shotgun import build_constants
-
-            api_key = build_constants.POSTHOG_API_KEY
-            if api_key:
-                logger.debug("Using PostHog configuration from build constants")
-        except (ImportError, AttributeError):
-            pass
-
-        # Fallback to environment variables if build constants are empty or missing
-        if not api_key:
-            api_key = os.getenv("POSTHOG_API_KEY", "")
-            if api_key:
-                logger.debug("Using PostHog configuration from environment variables")
-
-        if not api_key:
-            logger.debug(
-                "No PostHog API key configured, skipping PostHog initialization"
-            )
-            return False
-
-        logger.debug("Found PostHog configuration, proceeding with setup")
-
-        # Get version for context
-        from shotgun import __version__
+        logger.debug("Using hardcoded PostHog configuration")
 
         # Determine environment based on version
         # Dev versions contain "dev", "rc", "alpha", or "beta"
@@ -73,20 +50,25 @@ def setup_posthog_observability() -> bool:
 
         # Set user context with anonymous user ID from config
         try:
-            from shotgun.agents.config import get_config_manager
-
             config_manager = get_config_manager()
             user_id = config_manager.get_user_id()
+
+            # Identify the user in PostHog
+            posthog.identify(  # type: ignore[attr-defined]
+                distinct_id=user_id,
+                properties={
+                    "version": __version__,
+                    "environment": environment,
+                },
+            )
 
             # Set default properties for all events
             posthog.disabled = False
             posthog.personal_api_key = None  # Not needed for event tracking
 
-            logger.debug(
-                "PostHog user context will be set with anonymous ID: %s", user_id
-            )
+            logger.debug("PostHog user identified with anonymous ID: %s", user_id)
         except Exception as e:
-            logger.warning("Failed to get user context: %s", e)
+            logger.warning("Failed to set user context: %s", e)
 
         logger.debug(
             "PostHog analytics configured successfully (environment: %s, version: %s)",
@@ -95,9 +77,6 @@ def setup_posthog_observability() -> bool:
         )
         return True
 
-    except ImportError as e:
-        logger.error("PostHog SDK not available: %s", e)
-        return False
     except Exception as e:
         logger.warning("Failed to setup PostHog analytics: %s", e)
         return False
@@ -117,9 +96,6 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         return
 
     try:
-        from shotgun import __version__
-        from shotgun.agents.config import get_config_manager
-
         # Get user ID for tracking
         config_manager = get_config_manager()
         user_id = config_manager.get_user_id()

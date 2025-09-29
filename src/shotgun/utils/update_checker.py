@@ -5,6 +5,10 @@ import sys
 import threading
 from pathlib import Path
 
+import httpx
+from packaging import version
+
+from shotgun import __version__
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -108,13 +112,6 @@ def perform_auto_update_async(no_update_check: bool = False) -> threading.Thread
     thread = threading.Thread(target=_run_update, daemon=True)
     thread.start()
     return thread
-
-
-# Keep these for backward compatibility with the update CLI command
-import httpx  # noqa: E402
-from packaging import version  # noqa: E402
-
-from shotgun import __version__  # noqa: E402
 
 
 def is_dev_version(version_str: str | None = None) -> bool:

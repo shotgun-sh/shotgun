@@ -2,6 +2,7 @@
 
 import os
 
+from shotgun import __version__
 from shotgun.logging_config import get_early_logger
 
 # Use early logger to prevent automatic StreamHandler creation
@@ -40,9 +41,6 @@ def setup_sentry_observability() -> bool:
             return False
 
         logger.debug("Found DSN, proceeding with Sentry setup")
-
-        # Get version for release tracking
-        from shotgun import __version__
 
         # Determine environment based on version
         # Dev versions contain "dev", "rc", "alpha", or "beta"
