@@ -353,7 +353,19 @@ class CodebaseGraphManager:
 
         # Check if graph already exists
         if graph_path.exists():
-            raise CodebaseAlreadyIndexedError(repo_path)
+            # Verify it's not corrupted by checking if we can load the Project node
+            existing_graph = await self.get_graph(graph_id)
+            if existing_graph:
+                # Valid existing graph
+                raise CodebaseAlreadyIndexedError(repo_path)
+            else:
+                # Corrupted database - remove and re-index
+                logger.warning(
+                    f"Found corrupted database at {graph_path}, removing for re-indexing..."
+                )
+                import shutil
+
+                shutil.rmtree(graph_path)
 
         # Import the builder from local core module
         from shotgun.codebase.core import CodebaseIngestor

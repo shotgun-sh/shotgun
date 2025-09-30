@@ -238,25 +238,97 @@ class AgentResponseWidget(Widget):
                     continue
         return acc.strip()
 
+    def _truncate(self, text: str, max_length: int = 100) -> str:
+        """Truncate text to max_length characters, adding ellipsis if needed."""
+        if len(text) <= max_length:
+            return text
+        return text[: max_length - 3] + "..."
+
+    def _parse_args(self, args: dict[str, object] | str | None) -> dict[str, object]:
+        """Parse tool call arguments, handling both dict and JSON string formats."""
+        if args is None:
+            return {}
+        if isinstance(args, str):
+            try:
+                return json.loads(args) if args.strip() else {}
+            except json.JSONDecodeError:
+                return {}
+        return args if isinstance(args, dict) else {}
+
     def _format_tool_call_part(self, part: ToolCallPart) -> str:
         if part.tool_name == "ask_user":
             return self._format_ask_user_part(part)
+
+        # Parse args once (handles both JSON string and dict)
+        args = self._parse_args(part.args)
+
+        # Codebase tools - show friendly names
+        if part.tool_name == "query_graph":
+            if "query" in args:
+                query = self._truncate(str(args["query"]))
+                return f'Querying code: "{query}"'
+            return "Querying code"
+
+        if part.tool_name == "retrieve_code":
+            if "qualified_name" in args:
+                return f'Retrieving code: "{args["qualified_name"]}"'
+            return "Retrieving code"
+
+        if part.tool_name == "file_read":
+            if "file_path" in args:
+                return f'Reading file: "{args["file_path"]}"'
+            return "Reading file"
+
+        if part.tool_name == "directory_lister":
+            if "directory" in args:
+                return f'Listing directory: "{args["directory"]}"'
+            return "Listing directory"
+
+        if part.tool_name == "codebase_shell":
+            command = args.get("command", "")
+            cmd_args = args.get("args", [])
+            # Handle cmd_args as list of strings
+            if isinstance(cmd_args, list):
+                args_str = " ".join(str(arg) for arg in cmd_args)
+            else:
+                args_str = ""
+            full_cmd = f"{command} {args_str}".strip()
+            if full_cmd:
+                return f'Running shell: "{self._truncate(full_cmd)}"'
+            return "Running shell"
+
+        # File management tools
+        if part.tool_name == "read_file":
+            if "filename" in args:
+                return f'Reading file: "{args["filename"]}"'
+            return "Reading file"
+
+        # Web search tools
+        if part.tool_name in [
+            "openai_web_search_tool",
+            "anthropic_web_search_tool",
+            "gemini_web_search_tool",
+        ]:
+            if "query" in args:
+                query = self._truncate(str(args["query"]))
+                return f'Searching web: "{query}"'
+            return "Searching web"
+
         # write_file
         if part.tool_name == "write_file" or part.tool_name == "append_file":
-            if isinstance(part.args, dict) and "filename" in part.args:
-                return f"{part.tool_name}({part.args['filename']})"
-            else:
-                return f"{part.tool_name}()"
+            if "filename" in args:
+                return f"{part.tool_name}({args['filename']})"
+            return f"{part.tool_name}()"
+
         if part.tool_name == "write_artifact_section":
-            if isinstance(part.args, dict) and "section_title" in part.args:
-                return f"{part.tool_name}({part.args['section_title']})"
-            else:
-                return f"{part.tool_name}()"
+            if "section_title" in args:
+                return f"{part.tool_name}({args['section_title']})"
+            return f"{part.tool_name}()"
+
         if part.tool_name == "create_artifact":
-            if isinstance(part.args, dict) and "name" in part.args:
-                return f"{part.tool_name}({part.args['name']})"
-            else:
-                return f"▪ {part.tool_name}()"
+            if "name" in args:
+                return f"{part.tool_name}({args['name']})"
+            return f"▪ {part.tool_name}()"
 
         return f"{part.tool_name}({part.args})"
 

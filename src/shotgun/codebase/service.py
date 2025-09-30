@@ -69,6 +69,10 @@ class CodebaseService:
             # Otherwise, check if current directory is in the allowed list
             elif target_path in graph.indexed_from_cwds:
                 filtered_graphs.append(graph)
+            # Also allow access if current directory IS the repository itself
+            # Use Path.resolve() for robust comparison (handles symlinks, etc.)
+            elif Path(target_path).resolve() == Path(graph.repo_path).resolve():
+                filtered_graphs.append(graph)
 
         return filtered_graphs
 
