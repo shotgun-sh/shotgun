@@ -31,6 +31,7 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     ToolCallPart,
     ToolCallPartDelta,
+    ToolReturnPart,
 )
 from textual.message import Message
 from textual.widget import Widget
@@ -44,7 +45,7 @@ from shotgun.utils.source_detection import detect_source
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
 from .messages import AgentSystemPrompt
-from .models import AgentDeps, AgentRuntimeOptions
+from .models import AgentDeps, AgentRuntimeOptions, UserAnswer
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .specify import create_specify_agent
@@ -272,6 +273,8 @@ class AgentManager(Widget):
         # Use merged deps (shared state + agent-specific system prompt) if not provided
         if deps is None:
             deps = self._create_merged_deps(self._current_agent_type)
+        if not deferred_tool_results:
+            self.ensure_agent_canecelled_safely()
 
         # Ensure deps is not None
         if deps is None:
@@ -673,6 +676,32 @@ class AgentManager(Widget):
     def add_hint_message(self, message: HintMessage) -> None:
         self.ui_message_history.append(message)
         self._post_messages_updated()
+
+    def ensure_agent_canecelled_safely(self) -> None:
+        if not self.message_history:
+            return
+        self.last_response = self.message_history[-1]
+        ## we're searching for unanswered ask_user parts
+        found_tool = None
+        for part in self.message_history[-1].parts:
+            if isinstance(part, ToolCallPart) and part.tool_name == "ask_user":
+                found_tool = part
+                break
+        if not found_tool:
+            return
+        tool_result = ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_call_id=found_tool.tool_call_id,
+                    tool_name=found_tool.tool_name,
+                    content=UserAnswer(
+                        answer="⚠️ Operation cancelled by user",
+                        tool_call_id=found_tool.tool_call_id,
+                    ),
+                )
+            ]
+        )
+        self.message_history.append(tool_result)
 
 
 # Re-export AgentType for backward compatibility

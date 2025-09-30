@@ -746,6 +746,7 @@ class ChatScreen(Screen[None]):
         except asyncio.CancelledError:
             # Handle cancellation gracefully - DO NOT re-raise
             self.mount_hint("⚠️ Operation cancelled by user")
+            self.agent_manager.ensure_agent_canecelled_safely()
         finally:
             self.working = False
             self._current_worker = None
