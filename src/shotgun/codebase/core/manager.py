@@ -1221,26 +1221,11 @@ class CodebaseGraphManager:
 
         removed_graphs = []
 
-        # Find all .kuzu files (can be files or directories)
+        # Find all .kuzu databases (files in v0.11.2, directories in newer versions)
         for path in self.storage_dir.glob("*.kuzu"):
             graph_id = path.stem
 
-            # If it's a plain file (not a directory), it's corrupted
-            # Valid Kuzu databases are always directories
-            if path.is_file():
-                logger.warning(
-                    f"Detected corrupted database file (should be directory) at {path}, removing it"
-                )
-                try:
-                    await anyio.to_thread.run_sync(path.unlink)
-                    removed_graphs.append(graph_id)
-                    logger.info(f"Removed corrupted database file: {graph_id}")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to remove corrupted database file {graph_id}: {e}"
-                    )
-                continue
-
+            # Try to open and validate the database
             try:
                 # Try to open the database with a timeout to prevent hanging
                 async def try_open_database(
@@ -1346,7 +1331,7 @@ class CodebaseGraphManager:
         """
         graphs = []
 
-        # Find all .kuzu files
+        # Find all .kuzu database files (Kuzu v0.11.2 creates files, not directories)
         for path in self.storage_dir.glob("*.kuzu"):
             if path.is_file():
                 graph_id = path.stem
@@ -1439,6 +1424,8 @@ class CodebaseGraphManager:
         Args:
             graph_id: Graph to delete
         """
+        import shutil
+
         # Stop watcher if running
         if graph_id in self._watchers:
             await self.stop_watcher(graph_id)
@@ -1453,11 +1440,14 @@ class CodebaseGraphManager:
                 self._databases[graph_id].close()
                 del self._databases[graph_id]
 
-        # Delete files
+        # Delete database (files in v0.11.2, directories in newer versions)
         graph_path = self.storage_dir / f"{graph_id}.kuzu"
         if graph_path.exists():
-            # Delete the database file
-            await anyio.to_thread.run_sync(graph_path.unlink)
+            if graph_path.is_dir():
+                await anyio.to_thread.run_sync(shutil.rmtree, graph_path)
+            else:
+                # File-based database (Kuzu v0.11.2)
+                await anyio.to_thread.run_sync(graph_path.unlink)
 
         # Also delete the WAL file if it exists
         wal_path = self.storage_dir / f"{graph_id}.kuzu.wal"
