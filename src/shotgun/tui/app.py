@@ -83,6 +83,10 @@ class ShotgunApp(App[None]):
 
     async def action_quit(self) -> None:
         """Quit the application."""
+        # Shut down PostHog client to prevent threading errors
+        from shotgun.posthog_telemetry import shutdown
+
+        shutdown()
         self.exit()
 
     def get_system_commands(self, screen: Screen[Any]) -> Iterable[SystemCommand]:

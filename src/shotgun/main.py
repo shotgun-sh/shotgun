@@ -118,7 +118,15 @@ def main(
 
     if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
         logger.debug("Launching shotgun TUI application")
-        tui_app.run(no_update_check=no_update_check, continue_session=continue_session)
+        try:
+            tui_app.run(
+                no_update_check=no_update_check, continue_session=continue_session
+            )
+        finally:
+            # Ensure PostHog is shut down cleanly even if TUI exits unexpectedly
+            from shotgun.posthog_telemetry import shutdown
+
+            shutdown()
         raise typer.Exit()
 
     # For CLI commands, register PostHog shutdown handler

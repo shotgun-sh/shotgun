@@ -16,6 +16,7 @@ from textual import events, on, work
 from textual.app import ComposeResult
 from textual.command import CommandPalette
 from textual.containers import Container, Grid
+from textual.keys import Keys
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
@@ -285,13 +286,18 @@ class ChatScreen(Screen[None]):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
-        # If escape is pressed while agent is working, cancel the operation
-        if event.key == "escape" and self.working and self._current_worker:
-            # Track ESC cancellation event
+        # If escape or ctrl+c is pressed while agent is working, cancel the operation
+        if (
+            event.key in (Keys.Escape, Keys.ControlC)
+            and self.working
+            and self._current_worker
+        ):
+            # Track cancellation event
             track_event(
-                "agent_cancelled_escape",
+                "agent_cancelled",
                 {
                     "agent_mode": self.mode.value,
+                    "cancel_key": event.key,
                 },
             )
 
@@ -302,6 +308,8 @@ class ChatScreen(Screen[None]):
             # Re-enable the input
             prompt_input = self.query_one(PromptInput)
             prompt_input.focus()
+            # Prevent the event from propagating (don't quit the app)
+            event.stop()
 
     @work
     async def check_if_codebase_is_indexed(self) -> None:
