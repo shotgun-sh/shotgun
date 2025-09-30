@@ -101,7 +101,6 @@ class ChatHistory(Widget):
 
         # Track how many messages were rendered during initial compose
         self._rendered_count = len(filtered)
-        self.call_later(self.autoscroll)
 
     def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
         for idx, next_item in enumerate(self.items):
@@ -167,18 +166,6 @@ class ChatHistory(Widget):
                 self.vertical_tail.mount(widget, before=self.vertical_tail.children[-1])
 
             self._rendered_count = len(filtered)
-            self.call_after_refresh(self.autoscroll)
-
-    def autoscroll(self) -> None:
-        """Smoothly scroll to the bottom after new content is added."""
-        if self.vertical_tail:
-            # Scroll to absolute bottom - more reliable during recomposition
-            self.vertical_tail.scroll_end(animate=False, force=True)
-
-    def watch_partial_response(self, partial_response: ModelMessage | None) -> None:
-        """Trigger autoscroll when partial response updates during streaming."""
-        if partial_response is not None:
-            self.call_after_refresh(self.autoscroll)
 
 
 class UserQuestionWidget(Widget):
