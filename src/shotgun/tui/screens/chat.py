@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -20,7 +19,7 @@ from textual.containers import Container, Grid
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, DirectoryTree, Input, Label, Markdown, Static
+from textual.widgets import Button, Label, Markdown, Static
 
 from shotgun.agents.agent_manager import (
     AgentManager,
@@ -44,10 +43,11 @@ from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
-from shotgun.sdk.services import get_codebase_service
 from shotgun.tui.commands import CommandHandler
+from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
+from shotgun.utils import get_shotgun_home
 
 from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
@@ -167,11 +167,6 @@ class ModeIndicator(Widget):
         return f"[bold $text-accent]{mode_title}{status_icon} mode[/][$foreground-muted] ({description})[/]"
 
 
-class FilteredDirectoryTree(DirectoryTree):
-    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
-        return [path for path in paths if path.is_dir()]
-
-
 class CodebaseIndexPromptScreen(ModalScreen[bool]):
     """Modal dialog asking whether to index the detected codebase."""
 
@@ -226,105 +221,6 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
         self.dismiss(True)
 
 
-class CodebaseIndexScreen(ModalScreen[CodebaseIndexSelection | None]):
-    """Modal dialog for choosing a repository and name to index."""
-
-    DEFAULT_CSS = """
-        CodebaseIndexScreen {
-            align: center middle;
-            background: rgba(0, 0, 0, 0.0);
-        }
-        CodebaseIndexScreen > #index-dialog {
-            width: 80%;
-            max-width: 80;
-            height: 80%;
-            max-height: 40;
-            border: wide $primary;
-            padding: 1;
-            layout: vertical;
-            background: $surface;
-        }
-
-        #index-dialog DirectoryTree {
-            height: 1fr;
-            border: solid $accent;
-            overflow: auto;
-        }
-
-        #index-dialog-controls {
-            layout: horizontal;
-            align-horizontal: right;
-            padding-top: 1;
-        }
-    """
-
-    def __init__(self, start_path: Path | None = None) -> None:
-        super().__init__()
-        self.start_path = Path(start_path or Path.cwd())
-        self.selected_path: Path | None = self.start_path
-
-    def compose(self) -> ComposeResult:
-        with Container(id="index-dialog"):
-            yield Label("Index a codebase", id="index-dialog-title")
-            yield FilteredDirectoryTree(self.start_path, id="index-directory-tree")
-            yield Input(
-                placeholder="Enter a name for the codebase",
-                id="index-codebase-name",
-            )
-            with Container(id="index-dialog-controls"):
-                yield Button("Cancel", id="index-cancel")
-                yield Button(
-                    "Index",
-                    id="index-confirm",
-                    variant="primary",
-                    disabled=True,
-                )
-
-    def on_mount(self) -> None:
-        name_input = self.query_one("#index-codebase-name", Input)
-        if not name_input.value and self.selected_path:
-            name_input.value = self.selected_path.name
-        self._update_confirm()
-
-    def _update_confirm(self) -> None:
-        confirm = self.query_one("#index-confirm", Button)
-        name_input = self.query_one("#index-codebase-name", Input)
-        confirm.disabled = not (self.selected_path and name_input.value.strip())
-
-    @on(DirectoryTree.DirectorySelected, "#index-directory-tree")
-    def handle_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
-        event.stop()
-        selected = event.path if event.path.is_dir() else event.path.parent
-        self.selected_path = selected
-        name_input = self.query_one("#index-codebase-name", Input)
-        if not name_input.value:
-            name_input.value = selected.name
-        self._update_confirm()
-
-    @on(Input.Changed, "#index-codebase-name")
-    def handle_name_changed(self, event: Input.Changed) -> None:
-        event.stop()
-        self._update_confirm()
-
-    @on(Button.Pressed, "#index-cancel")
-    def handle_cancel(self, event: Button.Pressed) -> None:
-        event.stop()
-        self.dismiss(None)
-
-    @on(Button.Pressed, "#index-confirm")
-    def handle_confirm(self, event: Button.Pressed) -> None:
-        event.stop()
-        name_input = self.query_one("#index-codebase-name", Input)
-        if not self.selected_path:
-            self.dismiss(None)
-            return
-        selection = CodebaseIndexSelection(
-            repo_path=self.selected_path,
-            name=name_input.value.strip(),
-        )
-        self.dismiss(selection)
-
-
 class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
 
@@ -349,7 +245,9 @@ class ChatScreen(Screen[None]):
         super().__init__()
         # Get the model configuration and services
         model_config = get_provider_model()
-        codebase_service = get_codebase_service()
+        # Use filtered service in TUI to restrict access to CWD codebase only
+        storage_dir = get_shotgun_home() / "codebases"
+        codebase_service = FilteredCodebaseService(storage_dir)
         self.codebase_sdk = CodebaseSDK()
 
         # Create shared deps without system_prompt_fn (agents provide their own)
@@ -423,6 +321,7 @@ class ChatScreen(Screen[None]):
             self.mount_hint(help_text_with_codebase(already_indexed=True))
             return
 
+        # Ask user if they want to index the current directory
         should_index = await self.app.push_screen_wait(CodebaseIndexPromptScreen())
         if not should_index:
             self.mount_hint(help_text_empty_dir())
@@ -430,7 +329,10 @@ class ChatScreen(Screen[None]):
 
         self.mount_hint(help_text_with_codebase(already_indexed=False))
 
-        self.index_codebase_command()
+        # Auto-index the current directory with its name
+        cwd_name = cur_dir.name
+        selection = CodebaseIndexSelection(repo_path=cur_dir, name=cwd_name)
+        self.call_later(lambda: self.index_codebase(selection))
 
     def watch_mode(self, new_mode: AgentType) -> None:
         """React to mode changes by updating the agent manager."""
@@ -644,16 +546,11 @@ class ChatScreen(Screen[None]):
         return self.placeholder_hints.get_placeholder_for_mode(mode)
 
     def index_codebase_command(self) -> None:
-        start_path = Path.cwd()
-
-        def handle_result(result: CodebaseIndexSelection | None) -> None:
-            if result:
-                self.call_later(lambda: self.index_codebase(result))
-
-        self.app.push_screen(
-            CodebaseIndexScreen(start_path=start_path),
-            handle_result,
-        )
+        # Simplified: always index current working directory with its name
+        cur_dir = Path.cwd().resolve()
+        cwd_name = cur_dir.name
+        selection = CodebaseIndexSelection(repo_path=cur_dir, name=cwd_name)
+        self.call_later(lambda: self.index_codebase(selection))
 
     def delete_codebase_command(self) -> None:
         self.app.push_screen(
