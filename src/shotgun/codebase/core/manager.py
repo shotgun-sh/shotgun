@@ -1208,6 +1208,136 @@ class CodebaseGraphManager:
             )
             return None
 
+    async def cleanup_corrupted_databases(self) -> list[str]:
+        """Detect and remove corrupted Kuzu databases.
+
+        This method iterates through all .kuzu files in the storage directory,
+        attempts to open them, and removes any that are corrupted or unreadable.
+
+        Returns:
+            List of graph_ids that were removed due to corruption
+        """
+        import shutil
+
+        removed_graphs = []
+
+        # Find all .kuzu files (can be files or directories)
+        for path in self.storage_dir.glob("*.kuzu"):
+            graph_id = path.stem
+
+            # If it's a plain file (not a directory), it's corrupted
+            # Valid Kuzu databases are always directories
+            if path.is_file():
+                logger.warning(
+                    f"Detected corrupted database file (should be directory) at {path}, removing it"
+                )
+                try:
+                    await anyio.to_thread.run_sync(path.unlink)
+                    removed_graphs.append(graph_id)
+                    logger.info(f"Removed corrupted database file: {graph_id}")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to remove corrupted database file {graph_id}: {e}"
+                    )
+                continue
+
+            try:
+                # Try to open the database with a timeout to prevent hanging
+                async def try_open_database(
+                    gid: str = graph_id, db_path: Path = path
+                ) -> bool:
+                    lock = await self._get_lock()
+                    async with lock:
+                        # Close existing connections if any
+                        if gid in self._connections:
+                            try:
+                                self._connections[gid].close()
+                            except Exception as e:
+                                logger.debug(
+                                    f"Failed to close connection for {gid}: {e}"
+                                )
+                            del self._connections[gid]
+                        if gid in self._databases:
+                            try:
+                                self._databases[gid].close()
+                            except Exception as e:
+                                logger.debug(f"Failed to close database for {gid}: {e}")
+                            del self._databases[gid]
+
+                        # Try to open the database
+                        def _open_and_query(g: str = gid, p: Path = db_path) -> bool:
+                            db = kuzu.Database(str(p))
+                            conn = kuzu.Connection(db)
+                            try:
+                                result = conn.execute(
+                                    "MATCH (p:Project {graph_id: $graph_id}) RETURN p",
+                                    {"graph_id": g},
+                                )
+                                has_results = (
+                                    result.has_next()
+                                    if hasattr(result, "has_next")
+                                    else False
+                                )
+                                return has_results
+                            finally:
+                                conn.close()
+                                db.close()
+
+                        return await anyio.to_thread.run_sync(_open_and_query)
+
+                # Try to open with 5 second timeout
+                has_project = await asyncio.wait_for(try_open_database(), timeout=5.0)
+
+                if not has_project:
+                    # Database exists but has no Project node - consider it corrupted
+                    raise ValueError("No Project node found in database")
+
+            except (Exception, asyncio.TimeoutError) as e:
+                # Database is corrupted or timed out - remove it
+                error_type = (
+                    "timed out" if isinstance(e, asyncio.TimeoutError) else "corrupted"
+                )
+                logger.warning(
+                    f"Detected {error_type} database at {path}, removing it. "
+                    f"Error: {str(e) if not isinstance(e, asyncio.TimeoutError) else 'Operation timed out after 5 seconds'}"
+                )
+
+                try:
+                    # Clean up any open connections
+                    lock = await self._get_lock()
+                    async with lock:
+                        if graph_id in self._connections:
+                            try:
+                                self._connections[graph_id].close()
+                            except Exception as e:
+                                logger.debug(
+                                    f"Failed to close connection during cleanup for {graph_id}: {e}"
+                                )
+                            del self._connections[graph_id]
+                        if graph_id in self._databases:
+                            try:
+                                self._databases[graph_id].close()
+                            except Exception as e:
+                                logger.debug(
+                                    f"Failed to close database during cleanup for {graph_id}: {e}"
+                                )
+                            del self._databases[graph_id]
+
+                    # Remove the database (could be file or directory)
+                    if path.is_dir():
+                        await anyio.to_thread.run_sync(shutil.rmtree, path)
+                    else:
+                        await anyio.to_thread.run_sync(path.unlink)
+                    removed_graphs.append(graph_id)
+                    logger.info(f"Removed {error_type} database: {graph_id}")
+
+                except Exception as cleanup_error:
+                    logger.error(
+                        f"Failed to remove corrupted database {graph_id}: {cleanup_error}"
+                    )
+
+        return removed_graphs
+
     async def list_graphs(self) -> list[CodebaseGraph]:
         """List all available graphs.
 

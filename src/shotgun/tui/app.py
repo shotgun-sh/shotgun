@@ -100,6 +100,26 @@ def run(no_update_check: bool = False, continue_session: bool = False) -> None:
         no_update_check: If True, disable automatic update checks.
         continue_session: If True, continue from previous conversation.
     """
+    # Clean up any corrupted databases BEFORE starting the TUI
+    # This prevents crashes from corrupted databases during initialization
+    import asyncio
+
+    from shotgun.codebase.core.manager import CodebaseGraphManager
+    from shotgun.utils import get_shotgun_home
+
+    storage_dir = get_shotgun_home() / "codebases"
+    manager = CodebaseGraphManager(storage_dir)
+
+    try:
+        removed = asyncio.run(manager.cleanup_corrupted_databases())
+        if removed:
+            logger.info(
+                f"Cleaned up {len(removed)} corrupted database(s) before TUI startup"
+            )
+    except Exception as e:
+        logger.error(f"Failed to cleanup corrupted databases: {e}")
+        # Continue anyway - the TUI can still function
+
     app = ShotgunApp(no_update_check=no_update_check, continue_session=continue_session)
     app.run(inline_no_clear=True)
 
