@@ -41,7 +41,6 @@ class PartialResponseWidget(Widget):  # TODO: doesn't work lol
         self.item = item
 
     def compose(self) -> ComposeResult:
-        yield Markdown(markdown="**partial response**")
         if self.item is None:
             pass
         elif self.item.kind == "response":
@@ -172,10 +171,14 @@ class ChatHistory(Widget):
 
     def autoscroll(self) -> None:
         """Smoothly scroll to the bottom after new content is added."""
-        if self.vertical_tail and self.vertical_tail.children:
-            # Scroll to the last child widget for precise positioning
-            last_widget = self.vertical_tail.children[-1]
-            self.vertical_tail.scroll_to_widget(last_widget, animate=False, force=True)
+        if self.vertical_tail:
+            # Scroll to absolute bottom - more reliable during recomposition
+            self.vertical_tail.scroll_end(animate=False, force=True)
+
+    def watch_partial_response(self, partial_response: ModelMessage | None) -> None:
+        """Trigger autoscroll when partial response updates during streaming."""
+        if partial_response is not None:
+            self.call_after_refresh(self.autoscroll)
 
 
 class UserQuestionWidget(Widget):
