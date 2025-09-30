@@ -82,12 +82,14 @@ class ChatHistory(Widget):
         self.items: Sequence[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
         self.partial_response = None
+        self._rendered_count = 0  # Track how many messages have been mounted
 
     def compose(self) -> ComposeResult:
         self.vertical_tail = VerticalTail()
 
+        filtered = list(self.filtered_items())
         with self.vertical_tail:
-            for item in self.filtered_items():
+            for item in filtered:
                 if isinstance(item, ModelRequest):
                     yield UserQuestionWidget(item)
                 elif isinstance(item, HintMessage):
@@ -97,6 +99,9 @@ class ChatHistory(Widget):
             yield PartialResponseWidget(self.partial_response).data_bind(
                 item=ChatHistory.partial_response
             )
+
+        # Track how many messages were rendered during initial compose
+        self._rendered_count = len(filtered)
         self.call_later(self.autoscroll)
 
     def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
@@ -138,17 +143,39 @@ class ChatHistory(Widget):
             yield next_item
 
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
-        """Update the displayed messages without recomposing."""
+        """Update the displayed messages using incremental mounting."""
         if not self.vertical_tail:
             return
 
         self.items = messages
-        self.refresh(recompose=True)
-        self.call_later(self.autoscroll)
+        filtered = list(self.filtered_items())
+
+        # Only mount new messages that haven't been rendered yet
+        if len(filtered) > self._rendered_count:
+            new_messages = filtered[self._rendered_count :]
+            for item in new_messages:
+                widget: Widget
+                if isinstance(item, ModelRequest):
+                    widget = UserQuestionWidget(item)
+                elif isinstance(item, HintMessage):
+                    widget = HintMessageWidget(item)
+                elif isinstance(item, ModelResponse):
+                    widget = AgentResponseWidget(item)
+                else:
+                    continue
+
+                # Mount before the PartialResponseWidget
+                self.vertical_tail.mount(widget, before=self.vertical_tail.children[-1])
+
+            self._rendered_count = len(filtered)
+            self.call_after_refresh(self.autoscroll)
 
     def autoscroll(self) -> None:
-        if self.vertical_tail:
-            self.vertical_tail.scroll_end(animate=False, immediate=False, force=True)
+        """Smoothly scroll to the bottom after new content is added."""
+        if self.vertical_tail and self.vertical_tail.children:
+            # Scroll to the last child widget for precise positioning
+            last_widget = self.vertical_tail.children[-1]
+            self.vertical_tail.scroll_to_widget(last_widget, animate=False, force=True)
 
 
 class UserQuestionWidget(Widget):

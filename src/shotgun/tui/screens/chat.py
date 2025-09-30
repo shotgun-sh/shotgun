@@ -529,12 +529,16 @@ class ChatScreen(Screen[None]):
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
         self.partial_message = event.message
-
         history = self.query_one(ChatHistory)
-        history.update_messages(
-            self.messages + cast(list[ModelMessage | HintMessage], event.messages)
-        )
 
+        # Only update messages if the message list changed
+        new_message_list = self.messages + cast(
+            list[ModelMessage | HintMessage], event.messages
+        )
+        if len(new_message_list) != len(history.items):
+            history.update_messages(new_message_list)
+
+        # Always update the partial response (reactive property handles the update)
         history.partial_response = self.partial_message
 
     def _clear_partial_response(self) -> None:
