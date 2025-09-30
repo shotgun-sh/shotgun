@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from pydantic_ai import DeferredToolResults, RunContext
+from pydantic_ai import RunContext
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -37,7 +37,6 @@ from shotgun.agents.models import (
     AgentDeps,
     AgentType,
     FileOperationTracker,
-    UserAnswer,
     UserQuestion,
 )
 from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
@@ -712,7 +711,6 @@ class ChatScreen(Screen[None]):
 
     @work
     async def run_agent(self, message: str) -> None:
-        deferred_tool_results = None
         prompt = None
         self.working = True
 
@@ -721,32 +719,15 @@ class ChatScreen(Screen[None]):
 
         self._current_worker = get_current_worker()
 
-        if self.question:
-            # This is a response to a question from the agent
-            self.question.result.set_result(
-                UserAnswer(answer=message, tool_call_id=self.question.tool_call_id)
-            )
-
-            deferred_tool_results = DeferredToolResults()
-
-            deferred_tool_results.calls[self.question.tool_call_id] = UserAnswer(
-                answer=message, tool_call_id=self.question.tool_call_id
-            )
-
-            self.question = None
-        else:
-            # This is a new user prompt
-            prompt = message
+        prompt = message
 
         try:
             await self.agent_manager.run(
                 prompt=prompt,
-                deferred_tool_results=deferred_tool_results,
             )
         except asyncio.CancelledError:
             # Handle cancellation gracefully - DO NOT re-raise
             self.mount_hint("⚠️ Operation cancelled by user")
-            self.agent_manager.ensure_agent_canecelled_safely()
         finally:
             self.working = False
             self._current_worker = None

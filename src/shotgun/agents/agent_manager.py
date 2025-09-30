@@ -31,7 +31,6 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     ToolCallPart,
     ToolCallPartDelta,
-    ToolReturnPart,
 )
 from textual.message import Message
 from textual.widget import Widget
@@ -273,8 +272,15 @@ class AgentManager(Widget):
         # Use merged deps (shared state + agent-specific system prompt) if not provided
         if deps is None:
             deps = self._create_merged_deps(self._current_agent_type)
-        if not deferred_tool_results:
-            self.ensure_agent_canecelled_safely()
+        ask_user_part = self.get_unanswered_ask_user_part()
+        if ask_user_part and prompt:
+            if not deferred_tool_results:
+                deferred_tool_results = DeferredToolResults()
+            deferred_tool_results.calls[ask_user_part.tool_call_id] = UserAnswer(
+                answer=prompt,
+                tool_call_id=ask_user_part.tool_call_id,
+            )
+            prompt = None
 
         # Ensure deps is not None
         if deps is None:
@@ -677,31 +683,21 @@ class AgentManager(Widget):
         self.ui_message_history.append(message)
         self._post_messages_updated()
 
-    def ensure_agent_canecelled_safely(self) -> None:
+    def get_unanswered_ask_user_part(self) -> ToolCallPart | None:
         if not self.message_history:
-            return
+            return None
         self.last_response = self.message_history[-1]
         ## we're searching for unanswered ask_user parts
-        found_tool = None
-        for part in self.message_history[-1].parts:
-            if isinstance(part, ToolCallPart) and part.tool_name == "ask_user":
-                found_tool = part
-                break
-        if not found_tool:
-            return
-        tool_result = ModelRequest(
-            parts=[
-                ToolReturnPart(
-                    tool_call_id=found_tool.tool_call_id,
-                    tool_name=found_tool.tool_name,
-                    content=UserAnswer(
-                        answer="⚠️ Operation cancelled by user",
-                        tool_call_id=found_tool.tool_call_id,
-                    ),
-                )
-            ]
+        found_tool = next(
+            (
+                part
+                for part in self.message_history[-1].parts
+                if isinstance(part, ToolCallPart) and part.tool_name == "ask_user"
+            ),
+            None,
         )
-        self.message_history.append(tool_result)
+
+        return found_tool
 
 
 # Re-export AgentType for backward compatibility
