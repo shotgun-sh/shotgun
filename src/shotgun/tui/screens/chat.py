@@ -41,6 +41,7 @@ from shotgun.agents.models import (
     UserQuestion,
 )
 from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
+from shotgun.codebase.models import IndexProgress, ProgressPhase
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
@@ -592,6 +593,68 @@ class ChatScreen(Screen[None]):
             f"[$foreground-muted]Indexing [bold $text-accent]{selection.name}[/]...[/]"
         )
         label.refresh()
+
+        def create_progress_bar(percentage: float, width: int = 20) -> str:
+            """Create a visual progress bar using Unicode block characters."""
+            filled = int((percentage / 100) * width)
+            empty = width - filled
+            return "▓" * filled + "░" * empty
+
+        # Spinner animation state (shared between timer and progress callback)
+        spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        spinner_state: dict[str, int | str | float] = {
+            "frame_index": 0,
+            "phase_name": "Starting...",
+            "percentage": 0.0,
+        }
+
+        def update_spinner_display() -> None:
+            """Update spinner frame on timer - runs every 100ms."""
+            # Advance spinner frame
+            frame_idx = int(spinner_state["frame_index"])
+            spinner_state["frame_index"] = (frame_idx + 1) % len(spinner_frames)
+            spinner = spinner_frames[frame_idx]
+
+            # Get current state
+            phase = str(spinner_state["phase_name"])
+            pct = float(spinner_state["percentage"])
+            bar = create_progress_bar(pct)
+
+            # Update label
+            label.update(
+                f"[$foreground-muted]Indexing codebase: {spinner} {phase}... {bar} {pct:.0f}%[/]"
+            )
+
+        def progress_callback(progress_info: IndexProgress) -> None:
+            """Update progress state (spinner animates independently on timer)."""
+            # Calculate overall percentage (0-95%, reserve 95-100% for finalization)
+            if progress_info.phase == ProgressPhase.STRUCTURE:
+                # Phase 1: 0-10%, always show 5% while running, 10% when complete
+                overall_pct = 10.0 if progress_info.phase_complete else 5.0
+            elif progress_info.phase == ProgressPhase.DEFINITIONS:
+                # Phase 2: 10-80% based on files processed
+                if progress_info.total and progress_info.total > 0:
+                    phase_pct = (progress_info.current / progress_info.total) * 70.0
+                    overall_pct = 10.0 + phase_pct
+                else:
+                    overall_pct = 10.0
+            elif progress_info.phase == ProgressPhase.RELATIONSHIPS:
+                # Phase 3: 80-95% based on relationships processed (cap at 95%)
+                if progress_info.total and progress_info.total > 0:
+                    phase_pct = (progress_info.current / progress_info.total) * 15.0
+                    overall_pct = 80.0 + phase_pct
+                else:
+                    overall_pct = 80.0
+            else:
+                overall_pct = 0.0
+
+            # Update shared state (timer will render it)
+            spinner_state["phase_name"] = progress_info.phase_name
+            spinner_state["percentage"] = overall_pct
+
+        # Start spinner animation timer (10 fps = 100ms interval)
+        spinner_timer = self.set_interval(0.1, update_spinner_display)
+
         try:
             # Pass the current working directory as the indexed_from_cwd
             logger.debug(
@@ -602,7 +665,19 @@ class ChatScreen(Screen[None]):
                 selection.repo_path,
                 selection.name,
                 indexed_from_cwd=str(Path.cwd().resolve()),
+                progress_callback=progress_callback,
             )
+
+            # Stop spinner animation
+            spinner_timer.stop()
+
+            # Show 100% completion after indexing finishes
+            final_bar = create_progress_bar(100.0)
+            label.update(
+                f"[$foreground-muted]Indexing codebase: ✓ Complete {final_bar} 100%[/]"
+            )
+            label.refresh()
+
             logger.info(
                 f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
             )
@@ -613,10 +688,12 @@ class ChatScreen(Screen[None]):
             )
 
         except CodebaseAlreadyIndexedError as exc:
+            spinner_timer.stop()
             logger.warning(f"Codebase already indexed: {exc}")
             self.notify(str(exc), severity="warning")
             return
         except InvalidPathError as exc:
+            spinner_timer.stop()
             logger.error(f"Invalid path error: {exc}")
             self.notify(str(exc), severity="error")
 
@@ -628,6 +705,8 @@ class ChatScreen(Screen[None]):
             )
             self.notify(f"Failed to index codebase: {exc}", severity="error")
         finally:
+            # Always stop the spinner timer
+            spinner_timer.stop()
             label.update("")
             label.refresh()
 

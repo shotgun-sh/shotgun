@@ -535,6 +535,7 @@ class SimpleGraphBuilder:
         parsers: dict[str, Parser],
         queries: dict[str, Any],
         exclude_patterns: list[str] | None = None,
+        progress_callback: Any | None = None,
     ):
         self.ingestor = ingestor
         self.repo_path = repo_path
@@ -544,6 +545,7 @@ class SimpleGraphBuilder:
         self.ignore_dirs = IGNORE_PATTERNS
         if exclude_patterns:
             self.ignore_dirs = self.ignore_dirs.union(set(exclude_patterns))
+        self.progress_callback = progress_callback
 
         # Caches
         self.structural_elements: dict[Path, str | None] = {}
@@ -551,6 +553,34 @@ class SimpleGraphBuilder:
         self.function_registry: dict[str, str] = {}  # qualified_name -> type
         self.simple_name_lookup: dict[str, set[str]] = defaultdict(set)
         self.class_inheritance: dict[str, list[str]] = {}  # class_qn -> [parent_qns]
+
+    def _report_progress(
+        self,
+        phase: str,
+        phase_name: str,
+        current: int,
+        total: int | None = None,
+        phase_complete: bool = False,
+    ) -> None:
+        """Report progress via callback if available."""
+        if not self.progress_callback:
+            return
+
+        try:
+            # Import here to avoid circular dependency
+            from shotgun.codebase.models import IndexProgress, ProgressPhase
+
+            progress = IndexProgress(
+                phase=ProgressPhase(phase),
+                phase_name=phase_name,
+                current=current,
+                total=total,
+                phase_complete=phase_complete,
+            )
+            self.progress_callback(progress)
+        except Exception as e:
+            # Don't let progress callback errors crash the build
+            logger.debug(f"Progress callback error: {e}")
 
     def run(self) -> None:
         """Run the three-pass graph building process."""
@@ -575,6 +605,7 @@ class SimpleGraphBuilder:
 
     def _identify_structure(self) -> None:
         """First pass: Walk directory to find packages and folders."""
+        dir_count = 0
         for root_str, dirs, _ in os.walk(self.repo_path, topdown=True):
             dirs[:] = [d for d in dirs if d not in self.ignore_dirs]
             root = Path(root_str)
@@ -583,6 +614,13 @@ class SimpleGraphBuilder:
             # Skip root directory
             if root == self.repo_path:
                 continue
+
+            dir_count += 1
+            # Report progress every 10 directories
+            if dir_count % 10 == 0:
+                self._report_progress(
+                    "structure", "Identifying packages and folders", dir_count
+                )
 
             parent_rel_path = relative_root.parent
             parent_container_qn = self.structural_elements.get(parent_rel_path)
@@ -686,8 +724,34 @@ class SimpleGraphBuilder:
 
                 self.structural_elements[relative_root] = None
 
+        # Report phase completion
+        self._report_progress(
+            "structure",
+            "Identifying packages and folders",
+            dir_count,
+            phase_complete=True,
+        )
+
     def _process_files(self) -> None:
         """Second pass: Process files and extract definitions."""
+        # First pass: Count total files
+        total_files = 0
+        for root_str, _, files in os.walk(self.repo_path):
+            root = Path(root_str)
+
+            # Skip ignored directories
+            if any(part in self.ignore_dirs for part in root.parts):
+                continue
+
+            for filename in files:
+                filepath = root / filename
+                ext = filepath.suffix
+                lang_config = get_language_config(ext)
+
+                if lang_config and lang_config.name in self.parsers:
+                    total_files += 1
+
+        # Second pass: Process files with progress reporting
         file_count = 0
         for root_str, _, files in os.walk(self.repo_path):
             root = Path(root_str)
@@ -707,10 +771,27 @@ class SimpleGraphBuilder:
                     self._process_single_file(filepath, lang_config.name)
                     file_count += 1
 
-                    if file_count % 100 == 0:
-                        logger.info(f"  Processed {file_count} files...")
+                    # Report progress after each file
+                    self._report_progress(
+                        "definitions",
+                        "Processing files and extracting definitions",
+                        file_count,
+                        total_files,
+                    )
 
-        logger.info(f"  Total files processed: {file_count}")
+                    if file_count % 100 == 0:
+                        logger.info(f"  Processed {file_count}/{total_files} files...")
+
+        logger.info(f"  Total files processed: {file_count}/{total_files}")
+
+        # Report phase completion
+        self._report_progress(
+            "definitions",
+            "Processing files and extracting definitions",
+            file_count,
+            total_files,
+            phase_complete=True,
+        )
 
     def _process_single_file(self, filepath: Path, language: str) -> None:
         """Process a single file."""
@@ -1143,7 +1224,8 @@ class SimpleGraphBuilder:
         self._process_inheritance()
 
         # Then process function calls
-        logger.info(f"Processing function calls for {len(self.ast_cache)} files...")
+        total_files = len(self.ast_cache)
+        logger.info(f"Processing function calls for {total_files} files...")
         logger.info(f"Function registry has {len(self.function_registry)} entries")
         logger.info(
             f"Simple name lookup has {len(self.simple_name_lookup)} unique names"
@@ -1157,9 +1239,28 @@ class SimpleGraphBuilder:
                     f"  Example: '{name}' -> {list(self.simple_name_lookup[name])[:3]}"
                 )
 
+        file_count = 0
         for filepath, (root_node, language) in self.ast_cache.items():
             self._process_calls(filepath, root_node, language)
             # NOTE: Add import processing. wtf does this mean?
+
+            file_count += 1
+            # Report progress after each file
+            self._report_progress(
+                "relationships",
+                "Processing relationships (calls, imports)",
+                file_count,
+                total_files,
+            )
+
+        # Report phase completion
+        self._report_progress(
+            "relationships",
+            "Processing relationships (calls, imports)",
+            file_count,
+            total_files,
+            phase_complete=True,
+        )
 
     def _process_inheritance(self) -> None:
         """Process inheritance relationships between classes."""
@@ -1444,6 +1545,7 @@ class CodebaseIngestor:
         db_path: str,
         project_name: str | None = None,
         exclude_patterns: list[str] | None = None,
+        progress_callback: Any | None = None,
     ):
         """Initialize the ingestor.
 
@@ -1451,10 +1553,12 @@ class CodebaseIngestor:
             db_path: Path to Kuzu database
             project_name: Optional project name
             exclude_patterns: Patterns to exclude from processing
+            progress_callback: Optional callback for progress reporting
         """
         self.db_path = Path(db_path)
         self.project_name = project_name
         self.exclude_patterns = exclude_patterns or []
+        self.progress_callback = progress_callback
 
     def build_graph_from_directory(self, repo_path: str) -> None:
         """Build a code knowledge graph from a directory.
@@ -1484,7 +1588,12 @@ class CodebaseIngestor:
 
             # Build graph
             builder = SimpleGraphBuilder(
-                ingestor, repo_path_obj, parsers, queries, self.exclude_patterns
+                ingestor,
+                repo_path_obj,
+                parsers,
+                queries,
+                self.exclude_patterns,
+                self.progress_callback,
             )
             if self.project_name:
                 builder.project_name = self.project_name

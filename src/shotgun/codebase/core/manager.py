@@ -329,6 +329,7 @@ class CodebaseGraphManager:
         languages: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
         indexed_from_cwd: str | None = None,
+        progress_callback: Any | None = None,
     ) -> CodebaseGraph:
         """Build a new code knowledge graph.
 
@@ -337,6 +338,7 @@ class CodebaseGraphManager:
             name: Optional human-readable name
             languages: Languages to parse (default: all supported)
             exclude_patterns: Patterns to exclude
+            progress_callback: Optional callback for progress reporting
 
         Returns:
             Created graph metadata
@@ -391,6 +393,7 @@ class CodebaseGraphManager:
             db_path=str(graph_path),
             project_name=name,
             exclude_patterns=exclude_patterns or [],
+            progress_callback=progress_callback,
         )
 
         # Run build in thread pool
@@ -1476,6 +1479,7 @@ class CodebaseGraphManager:
         languages: list[str] | None,
         exclude_patterns: list[str] | None,
         indexed_from_cwd: str | None = None,
+        progress_callback: Any | None = None,
     ) -> CodebaseGraph:
         """Internal implementation of graph building (runs in background)."""
         operation_id = str(uuid.uuid4())
@@ -1499,7 +1503,13 @@ class CodebaseGraphManager:
 
             # Do the actual build work
             graph = await self._do_build_graph(
-                graph_id, repo_path, name, languages, exclude_patterns, indexed_from_cwd
+                graph_id,
+                repo_path,
+                name,
+                languages,
+                exclude_patterns,
+                indexed_from_cwd,
+                progress_callback,
             )
 
             # Update operation stats
@@ -1548,6 +1558,7 @@ class CodebaseGraphManager:
         languages: list[str] | None,
         exclude_patterns: list[str] | None,
         indexed_from_cwd: str | None = None,
+        progress_callback: Any | None = None,
     ) -> CodebaseGraph:
         """Execute the actual graph building logic (extracted from original build_graph)."""
         # The database and Project node already exist from _initialize_graph_metadata
@@ -1603,6 +1614,7 @@ class CodebaseGraphManager:
                 parsers=parsers,
                 queries=queries,
                 exclude_patterns=exclude_patterns,
+                progress_callback=progress_callback,
             )
 
             # Build the graph
@@ -1628,6 +1640,7 @@ class CodebaseGraphManager:
         languages: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
         indexed_from_cwd: str | None = None,
+        progress_callback: Any | None = None,
     ) -> str:
         """Start building a new code knowledge graph asynchronously.
 
@@ -1666,7 +1679,13 @@ class CodebaseGraphManager:
         # Start the build operation in background
         task = asyncio.create_task(
             self._build_graph_impl(
-                graph_id, repo_path, name, languages, exclude_patterns, indexed_from_cwd
+                graph_id,
+                repo_path,
+                name,
+                languages,
+                exclude_patterns,
+                indexed_from_cwd,
+                progress_callback,
             )
         )
         self._operations[graph_id] = task

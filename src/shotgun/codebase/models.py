@@ -1,5 +1,6 @@
 """Data models for codebase service."""
 
+from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
@@ -20,6 +21,30 @@ class QueryType(str, Enum):
 
     NATURAL_LANGUAGE = "natural_language"
     CYPHER = "cypher"
+
+
+class ProgressPhase(str, Enum):
+    """Phase of codebase indexing progress."""
+
+    STRUCTURE = "structure"  # Identifying packages and folders
+    DEFINITIONS = "definitions"  # Processing files and extracting definitions
+    RELATIONSHIPS = "relationships"  # Processing relationships (calls, imports)
+
+
+class IndexProgress(BaseModel):
+    """Progress information for codebase indexing."""
+
+    phase: ProgressPhase = Field(..., description="Current indexing phase")
+    phase_name: str = Field(..., description="Human-readable phase name")
+    current: int = Field(..., description="Current item count")
+    total: int | None = Field(None, description="Total items (None if unknown)")
+    phase_complete: bool = Field(
+        default=False, description="Whether this phase is complete"
+    )
+
+
+# Type alias for progress callback function
+ProgressCallback = Callable[[IndexProgress], None]
 
 
 class OperationStats(BaseModel):

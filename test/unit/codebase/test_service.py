@@ -154,7 +154,7 @@ async def test_create_graph_with_string_path():
             assert created_graph.name == graph_name
             assert created_graph.repo_path == repo_path
             mock_manager.build_graph.assert_called_once_with(
-                repo_path, graph_name, indexed_from_cwd=None
+                repo_path, graph_name, indexed_from_cwd=None, progress_callback=None
             )
 
 
@@ -190,7 +190,10 @@ async def test_create_graph_with_path_object():
 
             assert created_graph.name == graph_name
             mock_manager.build_graph.assert_called_once_with(
-                str(repo_path), graph_name, indexed_from_cwd=None
+                str(repo_path),
+                graph_name,
+                indexed_from_cwd=None,
+                progress_callback=None,
             )
 
 

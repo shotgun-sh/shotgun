@@ -77,7 +77,11 @@ class CodebaseService:
         return filtered_graphs
 
     async def create_graph(
-        self, repo_path: str | Path, name: str, indexed_from_cwd: str | None = None
+        self,
+        repo_path: str | Path,
+        name: str,
+        indexed_from_cwd: str | None = None,
+        progress_callback: Any | None = None,
     ) -> CodebaseGraph:
         """Create and index a new graph from a repository.
 
@@ -85,12 +89,16 @@ class CodebaseService:
             repo_path: Path to the repository to index
             name: Human-readable name for the graph
             indexed_from_cwd: Working directory from which indexing was initiated
+            progress_callback: Optional callback for progress reporting
 
         Returns:
             The created CodebaseGraph
         """
         return await self.manager.build_graph(
-            str(repo_path), name, indexed_from_cwd=indexed_from_cwd
+            str(repo_path),
+            name,
+            indexed_from_cwd=indexed_from_cwd,
+            progress_callback=progress_callback,
         )
 
     async def get_graph(self, graph_id: str) -> CodebaseGraph | None:

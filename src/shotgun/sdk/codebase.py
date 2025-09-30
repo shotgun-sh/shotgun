@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from shotgun.codebase.models import CodebaseGraph, QueryType
 from shotgun.logging_config import get_logger
@@ -63,7 +64,11 @@ class CodebaseSDK:
         return ListResult(graphs=graphs)
 
     async def index_codebase(
-        self, path: Path, name: str, indexed_from_cwd: str | None = None
+        self,
+        path: Path,
+        name: str,
+        indexed_from_cwd: str | None = None,
+        progress_callback: Any | None = None,
     ) -> IndexResult:
         """Index a new codebase.
 
@@ -72,6 +77,7 @@ class CodebaseSDK:
             name: Human-readable name for the codebase
             indexed_from_cwd: Working directory from which indexing was initiated.
                             If None, uses current working directory.
+            progress_callback: Optional callback for progress reporting
 
         Returns:
             IndexResult with indexing details
@@ -88,7 +94,10 @@ class CodebaseSDK:
             indexed_from_cwd = str(Path.cwd().resolve())
 
         graph = await self.service.create_graph(
-            resolved_path, name, indexed_from_cwd=indexed_from_cwd
+            resolved_path,
+            name,
+            indexed_from_cwd=indexed_from_cwd,
+            progress_callback=progress_callback,
         )
         file_count = sum(graph.language_stats.values()) if graph.language_stats else 0
 

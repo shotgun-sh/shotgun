@@ -22,3 +22,16 @@
   UNION ALL
   MATCH (m:Method) RETURN m.name AS name, m.qualified_name AS qname, m.path AS path  // ERROR: Extra column!
   ```
+- **NULL Type Casting in UNION ALL**: When a property doesn't exist on a node type, you MUST use a typed placeholder instead of bare NULL. Bare NULL has type ANY which causes "qualified_name has data type ANY but STRING was expected" errors.
+  CORRECT usage (use empty string or explicit cast):
+  ```
+  MATCH (f:Function) RETURN f.name AS name, f.qualified_name AS qname, 'Function' AS type
+  UNION ALL
+  MATCH (fi:File) RETURN fi.name AS name, '' AS qname, 'File' AS type  // Empty string for missing STRING property
+  ```
+  INCORRECT usage (bare NULL causes type mismatch):
+  ```
+  MATCH (f:Function) RETURN f.name AS name, f.qualified_name AS qname, 'Function' AS type
+  UNION ALL
+  MATCH (fi:File) RETURN fi.name AS name, NULL AS qname, 'File' AS type  // ERROR: NULL is type ANY, not STRING!
+  ```
