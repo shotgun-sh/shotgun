@@ -1,11 +1,14 @@
 """PostHog analytics setup for Shotgun."""
 
+from enum import Enum
 from typing import Any
 
 import posthog
+from pydantic import BaseModel
 
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
+from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.logging_config import get_early_logger
 
 # Use early logger to prevent automatic StreamHandler creation
@@ -132,3 +135,51 @@ def shutdown() -> None:
             logger.warning("Error shutting down PostHog: %s", e)
         finally:
             _posthog_client = None
+
+
+class FeedbackKind(str, Enum):
+    BUG = "bug"
+    FEATURE = "feature"
+    OTHER = "other"
+
+
+class Feedback(BaseModel):
+    kind: FeedbackKind
+    description: str
+    user_id: str
+
+
+SURVEY_ID = "01999f81-9486-0000-4fa6-9632959f92f3"
+Q_KIND_ID = "aaa5fcc3-88ba-4c24-bcf5-1481fd5efc2b"
+Q_DESCRIPTION_ID = "a0ed6283-5d4b-452c-9160-6768d879db8a"
+
+
+def submit_feedback_survey(feedback: Feedback) -> None:
+    global _posthog_client
+    if _posthog_client is None:
+        logger.debug("PostHog not initialized, skipping feedback survey")
+        return
+
+    config_manager = get_config_manager()
+    config = config_manager.load()
+    conversation_manager = ConversationManager()
+    conversation = conversation_manager.load()
+    last_10_messages = []
+    if conversation is not None:
+        last_10_messages = conversation.get_agent_messages()[:10]
+
+    track_event(
+        "survey sent",
+        properties={
+            "$survey_id": SURVEY_ID,
+            "$survey_questions": [
+                {"id": Q_KIND_ID, "question": "Feedback type"},
+                {"id": Q_DESCRIPTION_ID, "question": "Feedback description"},
+            ],
+            f"$survey_response_{Q_KIND_ID}": feedback.kind,
+            f"$survey_response_{Q_DESCRIPTION_ID}": feedback.description,
+            "provider": config.default_provider.value,
+            "config_version": config.config_version,
+            "last_10_messages": last_10_messages,  # last 10 messages
+        },
+    )

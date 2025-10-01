@@ -13,6 +13,7 @@ from shotgun.utils.update_checker import perform_auto_update_async
 
 from .screens.chat import ChatScreen
 from .screens.directory_setup import DirectorySetupScreen
+from .screens.feedback import FeedbackScreen
 from .screens.provider_config import ProviderConfigScreen
 
 logger = get_logger(__name__)
@@ -23,10 +24,12 @@ class ShotgunApp(App[None]):
         "chat": ChatScreen,
         "provider_config": ProviderConfigScreen,
         "directory_setup": DirectorySetupScreen,
+        "feedback": FeedbackScreen,
     }
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit the app"),
     ]
+
     CSS_PATH = "styles.tcss"
 
     def __init__(
@@ -90,7 +93,22 @@ class ShotgunApp(App[None]):
         self.exit()
 
     def get_system_commands(self, screen: Screen[Any]) -> Iterable[SystemCommand]:
-        return []  # we don't want any system commands
+        return [
+            SystemCommand(
+                "Feedback", "Send us feedback or report a bug", self.action_feedback
+            )
+        ]  # we don't want any system commands
+
+    def action_feedback(self) -> None:
+        """Open feedback screen and submit feedback."""
+        from shotgun.posthog_telemetry import Feedback, submit_feedback_survey
+
+        def handle_feedback(feedback: Feedback | None) -> None:
+            if feedback is not None:
+                submit_feedback_survey(feedback)
+                self.notify("✅ Feedback sent. Thank you!")
+
+        self.push_screen("feedback", callback=handle_feedback)
 
 
 def run(no_update_check: bool = False, continue_session: bool = False) -> None:
