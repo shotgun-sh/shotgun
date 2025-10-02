@@ -106,7 +106,7 @@ class ShotgunApp(App[None]):
         def handle_feedback(feedback: Feedback | None) -> None:
             if feedback is not None:
                 submit_feedback_survey(feedback)
-                self.notify("✅ Feedback sent. Thank you!")
+                self.notify("Feedback sent. Thank you!")
 
         self.push_screen("feedback", callback=handle_feedback)
 

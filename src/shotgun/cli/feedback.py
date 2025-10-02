@@ -43,4 +43,4 @@ def send_feedback(
 
     submit_feedback_survey(feedback)
 
-    console.print("✅ Feedback sent. Thank you!")
+    console.print("Feedback sent. Thank you!")
