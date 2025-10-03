@@ -119,6 +119,13 @@ class ProviderConfigScreen(Screen[None]):
         self.selected_provider = "openai"
         self.set_focus(self.query_one("#api-key", Input))
 
+    def on_screenresume(self) -> None:
+        """Refresh provider status when screen is resumed.
+
+        This ensures the UI reflects any provider changes made elsewhere.
+        """
+        self.refresh_provider_status()
+
     def action_done(self) -> None:
         self.dismiss()
 

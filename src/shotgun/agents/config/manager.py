@@ -46,13 +46,16 @@ class ConfigManager:
 
         self._config: ShotgunConfig | None = None
 
-    def load(self) -> ShotgunConfig:
+    def load(self, force_reload: bool = True) -> ShotgunConfig:
         """Load configuration from file.
+
+        Args:
+            force_reload: If True, reload from disk even if cached (default: True)
 
         Returns:
             ShotgunConfig: Loaded configuration or default config if file doesn't exist
         """
-        if self._config is not None:
+        if self._config is not None and not force_reload:
             return self._config
 
         if not self.config_path.exists():
@@ -243,7 +246,8 @@ class ConfigManager:
 
         This checks only the configuration file.
         """
-        config = self.load()
+        # Use force_reload=False to avoid infinite loop when called from load()
+        config = self.load(force_reload=False)
         provider_enum = self._ensure_provider_enum(provider)
         provider_config = self._get_provider_config(config, provider_enum)
 
@@ -251,7 +255,8 @@ class ConfigManager:
 
     def has_any_provider_key(self) -> bool:
         """Determine whether any provider has a configured API key."""
-        config = self.load()
+        # Use force_reload=False to avoid infinite loop when called from load()
+        config = self.load(force_reload=False)
         # Check LLM provider keys (BYOK)
         has_llm_key = any(
             self._provider_has_api_key(self._get_provider_config(config, provider))
@@ -381,6 +386,17 @@ class ConfigManager:
         return config.user_id
 
 
+# Global singleton instance
+_config_manager_instance: ConfigManager | None = None
+
+
 def get_config_manager() -> ConfigManager:
-    """Get the global ConfigManager instance."""
-    return ConfigManager()
+    """Get the global singleton ConfigManager instance.
+
+    Returns:
+        The singleton ConfigManager instance
+    """
+    global _config_manager_instance
+    if _config_manager_instance is None:
+        _config_manager_instance = ConfigManager()
+    return _config_manager_instance

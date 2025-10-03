@@ -12,10 +12,13 @@ from textual.screen import Screen
 from textual.widgets import Button, Label, ListItem, ListView, Static
 
 from shotgun.agents.config import ConfigManager
-from shotgun.agents.config.models import MODEL_SPECS, ModelName
+from shotgun.agents.config.models import MODEL_SPECS, ModelName, ShotgunConfig
+from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
+
+logger = get_logger(__name__)
 
 
 # Available models for selection
@@ -82,20 +85,52 @@ class ModelPickerScreen(Screen[None]):
                 "Select the AI model you want to use for your tasks.",
                 id="model-picker-summary",
             )
-        yield ListView(*self._build_model_items(), id="model-list")
+        yield ListView(id="model-list")
         with Horizontal(id="model-actions"):
             yield Button("Select \\[ENTER]", variant="primary", id="select")
             yield Button("Done \\[ESC]", id="done")
 
-    def on_mount(self) -> None:
-        # Load current selection
+    def _rebuild_model_list(self) -> None:
+        """Rebuild the model list from current config.
+
+        This method is called both on first show and when screen is resumed
+        to ensure the list always reflects the current configuration.
+        """
+        logger.debug("Rebuilding model list from current config")
+
+        # Load current config with force_reload to get latest API keys
         config_manager = self.config_manager
-        config = config_manager.load()
+        config = config_manager.load(force_reload=True)
+
+        # Log provider key status
+        logger.debug(
+            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s",
+            config_manager._provider_has_api_key(config.openai),
+            config_manager._provider_has_api_key(config.anthropic),
+            config_manager._provider_has_api_key(config.google),
+            config_manager._provider_has_api_key(config.shotgun),
+        )
+
         current_model = config.selected_model or ModelName.CLAUDE_SONNET_4_5
         self.selected_model = current_model
+        logger.debug("Current selected model: %s", current_model)
+
+        # Rebuild the model list with current available models
+        list_view = self.query_one(ListView)
+
+        # Remove all existing items
+        old_count = len(list(list_view.children))
+        for child in list(list_view.children):
+            child.remove()
+        logger.debug("Removed %d existing model items from list", old_count)
+
+        # Add new items (labels already have correct text including current indicator)
+        new_items = self._build_model_items(config)
+        for item in new_items:
+            list_view.append(item)
+        logger.debug("Added %d available model items to list", len(new_items))
 
         # Find and highlight current selection (if it's in the filtered list)
-        list_view = self.query_one(ListView)
         if list_view.children:
             for i, child in enumerate(list_view.children):
                 if isinstance(child, ListItem) and child.id:
@@ -106,7 +141,20 @@ class ModelPickerScreen(Screen[None]):
                             if model_name == current_model:
                                 list_view.index = i
                                 break
-        self.refresh_model_labels()
+
+    def on_show(self) -> None:
+        """Rebuild model list when screen is first shown."""
+        logger.debug("ModelPickerScreen.on_show() called")
+        self._rebuild_model_list()
+
+    def on_screenresume(self) -> None:
+        """Rebuild model list when screen is resumed (subsequent visits).
+
+        This is called when returning to the screen after it was suspended,
+        ensuring the model list reflects any config changes made while away.
+        """
+        logger.debug("ModelPickerScreen.on_screenresume() called")
+        self._rebuild_model_list()
 
     def action_done(self) -> None:
         self.dismiss()
@@ -138,13 +186,19 @@ class ModelPickerScreen(Screen[None]):
         return app.config_manager
 
     def refresh_model_labels(self) -> None:
-        """Update the list view entries to reflect current selection."""
-        current_model = (
-            self.config_manager.load().selected_model or ModelName.CLAUDE_SONNET_4_5
-        )
+        """Update the list view entries to reflect current selection.
+
+        Note: This method only updates labels for currently displayed models.
+        To rebuild the entire list after provider changes, on_show() should be used.
+        """
+        # Load config once with force_reload
+        config = self.config_manager.load(force_reload=True)
+        current_model = config.selected_model or ModelName.CLAUDE_SONNET_4_5
+
         # Update labels for available models only
         for model_name in AVAILABLE_MODELS:
-            if not self._is_model_available(model_name):
+            # Pass config to avoid multiple force reloads
+            if not self._is_model_available(model_name, config):
                 continue
             label = self.query_one(
                 f"#label-{_sanitize_model_name_for_id(model_name)}", Label
@@ -153,12 +207,15 @@ class ModelPickerScreen(Screen[None]):
                 self._model_label(model_name, is_current=model_name == current_model)
             )
 
-    def _build_model_items(self) -> list[ListItem]:
+    def _build_model_items(self, config: ShotgunConfig | None = None) -> list[ListItem]:
+        if config is None:
+            config = self.config_manager.load(force_reload=True)
+
         items: list[ListItem] = []
         current_model = self.selected_model
         for model_name in AVAILABLE_MODELS:
             # Only add models that are available
-            if not self._is_model_available(model_name):
+            if not self._is_model_available(model_name, config):
                 continue
 
             label = Label(
@@ -181,7 +238,9 @@ class ModelPickerScreen(Screen[None]):
                 return model_name
         return None
 
-    def _is_model_available(self, model_name: ModelName) -> bool:
+    def _is_model_available(
+        self, model_name: ModelName, config: ShotgunConfig | None = None
+    ) -> bool:
         """Check if a model is available based on provider key configuration.
 
         A model is available if:
@@ -190,22 +249,38 @@ class ModelPickerScreen(Screen[None]):
 
         Args:
             model_name: The model to check availability for
+            config: Optional pre-loaded config to avoid multiple reloads
 
         Returns:
             True if the model can be used, False otherwise
         """
-        config = self.config_manager.load()
+        if config is None:
+            config = self.config_manager.load(force_reload=True)
 
         # If Shotgun Account is configured, all models are available
         if self.config_manager._provider_has_api_key(config.shotgun):
+            logger.debug("Model %s available (Shotgun Account configured)", model_name)
             return True
 
         # In BYOK mode, check if the model's provider has a key
         if model_name not in MODEL_SPECS:
+            logger.debug("Model %s not available (not in MODEL_SPECS)", model_name)
             return False
 
         spec = MODEL_SPECS[model_name]
-        return self.config_manager.has_provider_key(spec.provider)
+        # Check provider key directly using the loaded config to avoid stale cache
+        provider_config = self.config_manager._get_provider_config(
+            config, spec.provider
+        )
+        has_key = self.config_manager._provider_has_api_key(provider_config)
+        logger.debug(
+            "Model %s available=%s (provider=%s, has_key=%s)",
+            model_name,
+            has_key,
+            spec.provider,
+            has_key,
+        )
+        return has_key
 
     def _model_label(self, model_name: ModelName, is_current: bool) -> str:
         """Generate label for model with specs and current indicator."""

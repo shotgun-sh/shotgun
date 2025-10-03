@@ -64,7 +64,8 @@ class ShotgunApp(App[None]):
                 return
 
             self.push_screen(
-                "provider_config", callback=lambda _arg: self.refresh_startup_screen()
+                ProviderConfigScreen(),
+                callback=lambda _arg: self.refresh_startup_screen(),
             )
             return
 
@@ -73,7 +74,8 @@ class ShotgunApp(App[None]):
                 return
 
             self.push_screen(
-                "directory_setup", callback=lambda _arg: self.refresh_startup_screen()
+                DirectorySetupScreen(),
+                callback=lambda _arg: self.refresh_startup_screen(),
             )
             return
 
@@ -110,7 +112,7 @@ class ShotgunApp(App[None]):
                 submit_feedback_survey(feedback)
                 self.notify("Feedback sent. Thank you!")
 
-        self.push_screen("feedback", callback=handle_feedback)
+        self.push_screen(FeedbackScreen(), callback=handle_feedback)
 
 
 def run(no_update_check: bool = False, continue_session: bool = False) -> None:

@@ -5,6 +5,8 @@ from textual.command import DiscoveryHit, Hit, Provider
 
 from shotgun.agents.models import AgentType
 from shotgun.codebase.models import CodebaseGraph
+from shotgun.tui.screens.model_picker import ModelPickerScreen
+from shotgun.tui.screens.provider_config import ProviderConfigScreen
 
 if TYPE_CHECKING:
     from shotgun.tui.screens.chat import ChatScreen
@@ -139,11 +141,11 @@ class ProviderSetupProvider(Provider):
 
     def open_provider_config(self) -> None:
         """Show the provider configuration screen."""
-        self.chat_screen.app.push_screen("provider_config")
+        self.chat_screen.app.push_screen(ProviderConfigScreen())
 
     def open_model_picker(self) -> None:
         """Show the model picker screen."""
-        self.chat_screen.app.push_screen("model_picker")
+        self.chat_screen.app.push_screen(ModelPickerScreen())
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         yield DiscoveryHit(
@@ -282,11 +284,11 @@ class UnifiedCommandProvider(Provider):
 
     def open_provider_config(self) -> None:
         """Show the provider configuration screen."""
-        self.chat_screen.app.push_screen("provider_config")
+        self.chat_screen.app.push_screen(ProviderConfigScreen())
 
     def open_model_picker(self) -> None:
         """Show the model picker screen."""
-        self.chat_screen.app.push_screen("model_picker")
+        self.chat_screen.app.push_screen(ModelPickerScreen())
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         """Provide commands in alphabetical order when palette opens."""

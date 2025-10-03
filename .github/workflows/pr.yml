@@ -142,10 +142,20 @@ jobs:
           source .venv/bin/activate
           shotgun --help
 
-  test-cli-research:
+  test-cli-commands:
     runs-on: ubuntu-latest
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    strategy:
+      matrix:
+        command:
+          - name: research
+            args: '"What is the capital of Poland?"'
+          - name: plan
+            args: '"Build a simple Agent using Pydantic AI"'
+          - name: tasks
+            args: '"Create the tasks for building a simple Agent using Pydantic AI"'
 
     steps:
       - uses: actions/checkout@v5
@@ -166,96 +176,31 @@ jobs:
           source .venv/bin/activate
           uv sync --all-extras
 
-      - name: Test research command
+      - name: Test ${{ matrix.command.name }} command
         env:
           SHOTGUN_LOG_LEVEL: DEBUG
         run: |
           source .venv/bin/activate
-          shotgun research --non-interactive "What is the capital of Poland?"
-
-  test-cli-plan:
-    runs-on: ubuntu-latest
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Create virtual environment
-        run: uv venv
-
-      - name: Install dependencies
-        run: |
-          source .venv/bin/activate
-          uv sync --all-extras
-
-      - name: Test plan command
-        env:
-          SHOTGUN_LOG_LEVEL: DEBUG
-        run: |
-          source .venv/bin/activate
-          shotgun plan --non-interactive "Build a simple Agent using Pydantic AI"
-
-  test-cli-tasks:
-    runs-on: ubuntu-latest
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Create virtual environment
-        run: uv venv
-
-      - name: Install dependencies
-        run: |
-          source .venv/bin/activate
-          uv sync --all-extras
-
-      - name: Test tasks command
-        env:
-          SHOTGUN_LOG_LEVEL: DEBUG
-        run: |
-          source .venv/bin/activate
-          shotgun tasks --non-interactive "Create the tasks for building a simple Agent using Pydantic AI"
+          shotgun config set openai --api-key $OPENAI_API_KEY
+          shotgun ${{ matrix.command.name }} --non-interactive ${{ matrix.command.args }}
 
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, test-cli-basics, test-cli-research, test-cli-plan, test-cli-tasks]
+    needs: [validate-pr-title, basic-pr-check, test-cli-basics, test-cli-commands]
     if: always()
-    
+
     steps:
       - name: Check job results
         run: |
           echo "validate-pr-title: ${{ needs.validate-pr-title.result }}"
           echo "basic-pr-check: ${{ needs.basic-pr-check.result }}"
           echo "test-cli-basics: ${{ needs.test-cli-basics.result }}"
-          echo "test-cli-research: ${{ needs.test-cli-research.result }}"
-          echo "test-cli-plan: ${{ needs.test-cli-plan.result }}"
-          echo "test-cli-tasks: ${{ needs.test-cli-tasks.result }}"
+          echo "test-cli-commands: ${{ needs.test-cli-commands.result }}"
 
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
                 "${{ needs.basic-pr-check.result }}" != "success" || \
                 "${{ needs.test-cli-basics.result }}" != "success" || \
-                "${{ needs.test-cli-research.result }}" != "success" || \
-                "${{ needs.test-cli-plan.result }}" != "success" || \
-                "${{ needs.test-cli-tasks.result }}" != "success" ]]; then
+                "${{ needs.test-cli-commands.result }}" != "success" ]]; then
             echo "❌ One or more required checks failed or were cancelled"
             exit 1
           else

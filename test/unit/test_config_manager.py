@@ -69,13 +69,14 @@ def test_load_config_not_exists(mock_logger):
 
 @patch("shotgun.agents.config.manager.logger")
 def test_load_config_cached(mock_logger):
-    """Test loading config returns cached version on second call."""
+    """Test loading config returns cached version when force_reload=False."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "nonexistent.json"
         manager = ConfigManager(config_path=config_path)
 
-        config1 = manager.load()
-        config2 = manager.load()
+        # Use force_reload=False to test caching behavior
+        config1 = manager.load(force_reload=False)
+        config2 = manager.load(force_reload=False)
 
         assert config1 is config2
         # First load creates config with user_id (2 log messages)
@@ -494,6 +495,115 @@ def test_update_provider_unsupported_provider():
             manager.update_provider("unsupported", api_key="key")
 
 
+def test_clear_provider_key_openai():
+    """Test clearing OpenAI provider API key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # First set a key
+        manager.update_provider(ProviderType.OPENAI, api_key="test-key")
+        assert manager.has_provider_key(ProviderType.OPENAI)
+
+        # Now clear it
+        manager.clear_provider_key(ProviderType.OPENAI)
+
+        # Verify key is cleared
+        assert not manager.has_provider_key(ProviderType.OPENAI)
+
+        # Verify config file was updated
+        with open(config_path, encoding="utf-8") as f:
+            saved_data = json.load(f)
+        assert saved_data["openai"]["api_key"] is None
+
+
+def test_clear_provider_key_anthropic():
+    """Test clearing Anthropic provider API key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # First set a key
+        manager.update_provider(ProviderType.ANTHROPIC, api_key="test-key")
+        assert manager.has_provider_key(ProviderType.ANTHROPIC)
+
+        # Now clear it
+        manager.clear_provider_key(ProviderType.ANTHROPIC)
+
+        # Verify key is cleared
+        assert not manager.has_provider_key(ProviderType.ANTHROPIC)
+
+        # Verify config file was updated
+        with open(config_path, encoding="utf-8") as f:
+            saved_data = json.load(f)
+        assert saved_data["anthropic"]["api_key"] is None
+
+
+def test_clear_provider_key_google():
+    """Test clearing Google provider API key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # First set a key
+        manager.update_provider(ProviderType.GOOGLE, api_key="test-key")
+        assert manager.has_provider_key(ProviderType.GOOGLE)
+
+        # Now clear it
+        manager.clear_provider_key(ProviderType.GOOGLE)
+
+        # Verify key is cleared
+        assert not manager.has_provider_key(ProviderType.GOOGLE)
+
+        # Verify config file was updated
+        with open(config_path, encoding="utf-8") as f:
+            saved_data = json.load(f)
+        assert saved_data["google"]["api_key"] is None
+
+
+def test_clear_provider_key_shotgun():
+    """Test clearing Shotgun Account API key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # First set a key
+        manager.update_provider("shotgun", api_key="test-key")
+
+        # Verify key is set by checking config directly
+        config = manager.load(force_reload=True)
+        assert manager._provider_has_api_key(config.shotgun)
+
+        # Now clear it
+        manager.clear_provider_key("shotgun")
+
+        # Verify key is cleared
+        config = manager.load(force_reload=True)
+        assert not manager._provider_has_api_key(config.shotgun)
+
+        # Verify config file was updated
+        with open(config_path, encoding="utf-8") as f:
+            saved_data = json.load(f)
+        assert saved_data["shotgun"]["api_key"] is None
+
+
+def test_clear_provider_key_string_provider():
+    """Test clearing provider key with string provider type."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # First set a key using string
+        manager.update_provider("anthropic", api_key="test-key")
+        assert manager.has_provider_key("anthropic")
+
+        # Now clear it using string
+        manager.clear_provider_key("anthropic")
+
+        # Verify key is cleared
+        assert not manager.has_provider_key("anthropic")
+
+
 @patch("shotgun.agents.config.manager.logger")
 def test_initialize(mock_logger):
     """Test initialize method creates default config and saves it."""
@@ -595,6 +705,63 @@ def test_get_config_manager():
 
     assert isinstance(manager, ConfigManager)
     assert manager.config_path == Path.home() / ".shotgun-sh" / "config.json"
+
+
+def test_get_config_manager_singleton():
+    """Test get_config_manager returns the same singleton instance."""
+    # Reset the singleton for this test
+    import shotgun.agents.config.manager as manager_module
+
+    original_instance = manager_module._config_manager_instance
+    manager_module._config_manager_instance = None
+
+    try:
+        manager1 = get_config_manager()
+        manager2 = get_config_manager()
+        manager3 = get_config_manager()
+
+        # All calls should return the same instance
+        assert manager1 is manager2
+        assert manager2 is manager3
+        assert manager1 is manager3
+    finally:
+        # Restore original singleton
+        manager_module._config_manager_instance = original_instance
+
+
+def test_config_manager_force_reload():
+    """Test ConfigManager force_reload parameter and caching behavior."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Load config with force_reload=False to enable caching
+        config1 = manager.load(force_reload=False)
+        assert config1.google.api_key is None
+
+        # Manually modify the config file
+        import uuid
+
+        config_data = {
+            ConfigSection.OPENAI.value: {},
+            ConfigSection.ANTHROPIC.value: {},
+            ConfigSection.GOOGLE.value: {API_KEY_FIELD: "new-google-key"},
+            ConfigSection.SHOTGUN.value: {},
+            "selected_model": None,
+            USER_ID_FIELD: str(uuid.uuid4()),
+            CONFIG_VERSION_FIELD: 2,
+        }
+        with open(config_path, "w") as f:
+            json.dump(config_data, f)
+
+        # Load with force_reload=False should return cached config
+        config2 = manager.load(force_reload=False)
+        assert config2.google.api_key is None  # Still cached
+
+        # Load with force_reload=True (default) should read from disk
+        config3 = manager.load(force_reload=True)
+        assert config3.google.api_key is not None
+        assert config3.google.api_key.get_secret_value() == "new-google-key"
 
 
 def test_update_provider_sets_selected_model_when_first_key():
@@ -754,3 +921,53 @@ def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
             assert len(info_calls) == 0
         finally:
             os.unlink(temp_file.name)
+
+
+def test_clear_provider_key_updates_selected_model():
+    """Test that clearing provider key updates selected_model to available provider."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Set up multiple providers
+        manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
+        manager.update_provider(ProviderType.ANTHROPIC, api_key="test-anthropic-key")
+
+        # Manually set selected_model to Anthropic model
+        manager.update_selected_model(ModelName.CLAUDE_SONNET_4_5)
+        config = manager.load(force_reload=True)
+        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
+
+        # Clear Anthropic provider key
+        manager.clear_provider_key(ProviderType.ANTHROPIC)
+
+        # Reload config and verify selected_model is updated to available provider
+        config = manager.load(force_reload=True)
+
+        # selected_model should be updated to an OpenAI model or set to None then to OpenAI on load
+        # The load() method should detect that the selected model's provider has no key
+        # and switch to an available provider
+        assert config.selected_model != ModelName.CLAUDE_SONNET_4_5
+        assert config.selected_model == ModelName.GPT_5  # Should switch to OpenAI
+
+
+def test_clear_all_provider_keys_sets_selected_model_to_none():
+    """Test that clearing all provider keys sets selected_model appropriately."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Set up a provider
+        manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
+        config = manager.load(force_reload=True)
+        assert config.selected_model == ModelName.GPT_5
+
+        # Clear the only provider key
+        manager.clear_provider_key(ProviderType.OPENAI)
+
+        # Reload config
+        config = manager.load(force_reload=True)
+
+        # selected_model should be None since no providers have keys
+        # The load() method will try to find an available provider but won't find any
+        assert config.selected_model is None
