@@ -614,19 +614,30 @@ class ChatScreen(Screen[None]):
             empty = width - filled
             return "▓" * filled + "░" * empty
 
+        # Spinner animation frames
+        spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
         # Progress state (shared between timer and progress callback)
-        progress_state: dict[str, float] = {
+        progress_state: dict[str, int | float] = {
+            "frame_index": 0,
             "percentage": 0.0,
         }
 
         def update_progress_display() -> None:
             """Update progress bar on timer - runs every 100ms."""
+            # Advance spinner frame
+            frame_idx = int(progress_state["frame_index"])
+            progress_state["frame_index"] = (frame_idx + 1) % len(spinner_frames)
+            spinner = spinner_frames[frame_idx]
+
             # Get current state
             pct = float(progress_state["percentage"])
             bar = create_progress_bar(pct)
 
             # Update label
-            label.update(f"[$foreground-muted]Indexing codebase: {bar} {pct:.0f}%[/]")
+            label.update(
+                f"[$foreground-muted]Indexing codebase: {spinner} {bar} {pct:.0f}%[/]"
+            )
 
         def progress_callback(progress_info: IndexProgress) -> None:
             """Update progress state (timer renders it independently)."""
