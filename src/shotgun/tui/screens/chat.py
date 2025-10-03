@@ -589,7 +589,7 @@ class ChatScreen(Screen[None]):
     async def index_codebase(self, selection: CodebaseIndexSelection) -> None:
         label = self.query_one("#indexing-job-display", Static)
         label.update(
-            f"[$foreground-muted]Indexing [bold $text-accent]{selection.name}[/]...[/]"
+            f"[$foreground-muted]Indexing codebase: [bold $text-accent]{selection.name}[/][/]"
         )
         label.refresh()
 
@@ -599,33 +599,22 @@ class ChatScreen(Screen[None]):
             empty = width - filled
             return "▓" * filled + "░" * empty
 
-        # Spinner animation state (shared between timer and progress callback)
-        spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        spinner_state: dict[str, int | str | float] = {
-            "frame_index": 0,
-            "phase_name": "Starting...",
+        # Progress state (shared between timer and progress callback)
+        progress_state: dict[str, float] = {
             "percentage": 0.0,
         }
 
-        def update_spinner_display() -> None:
-            """Update spinner frame on timer - runs every 100ms."""
-            # Advance spinner frame
-            frame_idx = int(spinner_state["frame_index"])
-            spinner_state["frame_index"] = (frame_idx + 1) % len(spinner_frames)
-            spinner = spinner_frames[frame_idx]
-
+        def update_progress_display() -> None:
+            """Update progress bar on timer - runs every 100ms."""
             # Get current state
-            phase = str(spinner_state["phase_name"])
-            pct = float(spinner_state["percentage"])
+            pct = float(progress_state["percentage"])
             bar = create_progress_bar(pct)
 
             # Update label
-            label.update(
-                f"[$foreground-muted]Indexing codebase: {spinner} {phase}... {bar} {pct:.0f}%[/]"
-            )
+            label.update(f"[$foreground-muted]Indexing codebase: {bar} {pct:.0f}%[/]")
 
         def progress_callback(progress_info: IndexProgress) -> None:
-            """Update progress state (spinner animates independently on timer)."""
+            """Update progress state (timer renders it independently)."""
             # Calculate overall percentage (0-95%, reserve 95-100% for finalization)
             if progress_info.phase == ProgressPhase.STRUCTURE:
                 # Phase 1: 0-10%, always show 5% while running, 10% when complete
@@ -648,11 +637,10 @@ class ChatScreen(Screen[None]):
                 overall_pct = 0.0
 
             # Update shared state (timer will render it)
-            spinner_state["phase_name"] = progress_info.phase_name
-            spinner_state["percentage"] = overall_pct
+            progress_state["percentage"] = overall_pct
 
-        # Start spinner animation timer (10 fps = 100ms interval)
-        spinner_timer = self.set_interval(0.1, update_spinner_display)
+        # Start progress animation timer (10 fps = 100ms interval)
+        progress_timer = self.set_interval(0.1, update_progress_display)
 
         try:
             # Pass the current working directory as the indexed_from_cwd
@@ -667,14 +655,12 @@ class ChatScreen(Screen[None]):
                 progress_callback=progress_callback,
             )
 
-            # Stop spinner animation
-            spinner_timer.stop()
+            # Stop progress animation
+            progress_timer.stop()
 
             # Show 100% completion after indexing finishes
             final_bar = create_progress_bar(100.0)
-            label.update(
-                f"[$foreground-muted]Indexing codebase: ✓ Complete {final_bar} 100%[/]"
-            )
+            label.update(f"[$foreground-muted]Indexing codebase: {final_bar} 100%[/]")
             label.refresh()
 
             logger.info(
@@ -687,12 +673,12 @@ class ChatScreen(Screen[None]):
             )
 
         except CodebaseAlreadyIndexedError as exc:
-            spinner_timer.stop()
+            progress_timer.stop()
             logger.warning(f"Codebase already indexed: {exc}")
             self.notify(str(exc), severity="warning")
             return
         except InvalidPathError as exc:
-            spinner_timer.stop()
+            progress_timer.stop()
             logger.error(f"Invalid path error: {exc}")
             self.notify(str(exc), severity="error")
 
@@ -704,8 +690,8 @@ class ChatScreen(Screen[None]):
             )
             self.notify(f"Failed to index codebase: {exc}", severity="error")
         finally:
-            # Always stop the spinner timer
-            spinner_timer.stop()
+            # Always stop the progress timer
+            progress_timer.stop()
             label.update("")
             label.refresh()
 
