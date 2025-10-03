@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING, Any, Protocol
 
+from pydantic_ai import ModelSettings
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -10,7 +11,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from shotgun.agents.config.models import shotgun_model_request
+from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
 from shotgun.logging_config import get_logger
@@ -154,7 +155,7 @@ async def token_limit_compactor(
 
     if last_summary_index is not None:
         # Check if post-summary conversation exceeds threshold for incremental compaction
-        post_summary_tokens = estimate_post_summary_tokens(
+        post_summary_tokens = await estimate_post_summary_tokens(
             messages, last_summary_index, deps.llm_model
         )
         post_summary_percentage = (
@@ -248,7 +249,7 @@ async def token_limit_compactor(
         ]
 
         # Calculate optimal max_tokens for summarization
-        max_tokens = calculate_max_summarization_tokens(
+        max_tokens = await calculate_max_summarization_tokens(
             deps.llm_model, request_messages
         )
 
@@ -261,7 +262,9 @@ async def token_limit_compactor(
         summary_response = await shotgun_model_request(
             model_config=deps.llm_model,
             messages=request_messages,
-            max_tokens=max_tokens,  # Use calculated optimal tokens for summarization
+            model_settings=ModelSettings(
+                max_tokens=max_tokens  # Use calculated optimal tokens for summarization
+            ),
         )
 
         log_summarization_response(summary_response, "INCREMENTAL")
@@ -328,7 +331,9 @@ async def token_limit_compactor(
 
         # Track compaction completion
         messages_after = len(compacted_messages)
-        tokens_after = estimate_tokens_from_messages(compacted_messages, deps.llm_model)
+        tokens_after = await estimate_tokens_from_messages(
+            compacted_messages, deps.llm_model
+        )
         reduction_percentage = (
             ((messages_before - messages_after) / messages_before * 100)
             if messages_before > 0
@@ -354,7 +359,7 @@ async def token_limit_compactor(
 
     else:
         # Check if total conversation exceeds threshold for full compaction
-        total_tokens = estimate_tokens_from_messages(messages, deps.llm_model)
+        total_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
         total_percentage = (total_tokens / max_tokens) * 100 if max_tokens > 0 else 0
 
         logger.debug(
@@ -392,7 +397,9 @@ async def _full_compaction(
     ]
 
     # Calculate optimal max_tokens for summarization
-    max_tokens = calculate_max_summarization_tokens(deps.llm_model, request_messages)
+    max_tokens = await calculate_max_summarization_tokens(
+        deps.llm_model, request_messages
+    )
 
     # Debug logging using shared utilities
     log_summarization_request(
@@ -403,11 +410,13 @@ async def _full_compaction(
     summary_response = await shotgun_model_request(
         model_config=deps.llm_model,
         messages=request_messages,
-        max_tokens=max_tokens,  # Use calculated optimal tokens for summarization
+        model_settings=ModelSettings(
+            max_tokens=max_tokens  # Use calculated optimal tokens for summarization
+        ),
     )
 
     # Calculate token reduction
-    current_tokens = estimate_tokens_from_messages(messages, deps.llm_model)
+    current_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
     summary_usage = summary_response.usage
     reduction_percentage = (
         ((current_tokens - summary_usage.output_tokens) / current_tokens) * 100

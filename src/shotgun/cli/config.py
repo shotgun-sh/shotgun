@@ -9,6 +9,7 @@ from rich.table import Table
 
 from shotgun.agents.config import ProviderType, get_config_manager
 from shotgun.logging_config import get_logger
+from shotgun.utils.env_utils import is_shotgun_account_enabled
 
 logger = get_logger(__name__)
 console = Console()
@@ -43,11 +44,11 @@ def init(
         console.print()
 
         # Initialize with defaults
-        config = config_manager.initialize()
+        config_manager.initialize()
 
-        # Ask for default provider
+        # Ask for provider
         provider_choices = ["openai", "anthropic", "google"]
-        console.print("Choose your default AI provider:")
+        console.print("Choose your AI provider:")
         for i, provider in enumerate(provider_choices, 1):
             console.print(f"  {i}. {provider}")
 
@@ -55,7 +56,7 @@ def init(
             try:
                 choice = typer.prompt("Enter choice (1-3)", type=int)
                 if 1 <= choice <= 3:
-                    config.default_provider = ProviderType(provider_choices[choice - 1])
+                    provider = ProviderType(provider_choices[choice - 1])
                     break
                 else:
                     console.print(
@@ -65,7 +66,6 @@ def init(
                 console.print("❌ Please enter a valid number.", style="red")
 
         # Ask for API key for the selected provider
-        provider = config.default_provider
         console.print(f"\n🔑 Setting up {provider.upper()} API key...")
 
         api_key = typer.prompt(
@@ -75,9 +75,9 @@ def init(
         )
 
         if api_key:
+            # update_provider will automatically set selected_model for first provider
             config_manager.update_provider(provider, api_key=api_key)
 
-        config_manager.save()
         console.print(
             f"\n✅ [bold green]Configuration saved to {config_manager.config_path}[/bold green]"
         )
@@ -98,16 +98,12 @@ def set(
         str | None,
         typer.Option("--api-key", "-k", help="API key for the provider"),
     ] = None,
-    default: Annotated[
-        bool,
-        typer.Option("--default", "-d", help="Set this provider as default"),
-    ] = False,
 ) -> None:
     """Set configuration for a specific provider."""
     config_manager = get_config_manager()
 
-    # If no API key provided via option and not just setting default, prompt for it
-    if api_key is None and not default:
+    # If no API key provided via option, prompt for it
+    if api_key is None:
         api_key = typer.prompt(
             f"Enter your {provider.upper()} API key",
             hide_input=True,
@@ -118,50 +114,10 @@ def set(
         if api_key:
             config_manager.update_provider(provider, api_key=api_key)
 
-        if default:
-            config = config_manager.load()
-            config.default_provider = provider
-            config_manager.save(config)
-
         console.print(f"✅ Configuration updated for {provider}")
 
     except Exception as e:
         console.print(f"❌ Failed to update configuration: {e}", style="red")
-        raise typer.Exit(1) from e
-
-
-@app.command()
-def set_default(
-    provider: Annotated[
-        ProviderType,
-        typer.Argument(
-            help="AI provider to set as default (openai, anthropic, google)"
-        ),
-    ],
-) -> None:
-    """Set the default AI provider without modifying API keys."""
-    config_manager = get_config_manager()
-
-    try:
-        config = config_manager.load()
-
-        # Check if the provider has an API key configured
-        provider_config = getattr(config, provider.value)
-        if not provider_config.api_key:
-            console.print(
-                f"⚠️  Warning: {provider.upper()} does not have an API key configured.",
-                style="yellow",
-            )
-            console.print(f"Use 'shotgun config set {provider}' to configure it.")
-
-        # Set as default
-        config.default_provider = provider
-        config_manager.save(config)
-
-        console.print(f"✅ Default provider set to: {provider}")
-
-    except Exception as e:
-        console.print(f"❌ Failed to set default provider: {e}", style="red")
         raise typer.Exit(1) from e
 
 
@@ -201,16 +157,23 @@ def _show_full_config(config: Any) -> None:
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="white")
 
-    # Default provider
-    table.add_row("Default Provider", f"[bold]{config.default_provider}[/bold]")
+    # Selected model
+    selected_model = config.selected_model or "None (will auto-detect)"
+    table.add_row("Selected Model", f"[bold]{selected_model}[/bold]")
     table.add_row("", "")  # Separator
 
     # Provider configurations
-    for provider_name, provider_config in [
+    providers_to_show = [
         ("OpenAI", config.openai),
         ("Anthropic", config.anthropic),
         ("Google", config.google),
-    ]:
+    ]
+
+    # Only show Shotgun Account if feature flag is enabled
+    if is_shotgun_account_enabled():
+        providers_to_show.append(("Shotgun Account", config.shotgun))
+
+    for provider_name, provider_config in providers_to_show:
         table.add_row(f"[bold]{provider_name}[/bold]", "")
 
         # API Key
@@ -231,6 +194,8 @@ def _show_provider_config(provider: ProviderType, config: Any) -> None:
         provider_config = config.anthropic
     elif provider_str == "google":
         provider_config = config.google
+    elif provider_str == "shotgun":
+        provider_config = config.shotgun
     else:
         console.print(f"❌ Unknown provider: {provider}", style="red")
         return
@@ -248,7 +213,13 @@ def _show_provider_config(provider: ProviderType, config: Any) -> None:
 
 def _mask_secrets(data: dict[str, Any]) -> None:
     """Mask secrets in configuration data."""
-    for provider in ["openai", "anthropic", "google"]:
+    providers = ["openai", "anthropic", "google"]
+
+    # Only mask shotgun if feature flag is enabled
+    if is_shotgun_account_enabled():
+        providers.append("shotgun")
+
+    for provider in providers:
         if provider in data and isinstance(data[provider], dict):
             if "api_key" in data[provider] and data[provider]["api_key"]:
                 data[provider]["api_key"] = _mask_value(data[provider]["api_key"])

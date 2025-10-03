@@ -14,6 +14,7 @@ from shotgun.utils.update_checker import perform_auto_update_async
 from .screens.chat import ChatScreen
 from .screens.directory_setup import DirectorySetupScreen
 from .screens.feedback import FeedbackScreen
+from .screens.model_picker import ModelPickerScreen
 from .screens.provider_config import ProviderConfigScreen
 
 logger = get_logger(__name__)
@@ -23,6 +24,7 @@ class ShotgunApp(App[None]):
     SCREENS = {
         "chat": ChatScreen,
         "provider_config": ProviderConfigScreen,
+        "model_picker": ModelPickerScreen,
         "directory_setup": DirectorySetupScreen,
         "feedback": FeedbackScreen,
     }

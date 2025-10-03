@@ -1,20 +1,24 @@
 """Anthropic web search tool implementation."""
 
-import anthropic
 from opentelemetry import trace
+from pydantic_ai.messages import ModelMessage, ModelRequest, TextPart
+from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import get_provider_model
+from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
 from shotgun.agents.config.models import ProviderType
+from shotgun.agents.llm import shotgun_model_request
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def anthropic_web_search_tool(query: str) -> str:
-    """Perform a web search using Anthropic's Claude API with streaming.
+async def anthropic_web_search_tool(query: str) -> str:
+    """Perform a web search using Anthropic's Claude API.
 
     This tool uses Anthropic's web search capabilities to find current information
-    about the given query. Results are streamed for faster response times.
+    about the given query. Works with both Shotgun API keys (via LiteLLM proxy)
+    and direct Anthropic API keys (BYOK).
 
     Args:
         query: The search query
@@ -27,49 +31,49 @@ def anthropic_web_search_tool(query: str) -> str:
     span = trace.get_current_span()
     span.set_attribute("input.value", f"**Query:** {query}\n")
 
-    logger.debug("📡 Executing Anthropic web search with streaming prompt: %s", query)
+    logger.debug("📡 Executing Anthropic web search with prompt: %s", query)
 
-    # Get API key from centralized configuration
+    # Get model configuration (supports both Shotgun and BYOK)
     try:
         model_config = get_provider_model(ProviderType.ANTHROPIC)
-        api_key = model_config.api_key
     except ValueError as e:
         error_msg = f"Anthropic API key not configured: {str(e)}"
         logger.error("❌ %s", error_msg)
         span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
         return error_msg
 
-    client = anthropic.Anthropic(api_key=api_key)
+    # Build the request messages
+    messages: list[ModelMessage] = [
+        ModelRequest.user_text_prompt(f"Search for: {query}")
+    ]
 
-    # Use the Messages API with web search tool and streaming
+    # Use the Messages API with web search tool
     try:
-        result_text = ""
+        response = await shotgun_model_request(
+            model_config=model_config,
+            messages=messages,
+            model_settings=ModelSettings(
+                max_tokens=MEDIUM_TEXT_8K_TOKENS,
+                # Enable Anthropic web search tool
+                extra_body={
+                    "tools": [
+                        {
+                            "type": "web_search_20250305",
+                            "name": "web_search",
+                        }
+                    ],
+                    "tool_choice": {"type": "tool", "name": "web_search"},
+                },
+            ),
+        )
 
-        with client.messages.stream(
-            model="claude-3-5-sonnet-latest",
-            max_tokens=8192,  # Maximum for Claude 3.5 Sonnet
-            messages=[{"role": "user", "content": f"Search for: {query}"}],
-            tools=[
-                {
-                    "type": "web_search_20250305",
-                    "name": "web_search",
-                }
-            ],
-            tool_choice={"type": "tool", "name": "web_search"},
-        ) as stream:
-            logger.debug("🌊 Started streaming Anthropic web search response")
-
-            for event in stream:
-                if event.type == "content_block_delta":
-                    if hasattr(event.delta, "text"):
-                        result_text += event.delta.text
-                elif event.type == "message_start":
-                    logger.debug("🚀 Streaming started")
-                elif event.type == "message_stop":
-                    logger.debug("✅ Streaming completed")
-
-        if not result_text:
-            result_text = "No content returned from search"
+        # Extract text from response
+        result_text = "No content returned from search"
+        if response.parts:
+            for part in response.parts:
+                if isinstance(part, TextPart):
+                    result_text = part.content
+                    break
 
         logger.debug("📄 Anthropic web search result: %d characters", len(result_text))
         logger.debug(
@@ -88,9 +92,8 @@ def anthropic_web_search_tool(query: str) -> str:
         return error_msg
 
 
-def main() -> None:
+async def main() -> None:
     """Main function for testing the Anthropic web search tool."""
-    import os
     import sys
 
     from shotgun.logging_config import setup_logger
@@ -110,24 +113,23 @@ def main() -> None:
     # Join all arguments as the search query
     query = " ".join(sys.argv[1:])
 
-    print("🔍 Testing Anthropic Web Search with streaming")
+    print("🔍 Testing Anthropic Web Search")
     print(f"📝 Query: {query}")
     print("=" * 60)
 
     # Check if API key is available
-    if not (
-        os.getenv("ANTHROPIC_API_KEY")
-        or (
-            callable(get_provider_model)
-            and get_provider_model(ProviderType.ANTHROPIC).api_key
-        )
-    ):
-        print("❌ Error: ANTHROPIC_API_KEY environment variable not set")
-        print("   Please set it with: export ANTHROPIC_API_KEY=your_key_here")
+    try:
+        if callable(get_provider_model):
+            model_config = get_provider_model(ProviderType.ANTHROPIC)
+            if not model_config.api_key:
+                raise ValueError("No API key configured")
+    except (ValueError, Exception):
+        print("❌ Error: Anthropic API key not configured")
+        print("   Please set it in your config file")
         sys.exit(1)
 
     try:
-        result = anthropic_web_search_tool(query)
+        result = await anthropic_web_search_tool(query)
         print(f"✅ Search completed! Result length: {len(result)} characters")
         print("=" * 60)
         print("📄 RESULTS:")
@@ -141,4 +143,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(main())

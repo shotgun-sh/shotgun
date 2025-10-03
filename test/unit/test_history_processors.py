@@ -20,7 +20,12 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from shotgun.agents.config.models import ModelConfig, ProviderType
+from shotgun.agents.config.models import (
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+)
 from shotgun.agents.history.constants import SUMMARY_MARKER
 from shotgun.agents.history.context_extraction import (
     extract_context_from_part as get_context_from_message,
@@ -50,8 +55,9 @@ from shotgun.agents.models import AgentDeps
 def mock_model_config() -> ModelConfig:
     """Create a mock ModelConfig for testing."""
     return ModelConfig(
-        name="test-model",
+        name=ModelName.GPT_5,
         provider=ProviderType.OPENAI,
+        key_provider=KeyProvider.BYOK,
         max_input_tokens=4096,
         max_output_tokens=2048,
         api_key="test-api-key",
@@ -965,7 +971,8 @@ class TestIncrementalCompaction:
 class TestMaxTokensCalculation:
     """Test suite for summarization max tokens calculation."""
 
-    def test_calculate_max_summarization_tokens(self, mock_run_context):
+    @pytest.mark.asyncio
+    async def test_calculate_max_summarization_tokens(self, mock_run_context):
         """Test calculation of maximum summarization tokens."""
         # Set up model config with known limits
         mock_run_context.deps.llm_model.max_output_tokens = 4096
@@ -977,14 +984,15 @@ class TestMaxTokensCalculation:
             )
         ]
 
-        max_tokens = calculate_max_summarization_tokens(
+        max_tokens = await calculate_max_summarization_tokens(
             mock_run_context, request_messages
         )
 
         # Should return the model's max_output_tokens since input is small
         assert max_tokens == 4096
 
-    def test_calculate_max_summarization_tokens_with_large_input(
+    @pytest.mark.asyncio
+    async def test_calculate_max_summarization_tokens_with_large_input(
         self, mock_run_context
     ):
         """Test calculation with large input that would affect token budget."""
@@ -997,14 +1005,15 @@ class TestMaxTokensCalculation:
             ModelRequest.user_text_prompt(large_context, instructions="Summarize this")
         ]
 
-        max_tokens = calculate_max_summarization_tokens(
+        max_tokens = await calculate_max_summarization_tokens(
             mock_run_context, request_messages
         )
 
         # Should still return max_output_tokens for separate limit models (like Claude)
         assert max_tokens == 4096
 
-    def test_calculate_max_summarization_tokens_minimum_enforced(
+    @pytest.mark.asyncio
+    async def test_calculate_max_summarization_tokens_minimum_enforced(
         self, mock_run_context
     ):
         """Test that minimum tokens are enforced even with very large input."""
@@ -1015,39 +1024,46 @@ class TestMaxTokensCalculation:
             ModelRequest.user_text_prompt("context", instructions="Summarize")
         ]
 
-        max_tokens = calculate_max_summarization_tokens(
+        max_tokens = await calculate_max_summarization_tokens(
             mock_run_context, request_messages
         )
 
         # Should enforce minimum of 100 tokens
         assert max_tokens >= 100
 
-    def test_estimate_tokens_from_messages(self, mock_model_config):
+    @pytest.mark.asyncio
+    async def test_estimate_tokens_from_messages(self, mock_model_config):
         """Test accurate token estimation from current message list."""
         messages = [
             ModelRequest(parts=[UserPromptPart(content="Short message")]),
             ModelResponse(parts=[TextPart(content="Response")]),
         ]
 
-        estimated_tokens = estimate_tokens_from_messages(messages, mock_model_config)
+        estimated_tokens = await estimate_tokens_from_messages(
+            messages, mock_model_config
+        )
 
         # Should be based on actual message content length
         assert estimated_tokens > 0
         assert isinstance(estimated_tokens, int)
 
-    def test_estimate_tokens_empty_messages(self, mock_model_config):
+    @pytest.mark.asyncio
+    async def test_estimate_tokens_empty_messages(self, mock_model_config):
         """Test token estimation with empty message list."""
         messages = []
-        estimated_tokens = estimate_tokens_from_messages(messages, mock_model_config)
+        estimated_tokens = await estimate_tokens_from_messages(
+            messages, mock_model_config
+        )
         assert estimated_tokens == 0
 
-    def test_estimate_tokens_from_message_parts(self, mock_model_config):
+    @pytest.mark.asyncio
+    async def test_estimate_tokens_from_message_parts(self, mock_model_config):
         """Test token estimation from message parts (for summarization requests)."""
         messages = [
             ModelRequest(parts=[UserPromptPart(content="Test message")]),
         ]
 
-        estimated_tokens = estimate_tokens_from_message_parts(
+        estimated_tokens = await estimate_tokens_from_message_parts(
             messages, mock_model_config
         )
 

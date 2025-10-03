@@ -217,7 +217,9 @@ class AgentResponseWidget(Widget):
             return ""
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                acc += f"**⏺** {part.content}\n\n"
+                # Only show the circle prefix if there's actual content
+                if part.content and part.content.strip():
+                    acc += f"**⏺** {part.content}\n\n"
             elif isinstance(part, ToolCallPart):
                 parts_str = self._format_tool_call_part(part)
                 acc += parts_str + "\n\n"

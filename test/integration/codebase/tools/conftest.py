@@ -8,7 +8,12 @@ import pytest
 import pytest_asyncio
 from pydantic_ai import Agent, RunContext
 
-from shotgun.agents.config.models import ModelConfig, ProviderType
+from shotgun.agents.config.models import (
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+)
 from shotgun.agents.models import AgentDeps, AgentRuntimeOptions
 from shotgun.agents.tools.codebase import (
     codebase_shell,
@@ -238,8 +243,9 @@ def agent_deps(codebase_service: CodebaseService, temp_storage_dir: Path) -> Age
 
     # Create ModelConfig for testing
     model_config = ModelConfig(
-        name="claude-3-5-sonnet-latest",
+        name=ModelName.CLAUDE_OPUS_4_1,
         provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
         max_input_tokens=200_000,
         max_output_tokens=20_000,
         api_key=os.getenv("ANTHROPIC_API_KEY", "test-api-key"),

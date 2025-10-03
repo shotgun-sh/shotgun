@@ -11,18 +11,19 @@ from shotgun.agents.tools.web_search import (
 )
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(
     not os.getenv("GEMINI_API_KEY"),
     reason="Gemini API key not set",
 )
-def test_gemini_web_search_smoke():
+async def test_gemini_web_search_smoke():
     """Smoke test to ensure Gemini web search doesn't crash."""
     # Check provider is available
     assert is_provider_available(ProviderType.GOOGLE)
 
     # Perform a simple search
     try:
-        result = gemini_web_search_tool("What is Python programming language?")
+        result = await gemini_web_search_tool("What is Python programming language?")
 
         # Basic assertions
         assert isinstance(result, str)
@@ -48,14 +49,15 @@ def test_gemini_web_search_smoke():
             raise
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(
     not os.getenv("GEMINI_API_KEY"),
     reason="Gemini API key not set",
 )
-def test_gemini_web_search_with_specific_query():
+async def test_gemini_web_search_with_specific_query():
     """Test Gemini web search with a specific query."""
     try:
-        result = gemini_web_search_tool("Latest Google AI announcements")
+        result = await gemini_web_search_tool("Latest Google AI announcements")
 
         assert isinstance(result, str)
 
@@ -80,7 +82,8 @@ def test_gemini_web_search_with_specific_query():
             raise
 
 
-def test_gemini_web_search_without_api_key():
+@pytest.mark.asyncio
+async def test_gemini_web_search_without_api_key():
     """Test that Gemini web search handles missing API key gracefully."""
     # Temporarily remove API key if it exists
     original_gemini_key = os.environ.pop("GEMINI_API_KEY", None)
@@ -92,13 +95,13 @@ def test_gemini_web_search_without_api_key():
 
         if not is_available:
             # Tool should return an error message about missing API key
-            result = gemini_web_search_tool("Test query")
+            result = await gemini_web_search_tool("Test query")
             assert isinstance(result, str)
             assert "API key not configured" in result or "not installed" in result
         else:
             # If available from config, the tool should work
             # We're just testing that removing env var doesn't break things
-            result = gemini_web_search_tool("Test query")
+            result = await gemini_web_search_tool("Test query")
             assert isinstance(result, str)
             # Should either work or return a package not installed error
             # (but not an API key error since it's configured)

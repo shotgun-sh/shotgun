@@ -1,9 +1,9 @@
 """Common models for CLI commands."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     """Output format options for CLI commands."""
 
     TEXT = "text"

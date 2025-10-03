@@ -31,7 +31,7 @@ async def apply_persistent_compaction(
 
     try:
         # Count actual token usage using shared utility
-        estimated_tokens = estimate_tokens_from_messages(messages, deps.llm_model)
+        estimated_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
 
         # Create minimal usage info for compaction check
         usage = RequestUsage(

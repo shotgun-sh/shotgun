@@ -242,7 +242,7 @@ def test_submit_feedback_survey_bug_report(
     # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
-    mock_config.default_provider.value = "openai"
+    mock_config.selected_model.value = "gpt-5"
     mock_config.config_version = "1.0.0"
     mock_config_manager.load.return_value = mock_config
     mock_get_config_manager.return_value = mock_config_manager
@@ -293,7 +293,7 @@ def test_submit_feedback_survey_bug_report(
         )
 
         # Verify config metadata
-        assert properties["provider"] == "openai"
+        assert properties["selected_model"] == "gpt-5"
         assert properties["config_version"] == "1.0.0"
 
         # Verify conversation messages
@@ -313,7 +313,7 @@ def test_submit_feedback_survey_feature_request(
     # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
-    mock_config.default_provider.value = "anthropic"
+    mock_config.selected_model.value = "claude-opus-4-1"
     mock_config.config_version = "2.0.0"
     mock_config_manager.load.return_value = mock_config
     mock_get_config_manager.return_value = mock_config_manager
@@ -367,7 +367,7 @@ def test_submit_feedback_survey_other_feedback(
     # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
-    mock_config.default_provider.value = "google"
+    mock_config.selected_model.value = "gemini-2.5-pro"
     mock_config.config_version = "1.5.0"
     mock_config_manager.load.return_value = mock_config
     mock_get_config_manager.return_value = mock_config_manager

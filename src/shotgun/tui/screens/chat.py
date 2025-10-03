@@ -54,11 +54,8 @@ from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
 from ..utils.mode_progress import PlaceholderHints
 from .chat_screen.command_providers import (
-    AgentModeProvider,
-    CodebaseCommandProvider,
     DeleteCodebasePaletteProvider,
-    ProviderSetupProvider,
-    UsageProvider,
+    UnifiedCommandProvider,
 )
 
 logger = logging.getLogger(__name__)
@@ -233,10 +230,7 @@ class ChatScreen(Screen[None]):
     ]
 
     COMMANDS = {
-        AgentModeProvider,
-        ProviderSetupProvider,
-        CodebaseCommandProvider,
-        UsageProvider,
+        UnifiedCommandProvider,
     }
 
     value = reactive("")

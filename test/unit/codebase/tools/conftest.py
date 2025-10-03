@@ -5,7 +5,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic_ai import RunContext
 
-from shotgun.agents.config.models import ModelConfig, ProviderType
+from shotgun.agents.config.models import (
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+)
 from shotgun.agents.models import AgentDeps, AgentRuntimeOptions
 from shotgun.codebase.models import CodebaseGraph, GraphStatus
 
@@ -42,8 +47,9 @@ def mock_agent_deps(mock_codebase_service):
 
     # Create a real ModelConfig instead of a mock
     model_config = ModelConfig(
-        name="test-model",
+        name=ModelName.GPT_5,
         provider=ProviderType.OPENAI,
+        key_provider=KeyProvider.BYOK,
         max_input_tokens=4096,
         max_output_tokens=2048,
         api_key="test-api-key",

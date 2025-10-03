@@ -19,10 +19,10 @@ from .constants import INPUT_BUFFER_TOKENS, MIN_SUMMARY_TOKENS
 from .token_counting import count_tokens_from_messages as _count_tokens_from_messages
 
 
-def estimate_tokens_from_messages(
+async def estimate_tokens_from_messages(
     messages: list[ModelMessage], model_config: ModelConfig
 ) -> int:
-    """Count actual tokens from current message list.
+    """Count actual tokens from current message list (async).
 
     This provides accurate token counting for compaction decisions using
     provider-specific token counting methods instead of rough estimation.
@@ -38,13 +38,13 @@ def estimate_tokens_from_messages(
         ValueError: If provider is not supported
         RuntimeError: If token counting fails
     """
-    return _count_tokens_from_messages(messages, model_config)
+    return await _count_tokens_from_messages(messages, model_config)
 
 
-def estimate_post_summary_tokens(
+async def estimate_post_summary_tokens(
     messages: list[ModelMessage], summary_index: int, model_config: ModelConfig
 ) -> int:
-    """Count actual tokens from summary onwards for incremental compaction decisions.
+    """Count actual tokens from summary onwards for incremental compaction decisions (async).
 
     This treats the summary as a reset point and only counts tokens from the summary
     message onwards. Used to determine if incremental compaction is needed.
@@ -65,13 +65,13 @@ def estimate_post_summary_tokens(
         return 0
 
     post_summary_messages = messages[summary_index:]
-    return estimate_tokens_from_messages(post_summary_messages, model_config)
+    return await estimate_tokens_from_messages(post_summary_messages, model_config)
 
 
-def estimate_tokens_from_message_parts(
+async def estimate_tokens_from_message_parts(
     messages: list[ModelMessage], model_config: ModelConfig
 ) -> int:
-    """Count actual tokens from message parts for summarization requests.
+    """Count actual tokens from message parts for summarization requests (async).
 
     This provides accurate token counting across the codebase using
     provider-specific methods instead of character estimation.
@@ -87,14 +87,14 @@ def estimate_tokens_from_message_parts(
         ValueError: If provider is not supported
         RuntimeError: If token counting fails
     """
-    return _count_tokens_from_messages(messages, model_config)
+    return await _count_tokens_from_messages(messages, model_config)
 
 
-def calculate_max_summarization_tokens(
+async def calculate_max_summarization_tokens(
     ctx_or_model_config: Union["RunContext[AgentDeps]", ModelConfig],
     request_messages: list[ModelMessage],
 ) -> int:
-    """Calculate maximum tokens available for summarization output.
+    """Calculate maximum tokens available for summarization output (async).
 
     This ensures we use the model's full capacity while leaving room for input tokens.
 
@@ -115,7 +115,7 @@ def calculate_max_summarization_tokens(
         return MIN_SUMMARY_TOKENS
 
     # Count actual input tokens using shared utility
-    estimated_input_tokens = estimate_tokens_from_message_parts(
+    estimated_input_tokens = await estimate_tokens_from_message_parts(
         request_messages, model_config
     )
 

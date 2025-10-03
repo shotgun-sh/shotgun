@@ -18,7 +18,7 @@ from pydantic_ai.messages import (
     ModelRequest,
 )
 
-from shotgun.agents.config import ProviderType, get_config_manager, get_provider_model
+from shotgun.agents.config import ProviderType, get_provider_model
 from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
@@ -115,14 +115,13 @@ def create_base_agent(
     """
     ensure_shotgun_directory_exists()
 
-    # Get configured model or fall back to hardcoded default
+    # Get configured model or fall back to first available provider
     try:
         model_config = get_provider_model(provider)
-        config_manager = get_config_manager()
-        provider_name = provider or config_manager.load().default_provider
+        provider_name = model_config.provider
         logger.debug(
             "🤖 Creating agent with configured %s model: %s",
-            provider_name.upper(),
+            provider_name.value.upper(),
             model_config.name,
         )
         # Use the Model instance directly (has API key baked in)

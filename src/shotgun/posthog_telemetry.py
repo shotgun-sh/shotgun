@@ -1,6 +1,6 @@
 """PostHog analytics setup for Shotgun."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import posthog
@@ -137,7 +137,7 @@ def shutdown() -> None:
             _posthog_client = None
 
 
-class FeedbackKind(str, Enum):
+class FeedbackKind(StrEnum):
     BUG = "bug"
     FEATURE = "feature"
     OTHER = "other"
@@ -178,7 +178,9 @@ def submit_feedback_survey(feedback: Feedback) -> None:
             ],
             f"$survey_response_{Q_KIND_ID}": feedback.kind,
             f"$survey_response_{Q_DESCRIPTION_ID}": feedback.description,
-            "provider": config.default_provider.value,
+            "selected_model": config.selected_model.value
+            if config.selected_model
+            else None,
             "config_version": config.config_version,
             "last_10_messages": last_10_messages,  # last 10 messages
         },

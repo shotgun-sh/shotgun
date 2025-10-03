@@ -1,5 +1,11 @@
 """Main CLI application for shotgun."""
 
+# NOTE: These are before we import any Google library to stop the noisy gRPC logs.
+import os  # noqa: I001
+
+os.environ["GRPC_VERBOSITY"] = "ERROR"
+os.environ["GLOG_minloglevel"] = "2"
+
 import logging
 
 # CRITICAL: Add NullHandler to root logger before ANY other imports.

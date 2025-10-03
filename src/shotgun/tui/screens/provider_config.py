@@ -12,9 +12,23 @@ from textual.screen import Screen
 from textual.widgets import Button, Input, Label, ListItem, ListView, Markdown, Static
 
 from shotgun.agents.config import ConfigManager, ProviderType
+from shotgun.utils.env_utils import is_shotgun_account_enabled
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
+
+
+def get_configurable_providers() -> list[str]:
+    """Get list of configurable providers based on feature flags.
+
+    Returns:
+        List of provider identifiers that can be configured.
+        Includes shotgun only if SHOTGUN_ACCOUNT_ENABLED is set.
+    """
+    providers = ["openai", "anthropic", "google"]
+    if is_shotgun_account_enabled():
+        providers.append("shotgun")
+    return providers
 
 
 class ProviderConfigScreen(Screen[None]):
@@ -73,7 +87,7 @@ class ProviderConfigScreen(Screen[None]):
         ("escape", "done", "Back"),
     ]
 
-    selected_provider: reactive[ProviderType] = reactive(ProviderType.OPENAI)
+    selected_provider: reactive[str] = reactive("openai")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
@@ -102,7 +116,7 @@ class ProviderConfigScreen(Screen[None]):
         list_view = self.query_one(ListView)
         if list_view.children:
             list_view.index = 0
-        self.selected_provider = ProviderType.OPENAI
+        self.selected_provider = "openai"
         self.set_focus(self.query_one("#api-key", Input))
 
     def action_done(self) -> None:
@@ -152,45 +166,55 @@ class ProviderConfigScreen(Screen[None]):
 
     def refresh_provider_status(self) -> None:
         """Update the list view entries to reflect configured providers."""
-        for provider in ProviderType:
-            label = self.query_one(f"#label-{provider.value}", Label)
-            label.update(self._provider_label(provider))
+        for provider_id in get_configurable_providers():
+            label = self.query_one(f"#label-{provider_id}", Label)
+            label.update(self._provider_label(provider_id))
 
     def _build_provider_items(self) -> list[ListItem]:
         items: list[ListItem] = []
-        for provider in ProviderType:
-            label = Label(self._provider_label(provider), id=f"label-{provider.value}")
-            items.append(ListItem(label, id=f"provider-{provider.value}"))
+        for provider_id in get_configurable_providers():
+            label = Label(self._provider_label(provider_id), id=f"label-{provider_id}")
+            items.append(ListItem(label, id=f"provider-{provider_id}"))
         return items
 
-    def _provider_from_item(self, item: ListItem | None) -> ProviderType | None:
+    def _provider_from_item(self, item: ListItem | None) -> str | None:
         if item is None or item.id is None:
             return None
         provider_id = item.id.removeprefix("provider-")
-        try:
-            return ProviderType(provider_id)
-        except ValueError:
-            return None
+        return provider_id if provider_id in get_configurable_providers() else None
 
-    def _provider_label(self, provider: ProviderType) -> str:
-        display = self._provider_display_name(provider)
+    def _provider_label(self, provider_id: str) -> str:
+        display = self._provider_display_name(provider_id)
         status = (
-            "Configured"
-            if self.config_manager.has_provider_key(provider)
-            else "Not configured"
+            "Configured" if self._has_provider_key(provider_id) else "Not configured"
         )
         return f"{display} · {status}"
 
-    def _provider_display_name(self, provider: ProviderType) -> str:
+    def _provider_display_name(self, provider_id: str) -> str:
         names = {
-            ProviderType.OPENAI: "OpenAI",
-            ProviderType.ANTHROPIC: "Anthropic",
-            ProviderType.GOOGLE: "Google Gemini",
+            "openai": "OpenAI",
+            "anthropic": "Anthropic",
+            "google": "Google Gemini",
+            "shotgun": "Shotgun Account",
         }
-        return names.get(provider, provider.value.title())
+        return names.get(provider_id, provider_id.title())
 
-    def _input_placeholder(self, provider: ProviderType) -> str:
-        return f"{self._provider_display_name(provider)} API key"
+    def _input_placeholder(self, provider_id: str) -> str:
+        return f"{self._provider_display_name(provider_id)} API key"
+
+    def _has_provider_key(self, provider_id: str) -> bool:
+        """Check if provider has a configured API key."""
+        if provider_id == "shotgun":
+            # Check shotgun key directly
+            config = self.config_manager.load()
+            return self.config_manager._provider_has_api_key(config.shotgun)
+        else:
+            # Check LLM provider key
+            try:
+                provider = ProviderType(provider_id)
+                return self.config_manager.has_provider_key(provider)
+            except ValueError:
+                return False
 
     def _save_api_key(self) -> None:
         input_widget = self.query_one("#api-key", Input)

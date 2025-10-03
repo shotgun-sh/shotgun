@@ -1,20 +1,24 @@
 """Gemini web search tool implementation."""
 
-import google.generativeai as genai
 from opentelemetry import trace
+from pydantic_ai.messages import ModelMessage, ModelRequest
+from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.config.models import ProviderType
+from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
+from shotgun.agents.config.models import ModelName
+from shotgun.agents.llm import shotgun_model_request
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def gemini_web_search_tool(query: str) -> str:
+async def gemini_web_search_tool(query: str) -> str:
     """Perform a web search using Google's Gemini API with grounding.
 
     This tool uses Gemini's Google Search grounding to find current information
-    about the given query.
+    about the given query. Works with both Shotgun API keys (via LiteLLM proxy)
+    and direct Gemini API keys (BYOK).
 
     Args:
         query: The search query
@@ -29,23 +33,16 @@ def gemini_web_search_tool(query: str) -> str:
 
     logger.debug("📡 Executing Gemini web search with prompt: %s", query)
 
-    # Get API key from centralized configuration
+    # Get model configuration (supports both Shotgun and BYOK)
     try:
-        model_config = get_provider_model(ProviderType.GOOGLE)
-        api_key = model_config.api_key
+        model_config = get_provider_model(ModelName.GEMINI_2_5_FLASH)
     except ValueError as e:
         error_msg = f"Gemini API key not configured: {str(e)}"
         logger.error("❌ %s", error_msg)
         span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
         return error_msg
 
-    genai.configure(api_key=api_key)  # type: ignore[attr-defined]
-
-    # Create model without built-in tools to avoid conflict with Pydantic AI
-    # Using prompt-based search approach instead
-    model = genai.GenerativeModel("gemini-2.5-pro")  # type: ignore[attr-defined]
-
-    # Create a search-optimized prompt that leverages Gemini's knowledge
+    # Create a search-optimized prompt
     search_prompt = f"""Please provide current and accurate information about the following query:
 
 Query: {query}
@@ -56,17 +53,31 @@ Instructions:
 - Focus on current and recent information
 - Be specific and accurate in your response"""
 
-    # Generate response using the model's knowledge
+    # Build the request messages
+    messages: list[ModelMessage] = [ModelRequest.user_text_prompt(search_prompt)]
+
+    # Generate response using Pydantic AI with Google Search grounding
     try:
-        response = model.generate_content(
-            search_prompt,
-            generation_config=genai.GenerationConfig(  # type: ignore[attr-defined]
+        response = await shotgun_model_request(
+            model_config=model_config,
+            messages=messages,
+            model_settings=ModelSettings(
                 temperature=0.3,
-                max_output_tokens=8192,
+                max_tokens=MEDIUM_TEXT_8K_TOKENS,
+                # Enable Google Search grounding for Gemini
+                extra_body={"tools": [{"googleSearch": {}}]},
             ),
         )
 
-        result_text = response.text or "No content returned from search"
+        # Extract text from response
+        from pydantic_ai.messages import TextPart
+
+        result_text = "No content returned from search"
+        if response.parts:
+            for part in response.parts:
+                if isinstance(part, TextPart):
+                    result_text = part.content
+                    break
 
         logger.debug("📄 Gemini web search result: %d characters", len(result_text))
         logger.debug(

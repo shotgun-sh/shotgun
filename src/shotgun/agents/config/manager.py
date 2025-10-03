@@ -1,7 +1,6 @@
 """Configuration manager for Shotgun CLI."""
 
 import json
-import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -12,17 +11,23 @@ from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
 
 from .constants import (
-    ANTHROPIC_API_KEY_ENV,
-    ANTHROPIC_PROVIDER,
     API_KEY_FIELD,
-    GEMINI_API_KEY_ENV,
-    GOOGLE_PROVIDER,
-    OPENAI_API_KEY_ENV,
-    OPENAI_PROVIDER,
+    ConfigSection,
 )
-from .models import ProviderType, ShotgunConfig
+from .models import (
+    AnthropicConfig,
+    GoogleConfig,
+    ModelName,
+    OpenAIConfig,
+    ProviderType,
+    ShotgunAccountConfig,
+    ShotgunConfig,
+)
 
 logger = get_logger(__name__)
+
+# Type alias for provider configuration objects
+ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 
 class ConfigManager:
@@ -69,20 +74,56 @@ class ConfigManager:
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
 
-            # Check if the default provider has a key, if not find one that does
-            if not self.has_provider_key(self._config.default_provider):
-                original_default = self._config.default_provider
-                # Find first provider with a configured key
-                for provider in ProviderType:
-                    if self.has_provider_key(provider):
+            # Validate selected_model if in BYOK mode (no Shotgun key)
+            if not self._provider_has_api_key(self._config.shotgun):
+                should_save = False
+
+                # If selected_model is set, verify its provider has a key
+                if self._config.selected_model:
+                    from .models import MODEL_SPECS
+
+                    if self._config.selected_model in MODEL_SPECS:
+                        spec = MODEL_SPECS[self._config.selected_model]
+                        if not self.has_provider_key(spec.provider):
+                            logger.info(
+                                "Selected model %s provider has no API key, finding available model",
+                                self._config.selected_model.value,
+                            )
+                            self._config.selected_model = None
+                            should_save = True
+                    else:
                         logger.info(
-                            "Default provider %s has no API key, updating to %s",
-                            original_default.value,
-                            provider.value,
+                            "Selected model %s not found in MODEL_SPECS, resetting",
+                            self._config.selected_model.value,
                         )
-                        self._config.default_provider = provider
-                        self.save(self._config)
-                        break
+                        self._config.selected_model = None
+                        should_save = True
+
+                # If no selected_model or it was invalid, find first available model
+                if not self._config.selected_model:
+                    for provider in ProviderType:
+                        if self.has_provider_key(provider):
+                            # Set to that provider's default model
+                            from .models import MODEL_SPECS, ModelName
+
+                            # Find default model for this provider
+                            provider_models = {
+                                ProviderType.OPENAI: ModelName.GPT_5,
+                                ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
+                                ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
+                            }
+
+                            if provider in provider_models:
+                                self._config.selected_model = provider_models[provider]
+                                logger.info(
+                                    "Set selected_model to %s (first available provider)",
+                                    self._config.selected_model.value,
+                                )
+                                should_save = True
+                                break
+
+                if should_save:
+                    self.save(self._config)
 
             return self._config
 
@@ -107,7 +148,6 @@ class ConfigManager:
                 # Create a new config with generated user_id
                 config = ShotgunConfig(
                     user_id=str(uuid.uuid4()),
-                    config_version=1,
                 )
 
         # Ensure directory exists
@@ -136,8 +176,13 @@ class ConfigManager:
             **kwargs: Configuration fields to update (only api_key supported)
         """
         config = self.load()
-        provider_enum = self._ensure_provider_enum(provider)
-        provider_config = self._get_provider_config(config, provider_enum)
+
+        # Get provider config and check if it's shotgun
+        provider_config, is_shotgun = self._get_provider_config_and_type(
+            config, provider
+        )
+        # For non-shotgun providers, we need the enum for default provider logic
+        provider_enum = None if is_shotgun else self._ensure_provider_enum(provider)
 
         # Only support api_key updates
         if API_KEY_FIELD in kwargs:
@@ -152,50 +197,63 @@ class ConfigManager:
             raise ValueError(f"Unsupported configuration fields: {unsupported_fields}")
 
         # If no other providers have keys configured and we just added one,
-        # set this provider as the default
-        if API_KEY_FIELD in kwargs and api_key_value is not None:
+        # set selected_model to that provider's default model (only for LLM providers, not shotgun)
+        if not is_shotgun and API_KEY_FIELD in kwargs and api_key_value is not None:
+            # provider_enum is guaranteed to be non-None here since is_shotgun is False
+            if provider_enum is None:
+                raise RuntimeError("Provider enum should not be None for LLM providers")
             other_providers = [p for p in ProviderType if p != provider_enum]
             has_other_keys = any(self.has_provider_key(p) for p in other_providers)
             if not has_other_keys:
-                config.default_provider = provider_enum
+                # Set selected_model to this provider's default model
+                from .models import ModelName
+
+                provider_models = {
+                    ProviderType.OPENAI: ModelName.GPT_5,
+                    ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
+                    ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
+                }
+                if provider_enum in provider_models:
+                    config.selected_model = provider_models[provider_enum]
 
         self.save(config)
 
     def clear_provider_key(self, provider: ProviderType | str) -> None:
-        """Remove the API key for the given provider."""
+        """Remove the API key for the given provider (LLM provider or shotgun)."""
         config = self.load()
-        provider_enum = self._ensure_provider_enum(provider)
-        provider_config = self._get_provider_config(config, provider_enum)
+
+        # Get provider config (shotgun or LLM provider)
+        provider_config, _ = self._get_provider_config_and_type(config, provider)
+
         provider_config.api_key = None
+        self.save(config)
+
+    def update_selected_model(self, model_name: "ModelName") -> None:
+        """Update the selected model.
+
+        Args:
+            model_name: Model to select
+        """
+        config = self.load()
+        config.selected_model = model_name
         self.save(config)
 
     def has_provider_key(self, provider: ProviderType | str) -> bool:
         """Check if the given provider has a non-empty API key configured.
 
-        This checks both the configuration file and environment variables.
+        This checks only the configuration file.
         """
         config = self.load()
         provider_enum = self._ensure_provider_enum(provider)
         provider_config = self._get_provider_config(config, provider_enum)
 
-        # Check config first
-        if self._provider_has_api_key(provider_config):
-            return True
-
-        # Check environment variable
-        if provider_enum == ProviderType.OPENAI:
-            return bool(os.getenv(OPENAI_API_KEY_ENV))
-        elif provider_enum == ProviderType.ANTHROPIC:
-            return bool(os.getenv(ANTHROPIC_API_KEY_ENV))
-        elif provider_enum == ProviderType.GOOGLE:
-            return bool(os.getenv(GEMINI_API_KEY_ENV))
-
-        return False
+        return self._provider_has_api_key(provider_config)
 
     def has_any_provider_key(self) -> bool:
         """Determine whether any provider has a configured API key."""
         config = self.load()
-        return any(
+        # Check LLM provider keys (BYOK)
+        has_llm_key = any(
             self._provider_has_api_key(self._get_provider_config(config, provider))
             for provider in (
                 ProviderType.OPENAI,
@@ -203,6 +261,9 @@ class ConfigManager:
                 ProviderType.GOOGLE,
             )
         )
+        # Also check Shotgun Account key
+        has_shotgun_key = self._provider_has_api_key(config.shotgun)
+        return has_llm_key or has_shotgun_key
 
     def initialize(self) -> ShotgunConfig:
         """Initialize configuration with defaults and save to file.
@@ -213,7 +274,6 @@ class ConfigManager:
         # Generate unique user ID for new config
         config = ShotgunConfig(
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         self.save(config)
         logger.info(
@@ -225,26 +285,26 @@ class ConfigManager:
 
     def _convert_secrets_to_secretstr(self, data: dict[str, Any]) -> None:
         """Convert plain text secrets in data to SecretStr objects."""
-        for provider in [OPENAI_PROVIDER, ANTHROPIC_PROVIDER, GOOGLE_PROVIDER]:
-            if provider in data and isinstance(data[provider], dict):
+        for section in ConfigSection:
+            if section.value in data and isinstance(data[section.value], dict):
                 if (
-                    API_KEY_FIELD in data[provider]
-                    and data[provider][API_KEY_FIELD] is not None
+                    API_KEY_FIELD in data[section.value]
+                    and data[section.value][API_KEY_FIELD] is not None
                 ):
-                    data[provider][API_KEY_FIELD] = SecretStr(
-                        data[provider][API_KEY_FIELD]
+                    data[section.value][API_KEY_FIELD] = SecretStr(
+                        data[section.value][API_KEY_FIELD]
                     )
 
     def _convert_secretstr_to_plain(self, data: dict[str, Any]) -> None:
         """Convert SecretStr objects in data to plain text for JSON serialization."""
-        for provider in [OPENAI_PROVIDER, ANTHROPIC_PROVIDER, GOOGLE_PROVIDER]:
-            if provider in data and isinstance(data[provider], dict):
+        for section in ConfigSection:
+            if section.value in data and isinstance(data[section.value], dict):
                 if (
-                    API_KEY_FIELD in data[provider]
-                    and data[provider][API_KEY_FIELD] is not None
+                    API_KEY_FIELD in data[section.value]
+                    and data[section.value][API_KEY_FIELD] is not None
                 ):
-                    if hasattr(data[provider][API_KEY_FIELD], "get_secret_value"):
-                        data[provider][API_KEY_FIELD] = data[provider][
+                    if hasattr(data[section.value][API_KEY_FIELD], "get_secret_value"):
+                        data[section.value][API_KEY_FIELD] = data[section.value][
                             API_KEY_FIELD
                         ].get_secret_value()
 
@@ -278,6 +338,38 @@ class ConfigManager:
             value = str(api_key)
 
         return bool(value.strip())
+
+    def _is_shotgun_provider(self, provider: ProviderType | str) -> bool:
+        """Check if provider string represents Shotgun Account.
+
+        Args:
+            provider: Provider type or string
+
+        Returns:
+            True if provider is shotgun account
+        """
+        return (
+            isinstance(provider, str)
+            and provider.lower() == ConfigSection.SHOTGUN.value
+        )
+
+    def _get_provider_config_and_type(
+        self, config: ShotgunConfig, provider: ProviderType | str
+    ) -> tuple[ProviderConfig, bool]:
+        """Get provider config, handling shotgun as special case.
+
+        Args:
+            config: Shotgun configuration
+            provider: Provider type or string
+
+        Returns:
+            Tuple of (provider_config, is_shotgun)
+        """
+        if self._is_shotgun_provider(provider):
+            return (config.shotgun, True)
+
+        provider_enum = self._ensure_provider_enum(provider)
+        return (self._get_provider_config(config, provider_enum), False)
 
     def get_user_id(self) -> str:
         """Get the user ID from configuration.

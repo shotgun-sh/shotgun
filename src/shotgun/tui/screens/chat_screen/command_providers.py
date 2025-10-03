@@ -141,15 +141,25 @@ class ProviderSetupProvider(Provider):
         """Show the provider configuration screen."""
         self.chat_screen.app.push_screen("provider_config")
 
+    def open_model_picker(self) -> None:
+        """Show the model picker screen."""
+        self.chat_screen.app.push_screen("model_picker")
+
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         yield DiscoveryHit(
             "Open Provider Setup",
             self.open_provider_config,
             help="⚙️ Manage API keys for available providers",
         )
+        yield DiscoveryHit(
+            "Select AI Model",
+            self.open_model_picker,
+            help="🤖 Choose which AI model to use",
+        )
 
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
         matcher = self.matcher(query)
+
         title = "Open Provider Setup"
         score = matcher.match(title)
         if score > 0:
@@ -158,6 +168,16 @@ class ProviderSetupProvider(Provider):
                 matcher.highlight(title),
                 self.open_provider_config,
                 help="⚙️ Manage API keys for available providers",
+            )
+
+        title = "Select AI Model"
+        score = matcher.match(title)
+        if score > 0:
+            yield Hit(
+                score,
+                matcher.highlight(title),
+                self.open_model_picker,
+                help="🤖 Choose which AI model to use",
             )
 
 
@@ -172,28 +192,28 @@ class CodebaseCommandProvider(Provider):
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         yield DiscoveryHit(
-            "Codebase: Index Codebase",
-            self.chat_screen.index_codebase_command,
-            help="Index a repository into the codebase graph",
-        )
-        yield DiscoveryHit(
             "Codebase: Delete Codebase Index",
             self.chat_screen.delete_codebase_command,
             help="Delete an existing codebase index",
+        )
+        yield DiscoveryHit(
+            "Codebase: Index Codebase",
+            self.chat_screen.index_codebase_command,
+            help="Index a repository into the codebase graph",
         )
 
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
         matcher = self.matcher(query)
         commands = [
             (
-                "Codebase: Index Codebase",
-                self.chat_screen.index_codebase_command,
-                "Index a repository into the codebase graph",
-            ),
-            (
                 "Codebase: Delete Codebase Index",
                 self.chat_screen.delete_codebase_command,
                 "Delete an existing codebase index",
+            ),
+            (
+                "Codebase: Index Codebase",
+                self.chat_screen.index_codebase_command,
+                "Index a repository into the codebase graph",
             ),
         ]
         for title, callback, help_text in commands:
@@ -249,3 +269,88 @@ class DeleteCodebasePaletteProvider(Provider):
                     ),
                     help=graph.repo_path,
                 )
+
+
+class UnifiedCommandProvider(Provider):
+    """Unified command provider with all commands in alphabetical order."""
+
+    @property
+    def chat_screen(self) -> "ChatScreen":
+        from shotgun.tui.screens.chat import ChatScreen
+
+        return cast(ChatScreen, self.screen)
+
+    def open_provider_config(self) -> None:
+        """Show the provider configuration screen."""
+        self.chat_screen.app.push_screen("provider_config")
+
+    def open_model_picker(self) -> None:
+        """Show the model picker screen."""
+        self.chat_screen.app.push_screen("model_picker")
+
+    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        """Provide commands in alphabetical order when palette opens."""
+        # Alphabetically ordered commands
+        yield DiscoveryHit(
+            "Codebase: Delete Codebase Index",
+            self.chat_screen.delete_codebase_command,
+            help="Delete an existing codebase index",
+        )
+        yield DiscoveryHit(
+            "Codebase: Index Codebase",
+            self.chat_screen.index_codebase_command,
+            help="Index a repository into the codebase graph",
+        )
+        yield DiscoveryHit(
+            "Open Provider Setup",
+            self.open_provider_config,
+            help="⚙️ Manage API keys for available providers",
+        )
+        yield DiscoveryHit(
+            "Select AI Model",
+            self.open_model_picker,
+            help="🤖 Choose which AI model to use",
+        )
+        yield DiscoveryHit(
+            "Show usage",
+            self.chat_screen.action_show_usage,
+            help="Display usage information for the current session",
+        )
+
+    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        """Search for commands in alphabetical order."""
+        matcher = self.matcher(query)
+
+        # Define all commands in alphabetical order
+        commands = [
+            (
+                "Codebase: Delete Codebase Index",
+                self.chat_screen.delete_codebase_command,
+                "Delete an existing codebase index",
+            ),
+            (
+                "Codebase: Index Codebase",
+                self.chat_screen.index_codebase_command,
+                "Index a repository into the codebase graph",
+            ),
+            (
+                "Open Provider Setup",
+                self.open_provider_config,
+                "⚙️ Manage API keys for available providers",
+            ),
+            (
+                "Select AI Model",
+                self.open_model_picker,
+                "🤖 Choose which AI model to use",
+            ),
+            (
+                "Show usage",
+                self.chat_screen.action_show_usage,
+                "Display usage information for the current session",
+            ),
+        ]
+
+        for title, callback, help_text in commands:
+            score = matcher.match(title)
+            if score > 0:
+                yield Hit(score, matcher.highlight(title), callback, help=help_text)

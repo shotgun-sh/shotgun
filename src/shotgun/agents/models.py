@@ -4,7 +4,7 @@ import os
 from asyncio import Future, Queue
 from collections.abc import Callable
 from datetime import datetime
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -116,7 +116,7 @@ class AgentRuntimeOptions(BaseModel):
     )
 
 
-class FileOperationType(str, Enum):
+class FileOperationType(StrEnum):
     """Types of file operations that can be tracked."""
 
     CREATED = "created"

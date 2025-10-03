@@ -10,22 +10,17 @@ import pytest
 from pydantic import SecretStr
 
 from shotgun.agents.config.constants import (
-    ANTHROPIC_API_KEY_ENV,
-    ANTHROPIC_PROVIDER,
     API_KEY_FIELD,
     CONFIG_VERSION_FIELD,
-    DEFAULT_PROVIDER_FIELD,
-    GEMINI_API_KEY_ENV,
-    GOOGLE_PROVIDER,
-    OPENAI_API_KEY_ENV,
-    OPENAI_PROVIDER,
     USER_ID_FIELD,
+    ConfigSection,
 )
 from shotgun.agents.config.manager import ConfigManager, get_config_manager
 from shotgun.agents.config.models import (
     AnthropicConfig,
     GoogleConfig,
     ModelConfig,
+    ModelName,
     OpenAIConfig,
     ProviderType,
     ShotgunConfig,
@@ -62,14 +57,14 @@ def test_load_config_not_exists(mock_logger):
         config = manager.load()
 
         assert isinstance(config, ShotgunConfig)
-        assert config.default_provider == ProviderType.OPENAI
+        assert config.selected_model is None
         assert manager._config is config
         # Now creates new config with user_id, so we get two log messages
         assert mock_logger.info.call_count == 2
         assert hasattr(config, "user_id")
         assert config.user_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 1
+        assert config.config_version == 2
 
 
 @patch("shotgun.agents.config.manager.logger")
@@ -94,12 +89,13 @@ def test_load_config_valid_file(mock_logger):
     import uuid
 
     config_data = {
-        OPENAI_PROVIDER: {API_KEY_FIELD: "test-openai-key"},
-        ANTHROPIC_PROVIDER: {API_KEY_FIELD: "test-anthropic-key"},
-        GOOGLE_PROVIDER: {API_KEY_FIELD: "test-google-key"},
-        DEFAULT_PROVIDER_FIELD: "anthropic",
+        ConfigSection.OPENAI.value: {API_KEY_FIELD: "test-openai-key"},
+        ConfigSection.ANTHROPIC.value: {API_KEY_FIELD: "test-anthropic-key"},
+        ConfigSection.GOOGLE.value: {API_KEY_FIELD: "test-google-key"},
+        ConfigSection.SHOTGUN.value: {},
+        "selected_model": "claude-sonnet-4-5",
         USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 1,
+        CONFIG_VERSION_FIELD: 2,
     }
 
     with tempfile.NamedTemporaryFile(
@@ -113,7 +109,7 @@ def test_load_config_valid_file(mock_logger):
             config = manager.load()
 
             assert isinstance(config, ShotgunConfig)
-            assert config.default_provider == ProviderType.ANTHROPIC
+            assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
             assert isinstance(config.openai.api_key, SecretStr)
             assert config.openai.api_key.get_secret_value() == "test-openai-key"
             assert isinstance(config.anthropic.api_key, SecretStr)
@@ -142,7 +138,7 @@ def test_load_config_invalid_json(mock_logger):
             config = manager.load()
 
             assert isinstance(config, ShotgunConfig)
-            assert config.default_provider == ProviderType.OPENAI
+            assert config.selected_model is None
             assert hasattr(config, "user_id")
             assert config.user_id is not None
             mock_logger.error.assert_called_once()
@@ -162,10 +158,9 @@ def test_save_config_with_argument(mock_logger):
         manager = ConfigManager(config_path=config_path)
 
         config = ShotgunConfig(
-            default_provider=ProviderType.ANTHROPIC,
+            selected_model=ModelName.CLAUDE_SONNET_4_5,
             openai=OpenAIConfig(api_key=SecretStr("test-key")),
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
 
         manager.save(config)
@@ -174,7 +169,7 @@ def test_save_config_with_argument(mock_logger):
         with open(config_path, encoding="utf-8") as f:
             saved_data = json.load(f)
 
-        assert saved_data["default_provider"] == "anthropic"
+        assert saved_data["selected_model"] == "claude-sonnet-4-5"
         assert saved_data["openai"]["api_key"] == "test-key"
         assert manager._config is config
         mock_logger.debug.assert_called_once_with(
@@ -210,7 +205,6 @@ def test_save_config_creates_directory(mock_logger):
 
         config = ShotgunConfig(
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         manager.save(config)
 
@@ -232,7 +226,6 @@ def test_save_config_failure(mock_logger):
         manager = ConfigManager(config_path=config_path)
         config = ShotgunConfig(
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
 
         try:
@@ -259,7 +252,6 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         config = ShotgunConfig(
             openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -269,21 +261,6 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         assert isinstance(model, ModelConfig)
         assert model.name == "gpt-5"
         assert model.api_key == "test-openai-key"
-
-
-@patch.dict(os.environ, {OPENAI_API_KEY_ENV: "env-openai-key"})
-@patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_openai_with_env_key(mock_get_config_manager):
-    """Test get_provider_model for OpenAI with API key in environment."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "config.json"
-        manager = ConfigManager(config_path=config_path)
-        mock_get_config_manager.return_value = manager
-
-        model = get_provider_model(ProviderType.OPENAI)
-
-        assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -313,7 +290,6 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         config = ShotgunConfig(
             anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key")),
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -321,23 +297,8 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
+        assert model.name == "claude-sonnet-4-5"
         assert model.api_key == "test-anthropic-key"
-
-
-@patch.dict(os.environ, {ANTHROPIC_API_KEY_ENV: "env-anthropic-key"})
-@patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_anthropic_with_env_key(mock_get_config_manager):
-    """Test get_provider_model for Anthropic with API key in environment."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "config.json"
-        manager = ConfigManager(config_path=config_path)
-        mock_get_config_manager.return_value = manager
-
-        model = get_provider_model(ProviderType.ANTHROPIC)
-
-        assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -367,7 +328,6 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         config = ShotgunConfig(
             google=GoogleConfig(api_key=SecretStr("test-google-key")),
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -377,21 +337,6 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         assert isinstance(model, ModelConfig)
         assert model.name == "gemini-2.5-pro"
         assert model.api_key == "test-google-key"
-
-
-@patch.dict(os.environ, {GEMINI_API_KEY_ENV: "env-google-key"})
-@patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_google_with_env_key(mock_get_config_manager):
-    """Test get_provider_model for Google with API key in environment."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "config.json"
-        manager = ConfigManager(config_path=config_path)
-        mock_get_config_manager.return_value = manager
-
-        model = get_provider_model(ProviderType.GOOGLE)
-
-        assert isinstance(model, ModelConfig)
-        assert model.name == "gemini-2.5-pro"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -420,7 +365,6 @@ def test_get_provider_model_string_provider(mock_get_config_manager):
         config = ShotgunConfig(
             openai=OpenAIConfig(api_key=SecretStr("test-key")),
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -432,20 +376,18 @@ def test_get_provider_model_string_provider(mock_get_config_manager):
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_none_uses_default(mock_get_config_manager):
-    """Test get_provider_model with None provider uses default."""
+def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
+    """Test get_provider_model with None provider finds first available."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # Set cached config directly
+        # Set cached config directly - only Anthropic has a key
         import uuid
 
         config = ShotgunConfig(
-            default_provider=ProviderType.ANTHROPIC,
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
             user_id=str(uuid.uuid4()),
-            config_version=1,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -453,7 +395,7 @@ def test_get_provider_model_none_uses_default(mock_get_config_manager):
         model = get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
+        assert model.name == "claude-sonnet-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -562,12 +504,12 @@ def test_initialize(mock_logger):
         config = manager.initialize()
 
         assert isinstance(config, ShotgunConfig)
-        assert config.default_provider == ProviderType.OPENAI
+        assert config.selected_model is None
         assert config_path.exists()
         assert hasattr(config, "user_id")
         assert config.user_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 1
+        assert config.config_version == 2
         # The log message now includes user_id
         assert mock_logger.info.call_count == 1
         call_args = mock_logger.info.call_args[0]
@@ -655,51 +597,51 @@ def test_get_config_manager():
     assert manager.config_path == Path.home() / ".shotgun-sh" / "config.json"
 
 
-def test_update_provider_sets_default_when_first_key():
-    """Test that adding the first API key sets that provider as default."""
+def test_update_provider_sets_selected_model_when_first_key():
+    """Test that adding the first API key sets selected_model to that provider's default."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # Initially, default is OpenAI
+        # Initially, selected_model is None
         config = manager.load()
-        assert config.default_provider == ProviderType.OPENAI
+        assert config.selected_model is None
 
         # Add API key to Anthropic when no other keys exist
         manager.update_provider(
             ProviderType.ANTHROPIC, **{API_KEY_FIELD: "test-anthropic-key"}
         )
 
-        # Verify Anthropic is now the default
+        # Verify selected_model is now set to Anthropic's default
         config = manager.load()
-        assert config.default_provider == ProviderType.ANTHROPIC
+        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
-def test_update_provider_keeps_default_when_other_keys_exist():
-    """Test that adding a key when others exist doesn't change the default."""
+def test_update_provider_keeps_selected_model_when_other_keys_exist():
+    """Test that adding a key when others exist doesn't change selected_model."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # First, add OpenAI key (should become default)
+        # First, add OpenAI key (should set selected_model to OpenAI default)
         manager.update_provider(
             ProviderType.OPENAI, **{API_KEY_FIELD: "test-openai-key"}
         )
         config = manager.load()
-        assert config.default_provider == ProviderType.OPENAI
+        assert config.selected_model == ModelName.GPT_5
 
-        # Now add Anthropic key (should NOT change default)
+        # Now add Anthropic key (should NOT change selected_model)
         manager.update_provider(
             ProviderType.ANTHROPIC, **{API_KEY_FIELD: "test-anthropic-key"}
         )
         config = manager.load()
-        assert config.default_provider == ProviderType.OPENAI  # Still OpenAI
+        assert config.selected_model == ModelName.GPT_5  # Still GPT-5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
-def test_update_provider_sets_default_for_google():
-    """Test that Google can become default provider when it's the first key."""
+def test_update_provider_sets_selected_model_for_google():
+    """Test that Google selected_model is set when it's the first key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
@@ -709,43 +651,44 @@ def test_update_provider_sets_default_for_google():
             ProviderType.GOOGLE, **{API_KEY_FIELD: "test-google-key"}
         )
 
-        # Verify Google is now the default
+        # Verify selected_model is now set to Google's default
         config = manager.load()
-        assert config.default_provider == ProviderType.GOOGLE
+        assert config.selected_model == ModelName.GEMINI_2_5_PRO
         assert config.google.api_key.get_secret_value() == "test-google-key"
 
 
-def test_update_provider_with_none_key_doesnt_set_default():
-    """Test that setting a None API key doesn't change the default provider."""
+def test_update_provider_with_none_key_doesnt_set_selected_model():
+    """Test that setting a None API key doesn't change selected_model."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # Initial default is OpenAI
+        # Initially selected_model is None
         config = manager.load()
-        assert config.default_provider == ProviderType.OPENAI
+        assert config.selected_model is None
 
         # Try to update Anthropic with None key
         manager.update_provider(ProviderType.ANTHROPIC, **{API_KEY_FIELD: None})
 
-        # Default should still be OpenAI
+        # selected_model should still be None
         config = manager.load()
-        assert config.default_provider == ProviderType.OPENAI
+        assert config.selected_model is None
         assert config.anthropic.api_key is None
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_updates_default_provider_when_no_key(mock_logger):
-    """Test that load() updates default provider when it has no API key."""
+def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
+    """Test that load() updates selected_model when its provider has no API key."""
     import uuid
 
     config_data = {
-        OPENAI_PROVIDER: {},  # No API key
-        ANTHROPIC_PROVIDER: {API_KEY_FIELD: "test-anthropic-key"},
-        GOOGLE_PROVIDER: {},
-        DEFAULT_PROVIDER_FIELD: "openai",  # Default is OpenAI but has no key
+        ConfigSection.OPENAI.value: {},  # No API key
+        ConfigSection.ANTHROPIC.value: {API_KEY_FIELD: "test-anthropic-key"},
+        ConfigSection.GOOGLE.value: {},
+        ConfigSection.SHOTGUN.value: {},
+        "selected_model": "gpt-5",  # Selected model is OpenAI but has no key
         USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 1,
+        CONFIG_VERSION_FIELD: 2,
     }
 
     with tempfile.NamedTemporaryFile(
@@ -758,33 +701,33 @@ def test_load_updates_default_provider_when_no_key(mock_logger):
             manager = ConfigManager(config_path=Path(temp_file.name))
             config = manager.load()
 
-            # Default should now be Anthropic since OpenAI has no key
-            assert config.default_provider == ProviderType.ANTHROPIC
+            # selected_model should now be Anthropic's default since OpenAI has no key
+            assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
             assert isinstance(config.anthropic.api_key, SecretStr)
             assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
             # Check that the info log was called
-            mock_logger.info.assert_any_call(
-                "Default provider %s has no API key, updating to %s",
-                "openai",
-                "anthropic",
+            assert any(
+                "Selected model" in str(call) and "finding available model" in str(call)
+                for call in mock_logger.info.call_args_list
             )
         finally:
             os.unlink(temp_file.name)
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_keeps_default_when_has_key(mock_logger):
-    """Test that load() keeps default provider when it has an API key."""
+def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
+    """Test that load() keeps selected_model when its provider has an API key."""
     import uuid
 
     config_data = {
-        OPENAI_PROVIDER: {API_KEY_FIELD: "test-openai-key"},
-        ANTHROPIC_PROVIDER: {API_KEY_FIELD: "test-anthropic-key"},
-        GOOGLE_PROVIDER: {},
-        DEFAULT_PROVIDER_FIELD: "openai",
+        ConfigSection.OPENAI.value: {API_KEY_FIELD: "test-openai-key"},
+        ConfigSection.ANTHROPIC.value: {API_KEY_FIELD: "test-anthropic-key"},
+        ConfigSection.GOOGLE.value: {},
+        ConfigSection.SHOTGUN.value: {},
+        "selected_model": "gpt-5",
         USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 1,
+        CONFIG_VERSION_FIELD: 2,
     }
 
     with tempfile.NamedTemporaryFile(
@@ -797,53 +740,17 @@ def test_load_keeps_default_when_has_key(mock_logger):
             manager = ConfigManager(config_path=Path(temp_file.name))
             config = manager.load()
 
-            # Default should still be OpenAI since it has a key
-            assert config.default_provider == ProviderType.OPENAI
+            # selected_model should still be GPT-5 since it has a key
+            assert config.selected_model == ModelName.GPT_5
             assert isinstance(config.openai.api_key, SecretStr)
             assert config.openai.api_key.get_secret_value() == "test-openai-key"
 
-            # Should not log any info about changing default
+            # Should not log any info about changing selected_model
             info_calls = [
                 call
                 for call in mock_logger.info.call_args_list
-                if "updating to" in str(call)
+                if "finding available model" in str(call)
             ]
             assert len(info_calls) == 0
-        finally:
-            os.unlink(temp_file.name)
-
-
-@patch.dict(os.environ, {GEMINI_API_KEY_ENV: "env-google-key"})
-@patch("shotgun.agents.config.manager.logger")
-def test_load_updates_default_to_env_provider(mock_logger):
-    """Test that load() can use env var to determine valid provider."""
-    import uuid
-
-    config_data = {
-        OPENAI_PROVIDER: {},  # No API key
-        ANTHROPIC_PROVIDER: {},  # No API key
-        GOOGLE_PROVIDER: {},  # No API key but has env var
-        DEFAULT_PROVIDER_FIELD: "openai",
-        USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 1,
-    }
-
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False
-    ) as temp_file:
-        json.dump(config_data, temp_file)
-        temp_file.flush()
-
-        try:
-            manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
-
-            # Default should now be Google since only it has an API key (from env)
-            assert config.default_provider == ProviderType.GOOGLE
-
-            # Check that the info log was called
-            mock_logger.info.assert_any_call(
-                "Default provider %s has no API key, updating to %s", "openai", "google"
-            )
         finally:
             os.unlink(temp_file.name)

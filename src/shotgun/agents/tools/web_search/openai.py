@@ -1,6 +1,6 @@
 """OpenAI web search tool implementation."""
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 from opentelemetry import trace
 
 from shotgun.agents.config import get_provider_model
@@ -10,7 +10,7 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def openai_web_search_tool(query: str) -> str:
+async def openai_web_search_tool(query: str) -> str:
     """Perform a web search and return results.
 
     This tool uses OpenAI's web search capabilities to find current information
@@ -54,8 +54,8 @@ Instructions:
 ALWAYS PROVIDE THE SOURCES (urls) TO BACK UP THE INFORMATION YOU PROVIDE.
 """
 
-        client = OpenAI(api_key=api_key)
-        response = client.responses.create(  # type: ignore[call-overload]
+        client = AsyncOpenAI(api_key=api_key)
+        response = await client.responses.create(  # type: ignore[call-overload]
             model="gpt-5-mini",
             input=[
                 {"role": "user", "content": [{"type": "input_text", "text": prompt}]}

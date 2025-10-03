@@ -1,13 +1,13 @@
 """Data models for codebase service."""
 
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class GraphStatus(str, Enum):
+class GraphStatus(StrEnum):
     """Status of a code knowledge graph."""
 
     READY = "READY"  # Graph is ready for queries
@@ -16,14 +16,14 @@ class GraphStatus(str, Enum):
     ERROR = "ERROR"  # Last operation failed
 
 
-class QueryType(str, Enum):
+class QueryType(StrEnum):
     """Type of query being executed."""
 
     NATURAL_LANGUAGE = "natural_language"
     CYPHER = "cypher"
 
 
-class ProgressPhase(str, Enum):
+class ProgressPhase(StrEnum):
     """Phase of codebase indexing progress."""
 
     STRUCTURE = "structure"  # Identifying packages and folders

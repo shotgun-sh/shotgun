@@ -1,17 +1,33 @@
 """Configuration constants for Shotgun agents."""
 
+from enum import StrEnum, auto
+
 # Field names
 API_KEY_FIELD = "api_key"
-DEFAULT_PROVIDER_FIELD = "default_provider"
 USER_ID_FIELD = "user_id"
 CONFIG_VERSION_FIELD = "config_version"
 
-# Provider names (for consistency with data dict keys)
-OPENAI_PROVIDER = "openai"
-ANTHROPIC_PROVIDER = "anthropic"
-GOOGLE_PROVIDER = "google"
+
+class ConfigSection(StrEnum):
+    """Configuration file section names (JSON keys)."""
+
+    OPENAI = auto()
+    ANTHROPIC = auto()
+    GOOGLE = auto()
+    SHOTGUN = auto()
+
+
+# Backwards compatibility - deprecated
+OPENAI_PROVIDER = ConfigSection.OPENAI.value
+ANTHROPIC_PROVIDER = ConfigSection.ANTHROPIC.value
+GOOGLE_PROVIDER = ConfigSection.GOOGLE.value
+SHOTGUN_PROVIDER = ConfigSection.SHOTGUN.value
 
 # Environment variable names
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY"
 GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
+SHOTGUN_API_KEY_ENV = "SHOTGUN_API_KEY"
+
+# Token limits
+MEDIUM_TEXT_8K_TOKENS = 8192  # Default max_tokens for web search requests

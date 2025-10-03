@@ -48,21 +48,6 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         assert model.api_key == "test-openai-key"
 
 
-@patch.dict(os.environ, {"OPENAI_API_KEY": "env-openai-key"})
-@patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_openai_with_env_key(mock_get_config_manager):
-    """Test get_provider_model for OpenAI with API key in environment."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "config.json"
-        manager = ConfigManager(config_path=config_path)
-        mock_get_config_manager.return_value = manager
-
-        model = get_provider_model(ProviderType.OPENAI)
-
-        assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
-
-
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
 def test_get_provider_model_openai_no_key(mock_get_config_manager):
@@ -98,23 +83,8 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
+        assert model.name == "claude-sonnet-4-5"
         assert model.api_key == "test-anthropic-key"
-
-
-@patch.dict(os.environ, {"ANTHROPIC_API_KEY": "env-anthropic-key"})
-@patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_anthropic_with_env_key(mock_get_config_manager):
-    """Test get_provider_model for Anthropic with API key in environment."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "config.json"
-        manager = ConfigManager(config_path=config_path)
-        mock_get_config_manager.return_value = manager
-
-        model = get_provider_model(ProviderType.ANTHROPIC)
-
-        assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -156,21 +126,6 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         assert model.api_key == "test-google-key"
 
 
-@patch.dict(os.environ, {"GEMINI_API_KEY": "env-google-key"})
-@patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_google_with_env_key(mock_get_config_manager):
-    """Test get_provider_model for Google with API key in environment."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "config.json"
-        manager = ConfigManager(config_path=config_path)
-        mock_get_config_manager.return_value = manager
-
-        model = get_provider_model(ProviderType.GOOGLE)
-
-        assert isinstance(model, ModelConfig)
-        assert model.name == "gemini-2.5-pro"
-
-
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
 def test_get_provider_model_google_no_key(mock_get_config_manager):
@@ -209,19 +164,17 @@ def test_get_provider_model_with_enum(mock_get_config_manager):
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_none_uses_default(mock_get_config_manager):
-    """Test get_provider_model with None provider uses default."""
+def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
+    """Test get_provider_model with None provider finds first available."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # Set cached config directly
+        # Set cached config directly - only Anthropic has a key
         import uuid
 
         config = ShotgunConfig(
             user_id=str(uuid.uuid4()),
-            config_version=1,
-            default_provider=ProviderType.ANTHROPIC,
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
         )
         manager._config = config
@@ -230,7 +183,7 @@ def test_get_provider_model_none_uses_default(mock_get_config_manager):
         model = get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
+        assert model.name == "claude-sonnet-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -276,35 +229,17 @@ def test_get_api_key_from_config():
     """Test _get_api_key returns config key when available."""
     config_key = SecretStr("config-key")
 
-    result = _get_api_key(config_key, "ENV_VAR")
+    result = _get_api_key(config_key)
 
     assert result == "config-key"
-
-
-@patch.dict(os.environ, {"ENV_VAR": "env-key"})
-def test_get_api_key_from_env():
-    """Test _get_api_key returns environment key when config key is None."""
-    result = _get_api_key(None, "ENV_VAR")
-
-    assert result == "env-key"
 
 
 @patch.dict(os.environ, {}, clear=True)
 def test_get_api_key_none():
-    """Test _get_api_key returns None when neither config nor env key available."""
-    result = _get_api_key(None, "ENV_VAR")
+    """Test _get_api_key returns None when config key is None."""
+    result = _get_api_key(None)
 
     assert result is None
-
-
-@patch.dict(os.environ, {"ENV_VAR": "env-key"})
-def test_get_api_key_config_takes_precedence():
-    """Test _get_api_key prefers config key over environment variable."""
-    config_key = SecretStr("config-key")
-
-    result = _get_api_key(config_key, "ENV_VAR")
-
-    assert result == "config-key"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -329,7 +264,7 @@ def test_get_provider_model_provider_enum_conversion(mock_get_config_manager):
         model = get_provider_model("anthropic")
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
+        assert model.name == "claude-sonnet-4-5"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -357,7 +292,7 @@ def test_get_provider_model_with_env_key_precedence(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-1"
+        assert model.name == "claude-sonnet-4-5"
         assert model.provider == ProviderType.ANTHROPIC
         # Config key takes precedence over environment variable
         assert model.api_key == "config-anthropic-key"
