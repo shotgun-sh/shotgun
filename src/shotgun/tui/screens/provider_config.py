@@ -9,7 +9,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, ListItem, ListView, Static
+from textual.widgets import Button, Input, Label, ListItem, ListView, Markdown, Static
 
 from shotgun.agents.config import ConfigManager, ProviderType
 
@@ -47,6 +47,10 @@ class ProviderConfigScreen(Screen[None]):
             color: $text-accent;
         }
 
+        #provider-links {
+            padding: 1 0;
+        }
+
         #provider-list {
             margin: 2 0;
             height: auto;
@@ -77,6 +81,10 @@ class ProviderConfigScreen(Screen[None]):
             yield Static(
                 "Select a provider and enter the API key needed to activate it.",
                 id="provider-config-summary",
+            )
+            yield Markdown(
+                "Don't have an API Key? Use these links to get one: [OpenAI](https://platform.openai.com/api-keys) | [Anthropic](https://console.anthropic.com) | [Google Gemini](https://aistudio.google.com)",
+                id="provider-links",
             )
         yield ListView(*self._build_provider_items(), id="provider-list")
         yield Input(
