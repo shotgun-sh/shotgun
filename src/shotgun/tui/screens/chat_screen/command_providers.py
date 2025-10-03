@@ -96,6 +96,38 @@ class AgentModeProvider(Provider):
                 yield Hit(score, matcher.highlight(title), callback, help=help_text)
 
 
+class UsageProvider(Provider):
+    """Command provider for agent mode switching."""
+
+    @property
+    def chat_screen(self) -> "ChatScreen":
+        from shotgun.tui.screens.chat import ChatScreen
+
+        return cast(ChatScreen, self.screen)
+
+    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        """Provide default mode switching commands when palette opens."""
+        yield DiscoveryHit(
+            "Show usage",
+            self.chat_screen.action_show_usage,
+            help="Display usage information for the current session",
+        )
+
+    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        """Search for mode commands."""
+        matcher = self.matcher(query)
+
+        async for discovery_hit in self.discover():
+            score = matcher.match(discovery_hit.text or "")
+            if score > 0:
+                yield Hit(
+                    score,
+                    matcher.highlight(discovery_hit.text or ""),
+                    discovery_hit.command,
+                    help=discovery_hit.help,
+                )
+
+
 class ProviderSetupProvider(Provider):
     """Command palette entries for provider configuration."""
 

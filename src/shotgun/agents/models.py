@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import RunContext
 
+from shotgun.agents.usage_manager import SessionUsageManager, get_session_usage_manager
+
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
@@ -106,6 +108,11 @@ class AgentRuntimeOptions(BaseModel):
     tasks: list[Future[UserAnswer]] = Field(
         default_factory=list,
         description="Tasks for storing deferred tool results",
+    )
+
+    usage_manager: SessionUsageManager = Field(
+        default_factory=get_session_usage_manager,
+        description="Usage manager for tracking usage",
     )
 
 

@@ -115,11 +115,11 @@ class AgentManager(Widget):
         super().__init__()
         self.display = False
 
+        if deps is None:
+            raise ValueError("AgentDeps must be provided to AgentManager")
+
         # Use provided deps or create default with interactive mode
         self.deps = deps
-
-        if self.deps is None:
-            raise ValueError("AgentDeps must be provided to AgentManager")
 
         # Create AgentRuntimeOptions from deps for agent creation
         agent_runtime_options = AgentRuntimeOptions(
@@ -269,6 +269,7 @@ class AgentManager(Widget):
         Returns:
             The agent run result.
         """
+        logger.info(f"Running agent {self._current_agent_type.value}")
         # Use merged deps (shared state + agent-specific system prompt) if not provided
         if deps is None:
             deps = self._create_merged_deps(self._current_agent_type)
@@ -395,6 +396,10 @@ class AgentManager(Widget):
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
         self.message_history = await apply_persistent_compaction(all_messages, deps)
+        usage = result.usage()
+        deps.usage_manager.add_usage(
+            usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
+        )
 
         # Log file operations summary if any files were modified
         file_operations = deps.file_tracker.operations.copy()
@@ -640,6 +645,9 @@ class AgentManager(Widget):
             else:
                 filtered_messages.append(msg)
         return filtered_messages
+
+    def get_usage_hint(self) -> str | None:
+        return self.deps.usage_manager.build_usage_hint()
 
     def get_conversation_state(self) -> "ConversationState":
         """Get the current conversation state.

@@ -45,6 +45,7 @@ dependencies = [
     "google-generativeai>=0.8.5",
     "tiktoken>=0.7.0",
     "packaging>=23.0",
+    "genai-prices>=0.0.27",
 ]
 
 [project.urls]

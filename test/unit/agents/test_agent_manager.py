@@ -16,8 +16,10 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
+from shotgun.agents.config.models import ProviderType
 from shotgun.agents.conversation_history import ConversationState
 from shotgun.agents.models import AgentDeps
+from shotgun.agents.usage_manager import SessionUsageManager
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 
@@ -42,11 +44,20 @@ def mock_agent_deps():
 
     # Add additional fields needed by _create_merged_deps
     llm_model_mock = MagicMock()
-    llm_model_mock.provider = "anthropic"  # Set a valid provider for token counting
+    llm_model_mock.provider = (
+        ProviderType.ANTHROPIC
+    )  # Set a valid provider for token counting
     deps.llm_model = llm_model_mock
     deps.codebase_service = MagicMock()
     deps.artifact_service = MagicMock()
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt")
+
+    usage_manager_mock = MagicMock(spec=SessionUsageManager)
+    usage_manager_mock.add_usage = MagicMock()
+    usage_manager_mock.build_usage_hint = MagicMock(
+        return_value="| Model | Provider | Input | Output | Cached |\n| --- | --- | ---: | ---: | ---: |\n| `test-model` | anthropic | 10 | 5 | 2 |\n| **Total** |  | **10** | **5** | **2** |\n"
+    )
+    deps.usage_manager = usage_manager_mock
 
     # Ensure model_copy preserves the llm_model structure
     def mock_model_copy(update=None):
@@ -64,6 +75,7 @@ def mock_agent_deps():
             "codebase_service",
             "artifact_service",
             "system_prompt_fn",
+            "usage_manager",
             "is_tui_context",
         ]:
             setattr(copy_mock, attr_name, getattr(deps, attr_name))
@@ -413,6 +425,7 @@ async def test_agent_manager_run_no_prompt(
     result = await manager.run()
 
     assert result == mock_result
+
     # Two post_message calls - one before run, one after (even without prompt)
     assert manager.post_message.call_count == 2
 
@@ -471,6 +484,10 @@ async def test_agent_manager_run_with_custom_deps(
     custom_deps.is_tui_context = False
     custom_deps.codebase_service = AsyncMock()
     custom_deps.codebase_service.list_graphs.return_value = []
+    custom_deps.llm_model = MagicMock()
+    custom_deps.llm_model.name = "custom-model"
+    custom_deps.llm_model.provider = ProviderType.OPENAI
+    custom_deps.usage_manager = MagicMock(spec=SessionUsageManager)
     await manager.run("test", deps=custom_deps)
 
     # Should use custom deps instead of manager deps

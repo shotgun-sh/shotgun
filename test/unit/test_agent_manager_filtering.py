@@ -13,8 +13,10 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.agent_manager import AgentManager
+from shotgun.agents.config.models import ProviderType
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps, AgentType
+from shotgun.agents.usage_manager import SessionUsageManager
 
 
 @pytest.fixture
@@ -28,7 +30,7 @@ def mock_agent_deps():
     deps.tasks = []
     deps.llm_model = MagicMock()
     deps.llm_model.name = "test-model"
-    deps.llm_model.provider = "anthropic"
+    deps.llm_model.provider = ProviderType.ANTHROPIC
     deps.is_tui_context = False
 
     # Add file_tracker mock
@@ -42,6 +44,7 @@ def mock_agent_deps():
     deps.codebase_service = MagicMock()
     deps.artifact_service = MagicMock()
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt")
+    deps.usage_manager = MagicMock(spec=SessionUsageManager)
 
     # Ensure model_copy preserves the structure
     def mock_model_copy(update=None):
@@ -59,6 +62,7 @@ def mock_agent_deps():
             "codebase_service",
             "artifact_service",
             "system_prompt_fn",
+            "usage_manager",
             "is_tui_context",
         ]:
             setattr(copy_mock, attr_name, getattr(deps, attr_name))

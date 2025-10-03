@@ -58,6 +58,7 @@ from .chat_screen.command_providers import (
     CodebaseCommandProvider,
     DeleteCodebasePaletteProvider,
     ProviderSetupProvider,
+    UsageProvider,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,9 +229,15 @@ class ChatScreen(Screen[None]):
     BINDINGS = [
         ("ctrl+p", "command_palette", "Command Palette"),
         ("shift+tab", "toggle_mode", "Toggle mode"),
+        ("ctrl+u", "show_usage", "Show usage"),
     ]
 
-    COMMANDS = {AgentModeProvider, ProviderSetupProvider, CodebaseCommandProvider}
+    COMMANDS = {
+        AgentModeProvider,
+        ProviderSetupProvider,
+        CodebaseCommandProvider,
+        UsageProvider,
+    }
 
     value = reactive("")
     mode = reactive(AgentType.RESEARCH)
@@ -400,6 +407,14 @@ class ChatScreen(Screen[None]):
         self.agent_manager.set_agent(self.mode)
         # whoops it actually changes focus. Let's be brutal for now
         self.call_later(lambda: self.query_one(PromptInput).focus())
+
+    def action_show_usage(self) -> None:
+        usage_hint = self.agent_manager.get_usage_hint()
+        logger.info(f"Usage hint: {usage_hint}")
+        if usage_hint:
+            self.mount_hint(usage_hint)
+        else:
+            self.notify("No usage hint available", severity="error")
 
     @work
     async def add_question_listener(self) -> None:
@@ -760,6 +775,7 @@ class ChatScreen(Screen[None]):
 
         # Update the current mode
         self.mode = AgentType(conversation.last_agent_model)
+        self.deps.usage_manager.restore_usage_state()
 
 
 def help_text_with_codebase(already_indexed: bool = False) -> str:
