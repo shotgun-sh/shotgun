@@ -51,14 +51,14 @@ def setup_posthog_observability() -> bool:
         # Store the client for later use
         _posthog_client = posthog
 
-        # Set user context with anonymous user ID from config
+        # Set user context with anonymous shotgun instance ID from config
         try:
             config_manager = get_config_manager()
-            user_id = config_manager.get_user_id()
+            shotgun_instance_id = config_manager.get_shotgun_instance_id()
 
             # Identify the user in PostHog
             posthog.identify(  # type: ignore[attr-defined]
-                distinct_id=user_id,
+                distinct_id=shotgun_instance_id,
                 properties={
                     "version": __version__,
                     "environment": environment,
@@ -69,7 +69,9 @@ def setup_posthog_observability() -> bool:
             posthog.disabled = False
             posthog.personal_api_key = None  # Not needed for event tracking
 
-            logger.debug("PostHog user identified with anonymous ID: %s", user_id)
+            logger.debug(
+                "PostHog user identified with anonymous ID: %s", shotgun_instance_id
+            )
         except Exception as e:
             logger.warning("Failed to set user context: %s", e)
 
@@ -99,9 +101,9 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         return
 
     try:
-        # Get user ID for tracking
+        # Get shotgun instance ID for tracking
         config_manager = get_config_manager()
-        user_id = config_manager.get_user_id()
+        shotgun_instance_id = config_manager.get_shotgun_instance_id()
 
         # Add version and environment to properties
         if properties is None:
@@ -116,7 +118,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
 
         # Track the event using PostHog's capture method
         _posthog_client.capture(
-            distinct_id=user_id, event=event_name, properties=properties
+            distinct_id=shotgun_instance_id, event=event_name, properties=properties
         )
         logger.debug("Tracked PostHog event: %s", event_name)
     except Exception as e:
@@ -146,7 +148,7 @@ class FeedbackKind(StrEnum):
 class Feedback(BaseModel):
     kind: FeedbackKind
     description: str
-    user_id: str
+    shotgun_instance_id: str
 
 
 SURVEY_ID = "01999f81-9486-0000-4fa6-9632959f92f3"

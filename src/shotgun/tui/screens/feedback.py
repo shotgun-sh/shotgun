@@ -182,12 +182,12 @@ class FeedbackScreen(Screen[Feedback | None]):
             return
 
         app = cast("ShotgunApp", self.app)
-        user_id = app.config_manager.get_user_id()
+        shotgun_instance_id = app.config_manager.get_shotgun_instance_id()
 
         feedback = Feedback(
             kind=self.selected_kind,
             description=description,
-            user_id=user_id,
+            shotgun_instance_id=shotgun_instance_id,
         )
 
         self.dismiss(feedback)

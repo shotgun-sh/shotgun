@@ -4,7 +4,8 @@ from enum import StrEnum, auto
 
 # Field names
 API_KEY_FIELD = "api_key"
-USER_ID_FIELD = "user_id"
+SUPABASE_JWT_FIELD = "supabase_jwt"
+SHOTGUN_INSTANCE_ID_FIELD = "shotgun_instance_id"
 CONFIG_VERSION_FIELD = "config_version"
 
 

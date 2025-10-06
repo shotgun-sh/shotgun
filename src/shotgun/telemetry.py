@@ -72,12 +72,15 @@ def setup_logfire_observability() -> bool:
             from shotgun.agents.config import get_config_manager
 
             config_manager = get_config_manager()
-            user_id = config_manager.get_user_id()
+            shotgun_instance_id = config_manager.get_shotgun_instance_id()
 
-            # Set user_id as baggage in global context - this will be included in all logs/spans
-            ctx = baggage.set_baggage("user_id", user_id)
+            # Set shotgun_instance_id as baggage in global context - this will be included in all logs/spans
+            ctx = baggage.set_baggage("shotgun_instance_id", shotgun_instance_id)
             context.attach(ctx)
-            logger.debug("Logfire user context set with user_id: %s", user_id)
+            logger.debug(
+                "Logfire user context set with shotgun_instance_id: %s",
+                shotgun_instance_id,
+            )
         except Exception as e:
             logger.warning("Failed to set Logfire user context: %s", e)
 

@@ -233,14 +233,14 @@ def _mask_value(value: str) -> str:
 
 
 @app.command()
-def get_user_id() -> None:
-    """Get the anonymous user ID from configuration."""
+def get_shotgun_instance_id() -> None:
+    """Get the anonymous shotgun instance ID from configuration."""
     config_manager = get_config_manager()
 
     try:
-        user_id = config_manager.get_user_id()
-        console.print(f"[green]User ID:[/green] {user_id}")
+        shotgun_instance_id = config_manager.get_shotgun_instance_id()
+        console.print(f"[green]Shotgun Instance ID:[/green] {shotgun_instance_id}")
     except Exception as e:
-        logger.error(f"Error getting user ID: {e}")
-        console.print(f"❌ Failed to get user ID: {str(e)}", style="red")
+        logger.error(f"Error getting shotgun instance ID: {e}")
+        console.print(f"❌ Failed to get shotgun instance ID: {str(e)}", style="red")
         raise typer.Exit(1) from e

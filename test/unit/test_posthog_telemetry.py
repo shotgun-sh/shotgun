@@ -54,7 +54,9 @@ def test_setup_posthog_with_build_constants():
                             "shotgun.posthog_telemetry.get_config_manager"
                         ) as mock_get_config:
                             mock_config = MagicMock()
-                            mock_config.get_user_id.return_value = "test-user-id"
+                            mock_config.get_shotgun_instance_id.return_value = (
+                                "test-shotgun-instance-id"
+                            )
                             mock_get_config.return_value = mock_config
 
                             result = posthog_telemetry.setup_posthog_observability()
@@ -82,7 +84,9 @@ def test_setup_posthog_with_env_vars():
                                 "shotgun.posthog_telemetry.get_config_manager"
                             ) as mock_get_config:
                                 mock_config = MagicMock()
-                                mock_config.get_user_id.return_value = "test-user-id"
+                                mock_config.get_shotgun_instance_id.return_value = (
+                                    "test-shotgun-instance-id"
+                                )
                                 mock_get_config.return_value = mock_config
 
                                 result = posthog_telemetry.setup_posthog_observability()
@@ -114,14 +118,16 @@ def test_track_event_initialized():
     try:
         with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
             mock_config = MagicMock()
-            mock_config.get_user_id.return_value = "test-user-id"
+            mock_config.get_shotgun_instance_id.return_value = (
+                "test-shotgun-instance-id"
+            )
             mock_get_config.return_value = mock_config
 
             with patch("shotgun.posthog_telemetry.__version__", "1.0.0"):
                 posthog_telemetry.track_event("test_event", {"custom": "property"})
 
                 mock_client.capture.assert_called_once_with(
-                    distinct_id="test-user-id",
+                    distinct_id="test-shotgun-instance-id",
                     event="test_event",
                     properties={
                         "custom": "property",
@@ -142,7 +148,9 @@ def test_track_event_dev_version():
     try:
         with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
             mock_config = MagicMock()
-            mock_config.get_user_id.return_value = "test-user-id"
+            mock_config.get_shotgun_instance_id.return_value = (
+                "test-shotgun-instance-id"
+            )
             mock_get_config.return_value = mock_config
 
             with patch("shotgun.posthog_telemetry.__version__", "1.0.0.dev1"):
@@ -223,7 +231,7 @@ def test_submit_feedback_survey_not_initialized():
         feedback = Feedback(
             kind=FeedbackKind.BUG,
             description="Test bug report",
-            user_id="test-user-123",
+            shotgun_instance_id="test-shotgun-instance-id",
         )
 
         # Should not raise an exception
@@ -265,7 +273,7 @@ def test_submit_feedback_survey_bug_report(
         feedback = Feedback(
             kind=FeedbackKind.BUG,
             description="Application crashes on startup",
-            user_id="test-user-456",
+            shotgun_instance_id="test-shotgun-instance-id",
         )
 
         posthog_telemetry.submit_feedback_survey(feedback)
@@ -331,7 +339,7 @@ def test_submit_feedback_survey_feature_request(
         feedback = Feedback(
             kind=FeedbackKind.FEATURE,
             description="Add support for dark mode",
-            user_id="test-user-789",
+            shotgun_instance_id="test-shotgun-instance-id",
         )
 
         posthog_telemetry.submit_feedback_survey(feedback)
@@ -390,7 +398,7 @@ def test_submit_feedback_survey_other_feedback(
         feedback = Feedback(
             kind=FeedbackKind.OTHER,
             description="Great tool, thanks!",
-            user_id="test-user-321",
+            shotgun_instance_id="test-shotgun-instance-id",
         )
 
         posthog_telemetry.submit_feedback_survey(feedback)

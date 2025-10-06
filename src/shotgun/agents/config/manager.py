@@ -12,6 +12,8 @@ from shotgun.utils import get_shotgun_home
 
 from .constants import (
     API_KEY_FIELD,
+    SHOTGUN_INSTANCE_ID_FIELD,
+    SUPABASE_JWT_FIELD,
     ConfigSection,
 )
 from .models import (
@@ -60,16 +62,24 @@ class ConfigManager:
 
         if not self.config_path.exists():
             logger.info(
-                "Configuration file not found, creating new config with user_id: %s",
+                "Configuration file not found, creating new config at: %s",
                 self.config_path,
             )
-            # Create new config with generated user_id
+            # Create new config with generated shotgun_instance_id
             self._config = self.initialize()
             return self._config
 
         try:
             with open(self.config_path, encoding="utf-8") as f:
                 data = json.load(f)
+
+            # Migration: Rename user_id to shotgun_instance_id (config v2 -> v3)
+            if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
+                data[SHOTGUN_INSTANCE_ID_FIELD] = data.pop("user_id")
+                data["config_version"] = 3
+                logger.info(
+                    "Migrated config v2->v3: renamed user_id to shotgun_instance_id"
+                )
 
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
@@ -134,7 +144,7 @@ class ConfigManager:
             logger.error(
                 "Failed to load configuration from %s: %s", self.config_path, e
             )
-            logger.info("Creating new configuration with generated user_id")
+            logger.info("Creating new configuration with generated shotgun_instance_id")
             self._config = self.initialize()
             return self._config
 
@@ -148,9 +158,9 @@ class ConfigManager:
             if self._config:
                 config = self._config
             else:
-                # Create a new config with generated user_id
+                # Create a new config with generated shotgun_instance_id
                 config = ShotgunConfig(
-                    user_id=str(uuid.uuid4()),
+                    shotgun_instance_id=str(uuid.uuid4()),
                 )
 
         # Ensure directory exists
@@ -276,15 +286,15 @@ class ConfigManager:
         Returns:
             Default ShotgunConfig
         """
-        # Generate unique user ID for new config
+        # Generate unique shotgun instance ID for new config
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         self.save(config)
         logger.info(
-            "Configuration initialized at %s with user_id: %s",
+            "Configuration initialized at %s with shotgun_instance_id: %s",
             self.config_path,
-            config.user_id,
+            config.shotgun_instance_id,
         )
         return config
 
@@ -292,6 +302,7 @@ class ConfigManager:
         """Convert plain text secrets in data to SecretStr objects."""
         for section in ConfigSection:
             if section.value in data and isinstance(data[section.value], dict):
+                # Convert API key
                 if (
                     API_KEY_FIELD in data[section.value]
                     and data[section.value][API_KEY_FIELD] is not None
@@ -299,11 +310,21 @@ class ConfigManager:
                     data[section.value][API_KEY_FIELD] = SecretStr(
                         data[section.value][API_KEY_FIELD]
                     )
+                # Convert supabase JWT (shotgun section only)
+                if (
+                    section == ConfigSection.SHOTGUN
+                    and SUPABASE_JWT_FIELD in data[section.value]
+                    and data[section.value][SUPABASE_JWT_FIELD] is not None
+                ):
+                    data[section.value][SUPABASE_JWT_FIELD] = SecretStr(
+                        data[section.value][SUPABASE_JWT_FIELD]
+                    )
 
     def _convert_secretstr_to_plain(self, data: dict[str, Any]) -> None:
         """Convert SecretStr objects in data to plain text for JSON serialization."""
         for section in ConfigSection:
             if section.value in data and isinstance(data[section.value], dict):
+                # Convert API key
                 if (
                     API_KEY_FIELD in data[section.value]
                     and data[section.value][API_KEY_FIELD] is not None
@@ -311,6 +332,18 @@ class ConfigManager:
                     if hasattr(data[section.value][API_KEY_FIELD], "get_secret_value"):
                         data[section.value][API_KEY_FIELD] = data[section.value][
                             API_KEY_FIELD
+                        ].get_secret_value()
+                # Convert supabase JWT (shotgun section only)
+                if (
+                    section == ConfigSection.SHOTGUN
+                    and SUPABASE_JWT_FIELD in data[section.value]
+                    and data[section.value][SUPABASE_JWT_FIELD] is not None
+                ):
+                    if hasattr(
+                        data[section.value][SUPABASE_JWT_FIELD], "get_secret_value"
+                    ):
+                        data[section.value][SUPABASE_JWT_FIELD] = data[section.value][
+                            SUPABASE_JWT_FIELD
                         ].get_secret_value()
 
     def _ensure_provider_enum(self, provider: ProviderType | str) -> ProviderType:
@@ -376,14 +409,36 @@ class ConfigManager:
         provider_enum = self._ensure_provider_enum(provider)
         return (self._get_provider_config(config, provider_enum), False)
 
-    def get_user_id(self) -> str:
-        """Get the user ID from configuration.
+    def get_shotgun_instance_id(self) -> str:
+        """Get the shotgun instance ID from configuration.
 
         Returns:
-            The unique user ID string
+            The unique shotgun instance ID string
         """
         config = self.load()
-        return config.user_id
+        return config.shotgun_instance_id
+
+    def update_shotgun_account(
+        self, api_key: str | None = None, supabase_jwt: str | None = None
+    ) -> None:
+        """Update Shotgun Account configuration.
+
+        Args:
+            api_key: LiteLLM proxy API key (optional)
+            supabase_jwt: Supabase authentication JWT (optional)
+        """
+        config = self.load()
+
+        if api_key is not None:
+            config.shotgun.api_key = SecretStr(api_key) if api_key else None
+
+        if supabase_jwt is not None:
+            config.shotgun.supabase_jwt = (
+                SecretStr(supabase_jwt) if supabase_jwt else None
+            )
+
+        self.save(config)
+        logger.info("Updated Shotgun Account configuration")
 
 
 # Global singleton instance

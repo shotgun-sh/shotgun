@@ -59,13 +59,13 @@ def setup_sentry_observability() -> bool:
             profiles_sample_rate=0.1 if environment == "production" else 1.0,
         )
 
-        # Set user context with anonymous user ID from config
+        # Set user context with anonymous shotgun instance ID from config
         try:
             from shotgun.agents.config import get_config_manager
 
             config_manager = get_config_manager()
-            user_id = config_manager.get_user_id()
-            sentry_sdk.set_user({"id": user_id})
+            shotgun_instance_id = config_manager.get_shotgun_instance_id()
+            sentry_sdk.set_user({"id": shotgun_instance_id})
             logger.debug("Sentry user context set with anonymous ID")
         except Exception as e:
             logger.warning("Failed to set Sentry user context: %s", e)

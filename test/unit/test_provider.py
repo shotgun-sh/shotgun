@@ -32,8 +32,7 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
         )
         manager._config = config
@@ -73,8 +72,7 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key")),
         )
         manager._config = config
@@ -112,8 +110,7 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             google=GoogleConfig(api_key=SecretStr("test-google-key")),
         )
         manager._config = config
@@ -150,8 +147,7 @@ def test_get_provider_model_with_enum(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             openai=OpenAIConfig(api_key=SecretStr("test-key")),
         )
         manager._config = config
@@ -174,7 +170,7 @@ def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
         )
         manager._config = config
@@ -210,8 +206,7 @@ def test_get_provider_model_prefers_config_over_env(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             openai=OpenAIConfig(api_key=SecretStr("config-key")),
         )
         manager._config = config
@@ -253,8 +248,7 @@ def test_get_provider_model_provider_enum_conversion(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
         )
         manager._config = config
@@ -279,8 +273,7 @@ def test_get_provider_model_with_env_key_precedence(mock_get_config_manager):
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             anthropic=AnthropicConfig(api_key=SecretStr("config-anthropic-key")),
         )
         manager._config = config
@@ -312,8 +305,7 @@ def test_get_provider_model_api_key_environment_isolation(mock_get_config_manage
         import uuid
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
-            config_version=1,
+            shotgun_instance_id=str(uuid.uuid4()),
             openai=OpenAIConfig(api_key=SecretStr("openai-key")),
             anthropic=AnthropicConfig(api_key=SecretStr("anthropic-key")),
         )

@@ -149,6 +149,9 @@ class ShotgunAccountConfig(BaseModel):
     """Configuration for Shotgun Account (LiteLLM proxy)."""
 
     api_key: SecretStr | None = None
+    supabase_jwt: SecretStr | None = Field(
+        default=None, description="Supabase authentication JWT"
+    )
 
 
 class ShotgunConfig(BaseModel):
@@ -162,5 +165,7 @@ class ShotgunConfig(BaseModel):
         default=None,
         description="User-selected model",
     )
-    user_id: str = Field(description="Unique anonymous user identifier")
-    config_version: int = Field(default=2, description="Configuration schema version")
+    shotgun_instance_id: str = Field(
+        description="Unique shotgun instance identifier (also used for anonymous telemetry)",
+    )
+    config_version: int = Field(default=3, description="Configuration schema version")

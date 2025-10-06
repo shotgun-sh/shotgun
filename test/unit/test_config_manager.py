@@ -12,7 +12,7 @@ from pydantic import SecretStr
 from shotgun.agents.config.constants import (
     API_KEY_FIELD,
     CONFIG_VERSION_FIELD,
-    USER_ID_FIELD,
+    SHOTGUN_INSTANCE_ID_FIELD,
     ConfigSection,
 )
 from shotgun.agents.config.manager import ConfigManager, get_config_manager
@@ -61,10 +61,10 @@ def test_load_config_not_exists(mock_logger):
         assert manager._config is config
         # Now creates new config with user_id, so we get two log messages
         assert mock_logger.info.call_count == 2
-        assert hasattr(config, "user_id")
-        assert config.user_id is not None
+        assert hasattr(config, "shotgun_instance_id")
+        assert config.shotgun_instance_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 2
+        assert config.config_version == 3
 
 
 @patch("shotgun.agents.config.manager.logger")
@@ -95,8 +95,8 @@ def test_load_config_valid_file(mock_logger):
         ConfigSection.GOOGLE.value: {API_KEY_FIELD: "test-google-key"},
         ConfigSection.SHOTGUN.value: {},
         "selected_model": "claude-sonnet-4-5",
-        USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 2,
+        SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+        CONFIG_VERSION_FIELD: 3,
     }
 
     with tempfile.NamedTemporaryFile(
@@ -140,8 +140,8 @@ def test_load_config_invalid_json(mock_logger):
 
             assert isinstance(config, ShotgunConfig)
             assert config.selected_model is None
-            assert hasattr(config, "user_id")
-            assert config.user_id is not None
+            assert hasattr(config, "shotgun_instance_id")
+            assert config.shotgun_instance_id is not None
             mock_logger.error.assert_called_once()
             # Now calls initialize() which logs twice
             assert mock_logger.info.call_count == 2
@@ -161,7 +161,7 @@ def test_save_config_with_argument(mock_logger):
         config = ShotgunConfig(
             selected_model=ModelName.CLAUDE_SONNET_4_5,
             openai=OpenAIConfig(api_key=SecretStr("test-key")),
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
 
         manager.save(config)
@@ -205,7 +205,7 @@ def test_save_config_creates_directory(mock_logger):
         manager = ConfigManager(config_path=config_path)
 
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         manager.save(config)
 
@@ -226,7 +226,7 @@ def test_save_config_failure(mock_logger):
 
         manager = ConfigManager(config_path=config_path)
         config = ShotgunConfig(
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
 
         try:
@@ -252,7 +252,7 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
 
         config = ShotgunConfig(
             openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -290,7 +290,7 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
 
         config = ShotgunConfig(
             anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key")),
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -328,7 +328,7 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
 
         config = ShotgunConfig(
             google=GoogleConfig(api_key=SecretStr("test-google-key")),
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -365,7 +365,7 @@ def test_get_provider_model_string_provider(mock_get_config_manager):
 
         config = ShotgunConfig(
             openai=OpenAIConfig(api_key=SecretStr("test-key")),
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -388,7 +388,7 @@ def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
 
         config = ShotgunConfig(
             anthropic=AnthropicConfig(api_key=SecretStr("test-key")),
-            user_id=str(uuid.uuid4()),
+            shotgun_instance_id=str(uuid.uuid4()),
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
@@ -616,16 +616,16 @@ def test_initialize(mock_logger):
         assert isinstance(config, ShotgunConfig)
         assert config.selected_model is None
         assert config_path.exists()
-        assert hasattr(config, "user_id")
-        assert config.user_id is not None
+        assert hasattr(config, "shotgun_instance_id")
+        assert config.shotgun_instance_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 2
+        assert config.config_version == 3
         # The log message now includes user_id
         assert mock_logger.info.call_count == 1
         call_args = mock_logger.info.call_args[0]
         assert "Configuration initialized at" in call_args[0]
         assert config_path == call_args[1]
-        assert config.user_id == call_args[2]
+        assert config.shotgun_instance_id == call_args[2]
 
 
 def test_convert_secrets_to_secretstr():
@@ -748,8 +748,8 @@ def test_config_manager_force_reload():
             ConfigSection.GOOGLE.value: {API_KEY_FIELD: "new-google-key"},
             ConfigSection.SHOTGUN.value: {},
             "selected_model": None,
-            USER_ID_FIELD: str(uuid.uuid4()),
-            CONFIG_VERSION_FIELD: 2,
+            SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+            CONFIG_VERSION_FIELD: 3,
         }
         with open(config_path, "w") as f:
             json.dump(config_data, f)
@@ -854,8 +854,8 @@ def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
         ConfigSection.GOOGLE.value: {},
         ConfigSection.SHOTGUN.value: {},
         "selected_model": "gpt-5",  # Selected model is OpenAI but has no key
-        USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 2,
+        SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+        CONFIG_VERSION_FIELD: 3,
     }
 
     with tempfile.NamedTemporaryFile(
@@ -893,8 +893,8 @@ def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
         ConfigSection.GOOGLE.value: {},
         ConfigSection.SHOTGUN.value: {},
         "selected_model": "gpt-5",
-        USER_ID_FIELD: str(uuid.uuid4()),
-        CONFIG_VERSION_FIELD: 2,
+        SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+        CONFIG_VERSION_FIELD: 3,
     }
 
     with tempfile.NamedTemporaryFile(

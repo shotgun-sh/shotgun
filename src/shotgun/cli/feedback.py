@@ -30,7 +30,7 @@ def send_feedback(
     """Initialize Shotgun configuration."""
     config_manager = get_config_manager()
     config_manager.load()
-    user_id = config_manager.get_user_id()
+    shotgun_instance_id = config_manager.get_shotgun_instance_id()
 
     if not description:
         console.print(
@@ -39,7 +39,9 @@ def send_feedback(
         )
         raise typer.Exit(1)
 
-    feedback = Feedback(kind=kind, description=description, user_id=user_id)
+    feedback = Feedback(
+        kind=kind, description=description, shotgun_instance_id=shotgun_instance_id
+    )
 
     submit_feedback_survey(feedback)
 

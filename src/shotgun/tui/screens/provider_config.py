@@ -108,6 +108,7 @@ class ProviderConfigScreen(Screen[None]):
         )
         with Horizontal(id="provider-actions"):
             yield Button("Save key \\[ENTER]", variant="primary", id="save")
+            yield Button("Authenticate", variant="success", id="authenticate")
             yield Button("Clear key", id="clear", variant="warning")
             yield Button("Done \\[ESC]", id="done")
 
@@ -117,6 +118,9 @@ class ProviderConfigScreen(Screen[None]):
         if list_view.children:
             list_view.index = 0
         self.selected_provider = "openai"
+
+        # Hide authenticate button by default (shown only for shotgun)
+        self.query_one("#authenticate", Button).display = False
         self.set_focus(self.query_one("#api-key", Input))
 
     def on_screenresume(self) -> None:
@@ -146,6 +150,10 @@ class ProviderConfigScreen(Screen[None]):
     def _on_save_pressed(self) -> None:
         self._save_api_key()
 
+    @on(Button.Pressed, "#authenticate")
+    def _on_authenticate_pressed(self) -> None:
+        self.run_worker(self._start_shotgun_auth(), exclusive=True)
+
     @on(Button.Pressed, "#clear")
     def _on_clear_pressed(self) -> None:
         self._clear_api_key()
@@ -162,9 +170,26 @@ class ProviderConfigScreen(Screen[None]):
     def watch_selected_provider(self, provider: ProviderType) -> None:
         if not self.is_mounted:
             return
+
+        # Show/hide UI elements based on provider type
+        is_shotgun = provider == "shotgun"
+
         input_widget = self.query_one("#api-key", Input)
-        input_widget.placeholder = self._input_placeholder(provider)
-        input_widget.value = ""
+        save_button = self.query_one("#save", Button)
+        auth_button = self.query_one("#authenticate", Button)
+
+        if is_shotgun:
+            # Hide API key input and save button, show authenticate button
+            input_widget.display = False
+            save_button.display = False
+            auth_button.display = True
+        else:
+            # Show API key input and save button, hide authenticate button
+            input_widget.display = True
+            save_button.display = True
+            auth_button.display = False
+            input_widget.placeholder = self._input_placeholder(provider)
+            input_widget.value = ""
 
     @property
     def config_manager(self) -> ConfigManager:
@@ -258,3 +283,15 @@ class ProviderConfigScreen(Screen[None]):
         self.notify(
             f"Cleared API key for {self._provider_display_name(self.selected_provider)}."
         )
+
+    async def _start_shotgun_auth(self) -> None:
+        """Launch Shotgun Account authentication flow."""
+        from .shotgun_auth import ShotgunAuthScreen
+
+        # Push the auth screen and wait for result
+        result = await self.app.push_screen_wait(ShotgunAuthScreen())
+
+        # Refresh provider status after auth completes
+        if result:
+            self.refresh_provider_status()
+            # Notify handled by auth screen
