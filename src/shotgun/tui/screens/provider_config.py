@@ -85,6 +85,7 @@ class ProviderConfigScreen(Screen[None]):
 
     BINDINGS = [
         ("escape", "done", "Back"),
+        ("ctrl+c", "app.quit", "Quit"),
     ]
 
     selected_provider: reactive[str] = reactive("openai")
@@ -114,6 +115,7 @@ class ProviderConfigScreen(Screen[None]):
 
     def on_mount(self) -> None:
         self.refresh_provider_status()
+        self._update_done_button_visibility()
         list_view = self.query_one(ListView)
         if list_view.children:
             list_view.index = 0
@@ -129,6 +131,7 @@ class ProviderConfigScreen(Screen[None]):
         This ensures the UI reflects any provider changes made elsewhere.
         """
         self.refresh_provider_status()
+        self._update_done_button_visibility()
 
     def action_done(self) -> None:
         self.dismiss()
@@ -179,10 +182,15 @@ class ProviderConfigScreen(Screen[None]):
         auth_button = self.query_one("#authenticate", Button)
 
         if is_shotgun:
-            # Hide API key input and save button, show authenticate button
+            # Hide API key input and save button
             input_widget.display = False
             save_button.display = False
-            auth_button.display = True
+
+            # Only show Authenticate button if shotgun is NOT already configured
+            if self._has_provider_key("shotgun"):
+                auth_button.display = False
+            else:
+                auth_button.display = True
         else:
             # Show API key input and save button, hide authenticate button
             input_widget.display = True
@@ -201,6 +209,12 @@ class ProviderConfigScreen(Screen[None]):
         for provider_id in get_configurable_providers():
             label = self.query_one(f"#label-{provider_id}", Label)
             label.update(self._provider_label(provider_id))
+
+    def _update_done_button_visibility(self) -> None:
+        """Show/hide Done button based on whether any provider keys are configured."""
+        done_button = self.query_one("#done", Button)
+        has_keys = self.config_manager.has_any_provider_key()
+        done_button.display = has_keys
 
     def _build_provider_items(self) -> list[ListItem]:
         items: list[ListItem] = []
@@ -267,6 +281,7 @@ class ProviderConfigScreen(Screen[None]):
 
         input_widget.value = ""
         self.refresh_provider_status()
+        self._update_done_button_visibility()
         self.notify(
             f"Saved API key for {self._provider_display_name(self.selected_provider)}."
         )
@@ -279,7 +294,14 @@ class ProviderConfigScreen(Screen[None]):
             return
 
         self.refresh_provider_status()
+        self._update_done_button_visibility()
         self.query_one("#api-key", Input).value = ""
+
+        # If we just cleared shotgun, show the Authenticate button
+        if self.selected_provider == "shotgun":
+            auth_button = self.query_one("#authenticate", Button)
+            auth_button.display = True
+
         self.notify(
             f"Cleared API key for {self._provider_display_name(self.selected_provider)}."
         )

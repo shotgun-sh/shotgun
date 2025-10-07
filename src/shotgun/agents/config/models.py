@@ -169,3 +169,7 @@ class ShotgunConfig(BaseModel):
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
     config_version: int = Field(default=3, description="Configuration schema version")
+    shown_welcome_screen: bool = Field(
+        default=False,
+        description="Whether the welcome screen has been shown to the user",
+    )

@@ -5,6 +5,7 @@ import webbrowser
 from typing import TYPE_CHECKING, cast
 
 import httpx
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
@@ -119,6 +120,11 @@ class ShotgunAuthScreen(Screen[bool]):
         if self.poll_worker and self.poll_worker.state == WorkerState.RUNNING:
             self.poll_worker.cancel()
         self.dismiss(False)
+
+    @on(Button.Pressed, "#cancel")
+    def _on_cancel_pressed(self) -> None:
+        """Handle cancel button press."""
+        self.action_cancel()
 
     @property
     def config_manager(self) -> ConfigManager:
