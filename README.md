@@ -112,7 +112,7 @@ shotgun
 
 - **Spec-driven workflow** across five Modes: `research → specify → plan → tasks → implement`
 - **Deterministic artifacts** you can version in Git
-- **Export to agents.md** so outputs plug into many code-generation tools (EXAMPLE TOOLS FROM AGENTS>MD SUPPORT LIST)
+- **Export to agents.md** so outputs plug into many code-generation tools (Codex, Cursor, Warp, Devin, opencode, Jules and so on)
 - **Local-first CLI** with minimal setup
 
 > Shotgun sits _under_ your codegen tools: it creates the structured inputs those tools need and keeps them consistent across the lifecycle.
