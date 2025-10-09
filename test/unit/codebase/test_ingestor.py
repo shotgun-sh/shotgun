@@ -8,28 +8,17 @@ import uuid
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from shotgun.codebase.core.ingestor import IGNORE_PATTERNS, Ingestor
+from shotgun.codebase.core.ingestor import (
+    BASE_IGNORE_DIRECTORIES,
+    BUILD_ARTIFACT_DIRECTORIES,
+    IGNORE_PATTERNS,
+    Ingestor,
+)
 
 
 def test_ignore_patterns_default_values():
     """Test that IGNORE_PATTERNS contains expected default values."""
-    expected_patterns = {
-        ".git",
-        "venv",
-        ".venv",
-        "__pycache__",
-        "node_modules",
-        "build",
-        "dist",
-        ".eggs",
-        ".pytest_cache",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".claude",
-        ".idea",
-        ".vscode",
-    }
-    assert IGNORE_PATTERNS == expected_patterns
+    assert IGNORE_PATTERNS == BASE_IGNORE_DIRECTORIES | BUILD_ARTIFACT_DIRECTORIES
 
 
 def test_ingestor_init():

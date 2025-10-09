@@ -18,15 +18,12 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-# Default ignore patterns
-IGNORE_PATTERNS = {
+# Directories that should never be traversed during indexing
+BASE_IGNORE_DIRECTORIES = {
     ".git",
     "venv",
     ".venv",
     "__pycache__",
-    "node_modules",
-    "build",
-    "dist",
     ".eggs",
     ".pytest_cache",
     ".mypy_cache",
@@ -35,6 +32,29 @@ IGNORE_PATTERNS = {
     ".idea",
     ".vscode",
 }
+
+# Well-known build output directories to skip when determining source files
+BUILD_ARTIFACT_DIRECTORIES = {
+    "node_modules",
+    ".next",
+    ".nuxt",
+    ".vite",
+    ".yarn",
+    ".svelte-kit",
+    ".output",
+    ".turbo",
+    ".parcel-cache",
+    ".vercel",
+    ".serverless",
+    "build",
+    "dist",
+    "out",
+    "tmp",
+    "coverage",
+}
+
+# Default ignore patterns combines base directories and build artifacts
+IGNORE_PATTERNS = BASE_IGNORE_DIRECTORIES | BUILD_ARTIFACT_DIRECTORIES
 
 
 class Ingestor:
