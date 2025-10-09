@@ -114,9 +114,9 @@ class StatusBar(Widget):
 
     def render(self) -> str:
         if self.working:
-            return """[$foreground-muted][bold $text]esc[/] to stop • [bold $text]enter[/] to send • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
+            return """[$foreground-muted][bold $text]esc[/] to stop • [bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
         else:
-            return """[$foreground-muted][bold $text]enter[/] to send • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
+            return """[$foreground-muted][bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
 
 
 class ModeIndicator(Widget):
