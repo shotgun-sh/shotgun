@@ -51,9 +51,13 @@ class CodebaseFileHandler(FileSystemEventHandler):
         self.pending_changes: list[FileChange] = []
         self._lock = anyio.Lock()
         # Import default ignore patterns from ingestor
-        from shotgun.codebase.core.ingestor import IGNORE_PATTERNS
+        from shotgun.codebase.core.ingestor import (
+            IGNORE_PATTERNS,
+            should_ignore_directory,
+        )
 
         self.ignore_patterns = ignore_patterns or IGNORE_PATTERNS
+        self._should_ignore_directory = should_ignore_directory
 
     def on_any_event(self, event: FileSystemEvent) -> None:
         """Handle any file system event."""
@@ -71,7 +75,7 @@ class CodebaseFileHandler(FileSystemEventHandler):
 
         # Check if any parent directory should be ignored
         for parent in path.parents:
-            if parent.name in self.ignore_patterns:
+            if self._should_ignore_directory(parent.name, self.ignore_patterns):
                 logger.debug(
                     f"Ignoring file in ignored directory: {parent.name} - path: {src_path_str}"
                 )
@@ -106,7 +110,7 @@ class CodebaseFileHandler(FileSystemEventHandler):
             )
             dest_path = Path(dest_path_str)
             for parent in dest_path.parents:
-                if parent.name in self.ignore_patterns:
+                if self._should_ignore_directory(parent.name, self.ignore_patterns):
                     logger.debug(
                         f"Ignoring move to ignored directory: {parent.name} - dest_path: {dest_path_str}"
                     )

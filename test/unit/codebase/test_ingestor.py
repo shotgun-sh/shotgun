@@ -13,6 +13,8 @@ from shotgun.codebase.core.ingestor import (
     BUILD_ARTIFACT_DIRECTORIES,
     IGNORE_PATTERNS,
     Ingestor,
+    is_path_ignored,
+    should_ignore_directory,
 )
 
 
@@ -216,7 +218,10 @@ def test_path_should_be_ignored():
     test_cases = [
         ("__pycache__/test.py", True),
         (".git/config", True),
+        (".config/settings.json", True),
         ("node_modules/pkg/index.js", True),
+        ("src/.hidden/module.py", True),
+        ("frontend/.storybook/main.ts", True),
         ("src/main.py", False),
         ("test/test_file.py", False),
         (".venv/lib/python3.9/site-packages/pkg", True),
@@ -224,11 +229,14 @@ def test_path_should_be_ignored():
 
     for path, should_ignore in test_cases:
         path_obj = Path(path)
-        # Check if any part of path is in ignore patterns
-        is_ignored = any(
-            ignore_pattern in str(path_obj) for ignore_pattern in IGNORE_PATTERNS
-        )
-        assert is_ignored == should_ignore
+        assert is_path_ignored(path_obj, IGNORE_PATTERNS) == should_ignore
+
+
+def test_should_ignore_directory_prefixes():
+    """Directories starting with dot should always be ignored."""
+    assert should_ignore_directory(".cache", IGNORE_PATTERNS)
+    assert should_ignore_directory(".storybook", IGNORE_PATTERNS)
+    assert should_ignore_directory(".git", IGNORE_PATTERNS)
 
 
 @patch("shotgun.codebase.core.ingestor.os.walk")

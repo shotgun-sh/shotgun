@@ -56,6 +56,23 @@ BUILD_ARTIFACT_DIRECTORIES = {
 # Default ignore patterns combines base directories and build artifacts
 IGNORE_PATTERNS = BASE_IGNORE_DIRECTORIES | BUILD_ARTIFACT_DIRECTORIES
 
+# Directory prefixes that should always be ignored
+IGNORED_DIRECTORY_PREFIXES = (".",)
+
+
+def should_ignore_directory(name: str, ignore_patterns: set[str] | None = None) -> bool:
+    """Return True if the directory name should be ignored."""
+    patterns = IGNORE_PATTERNS if ignore_patterns is None else ignore_patterns
+    if name in patterns:
+        return True
+    return name.startswith(IGNORED_DIRECTORY_PREFIXES)
+
+
+def is_path_ignored(path: Path, ignore_patterns: set[str] | None = None) -> bool:
+    """Return True if any part of the path should be ignored."""
+    patterns = IGNORE_PATTERNS if ignore_patterns is None else ignore_patterns
+    return any(should_ignore_directory(part, patterns) for part in path.parts)
+
 
 class Ingestor:
     """Handles all communication and ingestion with the Kuzu database."""
@@ -627,7 +644,9 @@ class SimpleGraphBuilder:
         """First pass: Walk directory to find packages and folders."""
         dir_count = 0
         for root_str, dirs, _ in os.walk(self.repo_path, topdown=True):
-            dirs[:] = [d for d in dirs if d not in self.ignore_dirs]
+            dirs[:] = [
+                d for d in dirs if not should_ignore_directory(d, self.ignore_dirs)
+            ]
             root = Path(root_str)
             relative_root = root.relative_to(self.repo_path)
 
@@ -760,7 +779,7 @@ class SimpleGraphBuilder:
             root = Path(root_str)
 
             # Skip ignored directories
-            if any(part in self.ignore_dirs for part in root.parts):
+            if is_path_ignored(root, self.ignore_dirs):
                 continue
 
             for filename in files:
@@ -777,7 +796,7 @@ class SimpleGraphBuilder:
             root = Path(root_str)
 
             # Skip ignored directories
-            if any(part in self.ignore_dirs for part in root.parts):
+            if is_path_ignored(root, self.ignore_dirs):
                 continue
 
             for filename in files:
