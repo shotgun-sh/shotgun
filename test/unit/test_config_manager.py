@@ -562,29 +562,35 @@ def test_clear_provider_key_google():
 
 
 def test_clear_provider_key_shotgun():
-    """Test clearing Shotgun Account API key."""
+    """Test clearing Shotgun Account API key and JWT."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # First set a key
-        manager.update_provider("shotgun", api_key="test-key")
+        # First set both api_key and supabase_jwt using update_shotgun_account
+        manager.update_shotgun_account(
+            api_key="test-api-key", supabase_jwt="test-jwt-token"
+        )
 
-        # Verify key is set by checking config directly
+        # Verify both are set by checking config directly
         config = manager.load(force_reload=True)
         assert manager._provider_has_api_key(config.shotgun)
+        assert config.shotgun.supabase_jwt is not None
+        assert config.shotgun.supabase_jwt.get_secret_value() == "test-jwt-token"
 
         # Now clear it
         manager.clear_provider_key("shotgun")
 
-        # Verify key is cleared
+        # Verify both api_key and supabase_jwt are cleared
         config = manager.load(force_reload=True)
         assert not manager._provider_has_api_key(config.shotgun)
+        assert config.shotgun.supabase_jwt is None
 
         # Verify config file was updated
         with open(config_path, encoding="utf-8") as f:
             saved_data = json.load(f)
         assert saved_data["shotgun"]["api_key"] is None
+        assert saved_data["shotgun"]["supabase_jwt"] is None
 
 
 def test_clear_provider_key_string_provider():

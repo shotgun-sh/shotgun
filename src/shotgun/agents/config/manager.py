@@ -256,9 +256,16 @@ class ConfigManager:
         config = self.load()
 
         # Get provider config (shotgun or LLM provider)
-        provider_config, _ = self._get_provider_config_and_type(config, provider)
+        provider_config, is_shotgun = self._get_provider_config_and_type(
+            config, provider
+        )
 
         provider_config.api_key = None
+
+        # For Shotgun Account, also clear the JWT
+        if is_shotgun and isinstance(provider_config, ShotgunAccountConfig):
+            provider_config.supabase_jwt = None
+
         self.save(config)
 
     def update_selected_model(self, model_name: "ModelName") -> None:

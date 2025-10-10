@@ -136,6 +136,12 @@ class WelcomeScreen(Screen[None]):
 
     def on_mount(self) -> None:
         """Focus the first button on mount."""
+        # Update BYOK button text based on whether user has existing providers
+        byok_button = self.query_one("#byok-button", Button)
+        app = cast("ShotgunApp", self.app)
+        if app.config_manager.has_any_provider_key():
+            byok_button.label = "I'll stick with my BYOK setup"
+
         self.query_one("#shotgun-button", Button).focus()
 
     @on(Button.Pressed, "#shotgun-button")
@@ -147,13 +153,18 @@ class WelcomeScreen(Screen[None]):
     def _on_byok_pressed(self) -> None:
         """Handle BYOK button press."""
         self._mark_welcome_shown()
-        # Push provider config screen before dismissing
+
+        app = cast("ShotgunApp", self.app)
+
+        # If user already has providers, just dismiss and continue to chat
+        if app.config_manager.has_any_provider_key():
+            self.dismiss()
+            return
+
+        # Otherwise, push provider config screen
         from .provider_config import ProviderConfigScreen
 
-        self.app.push_screen(
-            ProviderConfigScreen(),
-            callback=lambda _arg: self.dismiss(),
-        )
+        self.app.push_screen(ProviderConfigScreen())
 
     async def _start_shotgun_auth(self) -> None:
         """Launch Shotgun Account authentication flow."""
