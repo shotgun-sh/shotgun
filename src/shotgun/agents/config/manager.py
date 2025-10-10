@@ -81,6 +81,26 @@ class ConfigManager:
                     "Migrated config v2->v3: renamed user_id to shotgun_instance_id"
                 )
 
+            # Migration: Set shown_welcome_screen for existing BYOK users
+            # If shown_welcome_screen doesn't exist AND any BYOK provider has a key,
+            # set it to False so they see the welcome screen once
+            if "shown_welcome_screen" not in data:
+                has_byok_key = False
+                for section in ["openai", "anthropic", "google"]:
+                    if (
+                        section in data
+                        and isinstance(data[section], dict)
+                        and data[section].get("api_key")
+                    ):
+                        has_byok_key = True
+                        break
+
+                if has_byok_key:
+                    data["shown_welcome_screen"] = False
+                    logger.info(
+                        "Existing BYOK user detected: set shown_welcome_screen=False to show welcome screen"
+                    )
+
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
 

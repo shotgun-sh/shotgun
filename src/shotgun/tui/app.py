@@ -8,7 +8,6 @@ from textual.screen import Screen
 from shotgun.agents.config import ConfigManager, get_config_manager
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.splash import SplashScreen
-from shotgun.utils.env_utils import is_shotgun_account_enabled
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 from shotgun.utils.update_checker import perform_auto_update_async
 
@@ -61,27 +60,20 @@ class ShotgunApp(App[None]):
 
     def refresh_startup_screen(self) -> None:
         """Push the appropriate screen based on configured providers."""
-        if not self.config_manager.has_any_provider_key():
-            # If Shotgun Account is enabled, show welcome screen with choice
-            # Otherwise, go directly to provider config (BYOK only)
-            if is_shotgun_account_enabled():
-                if isinstance(self.screen, WelcomeScreen):
-                    return
-
-                self.push_screen(
-                    WelcomeScreen(),
-                    callback=lambda _arg: self.refresh_startup_screen(),
-                )
+        # Show welcome screen if no providers are configured OR if user hasn't seen it yet
+        config = self.config_manager.load()
+        if (
+            not self.config_manager.has_any_provider_key()
+            or not config.shown_welcome_screen
+        ):
+            if isinstance(self.screen, WelcomeScreen):
                 return
-            else:
-                if isinstance(self.screen, ProviderConfigScreen):
-                    return
 
-                self.push_screen(
-                    ProviderConfigScreen(),
-                    callback=lambda _arg: self.refresh_startup_screen(),
-                )
-                return
+            self.push_screen(
+                WelcomeScreen(),
+                callback=lambda _arg: self.refresh_startup_screen(),
+            )
+            return
 
         if not self.check_local_shotgun_directory_exists():
             if isinstance(self.screen, DirectorySetupScreen):

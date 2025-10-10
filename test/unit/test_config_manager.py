@@ -971,3 +971,120 @@ def test_clear_all_provider_keys_sets_selected_model_to_none():
         # selected_model should be None since no providers have keys
         # The load() method will try to find an available provider but won't find any
         assert config.selected_model is None
+
+
+@patch("shotgun.agents.config.manager.logger")
+def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(mock_logger):
+    """Test that load() sets shown_welcome_screen=False for existing BYOK users."""
+    import uuid
+
+    # Create config file without shown_welcome_screen but with a BYOK provider key
+    config_data = {
+        ConfigSection.OPENAI.value: {API_KEY_FIELD: "test-openai-key"},
+        ConfigSection.ANTHROPIC.value: {},
+        ConfigSection.GOOGLE.value: {},
+        ConfigSection.SHOTGUN.value: {},
+        "selected_model": "gpt-5",
+        SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+        CONFIG_VERSION_FIELD: 3,
+        # Note: shown_welcome_screen is intentionally missing
+    }
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False
+    ) as temp_file:
+        json.dump(config_data, temp_file)
+        temp_file.flush()
+
+        try:
+            manager = ConfigManager(config_path=Path(temp_file.name))
+            config = manager.load()
+
+            # shown_welcome_screen should be set to False for existing BYOK user
+            assert config.shown_welcome_screen is False
+
+            # Verify the migration log message was called
+            assert any(
+                "Existing BYOK user detected" in str(call)
+                for call in mock_logger.info.call_args_list
+            )
+        finally:
+            os.unlink(temp_file.name)
+
+
+@patch("shotgun.agents.config.manager.logger")
+def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(mock_logger):
+    """Test that load() does not set shown_welcome_screen for new users without BYOK keys."""
+    import uuid
+
+    # Create config file without shown_welcome_screen and without any BYOK provider keys
+    config_data = {
+        ConfigSection.OPENAI.value: {},
+        ConfigSection.ANTHROPIC.value: {},
+        ConfigSection.GOOGLE.value: {},
+        ConfigSection.SHOTGUN.value: {},
+        "selected_model": None,
+        SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+        CONFIG_VERSION_FIELD: 3,
+        # Note: shown_welcome_screen is intentionally missing
+    }
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False
+    ) as temp_file:
+        json.dump(config_data, temp_file)
+        temp_file.flush()
+
+        try:
+            manager = ConfigManager(config_path=Path(temp_file.name))
+            config = manager.load()
+
+            # shown_welcome_screen should use default (False) from the model
+            assert config.shown_welcome_screen is False
+
+            # Verify the migration log message was NOT called
+            assert not any(
+                "Existing BYOK user detected" in str(call)
+                for call in mock_logger.info.call_args_list
+            )
+        finally:
+            os.unlink(temp_file.name)
+
+
+@patch("shotgun.agents.config.manager.logger")
+def test_load_migration_respects_existing_shown_welcome_screen(mock_logger):
+    """Test that load() does not override existing shown_welcome_screen value."""
+    import uuid
+
+    # Create config file with shown_welcome_screen already set to True
+    config_data = {
+        ConfigSection.OPENAI.value: {API_KEY_FIELD: "test-openai-key"},
+        ConfigSection.ANTHROPIC.value: {},
+        ConfigSection.GOOGLE.value: {},
+        ConfigSection.SHOTGUN.value: {},
+        "selected_model": "gpt-5",
+        SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
+        CONFIG_VERSION_FIELD: 3,
+        "shown_welcome_screen": True,
+    }
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False
+    ) as temp_file:
+        json.dump(config_data, temp_file)
+        temp_file.flush()
+
+        try:
+            manager = ConfigManager(config_path=Path(temp_file.name))
+            config = manager.load()
+
+            # shown_welcome_screen should remain True
+            assert config.shown_welcome_screen is True
+
+            # Verify the migration log message was NOT called
+            assert not any(
+                "Existing BYOK user detected" in str(call)
+                for call in mock_logger.info.call_args_list
+            )
+        finally:
+            os.unlink(temp_file.name)

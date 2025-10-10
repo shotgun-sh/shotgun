@@ -1,16 +1,17 @@
 """Utilities for working with environment variables."""
 
-import os
-
 
 def is_shotgun_account_enabled() -> bool:
     """Check if Shotgun Account feature is enabled via environment variable.
 
     Returns:
-        True if SHOTGUN_ACCOUNT_ENABLED is set to a truthy value,
-        False otherwise
+        True always (Shotgun Account is now live for all users)
+
+    Note:
+        This function is deprecated and always returns True.
+        Shotgun Account is now available to all users by default.
     """
-    return is_truthy(os.environ.get("SHOTGUN_ACCOUNT_ENABLED"))
+    return True
 
 
 def is_truthy(value: str | None) -> bool:

@@ -12,23 +12,19 @@ from textual.screen import Screen
 from textual.widgets import Button, Input, Label, ListItem, ListView, Markdown, Static
 
 from shotgun.agents.config import ConfigManager, ProviderType
-from shotgun.utils.env_utils import is_shotgun_account_enabled
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
 
 
 def get_configurable_providers() -> list[str]:
-    """Get list of configurable providers based on feature flags.
+    """Get list of configurable providers.
 
     Returns:
         List of provider identifiers that can be configured.
-        Includes shotgun only if SHOTGUN_ACCOUNT_ENABLED is set.
+        Includes all providers: openai, anthropic, google, and shotgun.
     """
-    providers = ["openai", "anthropic", "google"]
-    if is_shotgun_account_enabled():
-        providers.append("shotgun")
-    return providers
+    return ["openai", "anthropic", "google", "shotgun"]
 
 
 class ProviderConfigScreen(Screen[None]):
