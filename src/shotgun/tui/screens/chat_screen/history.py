@@ -215,8 +215,27 @@ class AgentResponseWidget(Widget):
         acc = ""
         if self.item is None:
             return ""
+
+        # Check if there's an ask_user tool call and get its question content
+        ask_user_question = None
+        for part in self.item.parts:
+            if isinstance(part, ToolCallPart) and part.tool_name == "ask_user":
+                args = self._parse_args(part.args)
+                if isinstance(args, dict) and "question" in args:
+                    ask_user_question = args["question"]
+                    break
+
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
+                # Skip text parts that duplicate ask_user content
+                if (
+                    ask_user_question
+                    and part.content
+                    and isinstance(part.content, str)
+                    and isinstance(ask_user_question, str)
+                    and part.content.strip() == ask_user_question.strip()
+                ):
+                    continue
                 # Only show the circle prefix if there's actual content
                 if part.content and part.content.strip():
                     acc += f"**⏺** {part.content}\n\n"
@@ -224,7 +243,25 @@ class AgentResponseWidget(Widget):
                 parts_str = self._format_tool_call_part(part)
                 acc += parts_str + "\n\n"
             elif isinstance(part, BuiltinToolCallPart):
-                acc += f"{part.tool_name}({part.args})\n\n"
+                # Format builtin tool calls better
+                if part.tool_name and "search" in part.tool_name.lower():
+                    args = self._parse_args(part.args)
+                    if isinstance(args, dict) and "query" in args:
+                        query = self._truncate(str(args.get("query", "")))
+                        acc += f'Searching: "{query}"\n\n'
+                    else:
+                        acc += f"{part.tool_name}()\n\n"
+                else:
+                    # For other builtin tools, show name only or with truncated args
+                    if part.args:
+                        args_str = (
+                            str(part.args)[:50] + "..."
+                            if len(str(part.args)) > 50
+                            else str(part.args)
+                        )
+                        acc += f"{part.tool_name}({args_str})\n\n"
+                    else:
+                        acc += f"{part.tool_name}()\n\n"
             elif isinstance(part, BuiltinToolReturnPart):
                 acc += f"builtin tool ({part.tool_name}) return: {part.content}\n\n"
             elif isinstance(part, ThinkingPart):
@@ -305,12 +342,16 @@ class AgentResponseWidget(Widget):
                 return f'Reading file: "{args["filename"]}"'
             return "Reading file"
 
-        # Web search tools
-        if part.tool_name in [
-            "openai_web_search_tool",
-            "anthropic_web_search_tool",
-            "gemini_web_search_tool",
-        ]:
+        # Web search tools - handle variations
+        if (
+            part.tool_name
+            in [
+                "openai_web_search_tool",
+                "anthropic_web_search_tool",
+                "gemini_web_search_tool",
+            ]
+            or "search" in part.tool_name.lower()
+        ):  # Catch other search variations
             if "query" in args:
                 query = self._truncate(str(args["query"]))
                 return f'Searching web: "{query}"'
@@ -332,7 +373,24 @@ class AgentResponseWidget(Widget):
                 return f"{part.tool_name}({args['name']})"
             return f"▪ {part.tool_name}()"
 
-        return f"{part.tool_name}({part.args})"
+        # Default case for unrecognized tools - format args properly
+        args = self._parse_args(part.args)
+        if args and isinstance(args, dict):
+            # Try to extract common fields
+            if "query" in args:
+                return f'{part.tool_name}: "{self._truncate(str(args["query"]))}"'
+            elif "question" in args:
+                return f'{part.tool_name}: "{self._truncate(str(args["question"]))}"'
+            else:
+                # Show tool name with truncated args
+                args_str = (
+                    str(part.args)[:50] + "..."
+                    if len(str(part.args)) > 50
+                    else str(part.args)
+                )
+                return f"{part.tool_name}({args_str})"
+        else:
+            return f"{part.tool_name}()"
 
     def _format_ask_user_part(
         self,

@@ -36,6 +36,7 @@ from textual.message import Message
 from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
+from shotgun.agents.config.models import KeyProvider
 from shotgun.agents.models import AgentType, FileOperation
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -359,9 +360,17 @@ class AgentManager(Widget):
         model_name = ""
         if hasattr(deps, "llm_model") and deps.llm_model is not None:
             model_name = deps.llm_model.name
-        is_gpt5 = (  # streaming is likely not supported for gpt5. It varies between keys.
-            "gpt-5" in model_name.lower()
+
+        # Check if it's a Shotgun account
+        is_shotgun_account = (
+            hasattr(deps, "llm_model")
+            and deps.llm_model is not None
+            and deps.llm_model.key_provider == KeyProvider.SHOTGUN
         )
+
+        # Only disable streaming for GPT-5 if NOT a Shotgun account
+        # Shotgun accounts support streaming for GPT-5
+        is_gpt5_byok = "gpt-5" in model_name.lower() and not is_shotgun_account
 
         # Track message send event
         event_name = f"message_send_{self._current_agent_type.value}"
@@ -383,7 +392,9 @@ class AgentManager(Widget):
                 usage_limits=usage_limits,
                 message_history=message_history,
                 deferred_tool_results=deferred_tool_results,
-                event_stream_handler=self._handle_event_stream if not is_gpt5 else None,
+                event_stream_handler=self._handle_event_stream
+                if not is_gpt5_byok
+                else None,
                 **kwargs,
             )
         finally:
