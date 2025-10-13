@@ -216,25 +216,16 @@ class AgentResponseWidget(Widget):
         if self.item is None:
             return ""
 
-        # Check if there's an ask_user tool call and get its question content
-        ask_user_question = None
-        for part in self.item.parts:
-            if isinstance(part, ToolCallPart) and part.tool_name == "ask_user":
-                args = self._parse_args(part.args)
-                if isinstance(args, dict) and "question" in args:
-                    ask_user_question = args["question"]
-                    break
+        # Check if there's an ask_user tool call
+        has_ask_user = any(
+            isinstance(part, ToolCallPart) and part.tool_name == "ask_user"
+            for part in self.item.parts
+        )
 
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                # Skip text parts that duplicate ask_user content
-                if (
-                    ask_user_question
-                    and part.content
-                    and isinstance(part.content, str)
-                    and isinstance(ask_user_question, str)
-                    and part.content.strip() == ask_user_question.strip()
-                ):
+                # Skip ALL text parts if there's an ask_user tool call
+                if has_ask_user:
                     continue
                 # Only show the circle prefix if there's actual content
                 if part.content and part.content.strip():
