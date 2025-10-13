@@ -10,7 +10,10 @@ from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
-from shotgun.llm_proxy import create_litellm_provider
+from shotgun.llm_proxy import (
+    create_anthropic_proxy_provider,
+    create_litellm_provider,
+)
 from shotgun.logging_config import get_logger
 
 from .manager import get_config_manager
@@ -72,19 +75,37 @@ def get_or_create_model(
 
         # Use LiteLLM proxy for Shotgun Account, native providers for BYOK
         if key_provider == KeyProvider.SHOTGUN:
-            # Shotgun Account uses LiteLLM proxy for any model
+            # Shotgun Account uses LiteLLM proxy with native model types where possible
             if model_name in MODEL_SPECS:
                 litellm_model_name = MODEL_SPECS[model_name].litellm_proxy_model_name
             else:
                 # Fallback for unmapped models
                 litellm_model_name = f"openai/{model_name.value}"
 
-            litellm_provider = create_litellm_provider(api_key)
-            _model_cache[cache_key] = OpenAIChatModel(
-                litellm_model_name,
-                provider=litellm_provider,
-                settings=ModelSettings(max_tokens=max_tokens),
-            )
+            # Use native provider types to preserve API formats and features
+            if provider == ProviderType.ANTHROPIC:
+                # Anthropic: Use native AnthropicProvider with /anthropic endpoint
+                # This preserves Anthropic-specific features like tool_choice
+                # Note: Web search for Shotgun Account uses Gemini only (not Anthropic)
+                # Note: Anthropic API expects model name without prefix (e.g., "claude-sonnet-4-5")
+                anthropic_provider = create_anthropic_proxy_provider(api_key)
+                _model_cache[cache_key] = AnthropicModel(
+                    model_name.value,  # Use model name without "anthropic/" prefix
+                    provider=anthropic_provider,
+                    settings=AnthropicModelSettings(
+                        max_tokens=max_tokens,
+                        timeout=600,  # 10 minutes timeout for large responses
+                    ),
+                )
+            else:
+                # OpenAI and Google: Use LiteLLMProvider (OpenAI-compatible format)
+                # Google's GoogleProvider doesn't support base_url, so use LiteLLM
+                litellm_provider = create_litellm_provider(api_key)
+                _model_cache[cache_key] = OpenAIChatModel(
+                    litellm_model_name,
+                    provider=litellm_provider,
+                    settings=ModelSettings(max_tokens=max_tokens),
+                )
         elif key_provider == KeyProvider.BYOK:
             # Use native provider implementations with user's API keys
             if provider == ProviderType.OPENAI:
@@ -145,13 +166,19 @@ def get_provider_model(
     # Priority 1: Check if Shotgun key exists - if so, use it for ANY model
     shotgun_api_key = _get_api_key(config.shotgun.api_key)
     if shotgun_api_key:
-        # Use selected model or default to claude-sonnet-4-5
-        model_name = config.selected_model or ModelName.CLAUDE_SONNET_4_5
+        # Determine which model to use
+        if isinstance(provider_or_model, ModelName):
+            # Specific model requested - honor it (e.g., web search tools)
+            model_name = provider_or_model
+        else:
+            # No specific model requested - use selected or default
+            model_name = config.selected_model or ModelName.CLAUDE_SONNET_4_5
+
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name.value}' not found")
         spec = MODEL_SPECS[model_name]
 
-        # Use Shotgun Account with selected model (provider = actual LLM provider)
+        # Use Shotgun Account with determined model (provider = actual LLM provider)
         return ModelConfig(
             name=spec.name,
             provider=spec.provider,  # Actual LLM provider (OPENAI/ANTHROPIC/GOOGLE)

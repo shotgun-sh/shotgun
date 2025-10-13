@@ -3,7 +3,7 @@
 from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config.models import KeyProvider
-from shotgun.llm_proxy import create_anthropic_proxy_client
+from shotgun.llm_proxy import create_anthropic_proxy_provider
 from shotgun.logging_config import get_logger
 
 from .base import TokenCounter, extract_text_from_messages
@@ -36,19 +36,20 @@ class AnthropicTokenCounter(TokenCounter):
         try:
             if key_provider == KeyProvider.SHOTGUN:
                 # Use LiteLLM proxy for Shotgun Account
-                # Proxies to Anthropic's token counting API
-                self.client = create_anthropic_proxy_client(api_key)
+                # Get async client from AnthropicProvider
+                provider = create_anthropic_proxy_provider(api_key)
+                self.client = provider.client
                 logger.debug(
-                    f"Initialized Anthropic token counter for {model_name} via LiteLLM proxy"
+                    f"Initialized async Anthropic token counter for {model_name} via LiteLLM proxy"
                 )
             else:
-                # Direct Anthropic API for BYOK
-                self.client = anthropic.Anthropic(api_key=api_key)
+                # Direct Anthropic API for BYOK - use async client
+                self.client = anthropic.AsyncAnthropic(api_key=api_key)
                 logger.debug(
-                    f"Initialized Anthropic token counter for {model_name} via direct API"
+                    f"Initialized async Anthropic token counter for {model_name} via direct API"
                 )
         except Exception as e:
-            raise RuntimeError("Failed to initialize Anthropic client") from e
+            raise RuntimeError("Failed to initialize Anthropic async client") from e
 
     async def count_tokens(self, text: str) -> int:
         """Count tokens using Anthropic's official API (async).
@@ -64,7 +65,8 @@ class AnthropicTokenCounter(TokenCounter):
         """
         try:
             # Anthropic API expects messages format and model parameter
-            result = self.client.messages.count_tokens(
+            # Use await with async client
+            result = await self.client.messages.count_tokens(
                 messages=[{"role": "user", "content": text}], model=self.model_name
             )
             return result.input_tokens
