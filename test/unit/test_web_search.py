@@ -168,7 +168,20 @@ class TestWebSearchTool:
             ) as mock_get_provider,
             patch("shotgun.agents.tools.web_search.openai.AsyncOpenAI") as mock_openai,
             patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_datetime_context"
+            ) as mock_get_datetime,
         ):
+            from shotgun.utils.datetime_utils import DateTimeContext
+
+            # Mock datetime context with fixed values
+            mock_dt_context = DateTimeContext(
+                datetime_formatted="Monday, October 13, 2025 at 09:00:00 AM",
+                timezone_name="UTC",
+                utc_offset="UTC+00:00",
+            )
+            mock_get_datetime.return_value = mock_dt_context
+
             mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
@@ -303,7 +316,20 @@ class TestWebSearchTool:
             ) as mock_get_provider,
             patch("shotgun.agents.tools.web_search.openai.AsyncOpenAI") as mock_openai,
             patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_datetime_context"
+            ) as mock_get_datetime,
         ):
+            from shotgun.utils.datetime_utils import DateTimeContext
+
+            # Mock datetime context with fixed values
+            mock_dt_context = DateTimeContext(
+                datetime_formatted="Monday, October 13, 2025 at 09:00:00 AM",
+                timezone_name="UTC",
+                utc_offset="UTC+00:00",
+            )
+            mock_get_datetime.return_value = mock_dt_context
+
             mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()
@@ -386,7 +412,20 @@ class TestIntegrationScenarios:
             ) as mock_get_provider,
             patch("shotgun.agents.tools.web_search.openai.AsyncOpenAI") as mock_openai,
             patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_datetime_context"
+            ) as mock_get_datetime,
         ):
+            from shotgun.utils.datetime_utils import DateTimeContext
+
+            # Mock datetime context with fixed values
+            mock_dt_context = DateTimeContext(
+                datetime_formatted="Monday, October 13, 2025 at 09:00:00 AM",
+                timezone_name="UTC",
+                utc_offset="UTC+00:00",
+            )
+            mock_get_datetime.return_value = mock_dt_context
+
             mock_get_provider.return_value = mock_model_config
             mock_openai.return_value = mock_client
             mock_span = Mock()

@@ -60,27 +60,44 @@ async def test_add_system_status_message_empty_history(mock_deps):
             with patch(
                 "shotgun.agents.common.extract_markdown_toc"
             ) as mock_extract_toc:
-                mock_loader.render.return_value = "System state content"
-                mock_get_files.return_value = []
-                mock_extract_toc.return_value = None
+                with patch(
+                    "shotgun.agents.common.get_datetime_context"
+                ) as mock_get_datetime:
+                    from shotgun.utils.datetime_utils import DateTimeContext
 
-                result = await add_system_status_message(mock_deps)
+                    # Mock datetime context with fixed values
+                    mock_dt_context = DateTimeContext(
+                        datetime_formatted="Monday, October 13, 2025 at 09:00:00 AM",
+                        timezone_name="UTC",
+                        utc_offset="UTC+00:00",
+                    )
+                    mock_get_datetime.return_value = mock_dt_context
 
-                assert len(result) == 1
-                assert isinstance(result[0], ModelRequest)
-                assert len(result[0].parts) == 1
-                assert isinstance(result[0].parts[0], SystemPromptPart)
-                assert result[0].parts[0].content == "System state content"
+                    mock_loader.render.return_value = "System state content"
+                    mock_get_files.return_value = []
+                    mock_extract_toc.return_value = None
 
-                mock_get_files.assert_called_once_with(None)
-                mock_extract_toc.assert_called_once_with(None)
-                mock_loader.render.assert_called_once_with(
-                    "agents/state/system_state.j2",
-                    codebase_understanding_graphs=["graph1", "graph2"],
-                    is_tui_context=False,
-                    existing_files=[],
-                    markdown_toc=None,
-                )
+                    result = await add_system_status_message(mock_deps)
+
+                    assert len(result) == 1
+                    assert isinstance(result[0], ModelRequest)
+                    assert len(result[0].parts) == 1
+                    assert isinstance(result[0].parts[0], SystemPromptPart)
+                    assert result[0].parts[0].content == "System state content"
+
+                    mock_get_files.assert_called_once_with(None)
+                    mock_extract_toc.assert_called_once_with(None)
+                    mock_get_datetime.assert_called_once()
+                    mock_loader.render.assert_called_once_with(
+                        "agents/state/system_state.j2",
+                        codebase_understanding_graphs=["graph1", "graph2"],
+                        is_tui_context=False,
+                        existing_files=[],
+                        markdown_toc=None,
+                        current_datetime="Monday, October 13, 2025 at 09:00:00 AM",
+                        timezone_name="UTC",
+                        utc_offset="UTC+00:00",
+                    )
 
 
 @pytest.mark.asyncio
@@ -94,15 +111,30 @@ async def test_add_system_status_message_existing_history(mock_deps):
             with patch(
                 "shotgun.agents.common.extract_markdown_toc"
             ) as mock_extract_toc:
-                mock_loader.render.return_value = "System state content"
-                mock_get_files.return_value = []
-                mock_extract_toc.return_value = None
+                with patch(
+                    "shotgun.agents.common.get_datetime_context"
+                ) as mock_get_datetime:
+                    from shotgun.utils.datetime_utils import DateTimeContext
 
-                result = await add_system_status_message(mock_deps, existing_history)
+                    # Mock datetime context with fixed values
+                    mock_dt_context = DateTimeContext(
+                        datetime_formatted="Monday, October 13, 2025 at 09:00:00 AM",
+                        timezone_name="UTC",
+                        utc_offset="UTC+00:00",
+                    )
+                    mock_get_datetime.return_value = mock_dt_context
 
-                assert len(result) == 2
-                assert result[0] == existing_message  # Original message preserved
-                assert isinstance(result[1], ModelRequest)
+                    mock_loader.render.return_value = "System state content"
+                    mock_get_files.return_value = []
+                    mock_extract_toc.return_value = None
+
+                    result = await add_system_status_message(
+                        mock_deps, existing_history
+                    )
+
+                    assert len(result) == 2
+                    assert result[0] == existing_message  # Original message preserved
+                    assert isinstance(result[1], ModelRequest)
 
 
 @pytest.mark.asyncio

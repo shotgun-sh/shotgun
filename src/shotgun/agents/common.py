@@ -24,6 +24,7 @@ from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
+from shotgun.utils.datetime_utils import get_datetime_context
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 from .history import token_limit_compactor
@@ -74,12 +75,18 @@ async def add_system_status_message(
     # Extract table of contents from the agent's markdown file
     markdown_toc = extract_markdown_toc(deps.agent_mode)
 
+    # Get current datetime with timezone information
+    dt_context = get_datetime_context()
+
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
         is_tui_context=deps.is_tui_context,
         existing_files=existing_files,
         markdown_toc=markdown_toc,
+        current_datetime=dt_context.datetime_formatted,
+        timezone_name=dt_context.timezone_name,
+        utc_offset=dt_context.utc_offset,
     )
 
     message_history.append(

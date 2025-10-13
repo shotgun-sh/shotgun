@@ -9,8 +9,13 @@ from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.logging_config import get_logger
+from shotgun.prompts import PromptLoader
+from shotgun.utils.datetime_utils import get_datetime_context
 
 logger = get_logger(__name__)
+
+# Global prompt loader instance
+prompt_loader = PromptLoader()
 
 
 async def anthropic_web_search_tool(query: str) -> str:
@@ -42,10 +47,20 @@ async def anthropic_web_search_tool(query: str) -> str:
         span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
         return error_msg
 
+    # Get datetime context for the search prompt
+    dt_context = get_datetime_context()
+
+    # Render search prompt from template
+    search_prompt = prompt_loader.render(
+        "tools/web_search.j2",
+        query=query,
+        current_datetime=dt_context.datetime_formatted,
+        timezone_name=dt_context.timezone_name,
+        utc_offset=dt_context.utc_offset,
+    )
+
     # Build the request messages
-    messages: list[ModelMessage] = [
-        ModelRequest.user_text_prompt(f"Search for: {query}")
-    ]
+    messages: list[ModelMessage] = [ModelRequest.user_text_prompt(search_prompt)]
 
     # Use the Messages API with web search tool
     try:

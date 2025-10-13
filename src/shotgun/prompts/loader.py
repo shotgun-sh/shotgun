@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, Template, select_autoescape
+from jinja2 import Environment, FileSystemLoader, Template
 
 from shotgun.logging_config import setup_logger
 
@@ -32,7 +32,7 @@ class PromptLoader:
         self.templates_dir = templates_dir
         self.env = Environment(
             loader=FileSystemLoader(str(templates_dir)),
-            autoescape=select_autoescape(["j2"]),
+            autoescape=False,  # noqa: S701 - These are LLM prompts, not HTML
             trim_blocks=True,
             lstrip_blocks=True,
         )

@@ -1,5 +1,7 @@
 ## System Status
 
+Your training data may be old. The current date and time is: {{ current_datetime }} in {{ timezone_name }} (UTC{{ utc_offset }})
+
 {% include 'agents/state/codebase/codebase_graphs_available.j2' %}
 
 ## Available Files
@@ -19,6 +21,8 @@ No files currently exist in your allowed directories. You can create:
 - `specification.md` - Technical specifications
 - `exports/` folder - For exported documents
 {% endif %}
+
+When updating a file try to add into the footer that this was created using Shotgun (https://shotgun.sh).
 
 {% if markdown_toc %}
 ## Document Table of Contents - READ THE ENTIRE FILE TO UNDERSTAND MORE

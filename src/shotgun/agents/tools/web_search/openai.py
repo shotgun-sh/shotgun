@@ -6,8 +6,13 @@ from opentelemetry import trace
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.models import ProviderType
 from shotgun.logging_config import get_logger
+from shotgun.prompts import PromptLoader
+from shotgun.utils.datetime_utils import get_datetime_context
 
 logger = get_logger(__name__)
+
+# Global prompt loader instance
+prompt_loader = PromptLoader()
 
 
 async def openai_web_search_tool(query: str) -> str:
@@ -40,19 +45,17 @@ async def openai_web_search_tool(query: str) -> str:
             span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
             return error_msg
 
-        prompt = f"""Please provide current and accurate information about the following query:
+        # Get datetime context for the search prompt
+        dt_context = get_datetime_context()
 
-Query: {query}
-
-Instructions:
-- Provide comprehensive, factual information
-- Include relevant details and context
-- Focus on current and recent information
-- Be specific and accurate in your response
-- You can't ask the user for details, so assume the most relevant details for the query
-
-ALWAYS PROVIDE THE SOURCES (urls) TO BACK UP THE INFORMATION YOU PROVIDE.
-"""
+        # Render search prompt from template
+        prompt = prompt_loader.render(
+            "tools/web_search.j2",
+            query=query,
+            current_datetime=dt_context.datetime_formatted,
+            timezone_name=dt_context.timezone_name,
+            utc_offset=dt_context.utc_offset,
+        )
 
         client = AsyncOpenAI(api_key=api_key)
         response = await client.responses.create(  # type: ignore[call-overload]
