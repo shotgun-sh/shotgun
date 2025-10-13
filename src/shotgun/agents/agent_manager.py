@@ -706,12 +706,13 @@ class AgentManager(Widget):
         if not self.message_history:
             return None
         self.last_response = self.message_history[-1]
-        ## we're searching for unanswered ask_user parts
+        ## we're searching for unanswered ask_user or ask_questions parts
         found_tool = next(
             (
                 part
                 for part in self.message_history[-1].parts
-                if isinstance(part, ToolCallPart) and part.tool_name == "ask_user"
+                if isinstance(part, ToolCallPart)
+                and part.tool_name in ("ask_user", "ask_questions")
             ),
             None,
         )

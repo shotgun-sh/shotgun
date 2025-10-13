@@ -7,8 +7,15 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from pydantic_ai import CallDeferred
 
-from shotgun.agents.models import AgentDeps, ModelConfig, UserAnswer, UserQuestion
-from shotgun.agents.tools.user_interaction import ask_user
+from shotgun.agents.models import (
+    AgentDeps,
+    ModelConfig,
+    MultipleUserQuestions,
+    UserAnswer,
+    UserQuestion,
+)
+from shotgun.agents.tools.ask_questions import ask_questions
+from shotgun.agents.tools.ask_user import ask_user
 
 
 @pytest.fixture
@@ -118,7 +125,7 @@ async def test_ask_user_logging(mock_context):
     """Test that questions are logged properly."""
     question = "What is your favorite color?"
 
-    with patch("shotgun.agents.tools.user_interaction.logger") as mock_logger:
+    with patch("shotgun.agents.tools.ask_user.logger") as mock_logger:
         with pytest.raises(CallDeferred):
             await ask_user(mock_context, question)
 
@@ -130,7 +137,7 @@ async def test_ask_user_exception_logging(mock_context):
     """Test that exceptions are logged properly."""
     mock_context.deps.queue.put.side_effect = EOFError("Test EOF")
 
-    with patch("shotgun.agents.tools.user_interaction.logger") as mock_logger:
+    with patch("shotgun.agents.tools.ask_user.logger") as mock_logger:
         result = await ask_user(mock_context, "Test question")
 
         assert result == "User input not available or interrupted"
@@ -299,3 +306,174 @@ async def test_special_characters_in_questions():
         # Verify question is queued correctly
         user_question = await deps.queue.get()
         assert user_question.question == question
+
+
+# Tests for ask_questions tool
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_creates_multiple_questions_and_defers(mock_context):
+    """Test that ask_questions creates a MultipleUserQuestions and raises CallDeferred."""
+    questions = ["What's your name?", "What's your age?", "What's your favorite color?"]
+
+    with pytest.raises(CallDeferred) as exc_info:
+        await ask_questions(mock_context, questions)
+
+    # Verify CallDeferred was raised with first question preview
+    assert "Asking 3 questions starting with: What's your name?" in str(exc_info.value)
+
+    # Verify queue.put was called with correct MultipleUserQuestions
+    mock_context.deps.queue.put.assert_called_once()
+    call_args = mock_context.deps.queue.put.call_args[0][0]
+
+    assert isinstance(call_args, MultipleUserQuestions)
+    assert call_args.questions == questions
+    assert call_args.tool_call_id == "test-tool-call-123"
+    assert call_args.current_index == 0
+    assert call_args.answers == []
+    assert isinstance(call_args.result, asyncio.Future)
+
+    # Verify future was added to tasks
+    assert len(mock_context.deps.tasks) == 1
+    assert mock_context.deps.tasks[0] == call_args.result
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_with_single_question(mock_context):
+    """Test ask_questions with just one question."""
+    questions = ["Single question?"]
+
+    with pytest.raises(CallDeferred) as exc_info:
+        await ask_questions(mock_context, questions)
+
+    assert "Asking 1 questions starting with: Single question?" in str(exc_info.value)
+
+    call_args = mock_context.deps.queue.put.call_args[0][0]
+    assert isinstance(call_args, MultipleUserQuestions)
+    assert len(call_args.questions) == 1
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_with_many_questions(mock_context):
+    """Test ask_questions with a large number of questions."""
+    questions = [f"Question {i}?" for i in range(10)]
+
+    with pytest.raises(CallDeferred) as exc_info:
+        await ask_questions(mock_context, questions)
+
+    assert "Asking 10 questions starting with: Question 0?" in str(exc_info.value)
+
+    call_args = mock_context.deps.queue.put.call_args[0][0]
+    assert isinstance(call_args, MultipleUserQuestions)
+    assert len(call_args.questions) == 10
+    assert call_args.questions == questions
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_with_none_tool_call_id():
+    """Test that ask_questions raises AssertionError when tool_call_id is None."""
+    ctx = Mock()
+    ctx.tool_call_id = None
+    ctx.deps = Mock(spec=AgentDeps)
+    ctx.deps.queue = AsyncMock(spec=Queue)
+    ctx.deps.tasks = []
+
+    with pytest.raises(AssertionError):
+        await ask_questions(ctx, ["Question 1?", "Question 2?"])
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_handles_eof_error(mock_context):
+    """Test handling of EOFError during execution."""
+    mock_context.deps.queue.put.side_effect = EOFError("End of file")
+
+    result = await ask_questions(mock_context, ["Q1", "Q2"])
+
+    assert result == "User input not available or interrupted"
+    mock_context.deps.queue.put.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_handles_keyboard_interrupt(mock_context):
+    """Test handling of KeyboardInterrupt during execution."""
+    mock_context.deps.queue.put.side_effect = KeyboardInterrupt("Interrupted")
+
+    result = await ask_questions(mock_context, ["Q1", "Q2"])
+
+    assert result == "User input not available or interrupted"
+    mock_context.deps.queue.put.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_integration_with_real_queue():
+    """Test integration with actual Queue and Future objects."""
+    # Create real dependencies
+    deps = Mock(spec=AgentDeps)
+    deps.queue = Queue()
+    deps.tasks = []
+
+    ctx = Mock()
+    ctx.deps = deps
+    ctx.tool_call_id = "multi-real-test-id"
+
+    questions = ["Name?", "Age?", "Color?"]
+
+    # Call ask_questions
+    with pytest.raises(CallDeferred):
+        await ask_questions(ctx, questions)
+
+    # Verify questions were queued
+    assert not deps.queue.empty()
+    multi_questions = await deps.queue.get()
+
+    assert isinstance(multi_questions, MultipleUserQuestions)
+    assert multi_questions.questions == questions
+    assert multi_questions.tool_call_id == "multi-real-test-id"
+    assert multi_questions.current_index == 0
+    assert multi_questions.answers == []
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_with_special_characters():
+    """Test questions with special characters are handled correctly."""
+    special_questions = [
+        "Hello! @#$%^&*()",
+        "émojis 🚀 and unicode ñ",
+        "line with\ttabs",
+    ]
+
+    deps = Mock(spec=AgentDeps)
+    deps.queue = Queue()
+    deps.tasks = []
+
+    ctx = Mock()
+    ctx.deps = deps
+    ctx.tool_call_id = "special-multi-test"
+
+    with pytest.raises(CallDeferred):
+        await ask_questions(ctx, special_questions)
+
+    # Verify questions are queued correctly
+    multi_questions = await deps.queue.get()
+    assert multi_questions.questions == special_questions
+
+
+@pytest.mark.asyncio
+async def test_ask_questions_empty_list():
+    """Test ask_questions with empty list of questions."""
+    deps = Mock(spec=AgentDeps)
+    deps.queue = Queue()
+    deps.tasks = []
+
+    ctx = Mock()
+    ctx.deps = deps
+    ctx.tool_call_id = "empty-test"
+
+    questions = []
+
+    with pytest.raises(CallDeferred):
+        await ask_questions(ctx, questions)
+
+    multi_questions = await deps.queue.get()
+    assert multi_questions.questions == []
+    assert len(multi_questions.questions) == 0

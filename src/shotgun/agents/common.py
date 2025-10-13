@@ -33,6 +33,7 @@ from .messages import AgentSystemPrompt, SystemStatusPrompt
 from .models import AgentDeps, AgentRuntimeOptions, PipelineConfigEntry
 from .tools import (
     append_file,
+    ask_questions,
     ask_user,
     codebase_shell,
     directory_lister,
@@ -179,10 +180,13 @@ def create_base_agent(
     for tool in additional_tools or []:
         agent.tool_plain(tool)
 
-    # Register interactive tool conditionally based on deps
+    # Register interactive tools conditionally based on deps
     if deps.interactive_mode:
         agent.tool(ask_user)
-        logger.debug("📞 Interactive mode enabled - ask_user tool registered")
+        agent.tool(ask_questions)
+        logger.debug(
+            "📞 Interactive mode enabled - ask_user and ask_questions tools registered"
+        )
 
     # Register common file management tools (always available)
     agent.tool(write_file)
@@ -323,7 +327,9 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
         if prior_toc:
             # Add section with XML tags
             toc_sections.append(
-                f'<TABLE_OF_CONTENTS file_name="{prior_file}">\n{prior_toc}\n</TABLE_OF_CONTENTS>'
+                f'<TABLE_OF_CONTENTS file_name="{prior_file}">\n'
+                f"{prior_toc}\n"
+                f"</TABLE_OF_CONTENTS>"
             )
 
     # Extract TOC from own file (full detail)
@@ -334,7 +340,9 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
             # Put own file TOC at the beginning with XML tags
             toc_sections.insert(
                 0,
-                f'<TABLE_OF_CONTENTS file_name="{config.own_file}">\n{own_toc}\n</TABLE_OF_CONTENTS>',
+                f'<TABLE_OF_CONTENTS file_name="{config.own_file}">\n'
+                f"{own_toc}\n"
+                f"</TABLE_OF_CONTENTS>",
             )
 
     # Combine all sections
@@ -476,7 +484,8 @@ async def add_system_prompt_message(
     message_history = message_history or []
 
     # Create a minimal RunContext to call the system prompt function
-    # We'll pass None for model and usage since they're not used by our system prompt functions
+    # We'll pass None for model and usage since they're not used
+    # by our system prompt functions
     context = type(
         "RunContext", (), {"deps": deps, "retry": 0, "model": None, "usage": None}
     )()
@@ -544,7 +553,8 @@ async def run_agent(
             message_history=messages,
             deferred_tool_results=results,
         )
-        # Apply persistent compaction to prevent cascading token growth in multi-turn loops
+        # Apply persistent compaction to prevent cascading token growth
+        # in multi-turn loops
         messages = await apply_persistent_compaction(result.all_messages(), deps)
 
     # Log file operations summary if any files were modified

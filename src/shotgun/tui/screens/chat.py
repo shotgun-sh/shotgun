@@ -20,7 +20,7 @@ from textual.keys import Keys
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
 
 from shotgun.agents.agent_manager import (
     AgentManager,
@@ -37,6 +37,7 @@ from shotgun.agents.models import (
     AgentDeps,
     AgentType,
     FileOperationTracker,
+    MultipleUserQuestions,
     UserQuestion,
 )
 from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
@@ -114,9 +115,18 @@ class StatusBar(Widget):
 
     def render(self) -> str:
         if self.working:
-            return """[$foreground-muted][bold $text]esc[/] to stop • [bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
+            return (
+                "[$foreground-muted][bold $text]esc[/] to stop • "
+                "[bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • "
+                "[bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • "
+                "/help for commands[/]"
+            )
         else:
-            return """[$foreground-muted][bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • [bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • /help for commands[/]"""
+            return (
+                "[$foreground-muted][bold $text]enter[/] to send • "
+                "[bold $text]ctrl+j[/] for newline • [bold $text]ctrl+p[/] command palette • "
+                "[bold $text]shift+tab[/] cycle modes • /help for commands[/]"
+            )
 
 
 class ModeIndicator(Widget):
@@ -149,10 +159,16 @@ class ModeIndicator(Widget):
             AgentType.EXPORT: "Export",
         }
         mode_description = {
-            AgentType.RESEARCH: "Research topics with web search and synthesize findings",
+            AgentType.RESEARCH: (
+                "Research topics with web search and synthesize findings"
+            ),
             AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
-            AgentType.TASKS: "Generate specific, actionable tasks from research and plans",
-            AgentType.SPECIFY: "Create detailed specifications and requirements documents",
+            AgentType.TASKS: (
+                "Generate specific, actionable tasks from research and plans"
+            ),
+            AgentType.SPECIFY: (
+                "Create detailed specifications and requirements documents"
+            ),
             AgentType.EXPORT: "Export artifacts and findings to various formats",
         }
 
@@ -163,7 +179,10 @@ class ModeIndicator(Widget):
         has_content = self.progress_checker.has_mode_content(self.mode)
         status_icon = " ✓" if has_content else ""
 
-        return f"[bold $text-accent]{mode_title}{status_icon} mode[/][$foreground-muted] ({description})[/]"
+        return (
+            f"[bold $text-accent]{mode_title}{status_icon} mode[/]"
+            f"[$foreground-muted] ({description})[/]"
+        )
 
 
 class CodebaseIndexPromptScreen(ModalScreen[bool]):
@@ -199,7 +218,8 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
             yield Static(
                 f"Would you like to index the codebase at:\n{Path.cwd()}\n\n"
                 "This is required for the agent to understand your code and answer "
-                "questions about it. Without indexing, the agent cannot analyze your codebase."
+                "questions about it. Without indexing, the agent cannot analyze "
+                "your codebase."
             )
             with Container(id="index-prompt-buttons"):
                 yield Button(
@@ -238,7 +258,7 @@ class ChatScreen(Screen[None]):
     history: PromptHistory = PromptHistory()
     messages = reactive(list[ModelMessage | HintMessage]())
     working = reactive(False)
-    question: reactive[UserQuestion | None] = reactive(None)
+    question: reactive[UserQuestion | MultipleUserQuestions | None] = reactive(None)
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
     partial_message: reactive[ModelMessage | None] = reactive(None)
     _current_worker = None  # Track the current running worker for cancellation
@@ -378,17 +398,6 @@ class ChatScreen(Screen[None]):
             chat_history = self.query_one(ChatHistory)
             chat_history.update_messages(messages)
 
-    def watch_question(self, question: UserQuestion | None) -> None:
-        """Update the question display."""
-        if self.is_mounted:
-            question_display = self.query_one("#question-display", Markdown)
-            if question:
-                question_display.update(f"Question:\n\n{question.question}")
-                question_display.display = True
-            else:
-                question_display.update("")
-                question_display.display = False
-
     def action_toggle_mode(self) -> None:
         modes = [
             AgentType.RESEARCH,
@@ -414,8 +423,38 @@ class ChatScreen(Screen[None]):
     async def add_question_listener(self) -> None:
         while True:
             question = await self.deps.queue.get()
-            self.question = question
-            await question.result
+
+            if isinstance(question, MultipleUserQuestions):
+                # Set question state - handle_submit will add Q&A to chat
+                question.current_index = 0
+                self.question = question
+
+                # Show intro message with total question count
+                num_questions = len(question.questions)
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"I'm going to ask {num_questions} questions:")
+                )
+
+                # Show all questions in a numbered list so users can see what's coming
+                if question.questions:
+                    questions_list = "\n".join(
+                        f"{i + 1}. {q}" for i, q in enumerate(question.questions)
+                    )
+                    self.agent_manager.add_hint_message(
+                        HintMessage(message=questions_list)
+                    )
+
+                    # Now show the first question prompt to indicate where to start answering
+                    first_q = question.questions[0]
+                    self.agent_manager.add_hint_message(
+                        HintMessage(message=f"**Q1:** {first_q}")
+                    )
+            else:
+                # Handle single question (original behavior)
+                self.question = question
+                await question.result
+                self.question = None
+
             self.deps.queue.task_done()
 
     def compose(self) -> ComposeResult:
@@ -423,7 +462,6 @@ class ChatScreen(Screen[None]):
         with Container(id="window"):
             yield self.agent_manager
             yield ChatHistory()
-            yield Markdown(markdown="", id="question-display")
             with Container(id="footer"):
                 yield Spinner(
                     text="Processing...",
@@ -510,10 +548,69 @@ class ChatScreen(Screen[None]):
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:
+        from shotgun.agents.models import UserAnswer
+
         text = message.text.strip()
 
         # If empty text, just clear input and return
         if not text:
+            prompt_input = self.query_one(PromptInput)
+            prompt_input.clear()
+            self.value = ""
+            return
+
+        # Check if we're in a multi-question flow
+        if self.question and isinstance(self.question, MultipleUserQuestions):
+            q_num = self.question.current_index + 1
+
+            # Q1 already shown by handle_message_history_updated,
+            # Q2+ shown after previous answer. So we only need to add the answer to chat
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"**A{q_num}:** {text}")
+            )
+
+            # Store the answer
+            self.question.answers.append(text)
+
+            # Move to next question or finish
+            self.question.current_index += 1
+
+            if self.question.current_index < len(self.question.questions):
+                # Show the next question immediately after the answer
+                next_q = self.question.questions[self.question.current_index]
+                next_q_num = self.question.current_index + 1
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"**Q{next_q_num}:** {next_q}")
+                )
+            else:
+                # All questions answered! Format and resolve
+                formatted_qa = "\n\n".join(
+                    f"Q{i + 1}: {q}\nA{i + 1}: {a}"
+                    for i, (q, a) in enumerate(
+                        zip(self.question.questions, self.question.answers, strict=True)
+                    )
+                )
+
+                # Resolve the original future with formatted Q&A (this goes to the agent)
+                final_answer = UserAnswer(
+                    answer=formatted_qa,
+                    tool_call_id=self.question.tool_call_id,
+                )
+                self.question.result.set_result(final_answer)
+
+                # Clear question state
+                self.question = None
+
+                # Clear input first
+                prompt_input = self.query_one(PromptInput)
+                prompt_input.clear()
+                self.value = ""
+
+                # Send the formatted Q&A directly to the agent (no prefix needed)
+                self.run_agent(formatted_qa)
+                return
+
+            # Clear input and return
             prompt_input = self.query_one(PromptInput)
             prompt_input.clear()
             self.value = ""
@@ -785,7 +882,9 @@ class ChatScreen(Screen[None]):
 
 def help_text_with_codebase(already_indexed: bool = False) -> str:
     return (
-        "Howdy! Welcome to Shotgun - the context tool for software engineering. \n\nYou can research, build specs, plan, create tasks, and export context to your favorite code-gen agents.\n\n"
+        "Howdy! Welcome to Shotgun - the context tool for software engineering. \n\n"
+        "You can research, build specs, plan, create tasks, and export context to your "
+        "favorite code-gen agents.\n\n"
         f"{'' if already_indexed else 'Once your codebase is indexed, '}I can help with:\n\n"
         "- Speccing out a new feature\n"
         "- Onboarding you onto this project\n"
@@ -796,7 +895,9 @@ def help_text_with_codebase(already_indexed: bool = False) -> str:
 
 def help_text_empty_dir() -> str:
     return (
-        "Howdy! Welcome to Shotgun - the context tool for software engineering.\n\nYou can research, build specs, plan, create tasks, and export context to your favorite code-gen agents.\n\n"
+        "Howdy! Welcome to Shotgun - the context tool for software engineering.\n\n"
+        "You can research, build specs, plan, create tasks, and export context to your "
+        "favorite code-gen agents.\n\n"
         "What would you like to build? Here are some examples:\n\n"
         "- Research FastAPI vs Django\n"
         "- Plan my new web app using React\n"

@@ -114,7 +114,7 @@ class ChatHistory(Widget):
                         part
                         for part in prev_item.parts
                         if isinstance(part, ToolReturnPart)
-                        and part.tool_name == "ask_user"
+                        and part.tool_name in ("ask_user", "ask_questions")
                     ),
                     None,
                 )
@@ -124,7 +124,7 @@ class ChatHistory(Widget):
                         part
                         for part in next_item.parts
                         if isinstance(part, ToolCallPart)
-                        and part.tool_name == "ask_user"
+                        and part.tool_name in ("ask_user", "ask_questions")
                     ),
                     None,
                 )
@@ -289,6 +289,9 @@ class AgentResponseWidget(Widget):
         if part.tool_name == "ask_user":
             return self._format_ask_user_part(part)
 
+        if part.tool_name == "ask_questions":
+            return self._format_ask_questions_part(part)
+
         # Parse args once (handles both JSON string and dict)
         args = self._parse_args(part.args)
 
@@ -399,3 +402,10 @@ class AgentResponseWidget(Widget):
             return f"{_args['question']}"
         else:
             return "❓ "
+
+    def _format_ask_questions_part(
+        self,
+        part: ToolCallPart,
+    ) -> str:
+        """Hide ask_questions tool calls - Q&A shown as HintMessages instead."""
+        return ""

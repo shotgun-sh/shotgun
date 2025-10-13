@@ -1,4 +1,4 @@
-"""User interaction tools for Pydantic AI agents."""
+"""Ask user tool for Pydantic AI agents."""
 
 from asyncio import get_running_loop
 

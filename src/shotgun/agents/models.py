@@ -73,6 +73,30 @@ class UserQuestion(BaseModel):
     )
 
 
+class MultipleUserQuestions(BaseModel):
+    """Multiple questions to ask the user sequentially."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    questions: list[str] = Field(
+        description="List of questions to ask the user",
+    )
+    current_index: int = Field(
+        default=0,
+        description="Current question index being asked",
+    )
+    answers: list[str] = Field(
+        default_factory=list,
+        description="Accumulated answers from the user",
+    )
+    tool_call_id: str = Field(
+        description="Tool call id",
+    )
+    result: Future[UserAnswer] = Field(
+        description="Future that will contain all answers formatted as Q&A pairs"
+    )
+
+
 class AgentRuntimeOptions(BaseModel):
     """User interface options for agents."""
 
@@ -100,9 +124,9 @@ class AgentRuntimeOptions(BaseModel):
         description="Maximum number of iterations for agent loops",
     )
 
-    queue: Queue[UserQuestion] = Field(
+    queue: Queue[UserQuestion | MultipleUserQuestions] = Field(
         default_factory=Queue,
-        description="Queue for storing user responses",
+        description="Queue for storing user questions (single or multiple)",
     )
 
     tasks: list[Future[UserAnswer]] = Field(
