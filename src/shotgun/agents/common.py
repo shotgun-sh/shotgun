@@ -384,23 +384,48 @@ def get_agent_existing_files(agent_mode: AgentType | None = None) -> list[str]:
                     relative_path = file_path.relative_to(base_path)
                     existing_files.append(str(relative_path))
     else:
-        # For other agents, check both .md file and directory with same name
-        allowed_file = AGENT_DIRECTORIES[agent_mode]
+        # For other agents, check files/directories they have access to
+        allowed_paths_raw = AGENT_DIRECTORIES[agent_mode]
 
-        # Check for the .md file
-        md_file_path = base_path / allowed_file
-        if md_file_path.exists():
-            existing_files.append(allowed_file)
+        # Convert single Path/string to list of Paths for uniform handling
+        if isinstance(allowed_paths_raw, str):
+            # Special case: "*" means export agent (shouldn't reach here but handle it)
+            allowed_paths = (
+                [Path(allowed_paths_raw)] if allowed_paths_raw != "*" else []
+            )
+        elif isinstance(allowed_paths_raw, Path):
+            allowed_paths = [allowed_paths_raw]
+        else:
+            # Already a list
+            allowed_paths = allowed_paths_raw
 
-        # Check for directory with same base name (e.g., research/ for research.md)
-        base_name = allowed_file.replace(".md", "")
-        dir_path = base_path / base_name
-        if dir_path.exists() and dir_path.is_dir():
-            # List all files in the directory
-            for file_path in dir_path.rglob("*"):
-                if file_path.is_file():
-                    relative_path = file_path.relative_to(base_path)
-                    existing_files.append(str(relative_path))
+        # Check each allowed path
+        for allowed_path in allowed_paths:
+            allowed_str = str(allowed_path)
+
+            # Check if it's a directory (no .md suffix)
+            if not allowed_path.suffix or not allowed_str.endswith(".md"):
+                # It's a directory - list all files within it
+                dir_path = base_path / allowed_str
+                if dir_path.exists() and dir_path.is_dir():
+                    for file_path in dir_path.rglob("*"):
+                        if file_path.is_file():
+                            relative_path = file_path.relative_to(base_path)
+                            existing_files.append(str(relative_path))
+            else:
+                # It's a file - check if it exists
+                file_path = base_path / allowed_str
+                if file_path.exists():
+                    existing_files.append(allowed_str)
+
+                # Also check for associated directory (e.g., research/ for research.md)
+                base_name = allowed_str.replace(".md", "")
+                dir_path = base_path / base_name
+                if dir_path.exists() and dir_path.is_dir():
+                    for file_path in dir_path.rglob("*"):
+                        if file_path.is_file():
+                            relative_path = file_path.relative_to(base_path)
+                            existing_files.append(str(relative_path))
 
     return existing_files
 

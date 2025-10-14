@@ -15,11 +15,18 @@ from shotgun.utils.file_system_utils import get_shotgun_base_path
 logger = get_logger(__name__)
 
 # Map agent modes to their allowed directories/files (in workflow order)
-AGENT_DIRECTORIES = {
-    AgentType.RESEARCH: "research.md",
-    AgentType.SPECIFY: "specification.md",
-    AgentType.PLAN: "plan.md",
-    AgentType.TASKS: "tasks.md",
+# Values can be:
+# - A Path: exact file (e.g., Path("research.md"))
+# - A list of Paths: multiple allowed files/directories (e.g., [Path("specification.md"), Path("contracts")])
+# - "*": any file except protected files (for export agent)
+AGENT_DIRECTORIES: dict[AgentType, str | Path | list[Path]] = {
+    AgentType.RESEARCH: Path("research.md"),
+    AgentType.SPECIFY: [
+        Path("specification.md"),
+        Path("contracts"),
+    ],  # Specify can write specs and contract files
+    AgentType.PLAN: Path("plan.md"),
+    AgentType.TASKS: Path("tasks.md"),
     AgentType.EXPORT: "*",  # Export agent can write anywhere except protected files
 }
 
@@ -60,13 +67,52 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
             # Allow writing anywhere else in .shotgun directory
             full_path = (base_path / filename).resolve()
         else:
-            # For other agents, only allow writing to their specific file
-            allowed_file = AGENT_DIRECTORIES[agent_mode]
-            if filename != allowed_file:
+            # For other agents, check if they have access to the requested file
+            allowed_paths_raw = AGENT_DIRECTORIES[agent_mode]
+
+            # Convert single Path/string to list of Paths for uniform handling
+            if isinstance(allowed_paths_raw, str):
+                # Special case: "*" means export agent
+                allowed_paths = (
+                    [Path(allowed_paths_raw)] if allowed_paths_raw != "*" else []
+                )
+            elif isinstance(allowed_paths_raw, Path):
+                allowed_paths = [allowed_paths_raw]
+            else:
+                # Already a list
+                allowed_paths = allowed_paths_raw
+
+            # Check if filename matches any allowed path
+            is_allowed = False
+            for allowed_path in allowed_paths:
+                allowed_str = str(allowed_path)
+
+                # Check if it's a directory (no .md extension or suffix)
+                # Directories: Path("contracts") has no suffix, files: Path("spec.md") has .md suffix
+                if not allowed_path.suffix or (
+                    allowed_path.suffix and not allowed_str.endswith(".md")
+                ):
+                    # Directory - allow any file within this directory
+                    # Check both "contracts/file.py" and "contracts" prefix
+                    if (
+                        filename.startswith(allowed_str + "/")
+                        or filename == allowed_str
+                    ):
+                        is_allowed = True
+                        break
+                else:
+                    # Exact file match
+                    if filename == allowed_str:
+                        is_allowed = True
+                        break
+
+            if not is_allowed:
+                allowed_display = ", ".join(f"'{p}'" for p in allowed_paths)
                 raise ValueError(
-                    f"{agent_mode.value.capitalize()} agent can only write to '{allowed_file}'. "
+                    f"{agent_mode.value.capitalize()} agent can only write to {allowed_display}. "
                     f"Attempted to write to '{filename}'"
                 )
+
             full_path = (base_path / filename).resolve()
     else:
         # No agent mode specified, fall back to old validation

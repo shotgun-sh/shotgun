@@ -4,9 +4,17 @@ import json
 import logging
 from collections.abc import AsyncIterable, Sequence
 from dataclasses import dataclass, field, is_dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import logfire
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 if TYPE_CHECKING:
     from shotgun.agents.conversation_history import ConversationState
@@ -53,6 +61,35 @@ from .specify import create_specify_agent
 from .tasks import create_tasks_agent
 
 logger = logging.getLogger(__name__)
+
+
+def _is_retryable_error(exception: BaseException) -> bool:
+    """Check if exception should trigger a retry.
+
+    Args:
+        exception: The exception to check.
+
+    Returns:
+        True if the exception is a transient error that should be retried.
+    """
+    # ValueError for truncated/incomplete JSON
+    if isinstance(exception, ValueError):
+        error_str = str(exception)
+        return "EOF while parsing" in error_str or (
+            "JSON" in error_str and "parsing" in error_str
+        )
+
+    # API errors (overload, rate limits)
+    exception_name = type(exception).__name__
+    if "APIStatusError" in exception_name:
+        error_str = str(exception)
+        return "overload" in error_str.lower() or "rate" in error_str.lower()
+
+    # Network errors
+    if "ConnectionError" in exception_name or "TimeoutError" in exception_name:
+        return True
+
+    return False
 
 
 class MessageHistoryUpdated(Message):
@@ -268,6 +305,49 @@ class AgentManager(Widget):
                 f"Invalid agent type: {agent_type}. Must be one of: {', '.join(e.value for e in AgentType)}"
             ) from None
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        retry=retry_if_exception(_is_retryable_error),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    async def _run_agent_with_retry(
+        self,
+        agent: Agent[AgentDeps, AgentResponse],
+        prompt: str | None,
+        deps: AgentDeps,
+        usage_limits: UsageLimits | None,
+        message_history: list[ModelMessage],
+        event_stream_handler: Any,
+        **kwargs: Any,
+    ) -> AgentRunResult[AgentResponse]:
+        """Run agent with automatic retry on transient errors.
+
+        Args:
+            agent: The agent to run.
+            prompt: Optional prompt to send to the agent.
+            deps: Agent dependencies.
+            usage_limits: Optional usage limits.
+            message_history: Message history to provide to agent.
+            event_stream_handler: Event handler for streaming.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            The agent run result.
+
+        Raises:
+            Various exceptions if all retries fail.
+        """
+        return await agent.run(
+            prompt,
+            deps=deps,
+            usage_limits=usage_limits,
+            message_history=message_history,
+            event_stream_handler=event_stream_handler,
+            **kwargs,
+        )
+
     async def run(
         self,
         prompt: str | None = None,
@@ -394,8 +474,9 @@ class AgentManager(Widget):
         )
 
         try:
-            result: AgentRunResult[AgentResponse] = await self.current_agent.run(
-                prompt,
+            result: AgentRunResult[AgentResponse] = await self._run_agent_with_retry(
+                agent=self.current_agent,
+                prompt=prompt,
                 deps=deps,
                 usage_limits=usage_limits,
                 message_history=message_history,
@@ -404,6 +485,36 @@ class AgentManager(Widget):
                 else None,
                 **kwargs,
             )
+        except ValueError as e:
+            # Handle truncated/incomplete JSON in tool calls specifically
+            error_str = str(e)
+            if "EOF while parsing" in error_str or (
+                "JSON" in error_str and "parsing" in error_str
+            ):
+                logger.error(
+                    "Tool call with truncated/incomplete JSON arguments detected",
+                    extra={
+                        "agent_mode": self._current_agent_type.value,
+                        "model_name": model_name,
+                        "error": error_str,
+                    },
+                )
+                logfire.error(
+                    "Tool call with truncated JSON arguments",
+                    agent_mode=self._current_agent_type.value,
+                    model_name=model_name,
+                    error=error_str,
+                )
+                # Add helpful hint message for the user
+                self.ui_message_history.append(
+                    HintMessage(
+                        message="⚠️ The agent attempted an operation with arguments that were too large (truncated JSON). "
+                        "Try breaking your request into smaller steps or more focused contracts."
+                    )
+                )
+                self._post_messages_updated()
+            # Re-raise to maintain error visibility
+            raise
         except Exception as e:
             # Log the error with full stack trace to shotgun.log and Logfire
             logger.exception(
@@ -427,11 +538,38 @@ class AgentManager(Widget):
 
         # Agent ALWAYS returns AgentResponse with structured output
         agent_response = result.output
-        logger.debug("Agent returned structured AgentResponse")
+        logger.debug(
+            "Agent returned structured AgentResponse",
+            extra={
+                "has_response": agent_response.response is not None,
+                "response_length": len(agent_response.response)
+                if agent_response.response
+                else 0,
+                "response_preview": agent_response.response[:100] + "..."
+                if agent_response.response and len(agent_response.response) > 100
+                else agent_response.response or "(empty)",
+                "has_clarifying_questions": bool(agent_response.clarifying_questions),
+                "num_clarifying_questions": len(agent_response.clarifying_questions)
+                if agent_response.clarifying_questions
+                else 0,
+            },
+        )
 
         # Always add the agent's response messages to maintain conversation history
         self.ui_message_history = original_messages + cast(
             list[ModelRequest | ModelResponse | HintMessage], result.new_messages()
+        )
+
+        # Get file operations early so we can use them for contextual messages
+        file_operations = deps.file_tracker.operations.copy()
+        self.recently_change_files = file_operations
+
+        logger.debug(
+            "File operations tracked",
+            extra={
+                "num_file_operations": len(file_operations),
+                "operation_files": [Path(op.file_path).name for op in file_operations],
+            },
         )
 
         # Check if there are clarifying questions
@@ -480,12 +618,50 @@ class AgentManager(Widget):
                         response_text=agent_response.response,
                     )
                 )
+
+            # Post UI update with hint messages and file operations
+            logger.debug(
+                "Posting UI update for Q&A mode with hint messages and file operations"
+            )
+            self._post_messages_updated(file_operations)
         else:
-            # No clarifying questions - just show the response if present
+            # No clarifying questions - show the response or a default success message
             if agent_response.response and agent_response.response.strip():
+                logger.debug(
+                    "Adding agent response as hint",
+                    extra={
+                        "response_preview": agent_response.response[:100] + "..."
+                        if len(agent_response.response) > 100
+                        else agent_response.response,
+                        "has_file_operations": len(file_operations) > 0,
+                    },
+                )
                 self.ui_message_history.append(
                     HintMessage(message=agent_response.response)
                 )
+            else:
+                # Fallback: response is empty or whitespace
+                logger.debug(
+                    "Agent response was empty, using fallback completion message",
+                    extra={"has_file_operations": len(file_operations) > 0},
+                )
+                # Show contextual message based on whether files were modified
+                if file_operations:
+                    self.ui_message_history.append(
+                        HintMessage(
+                            message="✅ Task completed - files have been modified"
+                        )
+                    )
+                else:
+                    self.ui_message_history.append(
+                        HintMessage(message="✅ Task completed")
+                    )
+
+            # Post UI update immediately so user sees the response without delay
+            logger.debug(
+                "Posting immediate UI update with hint message and file operations"
+            )
+            self._post_messages_updated(file_operations)
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
@@ -517,16 +693,18 @@ class AgentManager(Widget):
             self.message_history = all_messages
 
         usage = result.usage()
-        deps.usage_manager.add_usage(
-            usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
-        )
+        if hasattr(deps, "llm_model") and deps.llm_model is not None:
+            deps.usage_manager.add_usage(
+                usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
+            )
+        else:
+            logger.warning(
+                "llm_model is None, skipping usage tracking",
+                extra={"agent_mode": self._current_agent_type.value},
+            )
 
-        # Log file operations summary if any files were modified
-        file_operations = deps.file_tracker.operations.copy()
-        self.recently_change_files = file_operations
-
-        # Post message history update (hints are now added synchronously above)
-        self._post_messages_updated(file_operations)
+        # UI updates are now posted immediately in each branch (Q&A or non-Q&A)
+        # before compaction, so no duplicate posting needed here
 
         return result
 

@@ -46,6 +46,7 @@ dependencies = [
     "sentencepiece>=0.2.0",
     "packaging>=23.0",
     "genai-prices>=0.0.27",
+    "tenacity>=8.0.0",
 ]
 
 [project.urls]
