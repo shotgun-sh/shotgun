@@ -84,7 +84,6 @@ class TestPromptTemplateIntegration:
 
         assert "USER INTERACTION IS DISABLED" in result
         assert "non-interactive mode" in result
-        assert "ask_user tool" in result
 
     def test_template_context_variations(self):
         """Test template rendering with various context strings."""

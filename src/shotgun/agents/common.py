@@ -1,14 +1,11 @@
 """Common utilities for agent creation and management."""
 
-import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from pydantic_ai import (
     Agent,
-    DeferredToolRequests,
-    DeferredToolResults,
     RunContext,
     UsageLimits,
 )
@@ -19,7 +16,7 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import ProviderType, get_provider_model
-from shotgun.agents.models import AgentType
+from shotgun.agents.models import AgentResponse, AgentType
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
@@ -28,13 +25,10 @@ from shotgun.utils.datetime_utils import get_datetime_context
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 from .history import token_limit_compactor
-from .history.compaction import apply_persistent_compaction
 from .messages import AgentSystemPrompt, SystemStatusPrompt
 from .models import AgentDeps, AgentRuntimeOptions, PipelineConfigEntry
 from .tools import (
     append_file,
-    ask_questions,
-    ask_user,
     codebase_shell,
     directory_lister,
     file_read,
@@ -107,7 +101,7 @@ def create_base_agent(
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
-) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
+) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
     """Create a base agent with common configuration.
 
     Args:
@@ -165,7 +159,7 @@ def create_base_agent(
 
     agent = Agent(
         model,
-        output_type=[str, DeferredToolRequests],
+        output_type=AgentResponse,
         deps_type=AgentDeps,
         instrument=True,
         history_processors=[history_processor],
@@ -179,14 +173,6 @@ def create_base_agent(
     # Register additional tools first (agent-specific)
     for tool in additional_tools or []:
         agent.tool_plain(tool)
-
-    # Register interactive tools conditionally based on deps
-    if deps.interactive_mode:
-        agent.tool(ask_user)
-        agent.tool(ask_questions)
-        logger.debug(
-            "📞 Interactive mode enabled - ask_user and ask_questions tools registered"
-        )
 
     # Register common file management tools (always available)
     agent.tool(write_file)
@@ -509,12 +495,12 @@ async def add_system_prompt_message(
 
 
 async def run_agent(
-    agent: Agent[AgentDeps, str | DeferredToolRequests],
+    agent: Agent[AgentDeps, AgentResponse],
     prompt: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
     usage_limits: UsageLimits | None = None,
-) -> AgentRunResult[str | DeferredToolRequests]:
+) -> AgentRunResult[AgentResponse]:
     # Clear file tracker for new run
     deps.file_tracker.clear()
     logger.debug("🔧 Cleared file tracker for new agent run")
@@ -528,34 +514,6 @@ async def run_agent(
         usage_limits=usage_limits,
         message_history=message_history,
     )
-
-    # Apply persistent compaction to prevent cascading token growth across CLI commands
-    messages = await apply_persistent_compaction(result.all_messages(), deps)
-    while isinstance(result.output, DeferredToolRequests):
-        logger.info("got deferred tool requests")
-        await deps.queue.join()
-        requests = result.output
-        done, _ = await asyncio.wait(deps.tasks)
-
-        task_results = [task.result() for task in done]
-        task_results_by_tool_call_id = {
-            result.tool_call_id: result.answer for result in task_results
-        }
-        logger.info("got task results", task_results_by_tool_call_id)
-        results = DeferredToolResults()
-        for call in requests.calls:
-            results.calls[call.tool_call_id] = task_results_by_tool_call_id[
-                call.tool_call_id
-            ]
-        result = await agent.run(
-            deps=deps,
-            usage_limits=usage_limits,
-            message_history=messages,
-            deferred_tool_results=results,
-        )
-        # Apply persistent compaction to prevent cascading token growth
-        # in multi-turn loops
-        messages = await apply_persistent_compaction(result.all_messages(), deps)
 
     # Log file operations summary if any files were modified
     if deps.file_tracker.operations:

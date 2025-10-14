@@ -65,6 +65,14 @@ def setup_logfire_observability() -> bool:
         # Instrument Pydantic AI for better observability
         logfire.instrument_pydantic_ai()
 
+        # Add LogfireLoggingHandler to root logger so logfire logs also go to file
+        import logging
+
+        root_logger = logging.getLogger()
+        logfire_handler = logfire.LogfireLoggingHandler()
+        root_logger.addHandler(logfire_handler)
+        logger.debug("Added LogfireLoggingHandler to root logger for file integration")
+
         # Set user context using baggage for all logs and spans
         try:
             from opentelemetry import baggage, context

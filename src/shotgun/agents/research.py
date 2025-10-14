@@ -4,7 +4,6 @@ from functools import partial
 
 from pydantic_ai import (
     Agent,
-    DeferredToolRequests,
 )
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
@@ -21,7 +20,7 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentRuntimeOptions, AgentType
+from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 from .tools import get_available_web_search_tools
 
 logger = get_logger(__name__)
@@ -29,7 +28,7 @@ logger = get_logger(__name__)
 
 def create_research_agent(
     agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
-) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
+) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
     """Create a research agent with web search and artifact management capabilities.
 
     Args:
@@ -66,11 +65,11 @@ def create_research_agent(
 
 
 async def run_research_agent(
-    agent: Agent[AgentDeps, str | DeferredToolRequests],
+    agent: Agent[AgentDeps, AgentResponse],
     query: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
-) -> AgentRunResult[str | DeferredToolRequests]:
+) -> AgentRunResult[AgentResponse]:
     """Perform research on the given query and update research artifacts.
 
     Args:

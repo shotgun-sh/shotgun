@@ -1,5 +1,6 @@
 """Anthropic token counting using official client."""
 
+import logfire
 from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config.models import KeyProvider
@@ -49,7 +50,15 @@ class AnthropicTokenCounter(TokenCounter):
                     f"Initialized async Anthropic token counter for {model_name} via direct API"
                 )
         except Exception as e:
-            raise RuntimeError("Failed to initialize Anthropic async client") from e
+            logfire.exception(
+                f"Failed to initialize Anthropic token counter for {model_name}",
+                model_name=model_name,
+                key_provider=key_provider.value,
+                exception_type=type(e).__name__,
+            )
+            raise RuntimeError(
+                f"Failed to initialize Anthropic async client for {model_name}: {type(e).__name__}: {str(e)}"
+            ) from e
 
     async def count_tokens(self, text: str) -> int:
         """Count tokens using Anthropic's official API (async).
@@ -71,8 +80,19 @@ class AnthropicTokenCounter(TokenCounter):
             )
             return result.input_tokens
         except Exception as e:
+            # Create a preview of the text for logging (truncated to avoid huge logs)
+            text_preview = text[:100] + "..." if len(text) > 100 else text
+
+            logfire.exception(
+                f"Anthropic token counting failed for {self.model_name}",
+                model_name=self.model_name,
+                text_length=len(text),
+                text_preview=text_preview,
+                exception_type=type(e).__name__,
+                exception_message=str(e),
+            )
             raise RuntimeError(
-                f"Anthropic token counting API failed for {self.model_name}"
+                f"Anthropic token counting API failed for {self.model_name}: {type(e).__name__}: {str(e)}"
             ) from e
 
     async def count_message_tokens(self, messages: list[ModelMessage]) -> int:

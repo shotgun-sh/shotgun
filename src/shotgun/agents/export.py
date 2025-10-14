@@ -4,7 +4,6 @@ from functools import partial
 
 from pydantic_ai import (
     Agent,
-    DeferredToolRequests,
 )
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
@@ -19,14 +18,14 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentRuntimeOptions, AgentType
+from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 
 logger = get_logger(__name__)
 
 
 def create_export_agent(
     agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
-) -> tuple[Agent[AgentDeps, str | DeferredToolRequests], AgentDeps]:
+) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
     """Create an export agent with file management capabilities.
 
     Args:
@@ -50,11 +49,11 @@ def create_export_agent(
 
 
 async def run_export_agent(
-    agent: Agent[AgentDeps, str | DeferredToolRequests],
+    agent: Agent[AgentDeps, AgentResponse],
     instruction: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
-) -> AgentRunResult[str | DeferredToolRequests]:
+) -> AgentRunResult[AgentResponse]:
     """Export artifacts based on the given instruction.
 
     Args:

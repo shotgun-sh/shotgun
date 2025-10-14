@@ -18,7 +18,7 @@ from pydantic_ai.messages import (
 from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.conversation_history import ConversationState
-from shotgun.agents.models import AgentDeps
+from shotgun.agents.models import AgentDeps, AgentResponse
 from shotgun.agents.usage_manager import SessionUsageManager
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
@@ -318,8 +318,12 @@ async def test_agent_manager_run(
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
+    mock_result.output = AgentResponse(
+        response="Test response", clarifying_questions=None
+    )
     mock_result.new_messages.return_value = [MagicMock()]
     mock_result.all_messages.return_value = [MagicMock(), MagicMock()]
+    mock_result.usage.return_value = MagicMock()
     research_agent.run = AsyncMock(return_value=mock_result)
 
     # Mock add_system_status_message to return the message history unchanged
@@ -351,7 +355,6 @@ async def test_agent_manager_run(
     assert isinstance(message_history[0], ModelRequest)
     assert len(message_history[0].parts) == 1
     assert isinstance(message_history[0].parts[0], SystemPromptPart)
-    assert call_args[1]["deferred_tool_results"] is None
     assert (
         call_args[1]["event_stream_handler"] is not None
     )  # Streaming should be enabled
@@ -407,8 +410,12 @@ async def test_agent_manager_run_no_prompt(
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
+    mock_result.output = AgentResponse(
+        response="Test response", clarifying_questions=None
+    )
     mock_result.new_messages.return_value = []
     mock_result.all_messages.return_value = []
+    mock_result.usage.return_value = MagicMock()
     research_agent.run = AsyncMock(return_value=mock_result)
 
     # Mock add_system_status_message to return the message history unchanged
@@ -458,8 +465,12 @@ async def test_agent_manager_run_with_custom_deps(
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
+    mock_result.output = AgentResponse(
+        response="Test response", clarifying_questions=None
+    )
     mock_result.new_messages.return_value = []
     mock_result.all_messages.return_value = []
+    mock_result.usage.return_value = MagicMock()
     research_agent.run = AsyncMock(return_value=mock_result)
 
     # Mock add_system_status_message to return the message history unchanged

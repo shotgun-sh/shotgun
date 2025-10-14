@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
 from pydantic_ai import (
     Agent,
-    DeferredToolRequests,
-    DeferredToolResults,
     RunContext,
     UsageLimits,
 )
@@ -37,7 +35,7 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.config.models import KeyProvider
-from shotgun.agents.models import AgentType, FileOperation
+from shotgun.agents.models import AgentResponse, AgentType, FileOperation
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
@@ -45,7 +43,7 @@ from shotgun.utils.source_detection import detect_source
 from .export import create_export_agent
 from .history.compaction import apply_persistent_compaction
 from .messages import AgentSystemPrompt
-from .models import AgentDeps, AgentRuntimeOptions, UserAnswer
+from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .specify import create_specify_agent
@@ -90,6 +88,25 @@ class PartialResponseMessage(Message):
         self.message = message
         self.messages = messages
         self.is_last = is_last
+
+
+class ClarifyingQuestionsMessage(Message):
+    """Event posted when agent returns clarifying questions."""
+
+    def __init__(
+        self,
+        questions: list[str],
+        response_text: str,
+    ) -> None:
+        """Initialize the clarifying questions message.
+
+        Args:
+            questions: List of clarifying questions from the agent
+            response_text: The agent's response text before asking questions
+        """
+        super().__init__()
+        self.questions = questions
+        self.response_text = response_text
 
 
 @dataclass(slots=True)
@@ -158,8 +175,12 @@ class AgentManager(Widget):
         self.recently_change_files: list[FileOperation] = []
         self._stream_state: _PartialStreamState | None = None
 
+        # Q&A mode state for structured output questions
+        self._qa_questions: list[str] | None = None
+        self._qa_mode_active: bool = False
+
     @property
-    def current_agent(self) -> Agent[AgentDeps, str | DeferredToolRequests]:
+    def current_agent(self) -> Agent[AgentDeps, AgentResponse]:
         """Get the currently active agent.
 
         Returns:
@@ -167,9 +188,7 @@ class AgentManager(Widget):
         """
         return self._get_agent(self._current_agent_type)
 
-    def _get_agent(
-        self, agent_type: AgentType
-    ) -> Agent[AgentDeps, str | DeferredToolRequests]:
+    def _get_agent(self, agent_type: AgentType) -> Agent[AgentDeps, AgentResponse]:
         """Get agent by type.
 
         Args:
@@ -252,9 +271,8 @@ class AgentManager(Widget):
         *,
         deps: AgentDeps | None = None,
         usage_limits: UsageLimits | None = None,
-        deferred_tool_results: DeferredToolResults | None = None,
         **kwargs: Any,
-    ) -> AgentRunResult[str | DeferredToolRequests]:
+    ) -> AgentRunResult[AgentResponse]:
         """Run the current agent with automatic message history management.
 
         This method wraps the agent's run method, automatically injecting the
@@ -264,7 +282,6 @@ class AgentManager(Widget):
             prompt: Optional prompt to send to the agent.
             deps: Optional dependencies override (defaults to manager's deps).
             usage_limits: Optional usage limits for the agent run.
-            deferred_tool_results: Optional deferred tool results for continuing a conversation.
             **kwargs: Additional keyword arguments to pass to the agent.
 
         Returns:
@@ -274,15 +291,6 @@ class AgentManager(Widget):
         # Use merged deps (shared state + agent-specific system prompt) if not provided
         if deps is None:
             deps = self._create_merged_deps(self._current_agent_type)
-        ask_user_part = self.get_unanswered_ask_user_part()
-        if ask_user_part and prompt:
-            if not deferred_tool_results:
-                deferred_tool_results = DeferredToolResults()
-            deferred_tool_results.calls[ask_user_part.tool_call_id] = UserAnswer(
-                answer=prompt,
-                tool_call_id=ask_user_part.tool_call_id,
-            )
-            prompt = None
 
         # Ensure deps is not None
         if deps is None:
@@ -378,20 +386,16 @@ class AgentManager(Widget):
             event_name,
             {
                 "has_prompt": prompt is not None,
-                "has_deferred_results": deferred_tool_results is not None,
                 "model_name": model_name,
             },
         )
 
         try:
-            result: AgentRunResult[
-                str | DeferredToolRequests
-            ] = await self.current_agent.run(
+            result: AgentRunResult[AgentResponse] = await self.current_agent.run(
                 prompt,
                 deps=deps,
                 usage_limits=usage_limits,
                 message_history=message_history,
-                deferred_tool_results=deferred_tool_results,
                 event_stream_handler=self._handle_event_stream
                 if not is_gpt5_byok
                 else None,
@@ -400,9 +404,67 @@ class AgentManager(Widget):
         finally:
             self._stream_state = None
 
+        # Agent ALWAYS returns AgentResponse with structured output
+        agent_response = result.output
+        logger.debug("Agent returned structured AgentResponse")
+
+        # Always add the agent's response messages to maintain conversation history
         self.ui_message_history = original_messages + cast(
             list[ModelRequest | ModelResponse | HintMessage], result.new_messages()
         )
+
+        # Check if there are clarifying questions
+        if agent_response.clarifying_questions:
+            logger.info(
+                f"Agent has {len(agent_response.clarifying_questions)} clarifying questions"
+            )
+
+            # Add agent's response first if present
+            if agent_response.response:
+                self.ui_message_history.append(
+                    HintMessage(message=agent_response.response)
+                )
+
+            if len(agent_response.clarifying_questions) == 1:
+                # Single question - treat as non-blocking suggestion, DON'T enter Q&A mode
+                self.ui_message_history.append(
+                    HintMessage(message=f"💡 {agent_response.clarifying_questions[0]}")
+                )
+            else:
+                # Multiple questions (2+) - enter Q&A mode
+                self._qa_questions = agent_response.clarifying_questions
+                self._qa_mode_active = True
+
+                # Show intro with list, then first question
+                questions_list_with_intro = (
+                    f"I have {len(agent_response.clarifying_questions)} questions:\n\n"
+                    + "\n".join(
+                        f"{i + 1}. {q}"
+                        for i, q in enumerate(agent_response.clarifying_questions)
+                    )
+                )
+                self.ui_message_history.append(
+                    HintMessage(message=questions_list_with_intro)
+                )
+                self.ui_message_history.append(
+                    HintMessage(
+                        message=f"**Q1:** {agent_response.clarifying_questions[0]}"
+                    )
+                )
+
+                # Post event to TUI to update Q&A mode state (only for multiple questions)
+                self.post_message(
+                    ClarifyingQuestionsMessage(
+                        questions=agent_response.clarifying_questions,
+                        response_text=agent_response.response,
+                    )
+                )
+        else:
+            # No clarifying questions - just show the response if present
+            if agent_response.response and agent_response.response.strip():
+                self.ui_message_history.append(
+                    HintMessage(message=agent_response.response)
+                )
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
@@ -416,6 +478,7 @@ class AgentManager(Widget):
         file_operations = deps.file_tracker.operations.copy()
         self.recently_change_files = file_operations
 
+        # Post message history update (hints are now added synchronously above)
         self._post_messages_updated(file_operations)
 
         return result
@@ -702,23 +765,6 @@ class AgentManager(Widget):
         self.ui_message_history.append(message)
         self._post_messages_updated()
 
-    def get_unanswered_ask_user_part(self) -> ToolCallPart | None:
-        if not self.message_history:
-            return None
-        self.last_response = self.message_history[-1]
-        ## we're searching for unanswered ask_user or ask_questions parts
-        found_tool = next(
-            (
-                part
-                for part in self.message_history[-1].parts
-                if isinstance(part, ToolCallPart)
-                and part.tool_name in ("ask_user", "ask_questions")
-            ),
-            None,
-        )
-
-        return found_tool
-
 
 # Re-export AgentType for backward compatibility
 __all__ = [
@@ -726,4 +772,5 @@ __all__ = [
     "AgentType",
     "MessageHistoryUpdated",
     "PartialResponseMessage",
+    "ClarifyingQuestionsMessage",
 ]

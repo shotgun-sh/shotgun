@@ -24,6 +24,7 @@ from textual.widgets import Button, Label, Static
 
 from shotgun.agents.agent_manager import (
     AgentManager,
+    ClarifyingQuestionsMessage,
     MessageHistoryUpdated,
     PartialResponseMessage,
 )
@@ -37,8 +38,6 @@ from shotgun.agents.models import (
     AgentDeps,
     AgentType,
     FileOperationTracker,
-    MultipleUserQuestions,
-    UserQuestion,
 )
 from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
 from shotgun.codebase.models import IndexProgress, ProgressPhase
@@ -114,6 +113,18 @@ class StatusBar(Widget):
         self.working = working
 
     def render(self) -> str:
+        # Check if in Q&A mode first (highest priority)
+        try:
+            chat_screen = self.screen
+            if isinstance(chat_screen, ChatScreen) and chat_screen.qa_mode:
+                return (
+                    "[$foreground-muted][bold $text]esc[/] to exit Q&A mode • "
+                    "[bold $text]enter[/] to send answer • [bold $text]ctrl+j[/] for newline[/]"
+                )
+        except Exception:  # noqa: S110
+            # If we can't access chat screen, continue with normal display
+            pass
+
         if self.working:
             return (
                 "[$foreground-muted][bold $text]esc[/] to stop • "
@@ -151,6 +162,18 @@ class ModeIndicator(Widget):
 
     def render(self) -> str:
         """Render the mode indicator."""
+        # Check if in Q&A mode first
+        try:
+            chat_screen = self.screen
+            if isinstance(chat_screen, ChatScreen) and chat_screen.qa_mode:
+                return (
+                    "[bold $text-accent]Q&A mode[/]"
+                    "[$foreground-muted] (Answer the clarifying questions or ESC to cancel)[/]"
+                )
+        except Exception:  # noqa: S110
+            # If we can't access chat screen, continue with normal display
+            pass
+
         mode_display = {
             AgentType.RESEARCH: "Research",
             AgentType.PLAN: "Planning",
@@ -258,10 +281,15 @@ class ChatScreen(Screen[None]):
     history: PromptHistory = PromptHistory()
     messages = reactive(list[ModelMessage | HintMessage]())
     working = reactive(False)
-    question: reactive[UserQuestion | MultipleUserQuestions | None] = reactive(None)
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
     partial_message: reactive[ModelMessage | None] = reactive(None)
     _current_worker = None  # Track the current running worker for cancellation
+
+    # Q&A mode state (for structured output clarifying questions)
+    qa_mode = reactive(False)
+    qa_questions: list[str] = []
+    qa_current_index = reactive(0)
+    qa_answers: list[str] = []
 
     def __init__(self, continue_session: bool = False) -> None:
         super().__init__()
@@ -302,11 +330,19 @@ class ChatScreen(Screen[None]):
             self._load_conversation()
 
         self.call_later(self.check_if_codebase_is_indexed)
-        # Start the question listener worker to handle ask_user interactions
-        self.call_later(self.add_question_listener)
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
+        # If escape is pressed during Q&A mode, exit Q&A
+        if event.key in (Keys.Escape, Keys.ControlC) and self.qa_mode:
+            self._exit_qa_mode()
+            # Re-enable the input
+            prompt_input = self.query_one(PromptInput)
+            prompt_input.focus()
+            # Prevent the event from propagating (don't quit the app)
+            event.stop()
+            return
+
         # If escape or ctrl+c is pressed while agent is working, cancel the operation
         if (
             event.key in (Keys.Escape, Keys.ControlC)
@@ -392,6 +428,17 @@ class ChatScreen(Screen[None]):
             status_bar.working = is_working
             status_bar.refresh()
 
+    def watch_qa_mode(self, qa_mode_active: bool) -> None:
+        """Update UI when Q&A mode state changes."""
+        if self.is_mounted:
+            # Update status bar to show "ESC to exit Q&A mode"
+            status_bar = self.query_one(StatusBar)
+            status_bar.refresh()
+
+            # Update mode indicator to show "Q&A mode"
+            mode_indicator = self.query_one(ModeIndicator)
+            mode_indicator.refresh()
+
     def watch_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the chat history when messages change."""
         if self.is_mounted:
@@ -399,6 +446,15 @@ class ChatScreen(Screen[None]):
             chat_history.update_messages(messages)
 
     def action_toggle_mode(self) -> None:
+        # Prevent mode switching during Q&A
+        if self.qa_mode:
+            self.notify(
+                "Cannot switch modes while answering questions",
+                severity="warning",
+                timeout=3,
+            )
+            return
+
         modes = [
             AgentType.RESEARCH,
             AgentType.SPECIFY,
@@ -418,44 +474,6 @@ class ChatScreen(Screen[None]):
             self.mount_hint(usage_hint)
         else:
             self.notify("No usage hint available", severity="error")
-
-    @work
-    async def add_question_listener(self) -> None:
-        while True:
-            question = await self.deps.queue.get()
-
-            if isinstance(question, MultipleUserQuestions):
-                # Set question state - handle_submit will add Q&A to chat
-                question.current_index = 0
-                self.question = question
-
-                # Show intro message with total question count
-                num_questions = len(question.questions)
-                self.agent_manager.add_hint_message(
-                    HintMessage(message=f"I'm going to ask {num_questions} questions:")
-                )
-
-                # Show all questions in a numbered list so users can see what's coming
-                if question.questions:
-                    questions_list = "\n".join(
-                        f"{i + 1}. {q}" for i, q in enumerate(question.questions)
-                    )
-                    self.agent_manager.add_hint_message(
-                        HintMessage(message=questions_list)
-                    )
-
-                    # Now show the first question prompt to indicate where to start answering
-                    first_q = question.questions[0]
-                    self.agent_manager.add_hint_message(
-                        HintMessage(message=f"**Q1:** {first_q}")
-                    )
-            else:
-                # Handle single question (original behavior)
-                self.question = question
-                await question.result
-                self.question = None
-
-            self.deps.queue.task_done()
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -501,6 +519,42 @@ class ChatScreen(Screen[None]):
     def _clear_partial_response(self) -> None:
         partial_response_widget = self.query_one(ChatHistory)
         partial_response_widget.partial_response = None
+
+    def _exit_qa_mode(self) -> None:
+        """Exit Q&A mode and clean up state."""
+        # Track cancellation event
+        track_event(
+            "qa_mode_cancelled",
+            {
+                "questions_total": len(self.qa_questions),
+                "questions_answered": len(self.qa_answers),
+            },
+        )
+
+        # Clear Q&A state
+        self.qa_mode = False
+        self.qa_questions = []
+        self.qa_answers = []
+        self.qa_current_index = 0
+
+        # Show cancellation message
+        self.mount_hint("⚠️ Q&A cancelled - You can continue the conversation.")
+
+    @on(ClarifyingQuestionsMessage)
+    def handle_clarifying_questions(self, event: ClarifyingQuestionsMessage) -> None:
+        """Handle clarifying questions from agent structured output.
+
+        Note: Hints are now added synchronously in agent_manager.run() before this
+        handler is called, so we only need to set up Q&A mode state here.
+        """
+        # Clear any streaming partial response (removes final_result JSON)
+        self._clear_partial_response()
+
+        # Enter Q&A mode
+        self.qa_mode = True
+        self.qa_questions = event.questions
+        self.qa_current_index = 0
+        self.qa_answers = []
 
     @on(MessageHistoryUpdated)
     def handle_message_history_updated(self, event: MessageHistoryUpdated) -> None:
@@ -548,8 +602,6 @@ class ChatScreen(Screen[None]):
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:
-        from shotgun.agents.models import UserAnswer
-
         text = message.text.strip()
 
         # If empty text, just clear input and return
@@ -559,58 +611,56 @@ class ChatScreen(Screen[None]):
             self.value = ""
             return
 
-        # Check if we're in a multi-question flow
-        if self.question and isinstance(self.question, MultipleUserQuestions):
-            q_num = self.question.current_index + 1
+        # Handle Q&A mode (from structured output clarifying questions)
+        if self.qa_mode and self.qa_questions:
+            # Collect answer
+            self.qa_answers.append(text)
 
-            # Q1 already shown by handle_message_history_updated,
-            # Q2+ shown after previous answer. So we only need to add the answer to chat
-            self.agent_manager.add_hint_message(
-                HintMessage(message=f"**A{q_num}:** {text}")
-            )
+            # Show answer
+            if len(self.qa_questions) == 1:
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"**A:** {text}")
+                )
+            else:
+                q_num = self.qa_current_index + 1
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"**A{q_num}:** {text}")
+                )
 
-            # Store the answer
-            self.question.answers.append(text)
+            # Move to next or finish
+            self.qa_current_index += 1
 
-            # Move to next question or finish
-            self.question.current_index += 1
-
-            if self.question.current_index < len(self.question.questions):
-                # Show the next question immediately after the answer
-                next_q = self.question.questions[self.question.current_index]
-                next_q_num = self.question.current_index + 1
+            if self.qa_current_index < len(self.qa_questions):
+                # Show next question
+                next_q = self.qa_questions[self.qa_current_index]
+                next_q_num = self.qa_current_index + 1
                 self.agent_manager.add_hint_message(
                     HintMessage(message=f"**Q{next_q_num}:** {next_q}")
                 )
             else:
-                # All questions answered! Format and resolve
-                formatted_qa = "\n\n".join(
-                    f"Q{i + 1}: {q}\nA{i + 1}: {a}"
-                    for i, (q, a) in enumerate(
-                        zip(self.question.questions, self.question.answers, strict=True)
+                # All answered - format and send back
+                if len(self.qa_questions) == 1:
+                    # Single question - just send the answer
+                    formatted_qa = f"Q: {self.qa_questions[0]}\nA: {self.qa_answers[0]}"
+                else:
+                    # Multiple questions - format all Q&A pairs
+                    formatted_qa = "\n\n".join(
+                        f"Q{i + 1}: {q}\nA{i + 1}: {a}"
+                        for i, (q, a) in enumerate(
+                            zip(self.qa_questions, self.qa_answers, strict=True)
+                        )
                     )
-                )
 
-                # Resolve the original future with formatted Q&A (this goes to the agent)
-                final_answer = UserAnswer(
-                    answer=formatted_qa,
-                    tool_call_id=self.question.tool_call_id,
-                )
-                self.question.result.set_result(final_answer)
+                # Exit Q&A mode
+                self.qa_mode = False
+                self.qa_questions = []
+                self.qa_answers = []
+                self.qa_current_index = 0
 
-                # Clear question state
-                self.question = None
-
-                # Clear input first
-                prompt_input = self.query_one(PromptInput)
-                prompt_input.clear()
-                self.value = ""
-
-                # Send the formatted Q&A directly to the agent (no prefix needed)
+                # Send answers back to agent
                 self.run_agent(formatted_qa)
-                return
 
-            # Clear input and return
+            # Clear input
             prompt_input = self.query_one(PromptInput)
             prompt_input.clear()
             self.value = ""

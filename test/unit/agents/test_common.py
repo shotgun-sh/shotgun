@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pydantic_ai import DeferredToolRequests
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelRequest, ModelResponse, SystemPromptPart, TextPart
 
@@ -187,51 +186,6 @@ async def test_run_agent_simple_string_output(mock_agent, mock_deps):
     assert "message_history" in call_kwargs
     assert len(call_kwargs["message_history"]) == 1
     assert isinstance(call_kwargs["message_history"][0], ModelRequest)
-
-
-@pytest.mark.asyncio
-async def test_run_agent_with_deferred_tool_requests(mock_agent, mock_deps):
-    """Test run_agent with deferred tool requests."""
-    # Mock the first run result with deferred tool requests
-    mock_deferred_requests = MagicMock(spec=DeferredToolRequests)
-    mock_deferred_requests.calls = [MagicMock(tool_call_id="test_call_id")]
-
-    mock_first_result = MagicMock(spec=AgentRunResult)
-    mock_first_result.output = mock_deferred_requests
-    mock_first_result.all_messages.return_value = [
-        ModelRequest(parts=[TextPart(content="First message")])
-    ]
-
-    # Mock the final run result
-    mock_final_result = MagicMock(spec=AgentRunResult)
-    mock_final_result.output = "Final response"
-    mock_final_result.all_messages.return_value = [
-        ModelRequest(parts=[TextPart(content="First message")]),
-        ModelResponse(parts=[TextPart(content="Final response")]),
-    ]
-
-    # Set up the agent to return different results on each call
-    mock_agent.run.side_effect = [mock_first_result, mock_final_result]
-
-    # Mock task completion
-    mock_task = MagicMock()
-    mock_task_result = MagicMock()
-    mock_task_result.tool_call_id = "test_call_id"
-    mock_task_result.answer = "Tool result"
-    mock_task.result.return_value = mock_task_result
-    mock_deps.tasks = [mock_task]
-
-    # Mock asyncio.wait to return our mock task as done
-    with patch("asyncio.wait") as mock_wait:
-        mock_wait.return_value = ([mock_task], [])
-
-        result = await run_agent(mock_agent, "Test prompt", mock_deps)
-
-        assert result == mock_final_result
-        assert mock_agent.run.call_count == 2
-
-        # Verify queue.join was called
-        mock_deps.queue.join.assert_called_once()
 
 
 def test_build_agent_system_prompt_research_agent():

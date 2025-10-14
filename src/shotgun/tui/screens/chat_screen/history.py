@@ -19,7 +19,6 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Markdown
 
-from shotgun.agents.models import UserAnswer
 from shotgun.tui.components.vertical_tail import VerticalTail
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessageWidget
 
@@ -103,42 +102,8 @@ class ChatHistory(Widget):
         self._rendered_count = len(filtered)
 
     def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
-        for idx, next_item in enumerate(self.items):
-            prev_item = self.items[idx - 1] if idx > 0 else None
-
-            if isinstance(prev_item, ModelRequest) and isinstance(
-                next_item, ModelResponse
-            ):
-                ask_user_tool_response_part = next(
-                    (
-                        part
-                        for part in prev_item.parts
-                        if isinstance(part, ToolReturnPart)
-                        and part.tool_name in ("ask_user", "ask_questions")
-                    ),
-                    None,
-                )
-
-                ask_user_part = next(
-                    (
-                        part
-                        for part in next_item.parts
-                        if isinstance(part, ToolCallPart)
-                        and part.tool_name in ("ask_user", "ask_questions")
-                    ),
-                    None,
-                )
-
-                if not ask_user_part or not ask_user_tool_response_part:
-                    yield next_item
-                    continue
-                if (
-                    ask_user_tool_response_part.tool_call_id
-                    == ask_user_part.tool_call_id
-                ):
-                    continue  # don't emit tool call that happens after tool response
-
-            yield next_item
+        # Simply yield all items - no filtering needed now that ask_user/ask_questions are gone
+        yield from self.items
 
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the displayed messages using incremental mounting."""
@@ -167,6 +132,9 @@ class ChatHistory(Widget):
 
             self._rendered_count = len(filtered)
 
+            # Scroll to bottom to show newly added messages
+            self.vertical_tail.scroll_end(animate=False)
+
 
 class UserQuestionWidget(Widget):
     def __init__(self, item: ModelRequest | None) -> None:
@@ -189,13 +157,8 @@ class UserQuestionWidget(Widget):
                     f"**>** {part.content if isinstance(part.content, str) else ''}\n\n"
                 )
             elif isinstance(part, ToolReturnPart):
-                if part.tool_name == "ask_user":
-                    acc += f"**>** {part.content.answer if isinstance(part.content, UserAnswer) else part.content['answer']}\n\n"
-                else:
-                    # acc += "  ∟ finished\n\n"  # let's not show anything yet
-                    pass
-            elif isinstance(part, UserPromptPart):
-                acc += f"**>** {part.content}\n\n"
+                # Don't show tool return parts in the UI
+                pass
         return acc
 
 
@@ -216,23 +179,15 @@ class AgentResponseWidget(Widget):
         if self.item is None:
             return ""
 
-        # Check if there's an ask_user tool call
-        has_ask_user = any(
-            isinstance(part, ToolCallPart) and part.tool_name == "ask_user"
-            for part in self.item.parts
-        )
-
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                # Skip ALL text parts if there's an ask_user tool call
-                if has_ask_user:
-                    continue
                 # Only show the circle prefix if there's actual content
                 if part.content and part.content.strip():
                     acc += f"**⏺** {part.content}\n\n"
             elif isinstance(part, ToolCallPart):
                 parts_str = self._format_tool_call_part(part)
-                acc += parts_str + "\n\n"
+                if parts_str:  # Only add if there's actual content
+                    acc += parts_str + "\n\n"
             elif isinstance(part, BuiltinToolCallPart):
                 # Format builtin tool calls better
                 if part.tool_name and "search" in part.tool_name.lower():
@@ -286,12 +241,6 @@ class AgentResponseWidget(Widget):
         return args if isinstance(args, dict) else {}
 
     def _format_tool_call_part(self, part: ToolCallPart) -> str:
-        if part.tool_name == "ask_user":
-            return self._format_ask_user_part(part)
-
-        if part.tool_name == "ask_questions":
-            return self._format_ask_questions_part(part)
-
         # Parse args once (handles both JSON string and dict)
         args = self._parse_args(part.args)
 
@@ -362,10 +311,9 @@ class AgentResponseWidget(Widget):
                 return f"{part.tool_name}({args['section_title']})"
             return f"{part.tool_name}()"
 
-        if part.tool_name == "create_artifact":
-            if "name" in args:
-                return f"{part.tool_name}({args['name']})"
-            return f"▪ {part.tool_name}()"
+        if part.tool_name == "final_result":
+            # Hide final_result tool calls completely - they're internal Pydantic AI mechanics
+            return ""
 
         # Default case for unrecognized tools - format args properly
         args = self._parse_args(part.args)
@@ -385,27 +333,3 @@ class AgentResponseWidget(Widget):
                 return f"{part.tool_name}({args_str})"
         else:
             return f"{part.tool_name}()"
-
-    def _format_ask_user_part(
-        self,
-        part: ToolCallPart,
-    ) -> str:
-        if isinstance(part.args, str):
-            try:
-                _args = json.loads(part.args) if part.args.strip() else {}
-            except json.JSONDecodeError:
-                _args = {}
-        else:
-            _args = part.args
-
-        if isinstance(_args, dict) and "question" in _args:
-            return f"{_args['question']}"
-        else:
-            return "❓ "
-
-    def _format_ask_questions_part(
-        self,
-        part: ToolCallPart,
-    ) -> str:
-        """Hide ask_questions tool calls - Q&A shown as HintMessages instead."""
-        return ""

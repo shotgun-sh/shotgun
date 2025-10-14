@@ -1,7 +1,5 @@
 """Tools package for Pydantic AI agents."""
 
-from .ask_questions import ask_questions
-from .ask_user import ask_user
 from .codebase import (
     codebase_shell,
     directory_lister,
@@ -22,8 +20,6 @@ __all__ = [
     "anthropic_web_search_tool",
     "gemini_web_search_tool",
     "get_available_web_search_tools",
-    "ask_user",
-    "ask_questions",
     "read_file",
     "write_file",
     "append_file",

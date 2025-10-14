@@ -19,6 +19,30 @@ if TYPE_CHECKING:
     from shotgun.codebase.service import CodebaseService
 
 
+class AgentResponse(BaseModel):
+    """Structured response from an agent with optional clarifying questions.
+
+    This model provides a consistent response format for all agents:
+    - response: The main response text (can be empty if only asking questions)
+    - clarifying_questions: Optional list of questions to ask the user
+
+    When clarifying_questions is provided, the agent expects to receive
+    answers before continuing its work. This replaces the ask_questions tool.
+    """
+
+    response: str = Field(
+        description="The agent's response text. Always respond with some text summarizing what happened, whats next, etc.",
+    )
+    clarifying_questions: list[str] | None = Field(
+        default=None,
+        description="""
+Optional list of clarifying questions to ask the user.
+- Single question: Shown as a non-blocking suggestion (user can answer or continue with other prompts)
+- Multiple questions (2+): Asked sequentially in Q&A mode (blocks input until all answered or cancelled)
+""",
+    )
+
+
 class AgentType(StrEnum):
     """Enumeration for available agent types."""
 

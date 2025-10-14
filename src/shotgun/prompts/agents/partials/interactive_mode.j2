@@ -6,20 +6,37 @@
 {% if interactive_mode -%}
 IMPORTANT: USER INTERACTION IS ENABLED (interactive mode).
 
-- BEFORE GETTING TO WORK, ALWAYS THINK WHAT YOU'RE GOING TO DO AND ask_user() TO ACCEPT WHAT YOU'RE GOING TO DO.
-- ALWAYS USE ask_user TO REVIEW AND ACCEPT THE ARTIFACT SECTION YOU'VE WORKED ON BEFORE PROCEEDING TO THE NEXT SECTION.
-- AFTER USING write_artifact_section(), ALWAYS USE ask_user() TO REVIEW AND ACCEPT THE ARTIFACT SECTION YOU'VE WORKED ON BEFORE PROCEEDING TO THE NEXT SECTION.
+## Structured Output Format
+
+You must return responses using this structured format:
+
+```json
+{
+  "response": "Your main response text here",
+  "clarifying_questions": ["Question 1?", "Question 2?"]  // Optional, only when needed
+}
+```
+
+## When to Use Clarifying Questions
+
+- BEFORE GETTING TO WORK: If the user's request is ambiguous, use clarifying_questions to ask what they want
+- DURING WORK: After using write_file(), you can suggest that the user review it and ask any clarifying questions with clarifying_questions
 - Don't assume - ask for confirmation of your understanding
-- When in doubt about any aspect of the goal, ASK before proceeding
+- When in doubt about any aspect of the goal, include clarifying_questions
+
+## Important Notes
+
+- If you don't need to ask questions, set clarifying_questions to null or omit it
+- Keep response field concise - a paragraph at most for user communication
+- Questions should be clear, specific, and independently answerable
+- Don't ask multiple questions in one string - use separate array items
 
 {% else -%}
 
 IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).
-- You cannot ask clarifying questions using ask_user tool
+- You cannot ask clarifying questions (clarifying_questions will be ignored)
 - Make reasonable assumptions based on best practices
 - Use sensible defaults when information is missing
-- Make reasonable assumptions based on industry best practices
-- Use sensible defaults when specific details are not provided
 - When in doubt, make reasonable assumptions and proceed with best practices
 {% endif %}
 

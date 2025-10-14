@@ -160,13 +160,18 @@ async def test_filters_system_prompts_from_other_agents(
         # Return a minimal valid result
         from pydantic_ai.agent import AgentRunResult
 
+        from shotgun.agents.models import AgentResponse
+
         mock_result = MagicMock(spec=AgentRunResult)
-        mock_result.data = "test response"
+        mock_result.output = AgentResponse(
+            response="test response", clarifying_questions=None
+        )
         mock_result.messages = message_history + [
             ModelResponse(parts=[TextPart(content="test response")])
         ]
         mock_result.all_messages.return_value = mock_result.messages
         mock_result.new_messages.return_value = [mock_result.messages[-1]]
+        mock_result.usage.return_value = MagicMock()
         return mock_result
 
     # Patch the research agent's run method
@@ -263,13 +268,18 @@ async def test_preserves_non_agent_system_prompts(
         captured_messages = message_history
         from pydantic_ai.agent import AgentRunResult
 
+        from shotgun.agents.models import AgentResponse
+
         mock_result = MagicMock(spec=AgentRunResult)
-        mock_result.data = "test response"
+        mock_result.output = AgentResponse(
+            response="test response", clarifying_questions=None
+        )
         mock_result.messages = message_history + [
             ModelResponse(parts=[TextPart(content="test response")])
         ]
         mock_result.all_messages.return_value = mock_result.messages
         mock_result.new_messages.return_value = [mock_result.messages[-1]]
+        mock_result.usage.return_value = MagicMock()
         return mock_result
 
     import unittest.mock
@@ -374,13 +384,16 @@ async def test_filters_mixed_agent_prompts(
         captured_messages = message_history
         from pydantic_ai.agent import AgentRunResult
 
+        from shotgun.agents.models import AgentResponse
+
         mock_result = MagicMock(spec=AgentRunResult)
-        mock_result.data = "test"
+        mock_result.output = AgentResponse(response="test", clarifying_questions=None)
         mock_result.messages = message_history + [
             ModelResponse(parts=[TextPart(content="test")])
         ]
         mock_result.all_messages.return_value = mock_result.messages
         mock_result.new_messages.return_value = [mock_result.messages[-1]]
+        mock_result.usage.return_value = MagicMock()
         return mock_result
 
     import unittest.mock
