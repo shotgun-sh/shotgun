@@ -2,7 +2,7 @@
 name = "shotgun-sh"
 version = "0.1.0.dev3"
 description = "AI-powered research, planning, and task management CLI tool"
-readme = "README.md"
+readme = "README_PYPI.md"
 license = { text = "MIT" }
 authors = [
     { name = "Proofs.io", email = "hello@proofs.io" }
@@ -76,6 +76,7 @@ packages = ["src/shotgun"]
 include = [
     "/src",
     "/README.md",
+    "/README_PYPI.md",
     "/LICENSE",
     "/pyproject.toml"
 ]
