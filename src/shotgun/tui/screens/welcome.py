@@ -152,6 +152,10 @@ class WelcomeScreen(Screen[None]):
     @on(Button.Pressed, "#byok-button")
     def _on_byok_pressed(self) -> None:
         """Handle BYOK button press."""
+        self.run_worker(self._start_byok_config(), exclusive=True)
+
+    async def _start_byok_config(self) -> None:
+        """Launch BYOK provider configuration flow."""
         self._mark_welcome_shown()
 
         app = cast("ShotgunApp", self.app)
@@ -161,10 +165,14 @@ class WelcomeScreen(Screen[None]):
             self.dismiss()
             return
 
-        # Otherwise, push provider config screen
+        # Otherwise, push provider config screen and wait for result
         from .provider_config import ProviderConfigScreen
 
-        self.app.push_screen(ProviderConfigScreen())
+        await self.app.push_screen_wait(ProviderConfigScreen())
+
+        # Dismiss welcome screen after config if providers are now configured
+        if app.config_manager.has_any_provider_key():
+            self.dismiss()
 
     async def _start_shotgun_auth(self) -> None:
         """Launch Shotgun Account authentication flow."""

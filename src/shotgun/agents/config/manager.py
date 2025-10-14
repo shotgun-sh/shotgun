@@ -249,6 +249,10 @@ class ConfigManager:
                 if provider_enum in provider_models:
                     config.selected_model = provider_models[provider_enum]
 
+            # Mark welcome screen as shown when BYOK provider is configured
+            # This prevents the welcome screen from showing again after user has made their choice
+            config.shown_welcome_screen = True
+
         self.save(config)
 
     def clear_provider_key(self, provider: ProviderType | str) -> None:

@@ -1094,3 +1094,93 @@ def test_load_migration_respects_existing_shown_welcome_screen(mock_logger):
             )
         finally:
             os.unlink(temp_file.name)
+
+
+def test_update_provider_sets_shown_welcome_screen_for_byok():
+    """Test that update_provider sets shown_welcome_screen=True when BYOK provider is configured."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Initially, shown_welcome_screen should be False (default)
+        config = manager.load()
+        assert config.shown_welcome_screen is False
+
+        # Add API key to OpenAI (BYOK provider)
+        manager.update_provider(
+            ProviderType.OPENAI, **{API_KEY_FIELD: "test-openai-key"}
+        )
+
+        # Verify shown_welcome_screen is now True
+        config = manager.load()
+        assert config.shown_welcome_screen is True
+        assert config.openai.api_key.get_secret_value() == "test-openai-key"
+
+        # Verify it's persisted to the config file
+        with open(config_path, encoding="utf-8") as f:
+            saved_data = json.load(f)
+        assert saved_data["shown_welcome_screen"] is True
+
+
+def test_update_provider_sets_shown_welcome_screen_for_all_byok_providers():
+    """Test that update_provider sets shown_welcome_screen=True for all BYOK providers."""
+    providers = [
+        (ProviderType.OPENAI, "test-openai-key"),
+        (ProviderType.ANTHROPIC, "test-anthropic-key"),
+        (ProviderType.GOOGLE, "test-google-key"),
+    ]
+
+    for provider, api_key in providers:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            manager = ConfigManager(config_path=config_path)
+
+            # Initially, shown_welcome_screen should be False
+            config = manager.load()
+            assert config.shown_welcome_screen is False
+
+            # Add API key to the provider
+            manager.update_provider(provider, **{API_KEY_FIELD: api_key})
+
+            # Verify shown_welcome_screen is now True
+            config = manager.load()
+            assert config.shown_welcome_screen is True
+
+
+def test_update_provider_does_not_set_shown_welcome_screen_for_none_key():
+    """Test that update_provider does not set shown_welcome_screen when setting None API key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Initially, shown_welcome_screen should be False
+        config = manager.load()
+        assert config.shown_welcome_screen is False
+
+        # Try to update OpenAI with None key
+        manager.update_provider(ProviderType.OPENAI, **{API_KEY_FIELD: None})
+
+        # shown_welcome_screen should still be False
+        config = manager.load()
+        assert config.shown_welcome_screen is False
+
+
+def test_update_shotgun_account_does_not_set_shown_welcome_screen():
+    """Test that update_shotgun_account does not set shown_welcome_screen."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Initially, shown_welcome_screen should be False
+        config = manager.load()
+        assert config.shown_welcome_screen is False
+
+        # Update Shotgun Account credentials
+        manager.update_shotgun_account(
+            api_key="test-api-key", supabase_jwt="test-jwt-token"
+        )
+
+        # shown_welcome_screen should still be False
+        # (Shotgun Account setup is handled differently in the welcome screen flow)
+        config = manager.load()
+        assert config.shown_welcome_screen is False
