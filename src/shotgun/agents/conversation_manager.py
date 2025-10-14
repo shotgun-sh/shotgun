@@ -1,6 +1,7 @@
 """Manager for handling conversation persistence operations."""
 
 import json
+import shutil
 from pathlib import Path
 
 from shotgun.logging_config import get_logger
@@ -77,9 +78,30 @@ class ConversationManager:
             )
             return conversation
 
-        except Exception as e:
+        except (json.JSONDecodeError, ValueError) as e:
+            # Handle corrupted JSON or validation errors
             logger.error(
-                "Failed to load conversation from %s: %s", self.conversation_path, e
+                "Corrupted conversation file at %s: %s. Creating backup and starting fresh.",
+                self.conversation_path,
+                e,
+            )
+
+            # Create a backup of the corrupted file for debugging
+            backup_path = self.conversation_path.with_suffix(".json.backup")
+            try:
+                shutil.copy2(self.conversation_path, backup_path)
+                logger.info("Backed up corrupted conversation to %s", backup_path)
+            except Exception as backup_error:  # pragma: no cover
+                logger.warning("Failed to backup corrupted file: %s", backup_error)
+
+            return None
+
+        except Exception as e:  # pragma: no cover
+            # Catch-all for unexpected errors
+            logger.error(
+                "Unexpected error loading conversation from %s: %s",
+                self.conversation_path,
+                e,
             )
             return None
 

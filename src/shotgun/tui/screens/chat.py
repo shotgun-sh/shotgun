@@ -881,6 +881,30 @@ class ChatScreen(Screen[None]):
         except asyncio.CancelledError:
             # Handle cancellation gracefully - DO NOT re-raise
             self.mount_hint("⚠️ Operation cancelled by user")
+        except Exception as e:
+            # Log with full stack trace to shotgun.log
+            logger.exception(
+                "Agent run failed",
+                extra={
+                    "agent_mode": self.mode.value,
+                    "error_type": type(e).__name__,
+                },
+            )
+
+            # Determine user-friendly message based on error type
+            error_name = type(e).__name__
+            error_message = str(e)
+
+            if "APIStatusError" in error_name and "overload" in error_message.lower():
+                hint = "⚠️ The AI service is temporarily overloaded. Please wait a moment and try again."
+            elif "APIStatusError" in error_name and "rate" in error_message.lower():
+                hint = "⚠️ Rate limit reached. Please wait before trying again."
+            elif "APIStatusError" in error_name:
+                hint = f"⚠️ AI service error: {error_message}"
+            else:
+                hint = f"⚠️ An error occurred: {error_message}\n\nCheck logs at ~/.shotgun-sh/logs/shotgun.log"
+
+            self.mount_hint(hint)
         finally:
             self.working = False
             self._current_worker = None
@@ -910,24 +934,41 @@ class ChatScreen(Screen[None]):
         """Load conversation from persistent storage."""
         conversation = self.conversation_manager.load()
         if conversation is None:
+            # Check if file existed but was corrupted (backup was created)
+            backup_path = self.conversation_manager.conversation_path.with_suffix(
+                ".json.backup"
+            )
+            if backup_path.exists():
+                # File was corrupted - show friendly notification
+                self.mount_hint(
+                    "⚠️ Previous session was corrupted and has been backed up. Starting fresh conversation."
+                )
             return
 
-        # Restore agent state
-        agent_messages = conversation.get_agent_messages()
-        ui_messages = conversation.get_ui_messages()
+        try:
+            # Restore agent state
+            agent_messages = conversation.get_agent_messages()
+            ui_messages = conversation.get_ui_messages()
 
-        # Create ConversationState for restoration
-        state = ConversationState(
-            agent_messages=agent_messages,
-            ui_messages=ui_messages,
-            agent_type=conversation.last_agent_model,
-        )
+            # Create ConversationState for restoration
+            state = ConversationState(
+                agent_messages=agent_messages,
+                ui_messages=ui_messages,
+                agent_type=conversation.last_agent_model,
+            )
 
-        self.agent_manager.restore_conversation_state(state)
+            self.agent_manager.restore_conversation_state(state)
 
-        # Update the current mode
-        self.mode = AgentType(conversation.last_agent_model)
-        self.deps.usage_manager.restore_usage_state()
+            # Update the current mode
+            self.mode = AgentType(conversation.last_agent_model)
+            self.deps.usage_manager.restore_usage_state()
+
+        except Exception as e:  # pragma: no cover
+            # If anything goes wrong during restoration, log it and continue
+            logger.error("Failed to restore conversation state: %s", e)
+            self.mount_hint(
+                "⚠️ Could not restore previous session. Starting fresh conversation."
+            )
 
 
 def help_text_with_codebase(already_indexed: bool = False) -> str:

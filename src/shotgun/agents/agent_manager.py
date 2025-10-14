@@ -1,9 +1,12 @@
 """Agent manager for coordinating multiple AI agents with shared message history."""
 
+import json
 import logging
 from collections.abc import AsyncIterable, Sequence
 from dataclasses import dataclass, field, is_dataclass, replace
 from typing import TYPE_CHECKING, Any, cast
+
+import logfire
 
 if TYPE_CHECKING:
     from shotgun.agents.conversation_history import ConversationState
@@ -401,6 +404,24 @@ class AgentManager(Widget):
                 else None,
                 **kwargs,
             )
+        except Exception as e:
+            # Log the error with full stack trace to shotgun.log and Logfire
+            logger.exception(
+                "Agent execution failed",
+                extra={
+                    "agent_mode": self._current_agent_type.value,
+                    "model_name": model_name,
+                    "error_type": type(e).__name__,
+                },
+            )
+            logfire.exception(
+                "Agent execution failed",
+                agent_mode=self._current_agent_type.value,
+                model_name=model_name,
+                error_type=type(e).__name__,
+            )
+            # Re-raise to let TUI handle user messaging
+            raise
         finally:
             self._stream_state = None
 
@@ -468,7 +489,33 @@ class AgentManager(Widget):
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
-        self.message_history = await apply_persistent_compaction(all_messages, deps)
+        try:
+            logger.debug(
+                "Starting message history compaction",
+                extra={"message_count": len(all_messages)},
+            )
+            self.message_history = await apply_persistent_compaction(all_messages, deps)
+            logger.debug(
+                "Completed message history compaction",
+                extra={
+                    "original_count": len(all_messages),
+                    "compacted_count": len(self.message_history),
+                },
+            )
+        except Exception as e:
+            # If compaction fails, log full error with stack trace and use uncompacted messages
+            logger.error(
+                "Failed to compact message history - using uncompacted messages",
+                exc_info=True,
+                extra={
+                    "error": str(e),
+                    "message_count": len(all_messages),
+                    "agent_mode": self._current_agent_type.value,
+                },
+            )
+            # Fallback: use uncompacted messages to prevent data loss
+            self.message_history = all_messages
+
         usage = result.usage()
         deps.usage_manager.add_usage(
             usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
@@ -553,6 +600,39 @@ class AgentManager(Widget):
 
                     # Detect source from call stack
                     source = detect_source()
+
+                    # Log if tool call has incomplete args (for debugging truncated JSON)
+                    if isinstance(event.part.args, str):
+                        try:
+                            json.loads(event.part.args)
+                        except (json.JSONDecodeError, ValueError):
+                            args_preview = (
+                                event.part.args[:100] + "..."
+                                if len(event.part.args) > 100
+                                else event.part.args
+                            )
+                            logger.warning(
+                                "FunctionToolCallEvent received with incomplete JSON args",
+                                extra={
+                                    "tool_name": event.part.tool_name,
+                                    "tool_call_id": event.part.tool_call_id,
+                                    "args_preview": args_preview,
+                                    "args_length": len(event.part.args)
+                                    if event.part.args
+                                    else 0,
+                                    "agent_mode": self._current_agent_type.value,
+                                },
+                            )
+                            logfire.warn(
+                                "FunctionToolCallEvent received with incomplete JSON args",
+                                tool_name=event.part.tool_name,
+                                tool_call_id=event.part.tool_call_id,
+                                args_preview=args_preview,
+                                args_length=len(event.part.args)
+                                if event.part.args
+                                else 0,
+                                agent_mode=self._current_agent_type.value,
+                            )
 
                     track_event(
                         "tool_called",
