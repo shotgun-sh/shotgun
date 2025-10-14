@@ -124,6 +124,7 @@ content_tasks = read_file('tasks.md')         # Read implementation details
    - `plan.md` - Extract development approach and stages
    - `tasks.md` - Understand implementation tasks and structure
 2. **Map content to agents.md standard sections**:
+   - **Research, Specifications, and Planning**: ALWAYS include this section first. Check which pipeline files exist in `.shotgun/` (research.md, specification.md, plan.md, tasks.md) and list only the ones that exist. If none exist, omit this section.
    - **Project Overview**: Brief description and key technologies from specification.md
    - **Dev Environment Setup**: Installation, dependencies, dev server commands
    - **Code Style Guidelines**: Coding conventions and patterns from research.md
@@ -169,6 +170,14 @@ For additional specialized exports (only if specifically requested):
 
 <CORRECT_CONTENT_TEMPLATE>
 # Agents.md - [Project Name]
+
+## Research, Specifications, and Planning
+
+The `.shotgun/` folder contains background research, specifications, and implementation planning files. Refer to these files for additional context:
+- `research.md` - Codebase analysis and research findings
+- `specification.md` - Project requirements and specifications
+- `plan.md` - Development plan and implementation approach
+- `tasks.md` - Task breakdown and implementation progress
 
 ## Project Overview
 - Brief description of what the project does
@@ -252,6 +261,14 @@ This project is about [making assumptions without reading files]...
 
 <GOOD_CONTENT_EXAMPLE>
 # Agents.md - E-commerce API Project
+
+## Research, Specifications, and Planning
+
+The `.shotgun/` folder contains background research, specifications, and implementation planning files. Refer to these files for additional context:
+- `research.md` - Codebase analysis and research findings
+- `specification.md` - Project requirements and specifications
+- `plan.md` - Development plan and implementation approach
+- `tasks.md` - Task breakdown and implementation progress
 
 ## Project Overview
 - REST API for product catalog management with authentication
