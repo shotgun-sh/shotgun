@@ -381,13 +381,20 @@ class AgentManager(Widget):
 
         # Clear file tracker before each run to track only this run's operations
         deps.file_tracker.clear()
-        # preprocess messages; maybe we need to include the user answer in the message history
 
-        original_messages = self.ui_message_history.copy()
-
+        # Add user prompt if present (will be shown immediately via post_messages_updated)
         if prompt:
-            self.ui_message_history.append(ModelRequest.user_text_prompt(prompt))
+            user_request = ModelRequest.user_text_prompt(prompt)
+            self.ui_message_history.append(user_request)
+
+        # Always post update before run to show user message (or current state if no prompt)
         self._post_messages_updated()
+
+        # Save history WITHOUT the just-added prompt to avoid duplicates
+        # (result.new_messages() will include the prompt)
+        original_messages = (
+            self.ui_message_history[:-1] if prompt else self.ui_message_history.copy()
+        )
 
         # Start with persistent message history
         message_history = self.message_history
