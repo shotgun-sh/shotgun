@@ -690,6 +690,12 @@ class ChatScreen(Screen[None]):
         # Not a command, process as normal
         self.history.append(message.text)
 
+        # Add user message to agent_manager's history BEFORE running the agent
+        # This ensures immediate visual feedback AND proper deduplication
+        user_message = ModelRequest.user_text_prompt(text)
+        self.agent_manager.ui_message_history.append(user_message)
+        self.messages = self.agent_manager.ui_message_history.copy()
+
         # Clear the input
         self.value = ""
         self.run_agent(text)  # Use stripped text

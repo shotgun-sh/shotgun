@@ -40,6 +40,7 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     ToolCallPart,
     ToolCallPartDelta,
+    UserPromptPart,
 )
 from textual.message import Message
 from textual.widget import Widget
@@ -554,10 +555,34 @@ class AgentManager(Widget):
             },
         )
 
-        # Always add the agent's response messages to maintain conversation history
-        self.ui_message_history = original_messages + cast(
+        # Merge agent's response messages, avoiding duplicates
+        # The TUI may have already added the user prompt, so check for it
+        new_messages = cast(
             list[ModelRequest | ModelResponse | HintMessage], result.new_messages()
         )
+
+        # Deduplicate: skip user prompts that are already in original_messages
+        deduplicated_new_messages = []
+        for msg in new_messages:
+            # Check if this is a user prompt that's already in original_messages
+            if isinstance(msg, ModelRequest) and any(
+                isinstance(part, UserPromptPart) for part in msg.parts
+            ):
+                # Check if an identical user prompt is already in original_messages
+                already_exists = any(
+                    isinstance(existing, ModelRequest)
+                    and any(isinstance(p, UserPromptPart) for p in existing.parts)
+                    and existing.parts == msg.parts
+                    for existing in original_messages[
+                        -5:
+                    ]  # Check last 5 messages for efficiency
+                )
+                if already_exists:
+                    continue  # Skip this duplicate user prompt
+
+            deduplicated_new_messages.append(msg)
+
+        self.ui_message_history = original_messages + deduplicated_new_messages
 
         # Get file operations early so we can use them for contextual messages
         file_operations = deps.file_tracker.operations.copy()
