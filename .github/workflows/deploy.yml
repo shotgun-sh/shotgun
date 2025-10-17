@@ -256,10 +256,65 @@ jobs:
           draft: false
           prerelease: false
 
-  notify-slack:
+  build-and-push-docker:
     runs-on: ubuntu-latest
     needs: [build-and-package, deploy-to-pypi]
-    if: always() && needs.deploy-to-pypi.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/shotgun-sh/shotgun
+          tags: |
+            # Tag with version number (e.g., v0.1.0)
+            type=semver,pattern=v{{version}},value=${{ needs.build-and-package.outputs.version }}
+            # Tag with 'latest' for stable releases only
+            type=raw,value=latest,enable=${{ needs.build-and-package.outputs.is_dev == 'false' }}
+            # Tag with 'dev' for development releases
+            type=raw,value=dev,enable=${{ needs.build-and-package.outputs.is_dev == 'true' }}
+          labels: |
+            org.opencontainers.image.title=Shotgun
+            org.opencontainers.image.description=AI-powered CLI tool for research, planning, and task management. Always use :latest for production - :dev versions have full telemetry and never auto-update.
+            org.opencontainers.image.version=${{ needs.build-and-package.outputs.version }}
+            org.opencontainers.image.source=https://github.com/shotgun-sh/shotgun
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.vendor=Shotgun
+            org.opencontainers.image.url=https://shotgun.sh
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  notify-slack:
+    runs-on: ubuntu-latest
+    needs: [build-and-package, deploy-to-pypi, build-and-push-docker]
+    if: always() && needs.deploy-to-pypi.result == 'success' && needs.build-and-push-docker.result == 'success'
 
     steps:
       - uses: actions/checkout@v5

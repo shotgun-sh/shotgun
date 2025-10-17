@@ -36,12 +36,16 @@ class ShotgunApp(App[None]):
     CSS_PATH = "styles.tcss"
 
     def __init__(
-        self, no_update_check: bool = False, continue_session: bool = False
+        self,
+        no_update_check: bool = False,
+        continue_session: bool = False,
+        force_reindex: bool = False,
     ) -> None:
         super().__init__()
         self.config_manager: ConfigManager = get_config_manager()
         self.no_update_check = no_update_check
         self.continue_session = continue_session
+        self.force_reindex = force_reindex
 
         # Start async update check and install
         if not no_update_check:
@@ -87,8 +91,12 @@ class ShotgunApp(App[None]):
 
         if isinstance(self.screen, ChatScreen):
             return
-        # Pass continue_session flag to ChatScreen
-        self.push_screen(ChatScreen(continue_session=self.continue_session))
+        # Pass continue_session and force_reindex flags to ChatScreen
+        self.push_screen(
+            ChatScreen(
+                continue_session=self.continue_session, force_reindex=self.force_reindex
+            )
+        )
 
     def check_local_shotgun_directory_exists(self) -> bool:
         shotgun_dir = get_shotgun_base_path()
@@ -121,12 +129,17 @@ class ShotgunApp(App[None]):
         self.push_screen(FeedbackScreen(), callback=handle_feedback)
 
 
-def run(no_update_check: bool = False, continue_session: bool = False) -> None:
+def run(
+    no_update_check: bool = False,
+    continue_session: bool = False,
+    force_reindex: bool = False,
+) -> None:
     """Run the TUI application.
 
     Args:
         no_update_check: If True, disable automatic update checks.
         continue_session: If True, continue from previous conversation.
+        force_reindex: If True, force re-indexing of codebase (ignores existing index).
     """
     # Clean up any corrupted databases BEFORE starting the TUI
     # This prevents crashes from corrupted databases during initialization
@@ -148,8 +161,132 @@ def run(no_update_check: bool = False, continue_session: bool = False) -> None:
         logger.error(f"Failed to cleanup corrupted databases: {e}")
         # Continue anyway - the TUI can still function
 
-    app = ShotgunApp(no_update_check=no_update_check, continue_session=continue_session)
+    app = ShotgunApp(
+        no_update_check=no_update_check,
+        continue_session=continue_session,
+        force_reindex=force_reindex,
+    )
     app.run(inline_no_clear=True)
+
+
+def serve(
+    host: str = "localhost",
+    port: int = 8000,
+    public_url: str | None = None,
+    no_update_check: bool = False,
+    continue_session: bool = False,
+    force_reindex: bool = False,
+) -> None:
+    """Serve the TUI application as a web application.
+
+    Args:
+        host: Host address for the web server.
+        port: Port number for the web server.
+        public_url: Public URL if behind a proxy.
+        no_update_check: If True, disable automatic update checks.
+        continue_session: If True, continue from previous conversation.
+        force_reindex: If True, force re-indexing of codebase (ignores existing index).
+    """
+    # Clean up any corrupted databases BEFORE starting the TUI
+    # This prevents crashes from corrupted databases during initialization
+    import asyncio
+
+    from textual_serve.server import Server
+
+    from shotgun.codebase.core.manager import CodebaseGraphManager
+    from shotgun.utils import get_shotgun_home
+
+    storage_dir = get_shotgun_home() / "codebases"
+    manager = CodebaseGraphManager(storage_dir)
+
+    try:
+        removed = asyncio.run(manager.cleanup_corrupted_databases())
+        if removed:
+            logger.info(
+                f"Cleaned up {len(removed)} corrupted database(s) before TUI startup"
+            )
+    except Exception as e:
+        logger.error(f"Failed to cleanup corrupted databases: {e}")
+        # Continue anyway - the TUI can still function
+
+    # Create a new event loop after asyncio.run() closes the previous one
+    # This is needed for the Server.serve() method
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Build the command string based on flags
+    command = "shotgun"
+    if no_update_check:
+        command += " --no-update-check"
+    if continue_session:
+        command += " --continue"
+    if force_reindex:
+        command += " --force-reindex"
+
+    # Create and start the server with hardcoded title and debug=False
+    server = Server(
+        command=command,
+        host=host,
+        port=port,
+        title="The Shotgun",
+        public_url=public_url,
+    )
+
+    # Set up graceful shutdown on SIGTERM/SIGINT
+    import signal
+    import sys
+
+    def signal_handler(_signum: int, _frame: Any) -> None:
+        """Handle shutdown signals gracefully."""
+        from shotgun.posthog_telemetry import shutdown
+
+        logger.info("Received shutdown signal, cleaning up...")
+        # Restore stdout/stderr before shutting down
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        shutdown()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # Suppress the textual-serve banner by redirecting stdout/stderr
+    import io
+
+    # Capture and suppress the banner, but show the actual serving URL
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+
+    captured_output = io.StringIO()
+    sys.stdout = captured_output
+    sys.stderr = captured_output
+
+    try:
+        # This will print the banner to our captured output
+        import logging
+
+        # Temporarily set logging to ERROR level to suppress INFO messages
+        textual_serve_logger = logging.getLogger("textual_serve")
+        original_level = textual_serve_logger.level
+        textual_serve_logger.setLevel(logging.ERROR)
+
+        # Print our own message to the original stdout
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        print(f"Serving Shotgun TUI at http://{host}:{port}")
+        print("Press Ctrl+C to quit")
+
+        # Now suppress output again for the serve call
+        sys.stdout = captured_output
+        sys.stderr = captured_output
+
+        server.serve(debug=False)
+    finally:
+        # Restore original stdout/stderr
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        if "textual_serve_logger" in locals():
+            textual_serve_logger.setLevel(original_level)
 
 
 if __name__ == "__main__":

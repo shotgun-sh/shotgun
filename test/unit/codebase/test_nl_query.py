@@ -69,7 +69,7 @@ async def test_generate_cypher_simple_query():
     mock_response = CypherGenerationResponse(
         cypher_query=expected_cypher,
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
@@ -103,7 +103,7 @@ async def test_generate_cypher_complex_query():
     mock_response = CypherGenerationResponse(
         cypher_query=expected_cypher.strip(),
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
@@ -131,7 +131,7 @@ async def test_generate_cypher_conceptual_query_raises_exception():
     mock_response = CypherGenerationResponse(
         cypher_query=None,
         can_generate_valid_cypher=False,
-        reason_cannot_generate="This is a conceptual question requiring interpretation"
+        reason_cannot_generate="This is a conceptual question requiring interpretation",
     )
 
     with (
@@ -163,7 +163,7 @@ async def test_generate_cypher_with_file_extension_query():
     mock_response = CypherGenerationResponse(
         cypher_query=expected_cypher.strip(),
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
@@ -223,13 +223,11 @@ async def test_generate_cypher_request_structure():
     mock_response = CypherGenerationResponse(
         cypher_query="MATCH (n) RETURN n",
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -257,13 +255,11 @@ async def test_generate_cypher_with_datetime():
     mock_response = CypherGenerationResponse(
         cypher_query="MATCH (f:Function) WHERE f.created_at > timestamp() - 86400000 RETURN f",
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -291,13 +287,11 @@ async def test_generate_cypher_empty_query():
     mock_response = CypherGenerationResponse(
         cypher_query="MATCH (n) RETURN n LIMIT 10",
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -324,13 +318,11 @@ async def test_generate_cypher_whitespace_query():
     mock_response = CypherGenerationResponse(
         cypher_query="MATCH (n) RETURN count(n)",
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -356,13 +348,11 @@ async def test_generate_cypher_unicode_query():
     mock_response = CypherGenerationResponse(
         cypher_query="MATCH (f:Function) WHERE f.name CONTAINS 'café' OR f.name CONTAINS 'naïve' RETURN f",
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -393,13 +383,11 @@ async def test_generate_cypher_long_query():
     mock_response = CypherGenerationResponse(
         cypher_query=expected_cypher.strip(),
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -427,13 +415,11 @@ async def test_generate_cypher_aggregation_query():
     mock_response = CypherGenerationResponse(
         cypher_query="MATCH (m:Module)-[:DEFINES]->(f:Function) RETURN m.name, count(f) ORDER BY count(f) DESC",
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -463,13 +449,11 @@ async def test_generate_cypher_relationship_query():
     mock_response = CypherGenerationResponse(
         cypher_query=expected_cypher.strip(),
         can_generate_valid_cypher=True,
-        reason_cannot_generate=None
+        reason_cannot_generate=None,
     )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -534,9 +518,7 @@ async def test_generate_cypher_timeout_handling():
     nl_query = "Find functions"
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -560,12 +542,12 @@ async def test_generate_cypher_response_validation():
     # Mock response with invalid structure (not a CypherGenerationResponse)
     mock_response = Mock()
     mock_response.can_generate_valid_cypher = True
-    mock_response.cypher_query = None  # Invalid: says it can generate but provides no query
+    mock_response.cypher_query = (
+        None  # Invalid: says it can generate but provides no query
+    )
 
     with (
-        patch(
-            "shotgun.codebase.core.nl_query.llm_cypher_prompt"
-        ) as mock_llm_prompt,
+        patch("shotgun.codebase.core.nl_query.llm_cypher_prompt") as mock_llm_prompt,
         patch("shotgun.codebase.core.nl_query.get_provider_model") as mock_get_model,
     ):
         mock_model = Mock()
@@ -573,5 +555,7 @@ async def test_generate_cypher_response_validation():
         mock_get_model.return_value = mock_model
         mock_llm_prompt.return_value = mock_response
 
-        with pytest.raises(RuntimeError, match="LLM indicated success but provided no query"):
+        with pytest.raises(
+            RuntimeError, match="LLM indicated success but provided no query"
+        ):
             await generate_cypher(nl_query)

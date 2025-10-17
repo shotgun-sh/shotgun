@@ -1,0 +1,81 @@
+# Development and test directories
+test/
+playground/
+tmp/
+
+# Build and coverage artifacts
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Project-specific directories
+.shotgun/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub workflows and configs
+.github/
+
+# Claude Code
+.claude/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Linting and type checking caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.pytype/
+
+# Testing and coverage
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+cover/
+
+# Documentation
+docs/
+*.md
+!README.md
+!README_PYPI.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+
+# Other development files
+lefthook.yml
+.python-version

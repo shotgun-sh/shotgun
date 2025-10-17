@@ -408,6 +408,90 @@ export SENTRY_DSN=your-sentry-dsn
 - **Opt-in for development**: Telemetry requires explicit environment variables
 - **Automatic in production**: Production builds include telemetry for error tracking
 
+## Docker
+
+Run Shotgun in a Docker container with web access.
+
+### Using Pre-built Images (Recommended)
+
+Pull the official image from GitHub Container Registry:
+
+```bash
+# Pull latest stable version
+docker pull ghcr.io/shotgun-sh/shotgun:latest
+
+# Or pull a specific version
+docker pull ghcr.io/shotgun-sh/shotgun:v0.1.0
+
+# Or pull development version
+docker pull ghcr.io/shotgun-sh/shotgun:dev
+```
+
+Then run:
+
+```bash
+docker run -p 8000:8000 \
+  -v $(pwd):/workspace \
+  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
+  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+```
+
+**Note:** The Docker image automatically includes `--force-reindex` to ensure fresh indexing on startup. You don't need to add any additional flags.
+
+### Building from Source (Optional)
+
+If you prefer to build the image yourself:
+
+```bash
+docker build -t shotgun:latest .
+```
+
+### Run the Container
+
+The container requires two volume mounts:
+1. Your codebase/workspace directory (mounted to `/workspace`)
+2. Config directory for API keys and settings (mounted to `/home/shotgun/.shotgun-sh`)
+
+```bash
+# Basic usage (serves on port 8000)
+docker run -p 8000:8000 \
+  -v $(pwd):/workspace \
+  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
+  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+
+# Custom port
+docker run -p 3000:3000 \
+  -v $(pwd):/workspace \
+  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
+  ghcr.io/shotgun-sh/shotgun:latest --no-update-check --port 3000
+
+# Different codebase directory
+docker run -p 8000:8000 \
+  -v /path/to/your/project:/workspace \
+  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
+  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+
+# Run in background with auto-restart
+docker run -d --restart unless-stopped \
+  --name shotgun-web \
+  -p 8000:8000 \
+  -v $(pwd):/workspace \
+  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
+  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+```
+
+**All Docker commands automatically include `--force-reindex`** - you don't need to specify it. The flag is baked into the Docker image's ENTRYPOINT to ensure reliable codebase indexing in containerized environments.
+
+### Configuration
+
+On first run, configure your API keys through the web UI. The configuration will persist in the mounted `~/.shotgun-sh` directory.
+
+Access the web interface at `http://localhost:8000` (or your custom port).
+
+### Codebase Indexing in Docker
+
+The Docker image automatically prompts you to index the codebase on each startup. This ensures you're always working with up-to-date code analysis, even if the container restarts or you mount a different directory. Simply click "Index now" when prompted.
+
 ## Support
 
 Join our discord https://discord.gg/5RmY6J2N7s

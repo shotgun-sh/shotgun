@@ -125,6 +125,41 @@ def main(
             help="Continue previous TUI conversation",
         ),
     ] = False,
+    web: Annotated[
+        bool,
+        typer.Option(
+            "--web",
+            help="Serve TUI as web application",
+        ),
+    ] = False,
+    port: Annotated[
+        int,
+        typer.Option(
+            "--port",
+            help="Port for web server (only used with --web)",
+        ),
+    ] = 8000,
+    host: Annotated[
+        str,
+        typer.Option(
+            "--host",
+            help="Host address for web server (only used with --web)",
+        ),
+    ] = "localhost",
+    public_url: Annotated[
+        str | None,
+        typer.Option(
+            "--public-url",
+            help="Public URL if behind proxy (only used with --web)",
+        ),
+    ] = None,
+    force_reindex: Annotated[
+        bool,
+        typer.Option(
+            "--force-reindex",
+            help="Force re-indexing of codebase (ignores existing index)",
+        ),
+    ] = False,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
@@ -134,16 +169,35 @@ def main(
         perform_auto_update_async(no_update_check=no_update_check)
 
     if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
-        logger.debug("Launching shotgun TUI application")
-        try:
-            tui_app.run(
-                no_update_check=no_update_check, continue_session=continue_session
-            )
-        finally:
-            # Ensure PostHog is shut down cleanly even if TUI exits unexpectedly
-            from shotgun.posthog_telemetry import shutdown
+        if web:
+            logger.debug("Launching shotgun TUI as web application")
+            try:
+                tui_app.serve(
+                    host=host,
+                    port=port,
+                    public_url=public_url,
+                    no_update_check=no_update_check,
+                    continue_session=continue_session,
+                    force_reindex=force_reindex,
+                )
+            finally:
+                # Ensure PostHog is shut down cleanly even if server exits unexpectedly
+                from shotgun.posthog_telemetry import shutdown
 
-            shutdown()
+                shutdown()
+        else:
+            logger.debug("Launching shotgun TUI application")
+            try:
+                tui_app.run(
+                    no_update_check=no_update_check,
+                    continue_session=continue_session,
+                    force_reindex=force_reindex,
+                )
+            finally:
+                # Ensure PostHog is shut down cleanly even if TUI exits unexpectedly
+                from shotgun.posthog_telemetry import shutdown
+
+                shutdown()
         raise typer.Exit()
 
     # For CLI commands, register PostHog shutdown handler

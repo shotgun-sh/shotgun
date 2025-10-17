@@ -291,7 +291,9 @@ class ChatScreen(Screen[None]):
     qa_current_index = reactive(0)
     qa_answers: list[str] = []
 
-    def __init__(self, continue_session: bool = False) -> None:
+    def __init__(
+        self, continue_session: bool = False, force_reindex: bool = False
+    ) -> None:
         super().__init__()
         # Get the model configuration and services
         model_config = get_provider_model()
@@ -319,6 +321,7 @@ class ChatScreen(Screen[None]):
         self.placeholder_hints = PlaceholderHints()
         self.conversation_manager = ConversationManager()
         self.continue_session = continue_session
+        self.force_reindex = force_reindex
 
     def on_mount(self) -> None:
         self.query_one(PromptInput).focus(scroll_visible=True)
@@ -377,6 +380,22 @@ class ChatScreen(Screen[None]):
         )
         if is_empty or self.continue_session:
             return
+
+        # If force_reindex is True, delete any existing graphs for this directory
+        if self.force_reindex:
+            accessible_graphs = (
+                await self.codebase_sdk.list_codebases_for_directory()
+            ).graphs
+            for graph in accessible_graphs:
+                try:
+                    await self.codebase_sdk.delete_codebase(graph.graph_id)
+                    logger.info(
+                        f"Deleted existing graph {graph.graph_id} due to --force-reindex"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to delete graph {graph.graph_id} during force reindex: {e}"
+                    )
 
         # Check if the current directory has any accessible codebases
         accessible_graphs = (
