@@ -506,9 +506,28 @@ class ChatScreen(Screen[None]):
         self.partial_message = event.message
         history = self.query_one(ChatHistory)
 
+        # Filter event.messages to exclude ModelRequest with only ToolReturnPart
+        # These are intermediate tool results that would render as empty (UserQuestionWidget
+        # filters out ToolReturnPart in format_prompt_parts), causing user messages to disappear
+        from pydantic_ai.messages import ToolReturnPart
+
+        filtered_event_messages: list[ModelMessage] = []
+        for msg in event.messages:
+            if isinstance(msg, ModelRequest):
+                # Check if this ModelRequest has any user-visible parts
+                has_user_content = any(
+                    not isinstance(part, ToolReturnPart) for part in msg.parts
+                )
+                if has_user_content:
+                    filtered_event_messages.append(msg)
+                # Skip ModelRequest with only ToolReturnPart
+            else:
+                # Keep all ModelResponse and other message types
+                filtered_event_messages.append(msg)
+
         # Only update messages if the message list changed
         new_message_list = self.messages + cast(
-            list[ModelMessage | HintMessage], event.messages
+            list[ModelMessage | HintMessage], filtered_event_messages
         )
         if len(new_message_list) != len(history.items):
             history.update_messages(new_message_list)
