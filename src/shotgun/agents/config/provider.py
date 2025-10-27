@@ -172,7 +172,7 @@ def get_provider_model(
             model_name = provider_or_model
         else:
             # No specific model requested - use selected or default
-            model_name = config.selected_model or ModelName.CLAUDE_SONNET_4_5
+            model_name = config.selected_model or ModelName.CLAUDE_HAIKU_4_5
 
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name.value}' not found")
@@ -247,8 +247,8 @@ def get_provider_model(
         if not api_key:
             raise ValueError("Anthropic API key not configured. Set via config.")
 
-        # Use requested model or default to claude-sonnet-4-5
-        model_name = requested_model if requested_model else ModelName.CLAUDE_SONNET_4_5
+        # Use requested model or default to claude-haiku-4-5
+        model_name = requested_model if requested_model else ModelName.CLAUDE_HAIKU_4_5
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name.value}' not found")
         spec = MODEL_SPECS[model_name]

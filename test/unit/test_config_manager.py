@@ -298,7 +298,7 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         model = get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-sonnet-4-5"
+        assert model.name == "claude-haiku-4-5"
         assert model.api_key == "test-anthropic-key"
 
 
@@ -396,7 +396,7 @@ def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
         model = get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-sonnet-4-5"
+        assert model.name == "claude-haiku-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -787,7 +787,7 @@ def test_update_provider_sets_selected_model_when_first_key():
 
         # Verify selected_model is now set to Anthropic's default
         config = manager.load()
-        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
+        assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
@@ -875,7 +875,7 @@ def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
             config = manager.load()
 
             # selected_model should now be Anthropic's default since OpenAI has no key
-            assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
+            assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
             assert isinstance(config.anthropic.api_key, SecretStr)
             assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
@@ -940,9 +940,9 @@ def test_clear_provider_key_updates_selected_model():
         manager.update_provider(ProviderType.ANTHROPIC, api_key="test-anthropic-key")
 
         # Manually set selected_model to Anthropic model
-        manager.update_selected_model(ModelName.CLAUDE_SONNET_4_5)
+        manager.update_selected_model(ModelName.CLAUDE_HAIKU_4_5)
         config = manager.load(force_reload=True)
-        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
+        assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
 
         # Clear Anthropic provider key
         manager.clear_provider_key(ProviderType.ANTHROPIC)
@@ -953,7 +953,7 @@ def test_clear_provider_key_updates_selected_model():
         # selected_model should be updated to an OpenAI model or set to None then to OpenAI on load
         # The load() method should detect that the selected model's provider has no key
         # and switch to an available provider
-        assert config.selected_model != ModelName.CLAUDE_SONNET_4_5
+        assert config.selected_model != ModelName.CLAUDE_HAIKU_4_5
         assert config.selected_model == ModelName.GPT_5  # Should switch to OpenAI
 
 

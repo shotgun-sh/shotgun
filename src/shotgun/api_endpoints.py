@@ -1,10 +1,16 @@
 """Shotgun backend service API endpoints and URLs."""
 
+import os
+
 # Shotgun Web API base URL (for authentication/subscription)
 # Can be overridden with environment variable
-SHOTGUN_WEB_BASE_URL = "https://api-219702594231.us-east4.run.app"
+SHOTGUN_WEB_BASE_URL = os.getenv(
+    "SHOTGUN_WEB_BASE_URL", "https://api-219702594231.us-east4.run.app"
+)
 # Shotgun's LiteLLM proxy base URL (for AI model requests)
-LITELLM_PROXY_BASE_URL = "https://litellm-219702594231.us-east4.run.app"
+LITELLM_PROXY_BASE_URL = os.getenv(
+    "SHOTGUN_ACCOUNT_LLM_BASE_URL", "https://litellm-219702594231.us-east4.run.app"
+)
 
 # Provider-specific LiteLLM proxy endpoints
 LITELLM_PROXY_ANTHROPIC_BASE = f"{LITELLM_PROXY_BASE_URL}/anthropic"
