@@ -25,7 +25,7 @@ ecosystem to help you get the most out of code-gen tools and Agents.
 <br>
 
 ```bash
-pipx install shotgun-sh
+uvx shotgun-sh
 ```
 
 </div>
@@ -48,55 +48,72 @@ pipx install shotgun-sh
 
 <h2 id="quickstart">Quickstart</h2>
 
-Shotgun is a Python-based CLI tool. We use `pipx` for clean, isolated installation.
-
+Shotgun is installed via `uvx` or `uv tool install`. First, install uv for your platform:
 
 > [!WARNING]
 > If you tried out an alpha version of shotgun, make sure to uninstall it:\
 > `npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server`
 
-
-### Step 1: Install pipx (if you don't have it)
+### Step 1: Install uv
 
 #### macOS
 
+**Using Homebrew (recommended):**
 ```bash
-brew install pipx && pipx ensurepath
+brew install uv
 ```
 
-_No Homebrew? [Install it here](https://brew.sh/)_
+**Using curl:**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
 #### Linux
 
 ```bash
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 #### Windows
 
+**Using PowerShell:**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**Using winget:**
 ```bash
-python -m pip install --user pipx
-python -m pipx ensurepath
+winget install --id=astral-sh.uv -e
 ```
 
 _Restart your terminal after installation_
 
-### Step 2: Install Shotgun
+---
 
+### Step 2: Run Shotgun
+
+Once uv is installed, run shotgun using one of these methods:
+
+**Option 1: Ephemeral execution (recommended for trying out)**
 ```bash
-pipx install shotgun-sh
+uvx shotgun-sh
 ```
 
-That's it! 30 seconds and you're ready.
+**Option 2: Permanent installation (recommended for regular use)**
+```bash
+uv tool install shotgun-sh
+```
 
-### Step 3: Start Shotgun
-
-Run:
-
+Then run:
 ```bash
 shotgun
 ```
+
+**Why uv?** It's 10-100x faster than pipx and handles binary wheels reliably, preventing build errors on systems without cmake/build tools.
+
+---
+
+### Step 3: Get Started
 
 **Shotgun will guide you through:**
 
@@ -105,6 +122,11 @@ shotgun
 - Starting your first research session
 
 **Pro tip:** Run Shotgun in your IDE's terminal for the best experience.
+
+**Links:**
+- Repository: https://github.com/shotgun-sh/shotgun
+- Website: https://shotgun.sh
+- Discord: https://discord.gg/5RmY6J2N7s
 
 ---
 
@@ -234,7 +256,7 @@ An upvote, review or comment there helps us reach more builders and gather early
 ### Uninstall:
 
 ```bash
-pipx uninstall shotgun-sh
+uv tool uninstall shotgun-sh
 ```
 
 ### Troubleshooting
@@ -256,7 +278,7 @@ npm uninstall -g @proofs-io/shotgun-server --loglevel=error
 <br>
   <p><strong>Research (what exists) → Specify (what to build) → Plan (how to build) → Tasks (break it down) → Export (to any tool). </strong></p>
 
-  <pre><code> pipx install shotgun-sh </code></pre>
+  <pre><code> uvx shotgun-sh </code></pre>
   <p>⚡ Takes 30 seconds to install.<br>
   🤠 Join the posse on <a href="https://discord.com/invite/5RmY6J2N7s">Discord</a> to share what you build.</p>
 
