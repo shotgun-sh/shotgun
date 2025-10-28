@@ -9,12 +9,16 @@ from shotgun.agents.config import ConfigManager, get_config_manager
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.splash import SplashScreen
 from shotgun.utils.file_system_utils import get_shotgun_base_path
-from shotgun.utils.update_checker import perform_auto_update_async
+from shotgun.utils.update_checker import (
+    detect_installation_method,
+    perform_auto_update_async,
+)
 
 from .screens.chat import ChatScreen
 from .screens.directory_setup import DirectorySetupScreen
 from .screens.feedback import FeedbackScreen
 from .screens.model_picker import ModelPickerScreen
+from .screens.pipx_migration import PipxMigrationScreen
 from .screens.provider_config import ProviderConfigScreen
 from .screens.welcome import WelcomeScreen
 
@@ -56,14 +60,35 @@ class ShotgunApp(App[None]):
         # Track TUI startup
         from shotgun.posthog_telemetry import track_event
 
-        track_event("tui_started", {})
+        track_event(
+            "tui_started",
+            {
+                "installation_method": detect_installation_method(),
+            },
+        )
 
         self.push_screen(
             SplashScreen(), callback=lambda _arg: self.refresh_startup_screen()
         )
 
-    def refresh_startup_screen(self) -> None:
+    def refresh_startup_screen(self, skip_pipx_check: bool = False) -> None:
         """Push the appropriate screen based on configured providers."""
+        # Check for pipx installation and show migration modal first
+        if not skip_pipx_check:
+            installation_method = detect_installation_method()
+            if installation_method == "pipx":
+                if isinstance(self.screen, PipxMigrationScreen):
+                    return
+
+                # Show pipx migration modal as a blocking modal screen
+                self.push_screen(
+                    PipxMigrationScreen(),
+                    callback=lambda _arg: self.refresh_startup_screen(
+                        skip_pipx_check=True
+                    ),
+                )
+                return
+
         # Show welcome screen if no providers are configured OR if user hasn't seen it yet
         config = self.config_manager.load()
         if (

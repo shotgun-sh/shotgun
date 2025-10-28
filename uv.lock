@@ -2487,7 +2487,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "kuzu", specifier = ">=0.7.0" },
     { name = "lefthook", marker = "extra == 'dev'", specifier = ">=1.12.0" },
-    { name = "logfire", extras = ["pydantic-ai"], specifier = ">=2.0.0" },
+    { name = "logfire", specifier = ">=2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "packaging", specifier = ">=23.0" },

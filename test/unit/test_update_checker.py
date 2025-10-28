@@ -68,9 +68,59 @@ def test_get_latest_version_network_error(mock_client):
 
 
 @patch("shotgun.utils.update_checker.subprocess.run")
-def test_detect_installation_method_pipx(mock_run):
+@patch("shotgun.utils.update_checker.Path")
+def test_detect_installation_method_uvx(mock_path, mock_run):
+    """Test detection of uvx (ephemeral) execution."""
+    # Mock executable path to look like uvx cache
+    mock_executable = Mock()
+    mock_executable.__str__ = (
+        lambda x: "/home/user/.cache/uv/tools/shotgun-sh/bin/python"
+    )
+    mock_path.return_value = mock_executable
+
+    result = detect_installation_method()
+    assert result == "uvx"
+
+
+@patch("shotgun.utils.update_checker.subprocess.run")
+@patch("shotgun.utils.update_checker.Path")
+def test_detect_installation_method_uv_tool(mock_path, mock_run):
+    """Test detection of uv tool installation."""
+    # Mock executable path to not match uvx cache
+    mock_executable = Mock()
+    mock_executable.__str__ = lambda x: "/home/user/.local/bin/python"
+    mock_path.return_value = mock_executable
+
+    # Mock uv tool list success
+    def run_side_effect(cmd, **kwargs):
+        if cmd[0] == "uv" and cmd[1] == "tool":
+            return Mock(stdout="shotgun-sh 0.1.0", returncode=0)
+        raise FileNotFoundError()
+
+    mock_run.side_effect = run_side_effect
+
+    result = detect_installation_method()
+    assert result == "uv-tool"
+
+
+@patch("shotgun.utils.update_checker.subprocess.run")
+@patch("shotgun.utils.update_checker.Path")
+def test_detect_installation_method_pipx(mock_path, mock_run):
     """Test detection of pipx installation."""
-    mock_run.return_value = Mock(stdout="shotgun-sh 0.1.0", returncode=0)
+    # Mock executable path to not match uvx cache
+    mock_executable = Mock()
+    mock_executable.__str__ = lambda x: "/usr/bin/python"
+    mock_path.return_value = mock_executable
+
+    # Mock subprocess calls
+    def run_side_effect(cmd, **kwargs):
+        if cmd[0] == "uv":
+            raise FileNotFoundError()
+        if cmd[0] == "pipx":
+            return Mock(stdout="shotgun-sh 0.1.0", returncode=0)
+        raise FileNotFoundError()
+
+    mock_run.side_effect = run_side_effect
 
     result = detect_installation_method()
     assert result == "pipx"
@@ -91,6 +141,12 @@ def test_detect_installation_method_venv(mock_run, monkeypatch):
 
 def test_get_update_command():
     """Test getting update commands for different installation methods."""
+    uvx_cmd = get_update_command("uvx")
+    assert uvx_cmd is None  # No update command for ephemeral
+
+    uv_tool_cmd = get_update_command("uv-tool")
+    assert uv_tool_cmd == ["uv", "tool", "upgrade", "shotgun-sh"]
+
     pipx_cmd = get_update_command("pipx")
     assert pipx_cmd == ["pipx", "upgrade", "shotgun-sh"]
 
@@ -145,6 +201,21 @@ def test_perform_update_success(mock_get_latest, mock_detect, mock_run, monkeypa
 
 @patch("shotgun.utils.update_checker.subprocess.run")
 @patch("shotgun.utils.update_checker.detect_installation_method")
+def test_perform_auto_update_uv_tool(mock_detect, mock_run):
+    """Test auto-update for uv tool installation."""
+    mock_detect.return_value = "uv-tool"
+    mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+    perform_auto_update(no_update_check=False)
+
+    # Should have called uv tool upgrade
+    mock_run.assert_called_once()
+    args = mock_run.call_args[0][0]
+    assert args == ["uv", "tool", "upgrade", "shotgun-sh"]
+
+
+@patch("shotgun.utils.update_checker.subprocess.run")
+@patch("shotgun.utils.update_checker.detect_installation_method")
 def test_perform_auto_update_pipx(mock_detect, mock_run):
     """Test auto-update for pipx installation."""
     mock_detect.return_value = "pipx"
@@ -159,6 +230,17 @@ def test_perform_auto_update_pipx(mock_detect, mock_run):
 
 
 @patch("shotgun.utils.update_checker.detect_installation_method")
+def test_perform_auto_update_uvx_skips(mock_detect):
+    """Test auto-update skips for uvx (ephemeral) installations."""
+    mock_detect.return_value = "uvx"
+
+    # Should not attempt update
+    with patch("shotgun.utils.update_checker.subprocess.run") as mock_run:
+        perform_auto_update(no_update_check=False)
+        mock_run.assert_not_called()
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
 def test_perform_auto_update_not_pipx(mock_detect):
     """Test auto-update skips for non-pipx installations."""
     mock_detect.return_value = "pip"
@@ -167,6 +249,21 @@ def test_perform_auto_update_not_pipx(mock_detect):
     with patch("shotgun.utils.update_checker.subprocess.run") as mock_run:
         perform_auto_update(no_update_check=False)
         mock_run.assert_not_called()
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_perform_update_uvx_shows_message(mock_get_latest, mock_detect, monkeypatch):
+    """Test that uvx installations get a helpful message instead of update."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.1.0")
+    mock_get_latest.return_value = "0.2.0"
+    mock_detect.return_value = "uvx"
+
+    success, message = perform_update()
+    assert success is False
+    assert "ephemeral mode" in message
+    assert "uvx shotgun-sh" in message
+    assert "uv tool install shotgun-sh" in message
 
 
 def test_perform_auto_update_async():

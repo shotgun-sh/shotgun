@@ -32,6 +32,34 @@ logger = get_logger(__name__)
 _model_cache: dict[tuple[ProviderType, KeyProvider, ModelName, str], Model] = {}
 
 
+def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
+    """Get the default model based on which provider/account is configured.
+
+    Checks API keys in priority order and returns appropriate default model.
+    Treats Shotgun Account as a provider context.
+
+    Args:
+        config: Shotgun configuration containing API keys
+
+    Returns:
+        Default ModelName for the configured provider/account
+    """
+    # Priority 1: Shotgun Account
+    if _get_api_key(config.shotgun.api_key):
+        return ModelName.CLAUDE_HAIKU_4_5
+
+    # Priority 2: Individual provider keys
+    if _get_api_key(config.anthropic.api_key):
+        return ModelName.CLAUDE_HAIKU_4_5
+    if _get_api_key(config.openai.api_key):
+        return ModelName.GPT_5
+    if _get_api_key(config.google.api_key):
+        return ModelName.GEMINI_2_5_PRO
+
+    # Fallback: system-wide default
+    return ModelName.CLAUDE_HAIKU_4_5
+
+
 def get_or_create_model(
     provider: ProviderType,
     key_provider: "KeyProvider",

@@ -243,6 +243,25 @@ jobs:
             ## 🚀 Release v${{ needs.build-and-package.outputs.version }}
 
             ### Installation
+
+            **Using uvx (Recommended - 10-100x faster):**
+
+            First, install uv if you don't have it:
+            ```bash
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            # Or with Homebrew: brew install uv
+            ```
+
+            Then install shotgun-sh:
+            ```bash
+            # Quick start (ephemeral)
+            uvx shotgun-sh
+
+            # Or install permanently
+            uv tool install shotgun-sh==${{ needs.build-and-package.outputs.version }}
+            ```
+
+            **Using pipx:**
             ```bash
             pipx install shotgun-sh==${{ needs.build-and-package.outputs.version }}
             ```
@@ -374,7 +393,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*Installation:*\n\`\`\`\npipx install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh\n\`\`\`"
+                  "text": "*Installation Instructions:*\n\nFirst, install uv if you don't have it:\n\`\`\`\ncurl -LsSf https://astral.sh/uv/install.sh | sh\n# Or: brew install uv\n\`\`\`\n\nThen run this version:\n\`\`\`\nuvx --no-cache --from shotgun-sh==${VERSION} shotgun\n\n# Or install permanently:\nuv tool install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed via pipx or uv, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh  # if using pipx\n# or\nuv tool uninstall shotgun-sh  # if using uv tool\n\`\`\`"
                 }
               },
               {
@@ -382,13 +401,6 @@ jobs:
                 "text": {
                   "type": "mrkdwn",
                   "text": "⚠️ *Warning:* You might need to wait a minute for this version to be available for installation, as it was just published.\n\nThis is a pre-release development version for testing."
-                }
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "*Need to install pipx?*\n\n*macOS:*\n\`brew install pipx && pipx ensurepath\`\n_No Homebrew?_ <https://brew.sh|Install here>\n\n*Ubuntu/Debian:*\n\`apt install pipx && pipx ensurepath\`\n\n*Fedora:*\n\`dnf install pipx && pipx ensurepath\`\n\n*Arch:*\n\`pacman -S python-pipx && pipx ensurepath\`\n\n*Any Linux (via pip):*\n\`python3 -m pip install --user pipx\`\n\`python3 -m pipx ensurepath\`"
                 }
               },
               {
@@ -438,21 +450,14 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*Installation:*\n\`\`\`\n# Install latest version:\npipx install shotgun-sh\n\n# Or install this specific version:\npipx install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh\n\`\`\`"
+                  "text": "*Installation Instructions:*\n\nFirst, install uv if you don't have it:\n\`\`\`\ncurl -LsSf https://astral.sh/uv/install.sh | sh\n# Or: brew install uv\n\`\`\`\n\nThen install shotgun-sh:\n\`\`\`\n# Quick start (always latest):\nuvx shotgun-sh\n\n# Or install this specific version:\nuvx --no-cache --from shotgun-sh==${VERSION} shotgun\n\n# Or install permanently:\nuv tool install shotgun-sh==${VERSION}\n\`\`\`\n\n💡 *Tip:* If you have a previous version installed via pipx or uv, uninstall it first:\n\`\`\`\npipx uninstall shotgun-sh  # if using pipx\n# or\nuv tool uninstall shotgun-sh  # if using uv tool\n\`\`\`"
                 }
               },
               {
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "⚠️ *Warning:* You might need to wait a minute for this version to be available for installation, as it was just published.\n\n✨ *Note for regular users:* You don't need to specify the version number. Simply use \`pipx install shotgun-sh\` to get the latest stable release. The version-specific command is included for testing this particular release."
-                }
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "*Need to install pipx?*\n\n*macOS:*\n\`brew install pipx && pipx ensurepath\`\n_No Homebrew?_ <https://brew.sh|Install here>\n\n*Ubuntu/Debian:*\n\`apt install pipx && pipx ensurepath\`\n\n*Fedora:*\n\`dnf install pipx && pipx ensurepath\`\n\n*Arch:*\n\`pacman -S python-pipx && pipx ensurepath\`\n\n*Any Linux (via pip):*\n\`python3 -m pip install --user pipx\`\n\`python3 -m pipx ensurepath\`"
+                  "text": "⚠️ *Warning:* You might need to wait a minute for this version to be available, as it was just published.\n\n✨ *Note for regular users:* You don't need to specify the version number. Simply use \`uvx shotgun-sh\` or \`uv tool install shotgun-sh\` to get the latest stable release.\n\n📦 *About uv:* uv is the modern, fast Python package installer (10-100x faster than pip/pipx). Auto-updates work with \`uv tool install\` but not with ephemeral \`uvx\` execution."
                 }
               },
               {

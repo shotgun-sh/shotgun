@@ -45,7 +45,7 @@ def update(
 
     This command will:
     - Check PyPI for the latest version
-    - Detect your installation method (pipx, pip, or venv)
+    - Detect your installation method (uvx, uv-tool, pipx, pip, or venv)
     - Perform the appropriate upgrade command
 
     Examples:
@@ -93,6 +93,8 @@ def update(
         )
         console.print(
             "Use --force to update anyway, or install the stable version with:\n"
+            "  uv tool install shotgun-sh\n"
+            "  or\n"
             "  pipx install shotgun-sh\n"
             "  or\n"
             "  pip install shotgun-sh",
@@ -134,7 +136,19 @@ def update(
             console.print(f"\n[red]✗[/red] {message}", style="bold red")
 
             # Provide manual update instructions
-            if method == "pipx":
+            if method == "uvx":
+                console.print(
+                    "\n[yellow]Run uvx again to use the latest version:[/yellow]\n"
+                    "  uvx shotgun-sh\n"
+                    "\n[yellow]Or install permanently:[/yellow]\n"
+                    "  uv tool install shotgun-sh"
+                )
+            elif method == "uv-tool":
+                console.print(
+                    "\n[yellow]Try updating manually:[/yellow]\n"
+                    "  uv tool upgrade shotgun-sh"
+                )
+            elif method == "pipx":
                 console.print(
                     "\n[yellow]Try updating manually:[/yellow]\n"
                     "  pipx upgrade shotgun-sh"

@@ -1,5 +1,6 @@
 """Simple auto-update functionality for shotgun-sh CLI."""
 
+import os
 import subprocess
 import sys
 import threading
@@ -18,8 +19,34 @@ def detect_installation_method() -> str:
     """Detect how shotgun-sh was installed.
 
     Returns:
-        Installation method: 'pipx', 'pip', 'venv', or 'unknown'.
+        Installation method: 'uvx', 'uv-tool', 'pipx', 'pip', 'venv', or 'unknown'.
     """
+    # Check for simulation environment variable (for testing)
+    if os.getenv("PIPX_SIMULATE", "").lower() in ("true", "1"):
+        logger.debug("PIPX_SIMULATE enabled, simulating pipx installation")
+        return "pipx"
+
+    # Check for uvx (ephemeral execution) by looking at executable path
+    # uvx runs from a temporary cache directory
+    executable = Path(sys.executable)
+    if ".cache/uv" in str(executable) or "uv/cache" in str(executable):
+        logger.debug("Detected uvx (ephemeral) execution")
+        return "uvx"
+
+    # Check for uv tool installation
+    try:
+        result = subprocess.run(
+            ["uv", "tool", "list"],  # noqa: S607, S603
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and "shotgun-sh" in result.stdout:
+            logger.debug("Detected uv tool installation")
+            return "uv-tool"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        pass
+
     # Check for pipx installation
     try:
         result = subprocess.run(
@@ -59,7 +86,7 @@ def detect_installation_method() -> str:
 
 
 def perform_auto_update(no_update_check: bool = False) -> None:
-    """Perform automatic update if installed via pipx.
+    """Perform automatic update if installed via pipx or uv tool.
 
     Args:
         no_update_check: If True, skip the update.
@@ -68,23 +95,40 @@ def perform_auto_update(no_update_check: bool = False) -> None:
         return
 
     try:
-        # Only auto-update for pipx installations
-        if detect_installation_method() != "pipx":
-            logger.debug("Not a pipx installation, skipping auto-update")
+        method = detect_installation_method()
+
+        # Skip auto-update for ephemeral uvx executions
+        if method == "uvx":
+            logger.debug("uvx (ephemeral) execution, skipping auto-update")
             return
 
-        # Run pipx upgrade quietly
-        logger.debug("Running pipx upgrade shotgun-sh --quiet")
-        result = subprocess.run(
-            ["pipx", "upgrade", "shotgun-sh", "--quiet"],  # noqa: S607, S603
+        # Only auto-update for pipx and uv-tool installations
+        if method not in ["pipx", "uv-tool"]:
+            logger.debug(f"Installation method '{method}', skipping auto-update")
+            return
+
+        # Determine the appropriate upgrade command
+        if method == "pipx":
+            command = ["pipx", "upgrade", "shotgun-sh", "--quiet"]
+            logger.debug("Running pipx upgrade shotgun-sh --quiet")
+        elif method == "uv-tool":
+            command = ["uv", "tool", "upgrade", "shotgun-sh"]
+            logger.debug("Running uv tool upgrade shotgun-sh")
+        else:
+            return
+
+        # Run upgrade command
+        result = subprocess.run(  # noqa: S603, S607
+            command,
             capture_output=True,
             text=True,
             timeout=30,
         )
 
         if result.returncode == 0:
-            # Check if there was an actual update (pipx shows output even with --quiet for actual updates)
-            if result.stdout and "upgraded" in result.stdout.lower():
+            # Check if there was an actual update
+            output = result.stdout.lower()
+            if "upgraded" in output or "updated" in output:
                 logger.info("Shotgun-sh has been updated to the latest version")
         else:
             # Only log errors at debug level to not annoy users
@@ -166,16 +210,18 @@ def compare_versions(current: str, latest: str) -> bool:
         return False
 
 
-def get_update_command(method: str) -> list[str]:
+def get_update_command(method: str) -> list[str] | None:
     """Get the appropriate update command based on installation method.
 
     Args:
-        method: Installation method ('pipx', 'pip', 'venv', or 'unknown').
+        method: Installation method ('uvx', 'uv-tool', 'pipx', 'pip', 'venv', or 'unknown').
 
     Returns:
-        Command list to execute for updating.
+        Command list to execute for updating, or None for uvx (ephemeral).
     """
     commands = {
+        "uvx": None,  # uvx is ephemeral, no update command
+        "uv-tool": ["uv", "tool", "upgrade", "shotgun-sh"],
         "pipx": ["pipx", "upgrade", "shotgun-sh"],
         "pip": [sys.executable, "-m", "pip", "install", "--upgrade", "shotgun-sh"],
         "venv": [sys.executable, "-m", "pip", "install", "--upgrade", "shotgun-sh"],
@@ -209,6 +255,15 @@ def perform_update(force: bool = False) -> tuple[bool, str]:
     # Detect installation method
     method = detect_installation_method()
     command = get_update_command(method)
+
+    # Handle uvx (ephemeral) installations
+    if method == "uvx" or command is None:
+        return (
+            False,
+            "You're running shotgun-sh via uvx (ephemeral mode). "
+            "To get the latest version, simply run 'uvx shotgun-sh' again, "
+            "or install permanently with 'uv tool install shotgun-sh'.",
+        )
 
     # Perform update
     try:

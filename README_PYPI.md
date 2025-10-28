@@ -28,13 +28,30 @@ Every research finding, every architectural decision, every "here's why we didn'
 
 ## Installation
 
-### Using pipx (Recommended)
+### Using uvx (Recommended)
+
+**Quick start (ephemeral):**
+```bash
+uvx shotgun-sh
+```
+
+**Install permanently:**
+```bash
+uv tool install shotgun-sh
+```
+
+**Why uvx?** It's 10-100x faster than pipx and handles binary wheels more reliably. If you don't have `uv` installed, get it at [astral.sh/uv](https://astral.sh/uv) or `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+### Using pipx
 
 ```bash
 pipx install shotgun-sh
 ```
 
-**Why pipx?** It installs Shotgun in an isolated environment, preventing dependency conflicts with your other Python projects.
+If you encounter build errors with kuzu on macOS:
+```bash
+pipx install --pip-args="--only-binary kuzu" shotgun-sh
+```
 
 ### Using pip
 

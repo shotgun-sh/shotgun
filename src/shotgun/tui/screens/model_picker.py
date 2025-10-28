@@ -13,6 +13,7 @@ from textual.widgets import Button, Label, ListItem, ListView, Static
 
 from shotgun.agents.config import ConfigManager
 from shotgun.agents.config.models import MODEL_SPECS, ModelName, ShotgunConfig
+from shotgun.agents.config.provider import get_default_model_for_provider
 from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -111,7 +112,7 @@ class ModelPickerScreen(Screen[None]):
             config_manager._provider_has_api_key(config.shotgun),
         )
 
-        current_model = config.selected_model or ModelName.CLAUDE_SONNET_4_5
+        current_model = config.selected_model or get_default_model_for_provider(config)
         self.selected_model = current_model
         logger.debug("Current selected model: %s", current_model)
 
@@ -193,7 +194,7 @@ class ModelPickerScreen(Screen[None]):
         """
         # Load config once with force_reload
         config = self.config_manager.load(force_reload=True)
-        current_model = config.selected_model or ModelName.CLAUDE_SONNET_4_5
+        current_model = config.selected_model or get_default_model_for_provider(config)
 
         # Update labels for available models only
         for model_name in AVAILABLE_MODELS:

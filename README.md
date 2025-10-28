@@ -10,7 +10,35 @@ A Python CLI tool for research, planning, and task management powered by AI agen
 
 ## Installation
 
-### From PyPI (Recommended)
+### Using uvx (Recommended)
+
+**Quick start (ephemeral):**
+```bash
+uvx shotgun-sh
+```
+
+**Install permanently:**
+```bash
+uv tool install shotgun-sh
+```
+
+**Why uvx?** It's 10-100x faster than pipx and handles binary wheels more reliably. If you don't have `uv` installed, get it at [astral.sh/uv](https://astral.sh/uv) or:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Using pipx
+
+```bash
+pipx install shotgun-sh
+```
+
+If you encounter build errors with kuzu on macOS:
+```bash
+pipx install --pip-args="--only-binary kuzu" shotgun-sh
+```
+
+### Using pip
 
 ```bash
 pip install shotgun-sh
@@ -115,6 +143,8 @@ shotgun --no-update-check research "topic"
 ### Installation Methods
 
 The update command automatically detects and uses the appropriate method:
+- **uvx**: Run `uvx shotgun-sh` again or use `uv tool install shotgun-sh` for permanent installation
+- **uv tool**: `uv tool upgrade shotgun-sh`
 - **pipx**: `pipx upgrade shotgun-sh`
 - **pip**: `pip install --upgrade shotgun-sh`
 - **venv**: Updates within the virtual environment

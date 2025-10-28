@@ -39,7 +39,10 @@ from shotgun.agents.models import (
     AgentType,
     FileOperationTracker,
 )
-from shotgun.codebase.core.manager import CodebaseAlreadyIndexedError
+from shotgun.codebase.core.manager import (
+    CodebaseAlreadyIndexedError,
+    CodebaseGraphManager,
+)
 from shotgun.codebase.models import IndexProgress, ProgressPhase
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
@@ -785,6 +788,28 @@ class ChatScreen(Screen[None]):
         except Exception as exc:  # pragma: no cover - defensive UI path
             self.notify(f"Failed to delete codebase: {exc}", severity="error")
 
+    def _is_kuzu_corruption_error(self, exception: Exception) -> bool:
+        """Check if error is related to kuzu database corruption.
+
+        Args:
+            exception: The exception to check
+
+        Returns:
+            True if the error indicates kuzu database corruption
+        """
+        error_str = str(exception).lower()
+        error_indicators = [
+            "not a directory",
+            "errno 20",
+            "corrupted",
+            ".kuzu",
+            "ioexception",
+            "unordered_map",  # C++ STL map errors from kuzu
+            "key not found",  # unordered_map::at errors
+            "std::exception",  # Generic C++ exceptions from kuzu
+        ]
+        return any(indicator in error_str for indicator in error_indicators)
+
     @work
     async def index_codebase(self, selection: CodebaseIndexSelection) -> None:
         label = self.query_one("#indexing-job-display", Static)
@@ -853,58 +878,96 @@ class ChatScreen(Screen[None]):
         # Start progress animation timer (10 fps = 100ms interval)
         progress_timer = self.set_interval(0.1, update_progress_display)
 
-        try:
-            # Pass the current working directory as the indexed_from_cwd
-            logger.debug(
-                f"Starting indexing - repo_path: {selection.repo_path}, "
-                f"name: {selection.name}, cwd: {Path.cwd().resolve()}"
-            )
-            result = await self.codebase_sdk.index_codebase(
-                selection.repo_path,
-                selection.name,
-                indexed_from_cwd=str(Path.cwd().resolve()),
-                progress_callback=progress_callback,
-            )
+        # Retry logic for handling kuzu corruption
+        max_retries = 3
 
-            # Stop progress animation
-            progress_timer.stop()
+        for attempt in range(max_retries):
+            try:
+                # Clean up corrupted DBs before retry (skip on first attempt)
+                if attempt > 0:
+                    logger.info(
+                        f"Retry attempt {attempt + 1}/{max_retries} - cleaning up corrupted databases"
+                    )
+                    manager = CodebaseGraphManager(
+                        self.codebase_sdk.service.storage_dir
+                    )
+                    cleaned = await manager.cleanup_corrupted_databases()
+                    logger.info(f"Cleaned up {len(cleaned)} corrupted database(s)")
+                    self.notify(
+                        f"Retrying indexing after cleanup (attempt {attempt + 1}/{max_retries})...",
+                        severity="information",
+                    )
 
-            # Show 100% completion after indexing finishes
-            final_bar = create_progress_bar(100.0)
-            label.update(f"[$foreground-muted]Indexing codebase: {final_bar} 100%[/]")
-            label.refresh()
+                # Pass the current working directory as the indexed_from_cwd
+                logger.debug(
+                    f"Starting indexing - repo_path: {selection.repo_path}, "
+                    f"name: {selection.name}, cwd: {Path.cwd().resolve()}"
+                )
+                result = await self.codebase_sdk.index_codebase(
+                    selection.repo_path,
+                    selection.name,
+                    indexed_from_cwd=str(Path.cwd().resolve()),
+                    progress_callback=progress_callback,
+                )
 
-            logger.info(
-                f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
-            )
-            self.notify(
-                f"Indexed codebase '{result.name}' (ID: {result.graph_id})",
-                severity="information",
-                timeout=8,
-            )
+                # Success! Stop progress animation
+                progress_timer.stop()
 
-        except CodebaseAlreadyIndexedError as exc:
-            progress_timer.stop()
-            logger.warning(f"Codebase already indexed: {exc}")
-            self.notify(str(exc), severity="warning")
-            return
-        except InvalidPathError as exc:
-            progress_timer.stop()
-            logger.error(f"Invalid path error: {exc}")
-            self.notify(str(exc), severity="error")
+                # Show 100% completion after indexing finishes
+                final_bar = create_progress_bar(100.0)
+                label.update(
+                    f"[$foreground-muted]Indexing codebase: {final_bar} 100%[/]"
+                )
+                label.refresh()
 
-        except Exception as exc:  # pragma: no cover - defensive UI path
-            # Log full exception details with stack trace
-            logger.exception(
-                f"Failed to index codebase - repo_path: {selection.repo_path}, "
-                f"name: {selection.name}, error: {exc}"
-            )
-            self.notify(f"Failed to index codebase: {exc}", severity="error")
-        finally:
-            # Always stop the progress timer
-            progress_timer.stop()
-            label.update("")
-            label.refresh()
+                logger.info(
+                    f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
+                )
+                self.notify(
+                    f"Indexed codebase '{result.name}' (ID: {result.graph_id})",
+                    severity="information",
+                    timeout=8,
+                )
+                break  # Success - exit retry loop
+
+            except CodebaseAlreadyIndexedError as exc:
+                progress_timer.stop()
+                logger.warning(f"Codebase already indexed: {exc}")
+                self.notify(str(exc), severity="warning")
+                return
+            except InvalidPathError as exc:
+                progress_timer.stop()
+                logger.error(f"Invalid path error: {exc}")
+                self.notify(str(exc), severity="error")
+                return
+
+            except Exception as exc:  # pragma: no cover - defensive UI path
+                # Check if this is a kuzu corruption error and we have retries left
+                if attempt < max_retries - 1 and self._is_kuzu_corruption_error(exc):
+                    logger.warning(
+                        f"Kuzu corruption detected on attempt {attempt + 1}/{max_retries}: {exc}. "
+                        f"Will retry after cleanup..."
+                    )
+                    # Exponential backoff: 1s, 2s
+                    await asyncio.sleep(2**attempt)
+                    continue
+
+                # Either final retry failed OR not a corruption error - show error
+                logger.exception(
+                    f"Failed to index codebase after {attempt + 1} attempts - "
+                    f"repo_path: {selection.repo_path}, name: {selection.name}, error: {exc}"
+                )
+                self.notify(
+                    f"Failed to index codebase after {attempt + 1} attempts: {exc}",
+                    severity="error",
+                    timeout=30,  # Keep error visible for 30 seconds
+                )
+                break
+
+        # Always stop the progress timer and clean up label
+        progress_timer.stop()
+        label.update("")
+        label.refresh()
 
     @work
     async def run_agent(self, message: str) -> None:

@@ -371,7 +371,16 @@ class CodebaseGraphManager:
                 )
                 import shutil
 
-                shutil.rmtree(graph_path)
+                # Handle both files and directories (kuzu v0.11.2+ uses files)
+                if graph_path.is_file():
+                    graph_path.unlink()  # Delete file
+                    # Also delete WAL file if it exists
+                    wal_path = graph_path.with_suffix(graph_path.suffix + ".wal")
+                    if wal_path.exists():
+                        wal_path.unlink()
+                        logger.debug(f"Deleted WAL file: {wal_path}")
+                else:
+                    shutil.rmtree(graph_path)  # Delete directory
 
         # Import the builder from local core module
         from shotgun.codebase.core import CodebaseIngestor
