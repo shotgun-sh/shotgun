@@ -85,7 +85,9 @@ On first run, configure your API keys through the web UI at http://localhost:800
 
 ## Full Documentation
 
-For complete documentation, installation options, and development setup, see the [main README](https://github.com/shotgun-sh/shotgun#readme).
+For complete Docker documentation including troubleshooting, advanced usage, and deployment guides, see [docs/DOCKER.md](docs/DOCKER.md).
+
+For general Shotgun documentation, installation options, and development setup, see the [main README](https://github.com/shotgun-sh/shotgun#readme).
 
 ## Support
 

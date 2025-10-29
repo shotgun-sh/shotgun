@@ -32,7 +32,7 @@ Every research finding, every architectural decision, every "here's why we didn'
 
 **Quick start (ephemeral):**
 ```bash
-uvx shotgun-sh
+uvx shotgun-sh@latest
 ```
 
 **Install permanently:**

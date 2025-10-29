@@ -1,12 +1,214 @@
-# Shotgun
+<p align="center">
+  <a href="https://discord.com/invite/5RmY6J2N7s">
+    <img src="https://img.shields.io/badge/Discord-Join%20Us-5865F2?logo=discord&logoColor=white" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" />
+  </a>
+</p>
 
-A Python CLI tool for research, planning, and task management powered by AI agents.
+<div align="center">
 
-## Features
+# SHOTGUN — Beta
 
-- **Research**: Perform research with agentic loops
-- **Planning**: Generate structured plans for achieving goals
-- **Tasks**: Generate prioritized task lists with agentic approaches
+<img width="600" height="200" alt="Shotgun Logo" src="docs/shotgun_logo.png" />
+
+### Shotgun is a CLI that turns what you want to work on into _research → specs → plans → tasks → implementation_ with full codebase understanding and agents doing the heavy lifting.
+
+It produces clean, reusable artifacts and exports to the [agents.md](https://github.com/openai/agents.md) ecosystem to help you get the most out of code-gen tools and Agents.
+
+```bash
+uvx shotgun-sh@latest
+```
+
+</div>
+
+---
+
+## Table of Contents
+
+- [Quickstart](#quickstart)
+- [Why Shotgun?](#why-shotgun)
+- [How It Works](#how-it-works)
+- [Core Features](#core-features)
+- [Use Cases](#use-cases)
+- [Demo](#demo)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Auto-Updates](#auto-updates)
+- [Docker](#docker)
+- [Roadmap](#roadmap)
+- [FAQ](#faq)
+- [Contributing](#contributing)
+- [Support](#support)
+
+---
+
+<h2 id="quickstart">Quickstart</h2>
+
+Shotgun is installed via `uvx` or `uv tool install`. First, install uv for your platform:
+
+> [!WARNING]
+> If you tried out an alpha version of shotgun, make sure to uninstall it:
+> `npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server`
+
+### Step 1: Install uv
+
+#### macOS
+
+**Using Homebrew (recommended):**
+```bash
+brew install uv
+```
+
+**Using curl:**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Linux
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Windows
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+_Restart your terminal after installation_
+
+---
+
+### Step 2: Run Shotgun
+
+Once uv is installed, run shotgun using one of these methods:
+
+**Option 1: Ephemeral execution (recommended for trying out)**
+```bash
+uvx shotgun-sh@latest
+```
+
+**Option 2: Permanent installation (recommended for regular use)**
+```bash
+uv tool install shotgun-sh
+```
+
+Then run:
+```bash
+shotgun
+```
+
+**Why uv?** It's 10-100x faster than other package managers and handles binary wheels reliably, preventing build errors on systems without cmake/build tools.
+
+---
+
+### Step 3: Get Started
+
+**Shotgun will guide you through:**
+
+- Indexing your codebase into a searchable graph
+- Setting up your LLM provider (OpenAI, Anthropic, or Gemini)
+- Starting your first research session
+
+**Pro tip:** Run Shotgun in your IDE's terminal for the best experience.
+
+---
+
+## What You Get Today
+
+- **Spec-driven workflow** across five Modes: `research → specify → plan → tasks → implement`
+- **Deterministic artifacts** you can version in Git
+- **Export to agents.md** so outputs plug into many code-generation tools (Codex, Cursor, Warp, Devin, opencode, Jules and so on)
+- **Local-first CLI** with minimal setup
+
+> Shotgun sits _under_ your codegen tools: it creates the structured inputs those tools need and keeps them consistent across the lifecycle.
+
+---
+
+## Why Shotgun?
+
+### 🎯 **Know your code. Decide faster.**
+
+- Answers grounded in your actual repo via a live code graph—no guessing or stale context
+- Cut research time: query your codebase, web, GitHub, and docs in one place
+- Turn clarity into action with specs and plans that stay in sync with your project
+
+### 🚀 **From idea to shipped—without chaos.**
+
+- Five guided modes: Research → Spec → Plan → Tasks → Export
+- Structured, editable artifacts live in your repo for review and clean handoffs
+- Export specs/tasks to any AI tool or workflow and keep a single source of truth
+
+### 🛡️ **AI speed with production-grade safety.**
+
+- Codebase-aware guardrails, conflict detection, and architecture constraints keep work on track
+- Human-in-the-loop checkpoints and streamed progress give control when it matters
+- Telemetry and change tracking reduce rework and late-night incidents
+
+---
+
+## How It Works
+
+1. **Install & Connect** - Point at your repo. Shotgun builds a live code graph.
+2. **Research What Exists** - Ask in plain English: "How do we handle auth?" Shotgun queries your code graph AND searches npm, GitHub, docs.
+3. **Choose Your Mode** - Research → Specify → Plan → Tasks → Export. Start anywhere. Each mode has specialized agents.
+4. **Review & Guide** - Watch agents work in your terminal. See what they find. Approve key decisions.
+5. **Export to Any Tool** - Export artifacts into agents.md format to drive downstream tools
+
+---
+
+## Core Features
+
+### 📊 **Complete Codebase Understanding**
+
+Before writing a single line, Shotgun reads all of it. Your patterns. Your dependencies. Your technical debt. Whether you're adding features, onboarding devs, planning migrations, or refactoring - Shotgun knows what you're working with.
+
+### 🔄 **Five Modes. One Journey. Zero Gaps.**
+
+**Research** (what exists) → **Specify** (what to build) → **Plan** (how to build) → **Tasks** (break it down) → **Export** (to any tool)
+
+Not another chatbot. A complete workflow where each mode feeds the next.
+
+### 📝 **Specs That Don't Die in Slack**
+
+Every research finding, every architectural decision, every "here's why we didn't use that library" - captured as markdown in your repo. Version controlled. Searchable.
+
+### ➡️ **Export to agents.md**
+
+Outputs plug into many code-generation tools including Codex, Cursor, Warp, Devin, opencode, Jules, and more.
+
+---
+
+## Use Cases
+
+- **🚀 Onboarding** - New developer? Shotgun maps your entire architecture and generates docs that actually match the code
+- **🔧 Refactoring** - Understand all dependencies before touching anything. Keep your refactor from becoming a rewrite
+- **🌱 Greenfield Projects** - Research existing solutions globally before writing line one
+- **➕ Adding Features** - Know exactly where your feature fits. Prevent duplicate functionality
+- **📦 Migration** - Map the old, plan the new, track the delta. Break migration into safe stages
+
+---
+
+<h2 id="demo">Demo</h2>
+
+**See Shotgun in action:**
+
+<p align="center">
+  <a href="https://youtu.be/eEUaSaQJBPg">
+    <img src="https://github.com/user-attachments/assets/da115b12-7ca5-4bbc-ae20-3684f971b567" alt="Watch the Shotgun demo" width="720" height="450">
+  </a>
+</p>
+
+**Give Shotgun a spin:**
+
+```bash
+Onboard me to this codebase.
+```
+
+---
 
 ## Installation
 
@@ -14,7 +216,7 @@ A Python CLI tool for research, planning, and task management powered by AI agen
 
 **Quick start (ephemeral):**
 ```bash
-uvx shotgun-sh
+uvx shotgun-sh@latest
 ```
 
 **Install permanently:**
@@ -47,11 +249,6 @@ shotgun --help
 uv run shotgun --help
 ```
 
-If installed from PyPI, simply use:
-```bash
-shotgun --help
-```
-
 ### Virtual Environment Setup (Optional)
 
 If you prefer using a local virtual environment:
@@ -63,6 +260,8 @@ uv sync --all-extras
 shotgun --help
 ```
 
+---
+
 ## Usage
 
 ### Using Direct Commands (after uv sync)
@@ -71,12 +270,17 @@ shotgun --help
 # Research a topic
 shotgun research "What is quantum computing?"
 
-# Generate a plan
+# Generate a specification
+shotgun spec "Add OAuth2 authentication"
+
+# Create a plan
 shotgun plan "Build a web application"
-shotgun plan "build me a house"
 
 # Generate tasks for a project
 shotgun tasks "Create a machine learning model"
+
+# Export to agents.md
+shotgun export
 ```
 
 ### Using uv run
@@ -91,6 +295,8 @@ uv run shotgun plan "Build a web application"
 # Generate tasks for a project
 uv run shotgun tasks "Create a machine learning model"
 ```
+
+---
 
 ## Auto-Updates
 
@@ -126,427 +332,133 @@ shotgun --no-update-check research "topic"
 ### Installation Methods
 
 The update command automatically detects and uses the appropriate method:
-- **uvx**: Run `uvx shotgun-sh` again or use `uv tool install shotgun-sh` for permanent installation
+- **uvx**: Run `uvx shotgun-sh@latest` again or use `uv tool install shotgun-sh` for permanent installation
 - **uv tool**: `uv tool upgrade shotgun-sh`
 - **venv**: Updates within the virtual environment
 
-## Development Setup
-
-### Requirements
-
-- **Python 3.11+** (3.13 recommended)
-- **uv** - Fast Python package installer and resolver
-- **actionlint** (optional) - For GitHub Actions workflow validation
-
-### Quick Start
-
-1. **Clone and setup**:
-   ```bash
-   git clone https://github.com/shotgun-sh/shotgun.git
-   cd shotgun
-   ```
-
-2. **Install uv** (if not already installed):
-   ```bash
-   # macOS/Linux
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   
-   # Or via brew
-   brew install uv
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   uv sync --all-extras
-   ```
-
-4. **Install git hooks**:
-   ```bash
-   uv run lefthook install
-   ```
-
-5. **Verify setup**:
-   ```bash
-   uv run shotgun --version
-   ```
-
-### Development Commands
-
-```bash
-# Run the CLI
-uv run shotgun --help
-
-# Run the TUI
-uv run tui
-
-# Run tests
-uv run pytest
-
-# Run tests with coverage
-uv run pytest --cov=src --cov-report=term-missing --cov-report=html
-
-# Run linting
-uv run ruff check .
-
-# Run formatting
-uv run ruff format .
-
-# Run type checking
-uv run mypy src/
-
-# Run all pre-commit hooks manually
-uv run lefthook run pre-commit
-```
-
-### Code Coverage
-
-To analyze test coverage and identify areas that need testing:
-
-```bash
-# Run tests with coverage analysis
-uv run pytest --cov=src --cov-report=term-missing --cov-report=html
-```
-
-This will:
-- Display coverage summary in the terminal
-- Generate a detailed HTML coverage report
-
-**Viewing the coverage report:**
-Open `htmlcov/index.html` in your browser to see:
-- Overall coverage percentage
-- File-by-file coverage breakdown  
-- Line-by-line coverage highlighting
-- Missing coverage areas
-
-The coverage configuration is in `pyproject.toml` and will automatically run when you use `uv run pytest`.
-
-### Git Hooks (Lefthook)
-
-This project uses [lefthook](https://github.com/evilmartians/lefthook) for git hooks. The hooks automatically run:
-
-- **ruff** - Python linting with auto-fix
-- **ruff-format** - Code formatting
-- **mypy** - Type checking
-- **trufflehog** - Secret scanning to prevent committed credentials
-- **commitizen** - Commit message validation
-- **actionlint** - GitHub Actions workflow validation (if installed)
-
-#### Installing trufflehog (required)
-
-Trufflehog scans your commits for secrets and API keys before they're pushed to the repository.
-
-```bash
-# macOS
-brew install trufflehog
-
-# Linux
-curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
-```
-
-**Manual secret scanning:**
-
-```bash
-# Quick scan: commits since HEAD (excludes uv.lock to avoid false positives)
-trufflehog git file://. --since-commit HEAD --exclude-globs=uv.lock
-
-# Full two-pass scan (recommended for comprehensive checking):
-# Pass 1: Scan everything except uv.lock
-trufflehog git file://. --exclude-globs=uv.lock
-
-# Pass 2: Scan uv.lock only, excluding SentryToken detector
-trufflehog git file://. --include-paths=.trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
-```
-
-**Two-Pass Scanning Strategy:**
-
-We use a defense-in-depth approach with two separate scans:
-- **Pass 1**: Scans all files except `uv.lock` with all detectors enabled
-- **Pass 2**: Scans ONLY `uv.lock` with SentryToken detector disabled
-
-This prevents false positives from Sentry SDK package hashes while still catching any real secrets that might somehow end up in lock files (e.g., credentials in package URLs).
-
-#### Installing actionlint (recommended)
-
-```bash
-# macOS
-brew install actionlint
-
-# Linux/macOS (direct download)
-curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash
-
-# Go install
-go install github.com/rhysd/actionlint/cmd/actionlint@latest
-```
-
-
-### Python Version Management
-
-The project supports **Python 3.11+**. The `.python-version` file specifies Python 3.11 to ensure development against the minimum supported version.
-
-If using **pyenv**:
-```bash
-pyenv install 3.11
-```
-
-If using **uv** (recommended):
-```bash
-uv python install 3.11
-uv sync --python 3.11
-```
-
-### Commit Message Convention
-
-This project enforces **Conventional Commits** specification. All commit messages must follow this format:
-
-```
-<type>[optional scope]: <description>
-```
-
-**Required commit types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code formatting changes
-- `refactor`: Code restructuring without feature changes
-- `perf`: Performance improvements
-- `test`: Adding or updating tests
-- `build`: Build system changes
-- `ci`: CI/CD changes
-- `chore`: Maintenance tasks
-- `revert`: Reverting previous commits
-
-**Examples:**
-```bash
-feat: add user authentication system
-fix: resolve memory leak in data processing
-docs: update API documentation
-refactor: simplify user validation logic
-```
-
-**For interactive commit creation:**
-```bash
-uv run cz commit
-```
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/feature-name`
-3. Make your changes
-4. Run the pre-commit hooks: `uv run lefthook run pre-commit`
-5. Commit with conventional format: `git commit -m "feat: add new feature"`
-6. Push to your fork: `git push origin feat/feature-name`
-7. Create a Pull Request with conventional title format
-
-### CI/CD
-
-GitHub Actions automatically:
-- Runs on pull requests and pushes to main
-- Tests with Python 3.11
-- Validates code with ruff, ruff-format, and mypy
-- Ensures all checks pass before merge
-
-## Observability & Telemetry
-
-Shotgun includes built-in observability with Sentry for error tracking and Logfire for logging and tracing. Both services track users anonymously using a UUID generated on first run.
-
-### Anonymous User Tracking
-
-Each user gets a unique anonymous ID stored in their config:
-```bash
-# Get your anonymous user ID
-shotgun config get-user-id
-```
-
-This ID is automatically included in:
-- **Sentry**: Error reports and exceptions
-- **Logfire**: All logs, traces, and spans
-
-### Logfire Queries
-
-Logfire uses SQL for querying logs. Here are helpful queries for debugging and analysis:
-
-#### Find all logs for a specific user
-```sql
-SELECT * FROM records
-WHERE attributes->>'user_id' = 'your-user-id-here'
-ORDER BY timestamp DESC;
-```
-
-#### Track user actions
-```sql
-SELECT
-  timestamp,
-  span_name,
-  message,
-  attributes
-FROM records
-WHERE attributes->>'user_id' = 'your-user-id-here'
-  AND span_name LIKE '%research%'
-ORDER BY timestamp DESC;
-```
-
-#### Find slow operations for a user
-```sql
-SELECT
-  span_name,
-  duration_ms,
-  attributes
-FROM records
-WHERE attributes->>'user_id' = 'your-user-id-here'
-  AND duration_ms > 1000
-ORDER BY duration_ms DESC;
-```
-
-#### Find errors for a user
-```sql
-SELECT * FROM records
-WHERE attributes->>'user_id' = 'your-user-id-here'
-  AND level = 'error'
-ORDER BY timestamp DESC;
-```
-
-#### Analyze user's AI provider usage
-```sql
-SELECT
-  attributes->>'provider' as provider,
-  COUNT(*) as usage_count,
-  AVG(duration_ms) as avg_duration
-FROM records
-WHERE attributes->>'user_id' = 'your-user-id-here'
-  AND attributes->>'provider' IS NOT NULL
-GROUP BY provider;
-```
-
-#### Track feature usage by user
-```sql
-SELECT
-  span_name,
-  COUNT(*) as usage_count
-FROM records
-WHERE attributes->>'user_id' = 'your-user-id-here'
-  AND span_name IN ('research', 'plan', 'tasks')
-GROUP BY span_name
-ORDER BY usage_count DESC;
-```
-
-### Setting Up Observability (Optional)
-
-For local development with Logfire:
-```bash
-# Set environment variables (SHOTGUN_ prefix required)
-export SHOTGUN_LOGFIRE_ENABLED=true
-export SHOTGUN_LOGFIRE_TOKEN=your-logfire-token
-
-# Run shotgun - will now send logs to Logfire
-shotgun research "topic"
-```
-
-For Sentry (automatically configured in production builds):
-```bash
-# Set for local development (SHOTGUN_ prefix required)
-export SHOTGUN_SENTRY_DSN=your-sentry-dsn
-```
-
-For PostHog analytics (automatically configured in production builds):
-```bash
-# Set for local development (SHOTGUN_ prefix required)
-export SHOTGUN_POSTHOG_API_KEY=your-posthog-api-key
-export SHOTGUN_POSTHOG_PROJECT_ID=your-posthog-project-id
-```
-
-**Note:** All telemetry environment variables use the `SHOTGUN_` prefix to avoid conflicts with other tools. In production builds, these values are embedded at build time via Hatch build hooks.
-
-### Privacy
-
-- **No PII collected**: Only anonymous UUIDs are used for identification
-- **Opt-in for development**: Telemetry requires explicit environment variables
-- **Automatic in production**: Production builds include telemetry for error tracking
+---
 
 ## Docker
 
-Run Shotgun in a Docker container with web access.
+Run Shotgun in a Docker container with web access. Perfect for deployment and isolated environments.
 
-### Using Pre-built Images (Recommended)
-
-Pull the official image from GitHub Container Registry:
+### Quick Start
 
 ```bash
-# Pull latest stable version
-docker pull ghcr.io/shotgun-sh/shotgun:latest
+cd /path/to/your/project
 
-# Or pull a specific version
-docker pull ghcr.io/shotgun-sh/shotgun:v0.1.0
-
-# Or pull development version
-docker pull ghcr.io/shotgun-sh/shotgun:dev
-```
-
-Then run:
-
-```bash
 docker run -p 8000:8000 \
   -v $(pwd):/workspace \
   -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
-  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+  ghcr.io/shotgun-sh/shotgun:latest
 ```
 
-**Note:** The Docker image automatically includes `--force-reindex` to ensure fresh indexing on startup. You don't need to add any additional flags.
+Access the web interface at **http://localhost:8000**
 
-### Building from Source (Optional)
+### Available Images
 
-If you prefer to build the image yourself:
+- **`latest`** - ✅ **Recommended** - Latest stable release
+- **`v0.1.0`** - Specific version tags
+- **`dev`** - ❌ **Not recommended** - Development version (for developers only)
 
-```bash
-docker build -t shotgun:latest .
-```
+For detailed Docker documentation including custom ports, background mode, troubleshooting, and more, see [Docker Guide](docs/DOCKER.md).
 
-### Run the Container
+---
 
-The container requires two volume mounts:
-1. Your codebase/workspace directory (mounted to `/workspace`)
-2. Config directory for API keys and settings (mounted to `/home/shotgun/.shotgun-sh`)
+<h2 id="roadmap">Roadmap</h2>
 
-```bash
-# Basic usage (serves on port 8000)
-docker run -p 8000:8000 \
-  -v $(pwd):/workspace \
-  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
-  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+### 🚧 Coming Soon
 
-# Custom port
-docker run -p 3000:3000 \
-  -v $(pwd):/workspace \
-  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
-  ghcr.io/shotgun-sh/shotgun:latest --no-update-check --port 3000
+- [ ] Token usage display & spend tracking
+- [ ] Support for local LLMs
+- [ ] Linear agents integration
+- [ ] Attachments: add screenshots / PDFs / files to Shotgun
+- [ ] Performance improvements (make Shotgun faster)
 
-# Different codebase directory
-docker run -p 8000:8000 \
-  -v /path/to/your/project:/workspace \
-  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
-  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
+---
 
-# Run in background with auto-restart
-docker run -d --restart unless-stopped \
-  --name shotgun-web \
-  -p 8000:8000 \
-  -v $(pwd):/workspace \
-  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
-  ghcr.io/shotgun-sh/shotgun:latest --no-update-check
-```
+## FAQ
 
-**All Docker commands automatically include `--force-reindex`** - you don't need to specify it. The flag is baked into the Docker image's ENTRYPOINT to ensure reliable codebase indexing in containerized environments.
+**Q: Does Shotgun collect any stats or data?**
+A: We only gather minimal, anonymous events (e.g., install, server start, tool call). We don't collect the content itself—only that an event occurred. We use Sentry for error reporting to improve stability.
 
-### Configuration
+**Q: Local LLMs?**
+A: Planned. We'll publish compatibility notes and local provider integrations.
 
-On first run, configure your API keys through the web UI. The configuration will persist in the mounted `~/.shotgun-sh` directory.
+**Q: What LLM providers are supported?**
+A: Currently OpenAI, Anthropic (Claude), and Google Gemini. Local LLM support is on the roadmap.
 
-Access the web interface at `http://localhost:8000` (or your custom port).
+**Q: Can I use Shotgun offline?**
+A: You need an internet connection for LLM API calls, but your codebase stays local.
 
-### Codebase Indexing in Docker
+**Q: How does the code graph work?**
+A: Shotgun indexes your codebase using tree-sitter for accurate parsing and creates a searchable graph of your code structure, dependencies, and relationships.
 
-The Docker image automatically prompts you to index the codebase on each startup. This ensures you're always working with up-to-date code analysis, even if the container restarts or you mount a different directory. Simply click "Index now" when prompted.
+---
+
+<h2 id="contributing">Contributing</h2>
+
+Shotgun is in Beta — we'd love your feedback and support!
+
+We welcome contributions! Whether you're fixing bugs, adding features, or improving documentation, your help makes Shotgun better.
+
+### Get Started
+
+- Join our [Discord community](https://discord.gg/5RmY6J2N7s)
+- Read the [Contributing Guide](docs/CONTRIBUTING.md)
+- Check out [open issues](https://github.com/shotgun-sh/shotgun/issues)
+- Review the [Git Hooks documentation](docs/GIT_HOOKS.md)
+
+### Development Resources
+
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Setup, workflow, and guidelines
+- **[Git Hooks](docs/GIT_HOOKS.md)** - Lefthook, trufflehog, and security scanning
+- **[CI/CD](docs/CI_CD.md)** - GitHub Actions and automated testing
+- **[Observability](docs/OBSERVABILITY.md)** - Telemetry, Logfire, and monitoring
+- **[Docker](docs/DOCKER.md)** - Container setup and deployment
+
+---
 
 ## Support
 
-Join our discord https://discord.gg/5RmY6J2N7s
+**Join our community:**
+- [Discord](https://discord.gg/5RmY6J2N7s) - Get help and discuss Shotgun
+- [GitHub Issues](https://github.com/shotgun-sh/shotgun/issues) - Report bugs and request features
+- [Website](https://shotgun.sh) - Learn more about Shotgun
+- [Product Hunt](https://www.producthunt.com/posts/shotgun) - We hit #7 on Product Hunt!
+
+### Uninstall
+
+```bash
+uv tool uninstall shotgun-sh
+```
+
+### Troubleshooting
+
+**Do you have the old version of Shotgun? (shotgun-alpha)**
+
+Uninstall the shotgun alpha (previous version):
+
+```bash
+npm uninstall -g @proofs-io/shotgun --loglevel=error
+npm uninstall -g @proofs-io/shotgun-server --loglevel=error
+```
+
+---
+
+<div align="center">
+
+<h2>🚀 Ready to write specs that truly capture your intents?</h2>
+
+<p><strong>Research (what exists) → Specify (what to build) → Plan (how to build) → Tasks (break it down) → Export (to any tool)</strong></p>
+
+<pre><code>uvx shotgun-sh@latest</code></pre>
+
+<p>⚡ Takes 30 seconds to install.<br>
+🤠 Join the posse on <a href="https://discord.com/invite/5RmY6J2N7s">Discord</a> to share what you build.</p>
+
+</div>
+
+---
+
+**License:** MIT | **Python:** 3.11+ | **Homepage:** [shotgun.sh](https://shotgun.sh/)

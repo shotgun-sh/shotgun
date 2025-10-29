@@ -64,7 +64,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 **Ephemeral (no installation):**
 ```bash
-uvx shotgun-sh
+uvx shotgun-sh@latest
 ```
 
 **Or install permanently:**
