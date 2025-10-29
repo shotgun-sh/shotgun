@@ -40,24 +40,7 @@ uvx shotgun-sh
 uv tool install shotgun-sh
 ```
 
-**Why uvx?** It's 10-100x faster than pipx and handles binary wheels more reliably. If you don't have `uv` installed, get it at [astral.sh/uv](https://astral.sh/uv) or `curl -LsSf https://astral.sh/uv/install.sh | sh`
-
-### Using pipx
-
-```bash
-pipx install shotgun-sh
-```
-
-If you encounter build errors with kuzu on macOS:
-```bash
-pipx install --pip-args="--only-binary kuzu" shotgun-sh
-```
-
-### Using pip
-
-```bash
-pip install shotgun-sh
-```
+If you don't have `uv` installed, get it at [astral.sh/uv](https://astral.sh/uv) or `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ## Quick Start
 
