@@ -13,6 +13,10 @@ pre-commit:
       run: uv run mypy {staged_files}
       glob: "*.py"
       exclude: "(^test/|hatch_build\\.py)"
+    trufflehog-main:
+      run: trufflehog git file://. --since-commit HEAD --fail --no-update --exclude-globs=uv.lock
+    trufflehog-lockfile:
+      run: trufflehog git file://. --since-commit HEAD --fail --no-update --include-paths=.trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
     actionlint:
       run: actionlint {staged_files}
       glob: ".github/workflows/*.yml"

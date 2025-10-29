@@ -244,10 +244,45 @@ The coverage configuration is in `pyproject.toml` and will automatically run whe
 This project uses [lefthook](https://github.com/evilmartians/lefthook) for git hooks. The hooks automatically run:
 
 - **ruff** - Python linting with auto-fix
-- **ruff-format** - Code formatting  
+- **ruff-format** - Code formatting
 - **mypy** - Type checking
+- **trufflehog** - Secret scanning to prevent committed credentials
 - **commitizen** - Commit message validation
 - **actionlint** - GitHub Actions workflow validation (if installed)
+
+#### Installing trufflehog (required)
+
+Trufflehog scans your commits for secrets and API keys before they're pushed to the repository.
+
+```bash
+# macOS
+brew install trufflehog
+
+# Linux
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+```
+
+**Manual secret scanning:**
+
+```bash
+# Quick scan: commits since HEAD (excludes uv.lock to avoid false positives)
+trufflehog git file://. --since-commit HEAD --exclude-globs=uv.lock
+
+# Full two-pass scan (recommended for comprehensive checking):
+# Pass 1: Scan everything except uv.lock
+trufflehog git file://. --exclude-globs=uv.lock
+
+# Pass 2: Scan uv.lock only, excluding SentryToken detector
+trufflehog git file://. --include-paths=.trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
+```
+
+**Two-Pass Scanning Strategy:**
+
+We use a defense-in-depth approach with two separate scans:
+- **Pass 1**: Scans all files except `uv.lock` with all detectors enabled
+- **Pass 2**: Scans ONLY `uv.lock` with SentryToken detector disabled
+
+This prevents false positives from Sentry SDK package hashes while still catching any real secrets that might somehow end up in lock files (e.g., credentials in package URLs).
 
 #### Installing actionlint (recommended)
 
