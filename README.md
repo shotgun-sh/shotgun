@@ -418,9 +418,9 @@ ORDER BY usage_count DESC;
 
 For local development with Logfire:
 ```bash
-# Set environment variables
-export LOGFIRE_ENABLED=true
-export LOGFIRE_TOKEN=your-logfire-token
+# Set environment variables (SHOTGUN_ prefix required)
+export SHOTGUN_LOGFIRE_ENABLED=true
+export SHOTGUN_LOGFIRE_TOKEN=your-logfire-token
 
 # Run shotgun - will now send logs to Logfire
 shotgun research "topic"
@@ -428,9 +428,18 @@ shotgun research "topic"
 
 For Sentry (automatically configured in production builds):
 ```bash
-# Set for local development
-export SENTRY_DSN=your-sentry-dsn
+# Set for local development (SHOTGUN_ prefix required)
+export SHOTGUN_SENTRY_DSN=your-sentry-dsn
 ```
+
+For PostHog analytics (automatically configured in production builds):
+```bash
+# Set for local development (SHOTGUN_ prefix required)
+export SHOTGUN_POSTHOG_API_KEY=your-posthog-api-key
+export SHOTGUN_POSTHOG_PROJECT_ID=your-posthog-project-id
+```
+
+**Note:** All telemetry environment variables use the `SHOTGUN_` prefix to avoid conflicts with other tools. In production builds, these values are embedded at build time via Hatch build hooks.
 
 ### Privacy
 

@@ -10,6 +10,7 @@ from shotgun import __version__
 from shotgun.agents.config import get_config_manager
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.logging_config import get_early_logger
+from shotgun.settings import settings
 
 # Use early logger to prevent automatic StreamHandler creation
 logger = get_early_logger(__name__)
@@ -32,10 +33,15 @@ def setup_posthog_observability() -> bool:
             logger.debug("PostHog is already initialized, skipping")
             return True
 
-        # Hardcoded PostHog configuration
-        api_key = "phc_KKnChzZUKeNqZDOTJ6soCBWNQSx3vjiULdwTR9H5Mcr"
+        # Get API key from settings (handles build constants + env vars automatically)
+        api_key = settings.telemetry.posthog_api_key
 
-        logger.debug("Using hardcoded PostHog configuration")
+        # If no API key is available, skip PostHog initialization
+        if not api_key:
+            logger.debug("No PostHog API key available, skipping initialization")
+            return False
+
+        logger.debug("Using PostHog API key from settings")
 
         # Determine environment based on version
         # Dev versions contain "dev", "rc", "alpha", or "beta"

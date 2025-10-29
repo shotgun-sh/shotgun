@@ -1,6 +1,5 @@
 """Simple auto-update functionality for shotgun-sh CLI."""
 
-import os
 import subprocess
 import sys
 import threading
@@ -11,6 +10,7 @@ from packaging import version
 
 from shotgun import __version__
 from shotgun.logging_config import get_logger
+from shotgun.settings import settings
 
 logger = get_logger(__name__)
 
@@ -22,8 +22,8 @@ def detect_installation_method() -> str:
         Installation method: 'uvx', 'uv-tool', 'pipx', 'pip', 'venv', or 'unknown'.
     """
     # Check for simulation environment variable (for testing)
-    if os.getenv("PIPX_SIMULATE", "").lower() in ("true", "1"):
-        logger.debug("PIPX_SIMULATE enabled, simulating pipx installation")
+    if settings.dev.pipx_simulate:
+        logger.debug("SHOTGUN_PIPX_SIMULATE enabled, simulating pipx installation")
         return "pipx"
 
     # Check for uvx (ephemeral execution) by looking at executable path

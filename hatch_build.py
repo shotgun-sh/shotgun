@@ -20,19 +20,19 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
             for marker in ["dev", "rc", "alpha", "beta", "a", "b"]
         )
 
-        # Only generate constants if SENTRY_DSN is provided (production builds)
-        sentry_dsn = os.environ.get("SENTRY_DSN", "")
+        # Get Sentry configuration from environment (SHOTGUN_ prefix for production builds)
+        sentry_dsn = os.environ.get("SHOTGUN_SENTRY_DSN", "")
 
-        # Get PostHog configuration from environment
-        posthog_api_key = os.environ.get("POSTHOG_API_KEY", "")
-        posthog_project_id = os.environ.get("POSTHOG_PROJECT_ID", "")
+        # Get PostHog configuration from environment (SHOTGUN_ prefix)
+        posthog_api_key = os.environ.get("SHOTGUN_POSTHOG_API_KEY", "")
+        posthog_project_id = os.environ.get("SHOTGUN_POSTHOG_PROJECT_ID", "")
 
-        # Get Logfire configuration (only for dev builds)
+        # Get Logfire configuration (SHOTGUN_ prefix, only for dev builds)
         logfire_enabled = ""
         logfire_token = ""
         if is_dev_build:
-            logfire_enabled = os.environ.get("LOGFIRE_ENABLED", "")
-            logfire_token = os.environ.get("LOGFIRE_TOKEN", "")
+            logfire_enabled = os.environ.get("SHOTGUN_LOGFIRE_ENABLED", "")
+            logfire_token = os.environ.get("SHOTGUN_LOGFIRE_TOKEN", "")
 
         # Generate Python configuration file with build-time constants
         constants_content = f'''"""Build-time constants generated during packaging.

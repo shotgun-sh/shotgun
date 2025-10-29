@@ -99,18 +99,19 @@ jobs:
 
       - name: Build package
         env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          # Map GitHub secrets to SHOTGUN_ prefixed environment variables for build
+          SHOTGUN_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SHOTGUN_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          SHOTGUN_POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
           # Logfire configuration for dev builds only
-          LOGFIRE_TOKEN: ${{ steps.version_update.outputs.is_dev == 'true' && secrets.LOGFIRE_TOKEN || '' }}
-          LOGFIRE_ENABLED: ${{ steps.version_update.outputs.is_dev == 'true' && 'true' || '' }}
+          SHOTGUN_LOGFIRE_TOKEN: ${{ steps.version_update.outputs.is_dev == 'true' && secrets.LOGFIRE_TOKEN || '' }}
+          SHOTGUN_LOGFIRE_ENABLED: ${{ steps.version_update.outputs.is_dev == 'true' && 'true' || '' }}
         run: |
           echo "🔨 Building package version: ${{ steps.version_update.outputs.version }}"
-          if [[ -n "$SENTRY_DSN" ]] || [[ -n "$POSTHOG_API_KEY" ]] || [[ "$LOGFIRE_ENABLED" == "true" ]]; then
-            [[ -n "$SENTRY_DSN" ]] && echo "✅ Building with Sentry integration enabled"
-            [[ -n "$POSTHOG_API_KEY" ]] && echo "✅ Building with PostHog analytics enabled"
-            [[ "$LOGFIRE_ENABLED" == "true" ]] && echo "✅ Building with Logfire observability enabled (dev build)"
+          if [[ -n "$SHOTGUN_SENTRY_DSN" ]] || [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] || [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]]; then
+            [[ -n "$SHOTGUN_SENTRY_DSN" ]] && echo "✅ Building with Sentry integration enabled"
+            [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] && echo "✅ Building with PostHog analytics enabled"
+            [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]] && echo "✅ Building with Logfire observability enabled (dev build)"
           else
             echo "⚠️  Building without analytics (Sentry/PostHog/Logfire will use fallback)"
           fi

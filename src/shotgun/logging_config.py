@@ -2,10 +2,10 @@
 
 import logging
 import logging.handlers
-import os
 import sys
 from pathlib import Path
 
+from shotgun.settings import settings
 from shotgun.utils.env_utils import is_truthy
 
 
@@ -75,12 +75,10 @@ def setup_logger(
     if has_file_handler:
         return logger
 
-    # Get log level from environment variable, default to INFO
-    env_level = os.getenv("SHOTGUN_LOG_LEVEL", "INFO").upper()
-    if env_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-        env_level = "INFO"
+    # Get log level from settings (already validated and uppercased)
+    log_level = settings.logging.log_level
 
-    logger.setLevel(getattr(logging, env_level))
+    logger.setLevel(getattr(logging, log_level))
 
     # Default format string
     if format_string is None:
@@ -102,13 +100,13 @@ def setup_logger(
     # Check if console logging is enabled (default: off)
     # Force console logging OFF if Logfire is enabled in dev build
     console_logging_enabled = (
-        is_truthy(os.getenv("LOGGING_TO_CONSOLE", "false")) and not is_logfire_dev_build
+        settings.logging.logging_to_console and not is_logfire_dev_build
     )
 
     if console_logging_enabled:
         # Create console handler
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(getattr(logging, env_level))
+        console_handler.setLevel(getattr(logging, log_level))
 
         # Use colored formatter for console
         console_formatter = ColoredFormatter(format_string, datefmt="%H:%M:%S")
@@ -118,7 +116,7 @@ def setup_logger(
         logger.addHandler(console_handler)
 
     # Check if file logging is enabled (default: on)
-    file_logging_enabled = is_truthy(os.getenv("LOGGING_TO_FILE", "true"))
+    file_logging_enabled = settings.logging.logging_to_file
 
     if file_logging_enabled:
         try:
@@ -137,7 +135,7 @@ def setup_logger(
 
             # Also set max file size (10MB) using RotatingFileHandler as fallback
             # Note: We'll use TimedRotatingFileHandler which handles both time and size
-            file_handler.setLevel(getattr(logging, env_level))
+            file_handler.setLevel(getattr(logging, log_level))
 
             # Use standard formatter for file (no colors)
             file_formatter = logging.Formatter(

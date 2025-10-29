@@ -1,7 +1,8 @@
 """File system utility functions."""
 
-import os
 from pathlib import Path
+
+from shotgun.settings import settings
 
 
 def get_shotgun_base_path() -> Path:
@@ -18,7 +19,7 @@ def get_shotgun_home() -> Path:
         Path to shotgun home directory (default: ~/.shotgun-sh/)
     """
     # Allow override via environment variable (useful for testing)
-    if custom_home := os.environ.get("SHOTGUN_HOME"):
+    if custom_home := settings.dev.home:
         return Path(custom_home)
 
     return Path.home() / ".shotgun-sh"

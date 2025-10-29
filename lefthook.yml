@@ -12,7 +12,7 @@ pre-commit:
     mypy:
       run: uv run mypy {staged_files}
       glob: "*.py"
-      exclude: "^test/"
+      exclude: "(^test/|hatch_build\\.py)"
     actionlint:
       run: actionlint {staged_files}
       glob: ".github/workflows/*.yml"

@@ -22,7 +22,7 @@ def test_setup_posthog_already_initialized():
 
 
 def test_setup_posthog_no_api_key():
-    """Test that setup returns True even without environment variables (hardcoded key)."""
+    """Test that setup returns False when no API key is available."""
     # Reset the global client
     original_client = posthog_telemetry._posthog_client
     posthog_telemetry._posthog_client = None
@@ -30,15 +30,15 @@ def test_setup_posthog_no_api_key():
     try:
         with patch.dict(os.environ, {}, clear=True):
             with patch("shotgun.build_constants.POSTHOG_API_KEY", ""):
-                # PostHog should still initialize with hardcoded API key
+                # PostHog should not initialize without API key
                 result = posthog_telemetry.setup_posthog_observability()
-                assert result is True
+                assert result is False
     finally:
         posthog_telemetry._posthog_client = original_client
 
 
 def test_setup_posthog_with_build_constants():
-    """Test setup with API key from build constants."""
+    """Test setup with API key from settings (via build constants or env vars)."""
     # Reset the global client
     original_client = posthog_telemetry._posthog_client
     posthog_telemetry._posthog_client = None
@@ -47,9 +47,10 @@ def test_setup_posthog_with_build_constants():
         with patch("posthog.api_key", None):
             with patch("posthog.host", None):
                 with patch("posthog.disabled", True):
-                    with patch(
-                        "shotgun.build_constants.POSTHOG_API_KEY", "test_api_key"
-                    ):
+                    with patch("shotgun.posthog_telemetry.settings") as mock_settings:
+                        # Mock the settings to return an API key
+                        mock_settings.telemetry.posthog_api_key = "test_api_key"
+
                         with patch(
                             "shotgun.posthog_telemetry.get_config_manager"
                         ) as mock_get_config:
@@ -69,7 +70,7 @@ def test_setup_posthog_with_build_constants():
 
 
 def test_setup_posthog_with_env_vars():
-    """Test setup with API key from environment variables."""
+    """Test setup with API key from environment variables via settings."""
     # Reset the global client
     original_client = posthog_telemetry._posthog_client
     posthog_telemetry._posthog_client = None
@@ -78,21 +79,23 @@ def test_setup_posthog_with_env_vars():
         with patch("posthog.api_key", None):
             with patch("posthog.host", None):
                 with patch("posthog.disabled", True):
-                    with patch.dict(os.environ, {"POSTHOG_API_KEY": "env_api_key"}):
-                        with patch("shotgun.build_constants.POSTHOG_API_KEY", ""):
-                            with patch(
-                                "shotgun.posthog_telemetry.get_config_manager"
-                            ) as mock_get_config:
-                                mock_config = MagicMock()
-                                mock_config.get_shotgun_instance_id.return_value = (
-                                    "test-shotgun-instance-id"
-                                )
-                                mock_get_config.return_value = mock_config
+                    with patch("shotgun.posthog_telemetry.settings") as mock_settings:
+                        # Mock the settings to return an API key from env
+                        mock_settings.telemetry.posthog_api_key = "env_api_key"
 
-                                result = posthog_telemetry.setup_posthog_observability()
+                        with patch(
+                            "shotgun.posthog_telemetry.get_config_manager"
+                        ) as mock_get_config:
+                            mock_config = MagicMock()
+                            mock_config.get_shotgun_instance_id.return_value = (
+                                "test-shotgun-instance-id"
+                            )
+                            mock_get_config.return_value = mock_config
 
-                                assert result is True
-                                assert posthog_telemetry._posthog_client is not None
+                            result = posthog_telemetry.setup_posthog_observability()
+
+                            assert result is True
+                            assert posthog_telemetry._posthog_client is not None
     finally:
         posthog_telemetry._posthog_client = original_client
 

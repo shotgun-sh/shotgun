@@ -1,9 +1,8 @@
 """Sentry observability setup for Shotgun."""
 
-import os
-
 from shotgun import __version__
 from shotgun.logging_config import get_early_logger
+from shotgun.settings import settings
 
 # Use early logger to prevent automatic StreamHandler creation
 logger = get_early_logger(__name__)
@@ -23,24 +22,14 @@ def setup_sentry_observability() -> bool:
             logger.debug("Sentry is already initialized, skipping")
             return True
 
-        # Try to get DSN from build constants first (production builds)
-        dsn = None
-        try:
-            from shotgun import build_constants
-
-            dsn = build_constants.SENTRY_DSN
-            logger.debug("Using Sentry DSN from build constants")
-        except ImportError:
-            # Fallback to environment variable (development)
-            dsn = os.getenv("SENTRY_DSN", "")
-            if dsn:
-                logger.debug("Using Sentry DSN from environment variable")
+        # Get DSN from settings (handles build constants + env vars automatically)
+        dsn = settings.telemetry.sentry_dsn
 
         if not dsn:
             logger.debug("No Sentry DSN configured, skipping Sentry initialization")
             return False
 
-        logger.debug("Found DSN, proceeding with Sentry setup")
+        logger.debug("Using Sentry DSN from settings, proceeding with setup")
 
         # Determine environment based on version
         # Dev versions contain "dev", "rc", "alpha", or "beta"
