@@ -1,0 +1,12 @@
+# CODEOWNERS
+# This file defines code ownership for the Shotgun repository.
+#
+# Each line is a file pattern followed by one or more owners.
+# When a pull request is opened, the specified owners will be
+# automatically requested for review.
+#
+# For more information about CODEOWNERS, see:
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owner - all files require review from @scottfrasso
+* @scottfrasso

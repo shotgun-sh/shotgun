@@ -142,8 +142,51 @@ jobs:
           source .venv/bin/activate
           shotgun --help
 
+  check-permissions:
+    runs-on: ubuntu-latest
+    outputs:
+      is-maintainer: ${{ steps.check.outputs.is-maintainer }}
+
+    steps:
+      - name: Check if user is maintainer
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const actor = context.actor;
+              const { owner, repo } = context.repo;
+
+              console.log(`Checking permissions for user: ${actor}`);
+
+              // Get the user's permission level for this repository
+              const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner,
+                repo,
+                username: actor,
+              });
+
+              const permission = permissionData.permission;
+              console.log(`User ${actor} has permission level: ${permission}`);
+
+              // Maintainers have 'write', 'maintain', or 'admin' permissions
+              const isMaintainer = ['write', 'maintain', 'admin'].includes(permission);
+
+              console.log(`Is maintainer: ${isMaintainer}`);
+              core.setOutput('is-maintainer', isMaintainer.toString());
+
+              return isMaintainer;
+            } catch (error) {
+              console.error('Error checking permissions:', error);
+              // On error, default to false (non-maintainer)
+              core.setOutput('is-maintainer', 'false');
+              return false;
+            }
+
   test-cli-commands:
     runs-on: ubuntu-latest
+    needs: check-permissions
+    if: needs.check-permissions.outputs.is-maintainer == 'true'
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -324,7 +367,7 @@ jobs:
 
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, test-cli-basics, test-cli-commands, secret-scanning]
+    needs: [validate-pr-title, basic-pr-check, test-cli-basics, check-permissions, test-cli-commands, secret-scanning]
     if: always()
 
     steps:
@@ -333,16 +376,30 @@ jobs:
           echo "validate-pr-title: ${{ needs.validate-pr-title.result }}"
           echo "basic-pr-check: ${{ needs.basic-pr-check.result }}"
           echo "test-cli-basics: ${{ needs.test-cli-basics.result }}"
+          echo "check-permissions: ${{ needs.check-permissions.result }}"
           echo "test-cli-commands: ${{ needs.test-cli-commands.result }}"
           echo "secret-scanning: ${{ needs.secret-scanning.result }}"
 
+          # Required jobs that must always succeed
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
                 "${{ needs.basic-pr-check.result }}" != "success" || \
                 "${{ needs.test-cli-basics.result }}" != "success" || \
-                "${{ needs.test-cli-commands.result }}" != "success" || \
+                "${{ needs.check-permissions.result }}" != "success" || \
                 "${{ needs.secret-scanning.result }}" != "success" ]]; then
             echo "❌ One or more required checks failed or were cancelled"
             exit 1
-          else
-            echo "✅ All checks have passed successfully!"
           fi
+
+          # test-cli-commands can be skipped for non-maintainers, but must succeed for maintainers
+          if [[ "${{ needs.test-cli-commands.result }}" == "failure" || \
+                "${{ needs.test-cli-commands.result }}" == "cancelled" ]]; then
+            echo "❌ LLM CLI commands test failed or was cancelled"
+            exit 1
+          fi
+
+          # If we get here, either all required checks passed, or test-cli-commands was skipped
+          if [[ "${{ needs.test-cli-commands.result }}" == "skipped" ]]; then
+            echo "⏭️  LLM CLI commands test skipped (non-maintainer PR)"
+          fi
+
+          echo "✅ All required checks have passed successfully!"
