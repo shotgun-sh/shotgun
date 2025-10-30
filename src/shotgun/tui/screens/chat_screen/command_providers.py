@@ -130,6 +130,38 @@ class UsageProvider(Provider):
                 )
 
 
+class ContextProvider(Provider):
+    """Command provider for showing conversation context analysis."""
+
+    @property
+    def chat_screen(self) -> "ChatScreen":
+        from shotgun.tui.screens.chat import ChatScreen
+
+        return cast(ChatScreen, self.screen)
+
+    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        """Provide context command when palette opens."""
+        yield DiscoveryHit(
+            "Show context",
+            self.chat_screen.action_show_context,
+            help="Display conversation context composition and statistics",
+        )
+
+    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        """Search for context command."""
+        matcher = self.matcher(query)
+
+        async for discovery_hit in self.discover():
+            score = matcher.match(discovery_hit.text or "")
+            if score > 0:
+                yield Hit(
+                    score,
+                    matcher.highlight(discovery_hit.text or ""),
+                    discovery_hit.command,
+                    help=discovery_hit.help,
+                )
+
+
 class ProviderSetupProvider(Provider):
     """Command palette entries for provider configuration."""
 
@@ -314,6 +346,11 @@ class UnifiedCommandProvider(Provider):
             help="🤖 Choose which AI model to use",
         )
         yield DiscoveryHit(
+            "Show context",
+            self.chat_screen.action_show_context,
+            help="Display conversation context composition and statistics",
+        )
+        yield DiscoveryHit(
             "Show usage",
             self.chat_screen.action_show_usage,
             help="Display usage information for the current session",
@@ -344,6 +381,11 @@ class UnifiedCommandProvider(Provider):
                 "Select AI Model",
                 self.open_model_picker,
                 "🤖 Choose which AI model to use",
+            ),
+            (
+                "Show context",
+                self.chat_screen.action_show_context,
+                "Display conversation context composition and statistics",
             ),
             (
                 "Show usage",

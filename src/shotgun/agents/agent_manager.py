@@ -1005,6 +1005,26 @@ class AgentManager(Widget):
     def get_usage_hint(self) -> str | None:
         return self.deps.usage_manager.build_usage_hint()
 
+    def get_context_hint(self) -> str | None:
+        """Get conversation context analysis as a formatted hint.
+
+        Returns:
+            Markdown-formatted string with context composition statistics, or None if unavailable
+        """
+        from shotgun.agents.context_analyzer import ContextAnalyzer
+
+        try:
+            analyzer = ContextAnalyzer(self.deps.llm_model)
+            import asyncio
+
+            analysis = asyncio.get_event_loop().run_until_complete(
+                analyzer.analyze_conversation(self.message_history, self.ui_message_history)
+            )
+            return analysis.format_analysis()
+        except Exception as e:
+            logger.error(f"Failed to generate context analysis: {e}")
+            return None
+
     def get_conversation_state(self) -> "ConversationState":
         """Get the current conversation state.
 
