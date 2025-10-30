@@ -340,6 +340,16 @@ async def token_limit_compactor(
             else 0
         )
 
+        # Get context composition properties
+        from shotgun.agents.history.compaction import get_compaction_context_properties
+
+        context_props_before = await get_compaction_context_properties(
+            messages, deps.llm_model
+        )
+        context_props_after = await get_compaction_context_properties(
+            compacted_messages, deps.llm_model
+        )
+
         track_event(
             "context_compaction_triggered",
             {
@@ -352,6 +362,44 @@ async def token_limit_compactor(
                 "agent_mode": deps.agent_mode.value
                 if hasattr(deps, "agent_mode") and deps.agent_mode
                 else "unknown",
+                # Context composition before
+                "user_message_proportion_before": context_props_before.get(
+                    "user_message_proportion", 0
+                ),
+                "assistant_message_proportion_before": context_props_before.get(
+                    "assistant_message_proportion", 0
+                ),
+                "system_status_proportion_before": context_props_before.get(
+                    "system_status_proportion", 0
+                ),
+                "tool_result_proportion_before": context_props_before.get(
+                    "tool_result_proportion", 0
+                ),
+                # Context composition after
+                "user_message_proportion_after": context_props_after.get(
+                    "user_message_proportion", 0
+                ),
+                "assistant_message_proportion_after": context_props_after.get(
+                    "assistant_message_proportion", 0
+                ),
+                "system_status_proportion_after": context_props_after.get(
+                    "system_status_proportion", 0
+                ),
+                "tool_result_proportion_after": context_props_after.get(
+                    "tool_result_proportion", 0
+                ),
+                # Context window metrics
+                "context_window_size": context_props_before.get("context_window_size", 0),
+                "context_window_usage_before": context_props_before.get(
+                    "context_window_usage", 0
+                ),
+                "context_window_usage_after": context_props_after.get(
+                    "context_window_usage", 0
+                ),
+                # Model and provider info
+                "model_name": context_props_before.get("model_name", "unknown"),
+                "provider": context_props_before.get("provider", "unknown"),
+                "key_provider": context_props_before.get("key_provider", "unknown"),
             },
         )
 
@@ -468,6 +516,14 @@ async def _full_compaction(
     tokens_before = current_tokens  # Already calculated above
     tokens_after = summary_usage.output_tokens if summary_usage else 0
 
+    # Get context composition properties
+    from shotgun.agents.history.compaction import get_compaction_context_properties
+
+    context_props_before = await get_compaction_context_properties(messages, deps.llm_model)
+    context_props_after = await get_compaction_context_properties(
+        compacted_messages, deps.llm_model
+    )
+
     track_event(
         "context_compaction_triggered",
         {
@@ -480,6 +536,42 @@ async def _full_compaction(
             "agent_mode": deps.agent_mode.value
             if hasattr(deps, "agent_mode") and deps.agent_mode
             else "unknown",
+            # Context composition before
+            "user_message_proportion_before": context_props_before.get(
+                "user_message_proportion", 0
+            ),
+            "assistant_message_proportion_before": context_props_before.get(
+                "assistant_message_proportion", 0
+            ),
+            "system_status_proportion_before": context_props_before.get(
+                "system_status_proportion", 0
+            ),
+            "tool_result_proportion_before": context_props_before.get(
+                "tool_result_proportion", 0
+            ),
+            # Context composition after
+            "user_message_proportion_after": context_props_after.get(
+                "user_message_proportion", 0
+            ),
+            "assistant_message_proportion_after": context_props_after.get(
+                "assistant_message_proportion", 0
+            ),
+            "system_status_proportion_after": context_props_after.get(
+                "system_status_proportion", 0
+            ),
+            "tool_result_proportion_after": context_props_after.get(
+                "tool_result_proportion", 0
+            ),
+            # Context window metrics
+            "context_window_size": context_props_before.get("context_window_size", 0),
+            "context_window_usage_before": context_props_before.get(
+                "context_window_usage", 0
+            ),
+            "context_window_usage_after": context_props_after.get("context_window_usage", 0),
+            # Model and provider info
+            "model_name": context_props_before.get("model_name", "unknown"),
+            "provider": context_props_before.get("provider", "unknown"),
+            "key_provider": context_props_before.get("key_provider", "unknown"),
         },
     )
 
