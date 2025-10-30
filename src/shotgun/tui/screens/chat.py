@@ -497,8 +497,8 @@ class ChatScreen(Screen[None]):
         else:
             self.notify("No usage hint available", severity="error")
 
-    def action_show_context(self) -> None:
-        context_hint = self.agent_manager.get_context_hint()
+    async def action_show_context(self) -> None:
+        context_hint = await self.agent_manager.get_context_hint()
         if context_hint:
             self.mount_hint(context_hint)
         else:

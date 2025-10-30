@@ -1005,7 +1005,7 @@ class AgentManager(Widget):
     def get_usage_hint(self) -> str | None:
         return self.deps.usage_manager.build_usage_hint()
 
-    def get_context_hint(self) -> str | None:
+    async def get_context_hint(self) -> str | None:
         """Get conversation context analysis as a formatted hint.
 
         Returns:
@@ -1015,10 +1015,8 @@ class AgentManager(Widget):
 
         try:
             analyzer = ContextAnalyzer(self.deps.llm_model)
-            import asyncio
-
-            analysis = asyncio.get_event_loop().run_until_complete(
-                analyzer.analyze_conversation(self.message_history, self.ui_message_history)
+            analysis = await analyzer.analyze_conversation(
+                self.message_history, self.ui_message_history
             )
             return analysis.format_analysis()
         except Exception as e:
