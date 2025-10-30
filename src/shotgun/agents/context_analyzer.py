@@ -121,8 +121,11 @@ class ContextAnalysis:
 
         lines.extend([
             f"Model: {self.model_name}",
+            "",
             f"Total Context: {self.agent_context_tokens:,} / {self.max_usable_tokens:,} tokens ({usage_percent:.1f}%)",
+            "",
             f"Free Space: {self.free_space_tokens:,} tokens ({free_percent:.1f}%)",
+            "",
             f"Autocompact Buffer: 500 tokens",
             "",
         ])
