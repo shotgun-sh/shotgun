@@ -127,10 +127,10 @@ class ContextAnalysis:
             "",
         ])
 
-        # Create 100-character visual bar showing proportional usage
-        # Each character represents 1% of total context
-        filled_chars = int(usage_percent)
-        empty_chars = 100 - filled_chars
+        # Create 25-character visual bar showing proportional usage
+        # Each character represents 4% of total context
+        filled_chars = int(usage_percent / 4)
+        empty_chars = 25 - filled_chars
         visual_bar = "●" * filled_chars + "○" * empty_chars
 
         lines.extend([

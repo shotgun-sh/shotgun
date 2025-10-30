@@ -51,7 +51,7 @@ def context(
             # Output as JSON
             console.print_json(json.dumps(result, indent=2))
         else:
-            # Output as markdown (default)
+            # Output as plain text (Markdown() reformats and makes categories inline)
             console.print(result["markdown"])
 
     except FileNotFoundError as e:
