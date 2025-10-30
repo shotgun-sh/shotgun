@@ -244,7 +244,7 @@ jobs:
         run: trufflehog git file://. --fail --no-update --exclude-globs=uv.lock
 
       - name: Run trufflehog scan (pass 2 - uv.lock only, exclude SentryToken)
-        run: trufflehog git file://. --fail --no-update --include-paths=.trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
+        run: trufflehog git file://. --fail --no-update --include-paths=.github/trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
 
   notify-slack-on-secret-found:
     runs-on: ubuntu-latest

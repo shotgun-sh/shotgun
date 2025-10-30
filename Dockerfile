@@ -26,7 +26,8 @@ WORKDIR /app
 # Copy project files
 COPY --chown=shotgun:shotgun pyproject.toml uv.lock hatch_build.py ./
 COPY --chown=shotgun:shotgun src/ ./src/
-COPY --chown=shotgun:shotgun README.md README_PYPI.md README_DOCKER.md LICENSE ./
+COPY --chown=shotgun:shotgun README.md LICENSE ./
+COPY --chown=shotgun:shotgun docs/README_PYPI.md docs/README_DOCKER.md ./docs/
 
 # Install dependencies
 RUN uv sync --frozen --no-dev
