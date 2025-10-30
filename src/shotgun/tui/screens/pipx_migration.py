@@ -101,7 +101,7 @@ Or install permanently: `uv tool install shotgun-sh`
 
 **Discord:** https://discord.gg/5RmY6J2N7s
 
-**Full Migration Guide:** https://github.com/shotgun-sh/shotgun/blob/main/PIPX_MIGRATION.md
+**Full Migration Guide:** https://github.com/shotgun-sh/shotgun/blob/main/docs/PIPX_MIGRATION.md
 """
                 )
 
