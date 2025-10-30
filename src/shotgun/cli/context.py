@@ -113,9 +113,9 @@ async def analyze_context() -> dict:
             "count": analysis.user_messages.count,
             "tokens": analysis.user_messages.tokens,
         },
-        "assistant_messages": {
-            "count": analysis.assistant_messages.count,
-            "tokens": analysis.assistant_messages.tokens,
+        "agent_responses": {
+            "count": analysis.agent_responses.count,
+            "tokens": analysis.agent_responses.tokens,
         },
         "system_prompts": {
             "count": analysis.system_prompts.count,
@@ -125,13 +125,21 @@ async def analyze_context() -> dict:
             "count": analysis.system_status.count,
             "tokens": analysis.system_status.tokens,
         },
-        "tool_calls": {
-            "count": analysis.tool_calls.count,
-            "tokens": analysis.tool_calls.tokens,
+        "codebase_understanding": {
+            "count": analysis.codebase_understanding.count,
+            "tokens": analysis.codebase_understanding.tokens,
         },
-        "tool_results": {
-            "count": analysis.tool_results.count,
-            "tokens": analysis.tool_results.tokens,
+        "artifact_management": {
+            "count": analysis.artifact_management.count,
+            "tokens": analysis.artifact_management.tokens,
+        },
+        "web_research": {
+            "count": analysis.web_research.count,
+            "tokens": analysis.web_research.tokens,
+        },
+        "unknown": {
+            "count": analysis.unknown.count,
+            "tokens": analysis.unknown.tokens,
         },
         "summary": {
             "total_messages": analysis.total_messages - analysis.hint_messages.count,

@@ -47,7 +47,7 @@ async def test_analyze_empty_conversation(model_config: ModelConfig) -> None:
     assert analysis.total_messages == 0
     assert analysis.total_tokens == 0
     assert analysis.user_messages.count == 0
-    assert analysis.assistant_messages.count == 0
+    assert analysis.agent_responses.count == 0
 
 
 @pytest.mark.asyncio()
@@ -67,8 +67,8 @@ async def test_analyze_user_and_assistant_messages(model_config: ModelConfig) ->
 
     assert analysis.total_messages == 4
     assert analysis.user_messages.count == 2
-    assert analysis.assistant_messages.count == 2
-    assert analysis.tool_calls.count == 0
+    assert analysis.agent_responses.count == 2
+    assert analysis.codebase_understanding.count == 0
 
 
 @pytest.mark.asyncio()
@@ -87,7 +87,7 @@ async def test_analyze_system_prompts(model_config: ModelConfig) -> None:
 
     assert analysis.system_prompts.count == 1
     assert analysis.user_messages.count == 1
-    assert analysis.assistant_messages.count == 1
+    assert analysis.agent_responses.count == 1
 
 
 @pytest.mark.asyncio()
@@ -106,7 +106,7 @@ async def test_analyze_system_status(model_config: ModelConfig) -> None:
 
     assert analysis.system_status.count == 1
     assert analysis.user_messages.count == 1
-    assert analysis.assistant_messages.count == 1
+    assert analysis.agent_responses.count == 1
 
 
 @pytest.mark.asyncio()
@@ -116,26 +116,25 @@ async def test_analyze_tool_calls(model_config: ModelConfig) -> None:
 
     # Create test messages with tool calls
     message_history = [
-        ModelRequest(parts=[UserPromptPart(content="Search for Python tutorials")]),
+        ModelRequest(parts=[UserPromptPart(content="Read main.py")]),
         ModelResponse(
             parts=[
                 ToolCallPart(
-                    tool_name="web_search",
-                    args={"query": "Python tutorials"},
+                    tool_name="file_read",
+                    args={"graph_id": "test", "file_path": "main.py"},
                     tool_call_id="call_1",
                 )
             ]
         ),
-        ModelRequest(parts=[ToolReturnPart(tool_name="web_search", content="Results...", tool_call_id="call_1")]),
-        ModelResponse(parts=[TextPart(content="I found some tutorials for you")]),
+        ModelRequest(parts=[ToolReturnPart(tool_name="file_read", content="# main.py content", tool_call_id="call_1")]),
+        ModelResponse(parts=[TextPart(content="Here's the content of main.py")]),
     ]
 
     analysis = await analyzer.analyze_conversation(message_history, message_history)
 
     assert analysis.user_messages.count == 1
-    assert analysis.assistant_messages.count == 2
-    assert analysis.tool_calls.count == 1
-    assert analysis.tool_results.count == 1
+    assert analysis.agent_responses.count == 2
+    assert analysis.codebase_understanding.count == 2  # tool call + tool result
 
 
 @pytest.mark.asyncio()
@@ -160,7 +159,7 @@ async def test_analyze_hint_messages(model_config: ModelConfig) -> None:
 
     assert analysis.hint_messages.count == 2
     assert analysis.user_messages.count == 1
-    assert analysis.assistant_messages.count == 1
+    assert analysis.agent_responses.count == 1
 
 
 @pytest.mark.asyncio()
@@ -177,11 +176,11 @@ async def test_percentage_calculation(model_config: ModelConfig) -> None:
 
     # Check that percentages add up (approximately, due to token counting)
     user_pct = analysis.get_percentage(analysis.user_messages)
-    assistant_pct = analysis.get_percentage(analysis.assistant_messages)
+    agent_response_pct = analysis.get_percentage(analysis.agent_responses)
 
     assert user_pct >= 0
-    assert assistant_pct >= 0
-    assert user_pct + assistant_pct <= 100
+    assert agent_response_pct >= 0
+    assert user_pct + agent_response_pct <= 100
 
 
 def test_format_analysis() -> None:
@@ -192,11 +191,13 @@ def test_format_analysis() -> None:
 
     analysis = ContextAnalysis(
         user_messages=MessageTypeStats(count=5, tokens=2000),
-        assistant_messages=MessageTypeStats(count=7, tokens=3000),
+        agent_responses=MessageTypeStats(count=7, tokens=3000),
         system_prompts=MessageTypeStats(count=1, tokens=500),
         system_status=MessageTypeStats(count=3, tokens=1000),
-        tool_calls=MessageTypeStats(count=10, tokens=1500),
-        tool_results=MessageTypeStats(count=10, tokens=1500),
+        codebase_understanding=MessageTypeStats(count=10, tokens=1500),
+        artifact_management=MessageTypeStats(count=10, tokens=1500),
+        web_research=MessageTypeStats(count=0, tokens=0),
+        unknown=MessageTypeStats(count=0, tokens=0),
         hint_messages=MessageTypeStats(count=2, tokens=500),
         total_tokens=total_tokens,
         total_messages=38,
@@ -209,11 +210,11 @@ def test_format_analysis() -> None:
     assert "# Conversation Context Analysis" in formatted
     assert "## Agent Context Composition" in formatted
     assert "🧑 User Messages:" in formatted
-    assert "🤖 Assistant Messages:" in formatted
+    assert "🤖 Agent Responses:" in formatted
     assert "📋 System Prompts:" in formatted
     assert "📊 System Status:" in formatted
-    assert "🔧 Tool Calls:" in formatted
-    assert "📥 Tool Results:" in formatted
+    assert "🔍 Codebase Understanding:" in formatted
+    assert "📦 Artifact Management:" in formatted
     assert "## Summary" in formatted
     # Total messages should exclude hints (38 - 2 = 36)
     assert "Total Messages: 36" in formatted
@@ -223,17 +224,23 @@ def test_format_analysis() -> None:
     assert "UI Elements" not in formatted
     assert "💡 Hints:" not in formatted
 
+    # Web research and unknown should NOT be shown when count is 0
+    assert "🌐 Web Research:" not in formatted
+    assert "⚠️  Unknown Tools:" not in formatted
+
 
 def test_format_analysis_excludes_zero_counts() -> None:
     """Test that message types with zero count are excluded from display."""
-    agent_context_tokens = 100 + 100  # user + assistant = 200
+    agent_context_tokens = 100 + 100  # user + agent responses = 200
     analysis = ContextAnalysis(
         user_messages=MessageTypeStats(count=2, tokens=100),
-        assistant_messages=MessageTypeStats(count=2, tokens=100),
+        agent_responses=MessageTypeStats(count=2, tokens=100),
         system_prompts=MessageTypeStats(count=0, tokens=0),
         system_status=MessageTypeStats(count=0, tokens=0),
-        tool_calls=MessageTypeStats(count=0, tokens=0),
-        tool_results=MessageTypeStats(count=0, tokens=0),
+        codebase_understanding=MessageTypeStats(count=0, tokens=0),
+        artifact_management=MessageTypeStats(count=0, tokens=0),
+        web_research=MessageTypeStats(count=0, tokens=0),
+        unknown=MessageTypeStats(count=0, tokens=0),
         hint_messages=MessageTypeStats(count=0, tokens=0),
         total_tokens=200,
         total_messages=4,
@@ -243,14 +250,14 @@ def test_format_analysis_excludes_zero_counts() -> None:
 
     formatted = analysis.format_analysis()
 
-    # Should include user and assistant
+    # Should include user and agent responses
     assert "🧑 User Messages:" in formatted
-    assert "🤖 Assistant Messages:" in formatted
+    assert "🤖 Agent Responses:" in formatted
 
     # Should not include categories with zero count
     assert "📋 System Prompts:" not in formatted
     assert "📊 System Status:" not in formatted
-    assert "🔧 Tool Calls:" not in formatted
+    assert "🔍 Codebase Understanding:" not in formatted
 
 
 @pytest.mark.asyncio()
@@ -292,23 +299,25 @@ async def test_analyze_multi_part_message_no_double_counting(model_config: Model
         f"Total tokens: {analysis.total_tokens}, "
         f"System prompts: {analysis.system_prompts.tokens}, "
         f"User messages: {analysis.user_messages.tokens}, "
-        f"Assistant messages: {analysis.assistant_messages.tokens}"
+        f"Agent responses: {analysis.agent_responses.tokens}"
     )
 
     # Verify that individual parts are counted separately
     assert analysis.system_prompts.count == 1
     assert analysis.user_messages.count == 1
-    assert analysis.assistant_messages.count == 1
+    assert analysis.agent_responses.count == 1
 
     # Verify tokens are properly distributed (no single category has inflated counts)
     # The total should be the sum of all parts, not sum of duplicate full messages
     calculated_total = (
         analysis.system_prompts.tokens
         + analysis.user_messages.tokens
-        + analysis.assistant_messages.tokens
+        + analysis.agent_responses.tokens
         + analysis.system_status.tokens
-        + analysis.tool_calls.tokens
-        + analysis.tool_results.tokens
+        + analysis.codebase_understanding.tokens
+        + analysis.artifact_management.tokens
+        + analysis.web_research.tokens
+        + analysis.unknown.tokens
         + analysis.hint_messages.tokens
     )
 

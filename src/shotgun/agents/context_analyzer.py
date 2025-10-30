@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import sentry_sdk
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -23,6 +24,49 @@ from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 logger = get_logger(__name__)
+
+# Tool category registry - maps tool names to their semantic category
+TOOL_CATEGORIES = {
+    # Codebase understanding tools
+    "query_graph": "codebase_understanding",
+    "retrieve_code": "codebase_understanding",
+    "file_read": "codebase_understanding",
+    "directory_lister": "codebase_understanding",
+    "codebase_shell": "codebase_understanding",
+    # Artifact management tools
+    "write_file": "artifact_management",
+    "append_file": "artifact_management",
+    "read_file": "artifact_management",
+    # Web research tools
+    "openai_web_search_tool": "web_research",
+    "anthropic_web_search_tool": "web_research",
+    "gemini_web_search_tool": "web_research",
+    # Special: final_result is treated as agent response, not a tool
+    "final_result": "agent_response",
+}
+
+
+def _get_tool_category(tool_name: str) -> str:
+    """Get category for a tool, logging unknown tools to Sentry.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        Category name or "unknown"
+    """
+    category = TOOL_CATEGORIES.get(tool_name)
+
+    if category is None:
+        logger.warning(f"Unknown tool encountered in context analysis: {tool_name}")
+        sentry_sdk.capture_message(
+            f"Unknown tool in context analysis: {tool_name}",
+            level="warning",
+            extras={"tool_name": tool_name},
+        )
+        return "unknown"
+
+    return category
 
 
 @dataclass
@@ -43,11 +87,13 @@ class ContextAnalysis:
     """Complete analysis of conversation context composition."""
 
     user_messages: MessageTypeStats
-    assistant_messages: MessageTypeStats
+    agent_responses: MessageTypeStats
     system_prompts: MessageTypeStats
     system_status: MessageTypeStats
-    tool_calls: MessageTypeStats
-    tool_results: MessageTypeStats
+    codebase_understanding: MessageTypeStats
+    artifact_management: MessageTypeStats
+    web_research: MessageTypeStats
+    unknown: MessageTypeStats
     hint_messages: MessageTypeStats
     total_tokens: int
     total_messages: int
@@ -65,12 +111,17 @@ class ContextAnalysis:
         # Add agent context categories only (hints are not part of agent context)
         agent_categories = [
             ("🧑 User Messages", self.user_messages),
-            ("🤖 Assistant Messages", self.assistant_messages),
+            ("🤖 Agent Responses", self.agent_responses),
             ("📋 System Prompts", self.system_prompts),
             ("📊 System Status", self.system_status),
-            ("🔧 Tool Calls", self.tool_calls),
-            ("📥 Tool Results", self.tool_results),
+            ("🔍 Codebase Understanding", self.codebase_understanding),
+            ("📦 Artifact Management", self.artifact_management),
+            ("🌐 Web Research", self.web_research),
         ]
+
+        # Only add unknown if it has content
+        if self.unknown.count > 0:
+            agent_categories.append(("⚠️  Unknown Tools", self.unknown))
 
         for label, stats in agent_categories:
             if stats.count > 0:
@@ -185,24 +236,37 @@ class ContextAnalyzer:
                     elif isinstance(part, UserPromptPart):
                         part_type_sizes["user"] += size
                     elif isinstance(part, ToolReturnPart):
-                        part_type_sizes["tool_results"] += size
+                        # Categorize tool results by tool category
+                        category = _get_tool_category(part.tool_name)
+                        if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
+                            part_type_sizes[category] += size
 
-        # Step 4: Calculate output proportions (tool calls vs assistant text)
-        # Note: final_result is semantically an assistant response, not a tool call
-        tool_call_size = 0
-        text_size = 0
+        # Step 4: Calculate output proportions by tool category
+        codebase_understanding_size = 0
+        artifact_management_size = 0
+        web_research_size = 0
+        unknown_size = 0
+        agent_response_size = 0
 
         for msg in message_history:
             if isinstance(msg, ModelResponse):
                 for part in msg.parts:
                     if isinstance(part, ToolCallPart):
-                        # Treat final_result as assistant text, not tool call
-                        if part.tool_name == "final_result":
-                            text_size += len(str(part.args))
-                        else:
-                            tool_call_size += len(str(part.args))
+                        category = _get_tool_category(part.tool_name)
+                        size = len(str(part.args))
+
+                        if category == "agent_response":
+                            agent_response_size += size
+                        elif category == "codebase_understanding":
+                            codebase_understanding_size += size
+                        elif category == "artifact_management":
+                            artifact_management_size += size
+                        elif category == "web_research":
+                            web_research_size += size
+                        elif category == "unknown":
+                            unknown_size += size
                     elif isinstance(part, TextPart):
-                        text_size += len(part.content)
+                        agent_response_size += len(part.content)
 
         # Step 5: Allocate input tokens proportionally
         token_counts: dict[str, int] = defaultdict(int)
@@ -214,14 +278,27 @@ class ContextAnalyzer:
                 token_counts[part_type] = int(last_input_tokens * proportion)
 
         # Step 6: Allocate output tokens proportionally
-        total_output_size = tool_call_size + text_size
+        total_output_size = (
+            codebase_understanding_size
+            + artifact_management_size
+            + web_research_size
+            + unknown_size
+            + agent_response_size
+        )
 
         if total_output_size > 0 and total_output_tokens > 0:
-            token_counts["tool_calls"] = int(total_output_tokens * (tool_call_size / total_output_size))
-            token_counts["assistant"] = int(total_output_tokens * (text_size / total_output_size))
+            token_counts["codebase_understanding"] += int(
+                total_output_tokens * (codebase_understanding_size / total_output_size)
+            )
+            token_counts["artifact_management"] += int(
+                total_output_tokens * (artifact_management_size / total_output_size)
+            )
+            token_counts["web_research"] += int(total_output_tokens * (web_research_size / total_output_size))
+            token_counts["unknown"] += int(total_output_tokens * (unknown_size / total_output_size))
+            token_counts["agent_responses"] += int(total_output_tokens * (agent_response_size / total_output_size))
         elif total_output_tokens > 0:
-            # If no content, put all in assistant
-            token_counts["assistant"] = total_output_tokens
+            # If no content, put all in agent responses
+            token_counts["agent_responses"] = total_output_tokens
 
         logger.debug(f"Token allocation complete: {dict(token_counts)}")
         logger.debug(f"Input tokens (from last response): {last_input_tokens}, Output tokens (sum): {total_output_tokens}")
@@ -252,7 +329,6 @@ class ContextAnalyzer:
                 has_user_prompt = False
                 has_system_prompt = False
                 has_system_status = False
-                has_tool_return = False
 
                 # Check what part types this message contains
                 for part in msg.parts:
@@ -266,7 +342,10 @@ class ContextAnalyzer:
                     elif isinstance(part, UserPromptPart):
                         has_user_prompt = True
                     elif isinstance(part, ToolReturnPart):
-                        has_tool_return = True
+                        # Categorize tool results by category
+                        category = _get_tool_category(part.tool_name)
+                        if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
+                            counts[category] += 1
 
                 # Count the message types (only count once per message)
                 if has_system_prompt:
@@ -275,19 +354,17 @@ class ContextAnalyzer:
                     counts["system_status"] += 1
                 if has_user_prompt:
                     counts["user"] += 1
-                if has_tool_return:
-                    counts["tool_results"] += 1
 
             elif isinstance(msg, ModelResponse):
-                # Assistant responses - count entire response as one
-                counts["assistant"] += 1
+                # Agent responses - count entire response as one
+                counts["agent_responses"] += 1
 
                 # Check for tool calls in the response
-                # Note: final_result is semantically an assistant response, not a tool call
                 for part in msg.parts:  # type: ignore[assignment]
                     if isinstance(part, ToolCallPart):
-                        if part.tool_name != "final_result":
-                            counts["tool_calls"] += 1
+                        category = _get_tool_category(part.tool_name)
+                        if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
+                            counts[category] += 1
 
         # Count hints from ui_message_history
         hint_count = sum(1 for msg in ui_message_history if isinstance(msg, HintMessage))
@@ -297,11 +374,13 @@ class ContextAnalyzer:
         usage_tokens = self._allocate_tokens_from_usage(message_history)
 
         user_tokens = usage_tokens.get("user", 0)
-        assistant_tokens = usage_tokens.get("assistant", 0)
+        agent_response_tokens = usage_tokens.get("agent_responses", 0)
         system_prompt_tokens = usage_tokens.get("system_prompts", 0)
         system_status_tokens = usage_tokens.get("system_status", 0)
-        tool_call_tokens = usage_tokens.get("tool_calls", 0)
-        tool_result_tokens = usage_tokens.get("tool_results", 0)
+        codebase_understanding_tokens = usage_tokens.get("codebase_understanding", 0)
+        artifact_management_tokens = usage_tokens.get("artifact_management", 0)
+        web_research_tokens = usage_tokens.get("web_research", 0)
+        unknown_tokens = usage_tokens.get("unknown", 0)
 
         # Estimate hint tokens (rough estimate based on character count)
         hint_tokens = 0
@@ -313,11 +392,13 @@ class ContextAnalyzer:
         # Calculate agent context tokens (excluding UI-only hints)
         agent_context_tokens = (
             user_tokens
-            + assistant_tokens
+            + agent_response_tokens
             + system_prompt_tokens
             + system_status_tokens
-            + tool_call_tokens
-            + tool_result_tokens
+            + codebase_understanding_tokens
+            + artifact_management_tokens
+            + web_research_tokens
+            + unknown_tokens
         )
 
         # Total tokens includes hints for display purposes, but agent_context_tokens does not
@@ -326,11 +407,17 @@ class ContextAnalyzer:
 
         return ContextAnalysis(
             user_messages=MessageTypeStats(count=counts["user"], tokens=user_tokens),
-            assistant_messages=MessageTypeStats(count=counts["assistant"], tokens=assistant_tokens),
+            agent_responses=MessageTypeStats(count=counts["agent_responses"], tokens=agent_response_tokens),
             system_prompts=MessageTypeStats(count=counts["system_prompts"], tokens=system_prompt_tokens),
             system_status=MessageTypeStats(count=counts["system_status"], tokens=system_status_tokens),
-            tool_calls=MessageTypeStats(count=counts["tool_calls"], tokens=tool_call_tokens),
-            tool_results=MessageTypeStats(count=counts["tool_results"], tokens=tool_result_tokens),
+            codebase_understanding=MessageTypeStats(
+                count=counts["codebase_understanding"], tokens=codebase_understanding_tokens
+            ),
+            artifact_management=MessageTypeStats(
+                count=counts["artifact_management"], tokens=artifact_management_tokens
+            ),
+            web_research=MessageTypeStats(count=counts["web_research"], tokens=web_research_tokens),
+            unknown=MessageTypeStats(count=counts["unknown"], tokens=unknown_tokens),
             hint_messages=MessageTypeStats(count=counts["hints"], tokens=hint_tokens),
             total_tokens=total_tokens,
             total_messages=total_messages,
