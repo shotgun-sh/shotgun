@@ -61,10 +61,10 @@ cover/
 
 # Documentation
 docs/
+!docs/README_PYPI.md
+!docs/README_DOCKER.md
 *.md
 !README.md
-!README_PYPI.md
-!README_DOCKER.md
 
 # OS files
 .DS_Store

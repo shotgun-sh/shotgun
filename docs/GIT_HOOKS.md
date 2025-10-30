@@ -58,7 +58,7 @@ trufflehog git file://. --since-commit HEAD --exclude-globs=uv.lock
 trufflehog git file://. --exclude-globs=uv.lock
 
 # Pass 2: Scan uv.lock only, excluding SentryToken detector
-trufflehog git file://. --include-paths=.trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
+trufflehog git file://. --include-paths=.github/trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
 ```
 
 ### Two-Pass Scanning Strategy
