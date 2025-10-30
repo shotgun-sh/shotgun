@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.context_analyzer import ContextAnalyzer
+from shotgun.agents.context_analyzer import ContextAnalyzer, ContextAnalysisOutput, ContextFormatter
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.logging_config import get_logger
 
@@ -49,10 +49,10 @@ def context(
 
         if format == "json":
             # Output as JSON
-            console.print_json(json.dumps(result, indent=2))
+            console.print_json(json.dumps(result.json_data, indent=2))
         else:
             # Output as plain text (Markdown() reformats and makes categories inline)
-            console.print(result["markdown"])
+            console.print(result.markdown)
 
     except FileNotFoundError as e:
         console.print(
@@ -67,11 +67,11 @@ def context(
         raise typer.Exit(code=1)
 
 
-async def analyze_context() -> dict:
+async def analyze_context() -> ContextAnalysisOutput:
     """Analyze the conversation context and return structured data.
 
     Returns:
-        Dictionary containing both markdown and JSON representations of the analysis
+        ContextAnalysisOutput with both markdown and JSON representations of the analysis
     """
     # Get conversation file path
     conversation_file = Path.home() / ".shotgun-sh" / "conversation.json"
@@ -107,54 +107,8 @@ async def analyze_context() -> dict:
     analyzer = ContextAnalyzer(model_config)
     analysis = await analyzer.analyze_conversation(agent_messages, agent_messages)
 
-    # Build JSON representation
-    json_data = {
-        "user_messages": {
-            "count": analysis.user_messages.count,
-            "tokens": analysis.user_messages.tokens,
-        },
-        "agent_responses": {
-            "count": analysis.agent_responses.count,
-            "tokens": analysis.agent_responses.tokens,
-        },
-        "system_prompts": {
-            "count": analysis.system_prompts.count,
-            "tokens": analysis.system_prompts.tokens,
-        },
-        "system_status": {
-            "count": analysis.system_status.count,
-            "tokens": analysis.system_status.tokens,
-        },
-        "codebase_understanding": {
-            "count": analysis.codebase_understanding.count,
-            "tokens": analysis.codebase_understanding.tokens,
-        },
-        "artifact_management": {
-            "count": analysis.artifact_management.count,
-            "tokens": analysis.artifact_management.tokens,
-        },
-        "web_research": {
-            "count": analysis.web_research.count,
-            "tokens": analysis.web_research.tokens,
-        },
-        "unknown": {
-            "count": analysis.unknown.count,
-            "tokens": analysis.unknown.tokens,
-        },
-        "summary": {
-            "total_messages": analysis.total_messages - analysis.hint_messages.count,
-            "agent_context_tokens": analysis.agent_context_tokens,
-            "context_window": analysis.context_window,
-            "usage_percentage": round(
-                (analysis.agent_context_tokens / analysis.context_window * 100)
-                if analysis.context_window > 0
-                else 0,
-                1,
-            ),
-        },
-    }
+    # Use formatter to generate markdown and JSON
+    markdown = ContextFormatter.format_markdown(analysis)
+    json_data = ContextFormatter.format_json(analysis)
 
-    return {
-        "markdown": analysis.format_analysis(),
-        "json": json_data,
-    }
+    return ContextAnalysisOutput(markdown=markdown, json_data=json_data)

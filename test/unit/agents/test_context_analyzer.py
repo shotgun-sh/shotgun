@@ -19,6 +19,7 @@ from shotgun.agents.config.models import (
 from shotgun.agents.context_analyzer import (
     ContextAnalysis,
     ContextAnalyzer,
+    ContextFormatter,
     MessageTypeStats,
 )
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
@@ -210,7 +211,7 @@ def test_format_analysis() -> None:
         free_space_tokens=free_space_tokens,
     )
 
-    formatted = analysis.format_analysis()
+    formatted = ContextFormatter.format_markdown(analysis)
 
     assert "# Conversation Context Analysis" in formatted
     assert "Model: claude-sonnet-4-5" in formatted
@@ -264,7 +265,7 @@ def test_format_analysis_excludes_zero_counts() -> None:
         free_space_tokens=free_space_tokens,
     )
 
-    formatted = analysis.format_analysis()
+    formatted = ContextFormatter.format_markdown(analysis)
 
     # Should include user and agent responses
     assert "🧑 User Messages" in formatted

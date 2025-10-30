@@ -1,11 +1,9 @@
-"""Analyze conversation context composition and display statistics."""
+"""Core context analysis logic."""
 
-import asyncio
+import json
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
 
-import sentry_sdk
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -23,151 +21,10 @@ from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
+from .constants import get_tool_category
+from .models import ContextAnalysis, MessageTypeStats
+
 logger = get_logger(__name__)
-
-# Tool category registry - maps tool names to their semantic category
-TOOL_CATEGORIES = {
-    # Codebase understanding tools
-    "query_graph": "codebase_understanding",
-    "retrieve_code": "codebase_understanding",
-    "file_read": "codebase_understanding",
-    "directory_lister": "codebase_understanding",
-    "codebase_shell": "codebase_understanding",
-    # Artifact management tools
-    "write_file": "artifact_management",
-    "append_file": "artifact_management",
-    "read_file": "artifact_management",
-    # Web research tools
-    "openai_web_search_tool": "web_research",
-    "anthropic_web_search_tool": "web_research",
-    "gemini_web_search_tool": "web_research",
-    # Special: final_result is treated as agent response, not a tool
-    "final_result": "agent_response",
-}
-
-
-def _get_tool_category(tool_name: str) -> str:
-    """Get category for a tool, logging unknown tools to Sentry.
-
-    Args:
-        tool_name: Name of the tool
-
-    Returns:
-        Category name or "unknown"
-    """
-    category = TOOL_CATEGORIES.get(tool_name)
-
-    if category is None:
-        logger.warning(f"Unknown tool encountered in context analysis: {tool_name}")
-        sentry_sdk.capture_message(
-            f"Unknown tool in context analysis: {tool_name}",
-            level="warning",
-            extras={"tool_name": tool_name},
-        )
-        return "unknown"
-
-    return category
-
-
-@dataclass
-class MessageTypeStats:
-    """Statistics for a specific message type."""
-
-    count: int
-    tokens: int
-
-    @property
-    def avg_tokens(self) -> float:
-        """Calculate average tokens per message."""
-        return self.tokens / self.count if self.count > 0 else 0.0
-
-
-@dataclass
-class ContextAnalysis:
-    """Complete analysis of conversation context composition."""
-
-    user_messages: MessageTypeStats
-    agent_responses: MessageTypeStats
-    system_prompts: MessageTypeStats
-    system_status: MessageTypeStats
-    codebase_understanding: MessageTypeStats
-    artifact_management: MessageTypeStats
-    web_research: MessageTypeStats
-    unknown: MessageTypeStats
-    hint_messages: MessageTypeStats
-    total_tokens: int
-    total_messages: int
-    context_window: int
-    agent_context_tokens: int  # Tokens that actually consume agent context (excluding UI-only)
-    model_name: str  # Name of the model being used
-    max_usable_tokens: int  # 80% of max_input_tokens (usable limit)
-    free_space_tokens: int  # Remaining tokens available
-
-    def get_percentage(self, stats: MessageTypeStats) -> float:
-        """Calculate percentage of agent context tokens for a message type."""
-        return (stats.tokens / self.agent_context_tokens * 100) if self.agent_context_tokens > 0 else 0.0
-
-    def format_analysis(self) -> str:
-        """Format the analysis as markdown for display."""
-        lines = ["# Conversation Context Analysis", ""]
-
-        # Top-level summary with model and usage info
-        usage_percent = (
-            (self.agent_context_tokens / self.max_usable_tokens * 100) if self.max_usable_tokens > 0 else 0
-        )
-        free_percent = (
-            (self.free_space_tokens / self.max_usable_tokens * 100) if self.max_usable_tokens > 0 else 0
-        )
-
-        lines.extend([
-            f"Model: {self.model_name}",
-            "",
-            f"Total Context: {self.agent_context_tokens:,} / {self.max_usable_tokens:,} tokens ({usage_percent:.1f}%)",
-            "",
-            f"Free Space: {self.free_space_tokens:,} tokens ({free_percent:.1f}%)",
-            "",
-            f"Autocompact Buffer: 500 tokens",
-            "",
-        ])
-
-        # Create 25-character visual bar showing proportional usage
-        # Each character represents 4% of total context
-        filled_chars = int(usage_percent / 4)
-        empty_chars = 25 - filled_chars
-        visual_bar = "●" * filled_chars + "○" * empty_chars
-
-        lines.extend([
-            "## Context Composition",
-            visual_bar,
-            "",
-        ])
-
-        # Add agent context categories only (hints are not part of agent context)
-        agent_categories = [
-            ("🧑 User Messages", self.user_messages),
-            ("🤖 Agent Responses", self.agent_responses),
-            ("📋 System Prompts", self.system_prompts),
-            ("📊 System Status", self.system_status),
-            ("🔍 Codebase Understanding", self.codebase_understanding),
-            ("📦 Artifact Management", self.artifact_management),
-            ("🌐 Web Research", self.web_research),
-        ]
-
-        # Only add unknown if it has content
-        if self.unknown.count > 0:
-            agent_categories.append(("⚠️  Unknown Tools", self.unknown))
-
-        for label, stats in agent_categories:
-            if stats.count > 0:
-                percentage = self.get_percentage(stats)
-                # Align labels to 30 characters for clean visual layout
-                lines.append(
-                    f"{label:<30} {percentage:>5.1f}%  ({stats.count} messages, ~{stats.tokens:,} tokens)"
-                )
-                # Add blank line to prevent Textual's Markdown widget from reflowing
-                lines.append("")
-
-        return "\n".join(lines)
 
 
 class ContextAnalyzer:
@@ -227,7 +84,6 @@ class ContextAnalyzer:
                         size = len(part.content)
                     elif isinstance(part, ToolReturnPart):
                         # ToolReturnPart.content can be Any type
-                        import json
                         try:
                             content_str = json.dumps(part.content) if part.content is not None else ""
                         except (TypeError, ValueError):
@@ -250,7 +106,7 @@ class ContextAnalyzer:
                         part_type_sizes["user"] += size
                     elif isinstance(part, ToolReturnPart):
                         # Categorize tool results by tool category
-                        category = _get_tool_category(part.tool_name)
+                        category = get_tool_category(part.tool_name)
                         if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
                             part_type_sizes[category] += size
 
@@ -265,7 +121,7 @@ class ContextAnalyzer:
             if isinstance(msg, ModelResponse):
                 for part in msg.parts:
                     if isinstance(part, ToolCallPart):
-                        category = _get_tool_category(part.tool_name)
+                        category = get_tool_category(part.tool_name)
                         size = len(str(part.args))
 
                         if category == "agent_response":
@@ -356,7 +212,7 @@ class ContextAnalyzer:
                         has_user_prompt = True
                     elif isinstance(part, ToolReturnPart):
                         # Categorize tool results by category
-                        category = _get_tool_category(part.tool_name)
+                        category = get_tool_category(part.tool_name)
                         if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
                             counts[category] += 1
 
@@ -375,7 +231,7 @@ class ContextAnalyzer:
                 # Check for tool calls in the response
                 for part in msg.parts:  # type: ignore[assignment]
                     if isinstance(part, ToolCallPart):
-                        category = _get_tool_category(part.tool_name)
+                        category = get_tool_category(part.tool_name)
                         if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
                             counts[category] += 1
 

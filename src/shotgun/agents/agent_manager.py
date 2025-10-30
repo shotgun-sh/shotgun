@@ -1039,14 +1039,14 @@ class AgentManager(Widget):
         Returns:
             Markdown-formatted string with context composition statistics, or None if unavailable
         """
-        from shotgun.agents.context_analyzer import ContextAnalyzer
+        from shotgun.agents.context_analyzer import ContextAnalyzer, ContextFormatter
 
         try:
             analyzer = ContextAnalyzer(self.deps.llm_model)
             analysis = await analyzer.analyze_conversation(
                 self.message_history, self.ui_message_history
             )
-            return analysis.format_analysis()
+            return ContextFormatter.format_markdown(analysis)
         except Exception as e:
             logger.error(f"Failed to generate context analysis: {e}")
             return None
