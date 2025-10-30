@@ -99,6 +99,9 @@ class ContextAnalysis:
     total_messages: int
     context_window: int
     agent_context_tokens: int  # Tokens that actually consume agent context (excluding UI-only)
+    model_name: str  # Name of the model being used
+    max_usable_tokens: int  # 80% of max_input_tokens (usable limit)
+    free_space_tokens: int  # Remaining tokens available
 
     def get_percentage(self, stats: MessageTypeStats) -> float:
         """Calculate percentage of agent context tokens for a message type."""
@@ -106,7 +109,35 @@ class ContextAnalysis:
 
     def format_analysis(self) -> str:
         """Format the analysis as markdown for display."""
-        lines = ["# Conversation Context Analysis", "", "## Agent Context Composition"]
+        lines = ["# Conversation Context Analysis", ""]
+
+        # Top-level summary with model and usage info
+        usage_percent = (
+            (self.agent_context_tokens / self.max_usable_tokens * 100) if self.max_usable_tokens > 0 else 0
+        )
+        free_percent = (
+            (self.free_space_tokens / self.max_usable_tokens * 100) if self.max_usable_tokens > 0 else 0
+        )
+
+        lines.extend([
+            f"Model: {self.model_name}",
+            f"Total Context: {self.agent_context_tokens:,} / {self.max_usable_tokens:,} tokens ({usage_percent:.1f}%)",
+            f"Free Space: {self.free_space_tokens:,} tokens ({free_percent:.1f}%)",
+            f"Autocompact Buffer: 500 tokens",
+            "",
+        ])
+
+        # Create 100-character visual bar showing proportional usage
+        # Each character represents 1% of total context
+        filled_chars = int(usage_percent)
+        empty_chars = 100 - filled_chars
+        visual_bar = "●" * filled_chars + "○" * empty_chars
+
+        lines.extend([
+            "## Context Composition",
+            visual_bar,
+            "",
+        ])
 
         # Add agent context categories only (hints are not part of agent context)
         agent_categories = [
@@ -126,33 +157,10 @@ class ContextAnalysis:
         for label, stats in agent_categories:
             if stats.count > 0:
                 percentage = self.get_percentage(stats)
+                # Align labels to 30 characters for clean visual layout
                 lines.append(
-                    f"- {label}: {percentage:.1f}% ({stats.count} messages, ~{stats.tokens:,} tokens)"
+                    f"{label:<30} {percentage:>5.1f}%  ({stats.count} messages, ~{stats.tokens:,} tokens)"
                 )
-
-        # Add summary section
-        lines.extend(
-            [
-                "",
-                "## Summary",
-                f"- Total Messages: {self.total_messages - self.hint_messages.count}",
-                f"- Agent Context Tokens: ~{self.agent_context_tokens:,}",
-            ]
-        )
-
-        # Calculate average based on agent context messages only (excluding hints)
-        agent_message_count = self.total_messages - self.hint_messages.count
-        if agent_message_count > 0:
-            avg_length = self.agent_context_tokens / agent_message_count
-            lines.append(f"- Average Message Length: ~{avg_length:.0f} tokens")
-
-        # Add context window usage based ONLY on agent context tokens
-        usage_percent = (
-            (self.agent_context_tokens / self.context_window * 100) if self.agent_context_tokens > 0 else 0
-        )
-        lines.append(
-            f"- Context Window Usage: ~{usage_percent:.1f}% of {self.context_window:,} limit"
-        )
 
         return "\n".join(lines)
 
@@ -405,6 +413,11 @@ class ContextAnalyzer:
         total_tokens = agent_context_tokens + hint_tokens
         total_messages = sum(counts.values())
 
+        # Calculate usable context limit (80% of max_input_tokens) and free space
+        # This matches the TOKEN_LIMIT_RATIO = 0.8 from history/constants.py
+        max_usable_tokens = int(self.model_config.max_input_tokens * 0.8)
+        free_space_tokens = max_usable_tokens - agent_context_tokens
+
         return ContextAnalysis(
             user_messages=MessageTypeStats(count=counts["user"], tokens=user_tokens),
             agent_responses=MessageTypeStats(count=counts["agent_responses"], tokens=agent_response_tokens),
@@ -423,6 +436,9 @@ class ContextAnalyzer:
             total_messages=total_messages,
             context_window=self.model_config.max_input_tokens,
             agent_context_tokens=agent_context_tokens,
+            model_name=self.model_config.name.value,
+            max_usable_tokens=max_usable_tokens,
+            free_space_tokens=free_space_tokens,
         )
 
     async def _count_tokens_for_parts(

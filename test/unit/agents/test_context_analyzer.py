@@ -188,6 +188,8 @@ def test_format_analysis() -> None:
     # Agent context tokens excludes hints
     agent_context_tokens = 2000 + 3000 + 500 + 1000 + 1500 + 1500  # 9500
     total_tokens = agent_context_tokens + 500  # +500 for hints = 10000
+    max_usable_tokens = int(200_000 * 0.8)  # 160,000
+    free_space_tokens = max_usable_tokens - agent_context_tokens  # 150,500
 
     analysis = ContextAnalysis(
         user_messages=MessageTypeStats(count=5, tokens=2000),
@@ -203,35 +205,46 @@ def test_format_analysis() -> None:
         total_messages=38,
         context_window=200_000,
         agent_context_tokens=agent_context_tokens,
+        model_name="claude-sonnet-4-5",
+        max_usable_tokens=max_usable_tokens,
+        free_space_tokens=free_space_tokens,
     )
 
     formatted = analysis.format_analysis()
 
     assert "# Conversation Context Analysis" in formatted
-    assert "## Agent Context Composition" in formatted
-    assert "🧑 User Messages:" in formatted
-    assert "🤖 Agent Responses:" in formatted
-    assert "📋 System Prompts:" in formatted
-    assert "📊 System Status:" in formatted
-    assert "🔍 Codebase Understanding:" in formatted
-    assert "📦 Artifact Management:" in formatted
-    assert "## Summary" in formatted
-    # Total messages should exclude hints (38 - 2 = 36)
-    assert "Total Messages: 36" in formatted
-    assert "Agent Context Tokens: ~9,500" in formatted
+    assert "Model: claude-sonnet-4-5" in formatted
+    assert "Total Context:" in formatted
+    assert "Free Space:" in formatted
+    assert "Autocompact Buffer: 500 tokens" in formatted
+    assert "## Context Composition" in formatted
+
+    # Check for visual bar (should have both filled and empty circles)
+    assert "●" in formatted
+    assert "○" in formatted
+
+    assert "🧑 User Messages" in formatted
+    assert "🤖 Agent Responses" in formatted
+    assert "📋 System Prompts" in formatted
+    assert "📊 System Status" in formatted
+    assert "🔍 Codebase Understanding" in formatted
+    assert "📦 Artifact Management" in formatted
 
     # Hints should NOT be shown in the formatted output
     assert "UI Elements" not in formatted
     assert "💡 Hints:" not in formatted
 
     # Web research and unknown should NOT be shown when count is 0
-    assert "🌐 Web Research:" not in formatted
-    assert "⚠️  Unknown Tools:" not in formatted
+    assert "🌐 Web Research" not in formatted
+    assert "⚠️  Unknown Tools" not in formatted
 
 
 def test_format_analysis_excludes_zero_counts() -> None:
     """Test that message types with zero count are excluded from display."""
     agent_context_tokens = 100 + 100  # user + agent responses = 200
+    max_usable_tokens = int(200_000 * 0.8)  # 160,000
+    free_space_tokens = max_usable_tokens - agent_context_tokens  # 159,800
+
     analysis = ContextAnalysis(
         user_messages=MessageTypeStats(count=2, tokens=100),
         agent_responses=MessageTypeStats(count=2, tokens=100),
@@ -246,18 +259,21 @@ def test_format_analysis_excludes_zero_counts() -> None:
         total_messages=4,
         context_window=200_000,
         agent_context_tokens=agent_context_tokens,
+        model_name="claude-sonnet-4-5",
+        max_usable_tokens=max_usable_tokens,
+        free_space_tokens=free_space_tokens,
     )
 
     formatted = analysis.format_analysis()
 
     # Should include user and agent responses
-    assert "🧑 User Messages:" in formatted
-    assert "🤖 Agent Responses:" in formatted
+    assert "🧑 User Messages" in formatted
+    assert "🤖 Agent Responses" in formatted
 
     # Should not include categories with zero count
-    assert "📋 System Prompts:" not in formatted
-    assert "📊 System Status:" not in formatted
-    assert "🔍 Codebase Understanding:" not in formatted
+    assert "📋 System Prompts" not in formatted
+    assert "📊 System Status" not in formatted
+    assert "🔍 Codebase Understanding" not in formatted
 
 
 @pytest.mark.asyncio()
