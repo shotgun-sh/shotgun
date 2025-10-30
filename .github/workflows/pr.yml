@@ -150,7 +150,7 @@ jobs:
     steps:
       - name: Check if user is maintainer
         id: check
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             try {
