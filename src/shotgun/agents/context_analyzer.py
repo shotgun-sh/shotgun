@@ -1,6 +1,7 @@
 """Analyze conversation context composition and display statistics."""
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pydantic_ai.messages import (
@@ -129,42 +130,45 @@ class ContextAnalyzer:
         # Track counts for each message type
         counts: dict[str, int] = defaultdict(int)
 
-        # Track separate message lists for token counting
-        user_msgs: list[ModelMessage] = []
-        assistant_msgs: list[ModelMessage] = []
-        system_prompt_msgs: list[ModelMessage] = []
-        system_status_msgs: list[ModelMessage] = []
-        tool_result_msgs: list[ModelMessage] = []
+        # Track separate parts for token counting (to avoid double-counting)
+        # We'll create synthetic single-part messages for accurate token counting
+        user_parts: list[UserPromptPart] = []
+        system_prompt_parts: list[SystemPromptPart] = []
+        system_status_parts: list[SystemStatusPrompt] = []
+        tool_return_parts: list[ToolReturnPart] = []
+
+        # For assistant messages and tool calls, track the full messages/parts
+        assistant_msgs: list[ModelResponse] = []
+        tool_call_parts: list[ToolCallPart] = []
 
         # Analyze message_history for most message types
         for msg in message_history:
             if isinstance(msg, ModelRequest):
-                # Track what types are in this message
+                # Track what types are in this message for counting
                 has_user_prompt = False
                 has_system_prompt = False
                 has_system_status = False
                 has_tool_return = False
 
-                # Check for different part types
+                # Collect individual parts for token counting
                 for part in msg.parts:
                     if isinstance(part, SystemPromptPart):
                         if isinstance(part, AgentSystemPrompt):
                             has_system_prompt = True
-                            system_prompt_msgs.append(msg)
+                            system_prompt_parts.append(part)
                         elif isinstance(part, SystemStatusPrompt):
                             has_system_status = True
-                            system_status_msgs.append(msg)
+                            system_status_parts.append(part)
                         else:
                             # Generic system prompt
                             has_system_prompt = True
-                            system_prompt_msgs.append(msg)
+                            system_prompt_parts.append(part)
                     elif isinstance(part, UserPromptPart):
-                        # User text message
                         has_user_prompt = True
-                        user_msgs.append(msg)
+                        user_parts.append(part)
                     elif isinstance(part, ToolReturnPart):
                         has_tool_return = True
-                        tool_result_msgs.append(msg)
+                        tool_return_parts.append(part)
 
                 # Count the message types (only count once per message)
                 if has_system_prompt:
@@ -177,7 +181,7 @@ class ContextAnalyzer:
                     counts["tool_results"] += 1
 
             elif isinstance(msg, ModelResponse):
-                # Assistant responses
+                # Assistant responses - count entire response as one
                 counts["assistant"] += 1
                 assistant_msgs.append(msg)
 
@@ -185,29 +189,23 @@ class ContextAnalyzer:
                 for part in msg.parts:  # type: ignore[assignment]
                     if isinstance(part, ToolCallPart):
                         counts["tool_calls"] += 1
-                        # Create a synthetic message for token counting tool calls
-                        # We'll count them as part of the assistant message
+                        tool_call_parts.append(part)
 
         # Count hints from ui_message_history
         hint_count = sum(1 for msg in ui_message_history if isinstance(msg, HintMessage))
         counts["hints"] = hint_count
 
-        # Count tokens for each message type
-        user_tokens = await self._count_tokens_safe(user_msgs)
-        assistant_tokens = await self._count_tokens_safe(assistant_msgs)
-        system_prompt_tokens = await self._count_tokens_safe(system_prompt_msgs)
-        system_status_tokens = await self._count_tokens_safe(system_status_msgs)
-        tool_result_tokens = await self._count_tokens_safe(tool_result_msgs)
+        # Count tokens for each part type by creating synthetic messages
+        user_tokens = await self._count_tokens_for_parts(user_parts, "user")
+        system_prompt_tokens = await self._count_tokens_for_parts(system_prompt_parts, "system")
+        system_status_tokens = await self._count_tokens_for_parts(system_status_parts, "system")
+        tool_result_tokens = await self._count_tokens_for_parts(tool_return_parts, "tool_return")
 
-        # For tool calls, they're typically part of assistant messages
-        # We'll estimate by looking at parts
-        tool_call_tokens = 0
-        for msg in message_history:
-            if isinstance(msg, ModelResponse):
-                for part in msg.parts:  # type: ignore[assignment]
-                    if isinstance(part, ToolCallPart):
-                        # Rough estimate: tool name + args
-                        tool_call_tokens += len(part.tool_name) + len(str(part.args_as_dict()))
+        # Count tokens for assistant messages (these are already full messages)
+        assistant_tokens = await self._count_tokens_safe(assistant_msgs)
+
+        # Count tokens for tool calls
+        tool_call_tokens = await self._count_tokens_for_parts(tool_call_parts, "tool_call")
 
         # Estimate hint tokens (rough estimate based on character count)
         hint_tokens = 0
@@ -241,7 +239,40 @@ class ContextAnalyzer:
             context_window=self.model_config.max_input_tokens,
         )
 
-    async def _count_tokens_safe(self, messages: list[ModelMessage]) -> int:
+    async def _count_tokens_for_parts(
+        self,
+        parts: Sequence[UserPromptPart | SystemPromptPart | ToolReturnPart | ToolCallPart],
+        part_type: str,
+    ) -> int:
+        """Count tokens for a list of parts by creating synthetic single-part messages.
+
+        This avoids double-counting when a message contains multiple part types.
+
+        Args:
+            parts: List of parts to count tokens for
+            part_type: Type of parts ("user", "system", "tool_return", "tool_call")
+
+        Returns:
+            Total token count for all parts
+        """
+        if not parts:
+            return 0
+
+        # Create synthetic messages with single parts for accurate token counting
+        synthetic_messages: list[ModelMessage] = []
+
+        for part in parts:
+            if part_type in ("user", "system", "tool_return"):
+                # These are request parts - wrap in ModelRequest
+                synthetic_messages.append(ModelRequest(parts=[part]))  # type: ignore[list-item]
+            elif part_type == "tool_call":
+                # Tool calls are in responses - wrap in ModelResponse
+                synthetic_messages.append(ModelResponse(parts=[part]))  # type: ignore[list-item]
+
+        # Count tokens for the synthetic messages
+        return await self._count_tokens_safe(synthetic_messages)
+
+    async def _count_tokens_safe(self, messages: Sequence[ModelMessage]) -> int:
         """Count tokens for a list of messages, returning 0 on error.
 
         Args:
@@ -254,7 +285,7 @@ class ContextAnalyzer:
             return 0
 
         try:
-            return await count_tokens_from_messages(messages, self.model_config)
+            return await count_tokens_from_messages(list(messages), self.model_config)
         except Exception as e:
             logger.warning(f"Failed to count tokens: {e}")
             # Fallback to rough estimate

@@ -25,6 +25,8 @@ from textual.widgets import Button, Label, Static
 from shotgun.agents.agent_manager import (
     AgentManager,
     ClarifyingQuestionsMessage,
+    CompactionCompletedMessage,
+    CompactionStartedMessage,
     MessageHistoryUpdated,
     PartialResponseMessage,
 )
@@ -647,6 +649,26 @@ class ChatScreen(Screen[None]):
                             )
 
                     self.mount_hint(message)
+
+    @on(CompactionStartedMessage)
+    def handle_compaction_started(self, event: CompactionStartedMessage) -> None:
+        """Update spinner text when compaction starts."""
+        try:
+            spinner = self.query_one("#spinner", Spinner)
+            spinner.text = "Compacting Conversation..."
+        except Exception:
+            # If spinner not found or any error, silently continue
+            pass
+
+    @on(CompactionCompletedMessage)
+    def handle_compaction_completed(self, event: CompactionCompletedMessage) -> None:
+        """Reset spinner text when compaction completes."""
+        try:
+            spinner = self.query_one("#spinner", Spinner)
+            spinner.text = "Processing..."
+        except Exception:
+            # If spinner not found or any error, silently continue
+            pass
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:

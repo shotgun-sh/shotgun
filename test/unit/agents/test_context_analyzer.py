@@ -240,3 +240,67 @@ def test_format_analysis_excludes_zero_counts() -> None:
     assert "📋 System Prompts:" not in formatted
     assert "📊 System Status:" not in formatted
     assert "🔧 Tool Calls:" not in formatted
+
+
+@pytest.mark.asyncio()
+async def test_analyze_multi_part_message_no_double_counting(model_config: ModelConfig) -> None:
+    """Test that messages with multiple parts are not double-counted.
+
+    This is a regression test for a bug where a ModelRequest containing both
+    a SystemPromptPart and UserPromptPart would count the full message tokens
+    for both categories, leading to inflated totals and >100% context usage.
+    """
+    analyzer = ContextAnalyzer(model_config)
+
+    # Create a message with BOTH system prompt and user prompt parts
+    # This should only count tokens once total, split by part type
+    multi_part_message = ModelRequest(
+        parts=[
+            AgentSystemPrompt(content="You are a helpful assistant."),
+            UserPromptPart(content="Hello, how are you?"),
+        ]
+    )
+
+    # Create a simple assistant response
+    assistant_message = ModelResponse(parts=[TextPart(content="I'm doing well, thank you!")])
+
+    message_history = [multi_part_message, assistant_message]
+
+    analysis = await analyzer.analyze_conversation(message_history, message_history)
+
+    # The key assertion: total tokens should NOT be double-counted
+    # Even though we have a multi-part message, the total should be reasonable
+    # and should never cause >100% context usage in a normal scenario
+
+    # Calculate what percentage this would be
+    context_usage_percentage = (analysis.total_tokens / analysis.context_window) * 100
+
+    # With proper counting, this small conversation should be well under 100%
+    assert context_usage_percentage < 1.0, (
+        f"Context usage is {context_usage_percentage:.1f}%, which suggests double-counting. "
+        f"Total tokens: {analysis.total_tokens}, "
+        f"System prompts: {analysis.system_prompts.tokens}, "
+        f"User messages: {analysis.user_messages.tokens}, "
+        f"Assistant messages: {analysis.assistant_messages.tokens}"
+    )
+
+    # Verify that individual parts are counted separately
+    assert analysis.system_prompts.count == 1
+    assert analysis.user_messages.count == 1
+    assert analysis.assistant_messages.count == 1
+
+    # Verify tokens are properly distributed (no single category has inflated counts)
+    # The total should be the sum of all parts, not sum of duplicate full messages
+    calculated_total = (
+        analysis.system_prompts.tokens
+        + analysis.user_messages.tokens
+        + analysis.assistant_messages.tokens
+        + analysis.system_status.tokens
+        + analysis.tool_calls.tokens
+        + analysis.tool_results.tokens
+        + analysis.hint_messages.tokens
+    )
+
+    assert analysis.total_tokens == calculated_total, (
+        "Total tokens should equal the sum of all part tokens"
+    )

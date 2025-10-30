@@ -150,6 +150,14 @@ class ClarifyingQuestionsMessage(Message):
         self.response_text = response_text
 
 
+class CompactionStartedMessage(Message):
+    """Event posted when conversation compaction starts."""
+
+
+class CompactionCompletedMessage(Message):
+    """Event posted when conversation compaction completes."""
+
+
 @dataclass(slots=True)
 class _PartialStreamState:
     """Tracks streamed messages while handling a single agent run."""
@@ -694,7 +702,14 @@ class AgentManager(Widget):
                 "Starting message history compaction",
                 extra={"message_count": len(all_messages)},
             )
+            # Notify UI that compaction is starting
+            self.post_message(CompactionStartedMessage())
+
             self.message_history = await apply_persistent_compaction(all_messages, deps)
+
+            # Notify UI that compaction is complete
+            self.post_message(CompactionCompletedMessage())
+
             logger.debug(
                 "Completed message history compaction",
                 extra={
@@ -1070,7 +1085,9 @@ class AgentManager(Widget):
 __all__ = [
     "AgentManager",
     "AgentType",
+    "ClarifyingQuestionsMessage",
+    "CompactionCompletedMessage",
+    "CompactionStartedMessage",
     "MessageHistoryUpdated",
     "PartialResponseMessage",
-    "ClarifyingQuestionsMessage",
 ]
