@@ -96,48 +96,20 @@ class ContextFormatter:
         Returns:
             Dictionary with context analysis data
         """
-        return {
-            "user_messages": {
-                "count": analysis.user_messages.count,
-                "tokens": analysis.user_messages.tokens,
-            },
-            "agent_responses": {
-                "count": analysis.agent_responses.count,
-                "tokens": analysis.agent_responses.tokens,
-            },
-            "system_prompts": {
-                "count": analysis.system_prompts.count,
-                "tokens": analysis.system_prompts.tokens,
-            },
-            "system_status": {
-                "count": analysis.system_status.count,
-                "tokens": analysis.system_status.tokens,
-            },
-            "codebase_understanding": {
-                "count": analysis.codebase_understanding.count,
-                "tokens": analysis.codebase_understanding.tokens,
-            },
-            "artifact_management": {
-                "count": analysis.artifact_management.count,
-                "tokens": analysis.artifact_management.tokens,
-            },
-            "web_research": {
-                "count": analysis.web_research.count,
-                "tokens": analysis.web_research.tokens,
-            },
-            "unknown": {
-                "count": analysis.unknown.count,
-                "tokens": analysis.unknown.tokens,
-            },
-            "summary": {
-                "total_messages": analysis.total_messages - analysis.hint_messages.count,
-                "agent_context_tokens": analysis.agent_context_tokens,
-                "context_window": analysis.context_window,
-                "usage_percentage": round(
-                    (analysis.agent_context_tokens / analysis.context_window * 100)
-                    if analysis.context_window > 0
-                    else 0,
-                    1,
-                ),
-            },
+        # Use Pydantic's model_dump() to serialize the model
+        data = analysis.model_dump()
+
+        # Add computed summary field
+        data["summary"] = {
+            "total_messages": analysis.total_messages - analysis.hint_messages.count,
+            "agent_context_tokens": analysis.agent_context_tokens,
+            "context_window": analysis.context_window,
+            "usage_percentage": round(
+                (analysis.agent_context_tokens / analysis.context_window * 100)
+                if analysis.context_window > 0
+                else 0,
+                1,
+            ),
         }
+
+        return data

@@ -9,8 +9,13 @@ import typer
 from rich.console import Console
 
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.context_analyzer import ContextAnalyzer, ContextAnalysisOutput, ContextFormatter
+from shotgun.agents.context_analyzer import (
+    ContextAnalysisOutput,
+    ContextAnalyzer,
+    ContextFormatter,
+)
 from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.cli.models import OutputFormat
 from shotgun.logging_config import get_logger
 
 app = typer.Typer(
@@ -23,13 +28,13 @@ console = Console()
 @app.callback(invoke_without_command=True)
 def context(
     format: Annotated[
-        str,
+        OutputFormat,
         typer.Option(
             "--format",
             "-f",
             help="Output format: markdown or json",
         ),
-    ] = "markdown",
+    ] = OutputFormat.MARKDOWN,
 ) -> None:
     """Analyze the current conversation's context usage.
 
@@ -37,17 +42,10 @@ def context(
     and displays token usage breakdown by message type. Only agent context is counted
     (UI elements like hints are excluded).
     """
-    if format not in ["markdown", "json"]:
-        console.print(
-            f"[red]Error:[/red] Invalid format '{format}'. Use 'markdown' or 'json'.",
-            style="bold",
-        )
-        raise typer.Exit(code=1)
-
     try:
         result = asyncio.run(analyze_context())
 
-        if format == "json":
+        if format == OutputFormat.JSON:
             # Output as JSON
             console.print_json(json.dumps(result.json_data, indent=2))
         else:
@@ -60,11 +58,11 @@ def context(
             "No conversation found. Start a TUI session first with: [cyan]shotgun[/cyan]",
             style="bold",
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         console.print(f"[red]Error:[/red] Failed to analyze context: {e}", style="bold")
         logger.debug("Full traceback:", exc_info=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 async def analyze_context() -> ContextAnalysisOutput:
@@ -105,7 +103,8 @@ async def analyze_context() -> ContextAnalysisOutput:
 
     # Analyze with ContextAnalyzer
     analyzer = ContextAnalyzer(model_config)
-    analysis = await analyzer.analyze_conversation(agent_messages, agent_messages)
+    # For CLI, agent_messages and ui_message_history are the same (no hints in CLI mode)
+    analysis = await analyzer.analyze_conversation(agent_messages, list(agent_messages))
 
     # Use formatter to generate markdown and JSON
     markdown = ContextFormatter.format_markdown(analysis)

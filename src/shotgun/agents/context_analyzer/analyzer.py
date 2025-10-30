@@ -22,7 +22,7 @@ from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 from .constants import ToolCategory, get_tool_category
-from .models import ContextAnalysis, MessageTypeStats
+from .models import ContextAnalysis, MessageTypeStats, TokenAllocation
 
 logger = get_logger(__name__)
 
@@ -41,7 +41,7 @@ class ContextAnalyzer:
     def _allocate_tokens_from_usage(
         self,
         message_history: list[ModelMessage],
-    ) -> dict[str, int]:
+    ) -> TokenAllocation:
         """Allocate tokens from actual API usage data proportionally to parts.
 
         This uses the ground truth token counts from ModelResponse.usage instead of
@@ -56,9 +56,7 @@ class ContextAnalyzer:
             message_history: List of actual messages from conversation
 
         Returns:
-            Dict with token counts by part type:
-            'user', 'assistant', 'system_prompts', 'system_status',
-            'tool_calls', 'tool_results'
+            TokenAllocation with token counts by message/tool type
         """
         # Step 1: Find the last response's usage data (ground truth for input tokens)
         last_input_tokens = 0
@@ -177,7 +175,17 @@ class ContextAnalyzer:
         logger.debug(f"Token allocation complete: {dict(token_counts)}")
         logger.debug(f"Input tokens (from last response): {last_input_tokens}, Output tokens (sum): {total_output_tokens}")
 
-        return dict(token_counts)
+        # Create TokenAllocation model from the collected counts
+        return TokenAllocation(
+            user=token_counts.get("user", 0),
+            agent_responses=token_counts.get("agent_responses", 0),
+            system_prompts=token_counts.get("system_prompts", 0),
+            system_status=token_counts.get("system_status", 0),
+            codebase_understanding=token_counts.get("codebase_understanding", 0),
+            artifact_management=token_counts.get("artifact_management", 0),
+            web_research=token_counts.get("web_research", 0),
+            unknown=token_counts.get("unknown", 0),
+        )
 
     async def analyze_conversation(
         self,
@@ -257,14 +265,14 @@ class ContextAnalyzer:
         # Use actual API usage data for accurate token counting (avoids synthetic message overhead)
         usage_tokens = self._allocate_tokens_from_usage(message_history)
 
-        user_tokens = usage_tokens.get("user", 0)
-        agent_response_tokens = usage_tokens.get("agent_responses", 0)
-        system_prompt_tokens = usage_tokens.get("system_prompts", 0)
-        system_status_tokens = usage_tokens.get("system_status", 0)
-        codebase_understanding_tokens = usage_tokens.get("codebase_understanding", 0)
-        artifact_management_tokens = usage_tokens.get("artifact_management", 0)
-        web_research_tokens = usage_tokens.get("web_research", 0)
-        unknown_tokens = usage_tokens.get("unknown", 0)
+        user_tokens = usage_tokens.user
+        agent_response_tokens = usage_tokens.agent_responses
+        system_prompt_tokens = usage_tokens.system_prompts
+        system_status_tokens = usage_tokens.system_status
+        codebase_understanding_tokens = usage_tokens.codebase_understanding
+        artifact_management_tokens = usage_tokens.artifact_management
+        web_research_tokens = usage_tokens.web_research
+        unknown_tokens = usage_tokens.unknown
 
         # Estimate hint tokens (rough estimate based on character count)
         hint_tokens = 0
