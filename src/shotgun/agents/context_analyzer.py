@@ -48,6 +48,7 @@ class ContextAnalysis:
     hint_messages: MessageTypeStats
     total_tokens: int
     total_messages: int
+    context_window: int
 
     def get_percentage(self, stats: MessageTypeStats) -> float:
         """Calculate percentage of total tokens for a message type."""
@@ -89,10 +90,13 @@ class ContextAnalysis:
             avg_length = self.total_tokens / self.total_messages
             lines.append(f"- Average Message Length: ~{avg_length:.0f} tokens")
 
-        # Add context window usage info (assuming 100k context window)
-        context_window = 100_000
-        usage_percent = (self.total_tokens / context_window * 100) if self.total_tokens > 0 else 0
-        lines.append(f"- Context Window Usage: ~{usage_percent:.1f}% of {context_window:,} limit")
+        # Add context window usage info using actual model's max_input_tokens
+        usage_percent = (
+            (self.total_tokens / self.context_window * 100) if self.total_tokens > 0 else 0
+        )
+        lines.append(
+            f"- Context Window Usage: ~{usage_percent:.1f}% of {self.context_window:,} limit"
+        )
 
         return "\n".join(lines)
 
@@ -234,6 +238,7 @@ class ContextAnalyzer:
             hint_messages=MessageTypeStats(count=counts["hints"], tokens=hint_tokens),
             total_tokens=total_tokens,
             total_messages=total_messages,
+            context_window=self.model_config.max_input_tokens,
         )
 
     async def _count_tokens_safe(self, messages: list[ModelMessage]) -> int:

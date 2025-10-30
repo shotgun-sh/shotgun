@@ -196,6 +196,7 @@ def test_format_analysis() -> None:
         hint_messages=MessageTypeStats(count=2, tokens=500),
         total_tokens=10000,
         total_messages=38,
+        context_window=200_000,
     )
 
     formatted = analysis.format_analysis()
@@ -226,6 +227,7 @@ def test_format_analysis_excludes_zero_counts() -> None:
         hint_messages=MessageTypeStats(count=0, tokens=0),
         total_tokens=200,
         total_messages=4,
+        context_window=200_000,
     )
 
     formatted = analysis.format_analysis()
