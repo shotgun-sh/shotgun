@@ -197,8 +197,8 @@ Outputs plug into many code-generation tools including Codex, Cursor, Warp, Devi
 **See Shotgun in action:**
 
 <p align="center">
-  <a href="https://youtu.be/eEUaSaQJBPg">
-    <img src="https://github.com/user-attachments/assets/da115b12-7ca5-4bbc-ae20-3684f971b567" alt="Watch the Shotgun demo" width="720" height="450">
+  <a href="https://www.youtube.com/watch?v=3e7kxhANXWA">
+    <img src="https://img.youtube.com/vi/3e7kxhANXWA/maxresdefault.jpg" alt="Watch the Shotgun demo" width="720" height="450">
   </a>
 </p>
 
