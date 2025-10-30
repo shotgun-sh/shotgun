@@ -47,6 +47,7 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.config.models import KeyProvider
+from shotgun.agents.context_analyzer import ContextAnalyzer
 from shotgun.agents.models import AgentResponse, AgentType, FileOperation
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -697,6 +698,9 @@ class AgentManager(Widget):
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
+        messages_before_compaction = len(all_messages)
+        compaction_occurred = False
+
         try:
             logger.debug(
                 "Starting message history compaction",
@@ -706,6 +710,9 @@ class AgentManager(Widget):
             self.post_message(CompactionStartedMessage())
 
             self.message_history = await apply_persistent_compaction(all_messages, deps)
+
+            # Track if compaction actually modified the history
+            compaction_occurred = len(self.message_history) != len(all_messages)
 
             # Notify UI that compaction is complete
             self.post_message(CompactionCompletedMessage())
@@ -730,6 +737,12 @@ class AgentManager(Widget):
             )
             # Fallback: use uncompacted messages to prevent data loss
             self.message_history = all_messages
+
+        # Track context composition telemetry
+        await self._track_context_analysis(
+            compaction_occurred=compaction_occurred,
+            messages_before_compaction=messages_before_compaction if compaction_occurred else None,
+        )
 
         usage = result.usage()
         if hasattr(deps, "llm_model") and deps.llm_model is not None:
@@ -1037,6 +1050,83 @@ class AgentManager(Widget):
         except Exception as e:
             logger.error(f"Failed to generate context analysis: {e}")
             return None
+
+    async def _track_context_analysis(
+        self,
+        compaction_occurred: bool = False,
+        messages_before_compaction: int | None = None,
+    ) -> None:
+        """Track context composition telemetry to PostHog.
+
+        Args:
+            compaction_occurred: Whether compaction was applied
+            messages_before_compaction: Message count before compaction, if it occurred
+        """
+        try:
+            analyzer = ContextAnalyzer(self.deps.llm_model)
+            analysis = await analyzer.analyze_conversation(
+                self.message_history, self.ui_message_history
+            )
+
+            # Build properties for PostHog event
+            properties = {
+                # Context usage
+                "total_messages": analysis.total_messages - analysis.hint_messages.count,
+                "agent_context_tokens": analysis.agent_context_tokens,
+                "context_window": analysis.context_window,
+                "max_usable_tokens": analysis.max_usable_tokens,
+                "free_space_tokens": analysis.free_space_tokens,
+                "usage_percentage": round(
+                    (analysis.agent_context_tokens / analysis.max_usable_tokens * 100)
+                    if analysis.max_usable_tokens > 0
+                    else 0,
+                    1,
+                ),
+                # Message type counts
+                "user_messages_count": analysis.user_messages.count,
+                "agent_responses_count": analysis.agent_responses.count,
+                "system_prompts_count": analysis.system_prompts.count,
+                "system_status_count": analysis.system_status.count,
+                "codebase_understanding_count": analysis.codebase_understanding.count,
+                "artifact_management_count": analysis.artifact_management.count,
+                "web_research_count": analysis.web_research.count,
+                "unknown_tools_count": analysis.unknown.count,
+                # Token distribution percentages
+                "user_messages_pct": round(analysis.get_percentage(analysis.user_messages), 1),
+                "agent_responses_pct": round(analysis.get_percentage(analysis.agent_responses), 1),
+                "system_prompts_pct": round(analysis.get_percentage(analysis.system_prompts), 1),
+                "system_status_pct": round(analysis.get_percentage(analysis.system_status), 1),
+                "codebase_understanding_pct": round(
+                    analysis.get_percentage(analysis.codebase_understanding), 1
+                ),
+                "artifact_management_pct": round(analysis.get_percentage(analysis.artifact_management), 1),
+                "web_research_pct": round(analysis.get_percentage(analysis.web_research), 1),
+                "unknown_tools_pct": round(analysis.get_percentage(analysis.unknown), 1),
+                # Compaction info
+                "compaction_occurred": compaction_occurred,
+            }
+
+            # Add compaction metrics if it occurred
+            if compaction_occurred and messages_before_compaction is not None:
+                properties["messages_before_compaction"] = messages_before_compaction
+                properties["messages_after_compaction"] = (
+                    analysis.total_messages - analysis.hint_messages.count
+                )
+                properties["compaction_reduction_pct"] = round(
+                    (
+                        1
+                        - (
+                            (analysis.total_messages - analysis.hint_messages.count)
+                            / messages_before_compaction
+                        )
+                    )
+                    * 100,
+                    1,
+                ) if messages_before_compaction > 0 else 0
+
+            track_event("agent_context_composition", properties)
+        except Exception as e:
+            logger.warning(f"Failed to track context analysis: {e}")
 
     def get_conversation_state(self) -> "ConversationState":
         """Get the current conversation state.
