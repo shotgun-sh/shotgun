@@ -99,18 +99,15 @@ The coverage configuration is in `pyproject.toml` and will automatically run whe
 
 ## Python Version Management
 
-The project supports **Python 3.11+**. The `.python-version` file specifies Python 3.11 to ensure development against the minimum supported version.
+The project supports **Python 3.11+** and uses **uv** exclusively for Python version and package management.
 
-If using **pyenv**:
-```bash
-pyenv install 3.11
-```
-
-If using **uv** (recommended):
+To ensure you're developing against the minimum supported version:
 ```bash
 uv python install 3.11
 uv sync --python 3.11
 ```
+
+**Note:** This project does not use pyenv or other version managers. All Python version management is handled through uv.
 
 ## Commit Message Convention
 
