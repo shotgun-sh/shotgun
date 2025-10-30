@@ -186,6 +186,10 @@ async def test_percentage_calculation(model_config: ModelConfig) -> None:
 
 def test_format_analysis() -> None:
     """Test formatting the analysis as markdown."""
+    # Agent context tokens excludes hints
+    agent_context_tokens = 2000 + 3000 + 500 + 1000 + 1500 + 1500  # 9500
+    total_tokens = agent_context_tokens + 500  # +500 for hints = 10000
+
     analysis = ContextAnalysis(
         user_messages=MessageTypeStats(count=5, tokens=2000),
         assistant_messages=MessageTypeStats(count=7, tokens=3000),
@@ -194,29 +198,35 @@ def test_format_analysis() -> None:
         tool_calls=MessageTypeStats(count=10, tokens=1500),
         tool_results=MessageTypeStats(count=10, tokens=1500),
         hint_messages=MessageTypeStats(count=2, tokens=500),
-        total_tokens=10000,
+        total_tokens=total_tokens,
         total_messages=38,
         context_window=200_000,
+        agent_context_tokens=agent_context_tokens,
     )
 
     formatted = analysis.format_analysis()
 
     assert "# Conversation Context Analysis" in formatted
-    assert "## Message Composition" in formatted
+    assert "## Agent Context Composition" in formatted
     assert "🧑 User Messages:" in formatted
     assert "🤖 Assistant Messages:" in formatted
     assert "📋 System Prompts:" in formatted
     assert "📊 System Status:" in formatted
     assert "🔧 Tool Calls:" in formatted
     assert "📥 Tool Results:" in formatted
-    assert "💡 Hints:" in formatted
     assert "## Summary" in formatted
-    assert "Total Messages: 38" in formatted
-    assert "Total Tokens: ~10,000" in formatted
+    # Total messages should exclude hints (38 - 2 = 36)
+    assert "Total Messages: 36" in formatted
+    assert "Agent Context Tokens: ~9,500" in formatted
+
+    # Hints should NOT be shown in the formatted output
+    assert "UI Elements" not in formatted
+    assert "💡 Hints:" not in formatted
 
 
 def test_format_analysis_excludes_zero_counts() -> None:
     """Test that message types with zero count are excluded from display."""
+    agent_context_tokens = 100 + 100  # user + assistant = 200
     analysis = ContextAnalysis(
         user_messages=MessageTypeStats(count=2, tokens=100),
         assistant_messages=MessageTypeStats(count=2, tokens=100),
@@ -228,6 +238,7 @@ def test_format_analysis_excludes_zero_counts() -> None:
         total_tokens=200,
         total_messages=4,
         context_window=200_000,
+        agent_context_tokens=agent_context_tokens,
     )
 
     formatted = analysis.format_analysis()
