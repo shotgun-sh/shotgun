@@ -1,5 +1,6 @@
 """Analyze conversation context composition and display statistics."""
 
+import asyncio
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -195,17 +196,25 @@ class ContextAnalyzer:
         hint_count = sum(1 for msg in ui_message_history if isinstance(msg, HintMessage))
         counts["hints"] = hint_count
 
-        # Count tokens for each part type by creating synthetic messages
-        user_tokens = await self._count_tokens_for_parts(user_parts, "user")
-        system_prompt_tokens = await self._count_tokens_for_parts(system_prompt_parts, "system")
-        system_status_tokens = await self._count_tokens_for_parts(system_status_parts, "system")
-        tool_result_tokens = await self._count_tokens_for_parts(tool_return_parts, "tool_return")
+        # Count tokens for all message types in parallel for better performance
+        token_results = await asyncio.gather(
+            self._count_tokens_for_parts(user_parts, "user"),
+            self._count_tokens_for_parts(system_prompt_parts, "system"),
+            self._count_tokens_for_parts(system_status_parts, "system"),
+            self._count_tokens_for_parts(tool_return_parts, "tool_return"),
+            self._count_tokens_safe(assistant_msgs),
+            self._count_tokens_for_parts(tool_call_parts, "tool_call"),
+        )
 
-        # Count tokens for assistant messages (these are already full messages)
-        assistant_tokens = await self._count_tokens_safe(assistant_msgs)
-
-        # Count tokens for tool calls
-        tool_call_tokens = await self._count_tokens_for_parts(tool_call_parts, "tool_call")
+        # Unpack results
+        (
+            user_tokens,
+            system_prompt_tokens,
+            system_status_tokens,
+            tool_result_tokens,
+            assistant_tokens,
+            tool_call_tokens,
+        ) = token_results
 
         # Estimate hint tokens (rough estimate based on character count)
         hint_tokens = 0
