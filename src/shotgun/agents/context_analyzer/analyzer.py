@@ -147,13 +147,37 @@ class ContextAnalyzer:
                         agent_response_size += len(part.content)
 
         # Step 5: Allocate input tokens proportionally
-        token_counts: dict[str, int] = defaultdict(int)
+        # Initialize TokenAllocation fields
+        user_tokens = 0
+        agent_response_tokens = 0
+        system_prompt_tokens = 0
+        system_status_tokens = 0
+        codebase_understanding_tokens = 0
+        artifact_management_tokens = 0
+        web_research_tokens = 0
+        unknown_tokens = 0
+
         total_input_size = sum(part_type_sizes.values())
 
         if total_input_size > 0 and last_input_tokens > 0:
             for part_type, size in part_type_sizes.items():
                 proportion = size / total_input_size
-                token_counts[part_type] = int(last_input_tokens * proportion)
+                allocated_tokens = int(last_input_tokens * proportion)
+
+                if part_type == "user":
+                    user_tokens = allocated_tokens
+                elif part_type == "system_prompts":
+                    system_prompt_tokens = allocated_tokens
+                elif part_type == "system_status":
+                    system_status_tokens = allocated_tokens
+                elif part_type == "codebase_understanding":
+                    codebase_understanding_tokens = allocated_tokens
+                elif part_type == "artifact_management":
+                    artifact_management_tokens = allocated_tokens
+                elif part_type == "web_research":
+                    web_research_tokens = allocated_tokens
+                elif part_type == "unknown":
+                    unknown_tokens = allocated_tokens
 
         # Step 6: Allocate output tokens proportionally
         total_output_size = (
@@ -165,40 +189,46 @@ class ContextAnalyzer:
         )
 
         if total_output_size > 0 and total_output_tokens > 0:
-            token_counts["codebase_understanding"] += int(
+            codebase_understanding_tokens += int(
                 total_output_tokens * (codebase_understanding_size / total_output_size)
             )
-            token_counts["artifact_management"] += int(
+            artifact_management_tokens += int(
                 total_output_tokens * (artifact_management_size / total_output_size)
             )
-            token_counts["web_research"] += int(
+            web_research_tokens += int(
                 total_output_tokens * (web_research_size / total_output_size)
             )
-            token_counts["unknown"] += int(
+            unknown_tokens += int(
                 total_output_tokens * (unknown_size / total_output_size)
             )
-            token_counts["agent_responses"] += int(
+            agent_response_tokens += int(
                 total_output_tokens * (agent_response_size / total_output_size)
             )
         elif total_output_tokens > 0:
             # If no content, put all in agent responses
-            token_counts["agent_responses"] = total_output_tokens
+            agent_response_tokens = total_output_tokens
 
-        logger.debug(f"Token allocation complete: {dict(token_counts)}")
+        logger.debug(
+            f"Token allocation complete: user={user_tokens}, agent_responses={agent_response_tokens}, "
+            f"system_prompts={system_prompt_tokens}, system_status={system_status_tokens}, "
+            f"codebase_understanding={codebase_understanding_tokens}, "
+            f"artifact_management={artifact_management_tokens}, web_research={web_research_tokens}, "
+            f"unknown={unknown_tokens}"
+        )
         logger.debug(
             f"Input tokens (from last response): {last_input_tokens}, Output tokens (sum): {total_output_tokens}"
         )
 
-        # Create TokenAllocation model from the collected counts
+        # Create TokenAllocation model
         return TokenAllocation(
-            user=token_counts.get("user", 0),
-            agent_responses=token_counts.get("agent_responses", 0),
-            system_prompts=token_counts.get("system_prompts", 0),
-            system_status=token_counts.get("system_status", 0),
-            codebase_understanding=token_counts.get("codebase_understanding", 0),
-            artifact_management=token_counts.get("artifact_management", 0),
-            web_research=token_counts.get("web_research", 0),
-            unknown=token_counts.get("unknown", 0),
+            user=user_tokens,
+            agent_responses=agent_response_tokens,
+            system_prompts=system_prompt_tokens,
+            system_status=system_status_tokens,
+            codebase_understanding=codebase_understanding_tokens,
+            artifact_management=artifact_management_tokens,
+            web_research=web_research_tokens,
+            unknown=unknown_tokens,
         )
 
     async def analyze_conversation(
