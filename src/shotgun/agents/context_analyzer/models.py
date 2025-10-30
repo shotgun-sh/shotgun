@@ -13,14 +13,24 @@ class TokenAllocation(BaseModel):
     """
 
     user: int = Field(ge=0, default=0, description="Tokens from user prompts")
-    agent_responses: int = Field(ge=0, default=0, description="Tokens from agent text responses")
-    system_prompts: int = Field(ge=0, default=0, description="Tokens from system prompts")
-    system_status: int = Field(ge=0, default=0, description="Tokens from system status messages")
+    agent_responses: int = Field(
+        ge=0, default=0, description="Tokens from agent text responses"
+    )
+    system_prompts: int = Field(
+        ge=0, default=0, description="Tokens from system prompts"
+    )
+    system_status: int = Field(
+        ge=0, default=0, description="Tokens from system status messages"
+    )
     codebase_understanding: int = Field(
         ge=0, default=0, description="Tokens from codebase understanding tools"
     )
-    artifact_management: int = Field(ge=0, default=0, description="Tokens from artifact management tools")
-    web_research: int = Field(ge=0, default=0, description="Tokens from web research tools")
+    artifact_management: int = Field(
+        ge=0, default=0, description="Tokens from artifact management tools"
+    )
+    web_research: int = Field(
+        ge=0, default=0, description="Tokens from web research tools"
+    )
     unknown: int = Field(ge=0, default=0, description="Tokens from uncategorized tools")
 
 
@@ -52,10 +62,13 @@ class ContextAnalysis(BaseModel):
     total_messages: int = Field(ge=0, description="Total message count including hints")
     context_window: int = Field(ge=0, description="Model's maximum input tokens")
     agent_context_tokens: int = Field(
-        ge=0, description="Tokens that actually consume agent context (excluding UI-only)"
+        ge=0,
+        description="Tokens that actually consume agent context (excluding UI-only)",
     )
     model_name: str = Field(description="Name of the model being used")
-    max_usable_tokens: int = Field(ge=0, description="80% of max_input_tokens (usable limit)")
+    max_usable_tokens: int = Field(
+        ge=0, description="80% of max_input_tokens (usable limit)"
+    )
     free_space_tokens: int = Field(ge=0, description="Remaining tokens available")
 
     def get_percentage(self, stats: MessageTypeStats) -> float:
@@ -67,7 +80,11 @@ class ContextAnalysis(BaseModel):
         Returns:
             Percentage of total agent context tokens (0-100)
         """
-        return (stats.tokens / self.agent_context_tokens * 100) if self.agent_context_tokens > 0 else 0.0
+        return (
+            (stats.tokens / self.agent_context_tokens * 100)
+            if self.agent_context_tokens > 0
+            else 0.0
+        )
 
 
 class ContextCompositionTelemetry(BaseModel):
@@ -161,11 +178,19 @@ class ContextCompositionTelemetry(BaseModel):
             unknown_tools_count=analysis.unknown.count,
             # Token distribution percentages
             user_messages_pct=round(analysis.get_percentage(analysis.user_messages), 1),
-            agent_responses_pct=round(analysis.get_percentage(analysis.agent_responses), 1),
-            system_prompts_pct=round(analysis.get_percentage(analysis.system_prompts), 1),
+            agent_responses_pct=round(
+                analysis.get_percentage(analysis.agent_responses), 1
+            ),
+            system_prompts_pct=round(
+                analysis.get_percentage(analysis.system_prompts), 1
+            ),
             system_status_pct=round(analysis.get_percentage(analysis.system_status), 1),
-            codebase_understanding_pct=round(analysis.get_percentage(analysis.codebase_understanding), 1),
-            artifact_management_pct=round(analysis.get_percentage(analysis.artifact_management), 1),
+            codebase_understanding_pct=round(
+                analysis.get_percentage(analysis.codebase_understanding), 1
+            ),
+            artifact_management_pct=round(
+                analysis.get_percentage(analysis.artifact_management), 1
+            ),
             web_research_pct=round(analysis.get_percentage(analysis.web_research), 1),
             unknown_tools_pct=round(analysis.get_percentage(analysis.unknown), 1),
             # Compaction info
@@ -180,4 +205,6 @@ class ContextAnalysisOutput(BaseModel):
     """Output format for context analysis with multiple representations."""
 
     markdown: str = Field(description="Markdown-formatted analysis for display")
-    json_data: dict[str, Any] = Field(description="JSON representation of analysis data")
+    json_data: dict[str, Any] = Field(
+        description="JSON representation of analysis data"
+    )

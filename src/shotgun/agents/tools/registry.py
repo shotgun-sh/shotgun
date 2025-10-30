@@ -91,7 +91,9 @@ def register_special_tool(tool_name: str, category: ToolCategory) -> None:
         category: Category to assign to this tool
     """
     _TOOL_REGISTRY[tool_name] = category
-    logger.debug(f"Registered special tool '{tool_name}' as category '{category.value}'")
+    logger.debug(
+        f"Registered special tool '{tool_name}' as category '{category.value}'"
+    )
 
 
 # Register special tools that don't have decorators

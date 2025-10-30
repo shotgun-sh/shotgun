@@ -83,9 +83,15 @@ class ContextAnalyzer:
                     elif isinstance(part, ToolReturnPart):
                         # ToolReturnPart.content can be Any type
                         try:
-                            content_str = json.dumps(part.content) if part.content is not None else ""
+                            content_str = (
+                                json.dumps(part.content)
+                                if part.content is not None
+                                else ""
+                            )
                         except (TypeError, ValueError):
-                            content_str = str(part.content) if part.content is not None else ""
+                            content_str = (
+                                str(part.content) if part.content is not None else ""
+                            )
                         size = len(content_str)
                     else:
                         size = 0
@@ -165,15 +171,23 @@ class ContextAnalyzer:
             token_counts["artifact_management"] += int(
                 total_output_tokens * (artifact_management_size / total_output_size)
             )
-            token_counts["web_research"] += int(total_output_tokens * (web_research_size / total_output_size))
-            token_counts["unknown"] += int(total_output_tokens * (unknown_size / total_output_size))
-            token_counts["agent_responses"] += int(total_output_tokens * (agent_response_size / total_output_size))
+            token_counts["web_research"] += int(
+                total_output_tokens * (web_research_size / total_output_size)
+            )
+            token_counts["unknown"] += int(
+                total_output_tokens * (unknown_size / total_output_size)
+            )
+            token_counts["agent_responses"] += int(
+                total_output_tokens * (agent_response_size / total_output_size)
+            )
         elif total_output_tokens > 0:
             # If no content, put all in agent responses
             token_counts["agent_responses"] = total_output_tokens
 
         logger.debug(f"Token allocation complete: {dict(token_counts)}")
-        logger.debug(f"Input tokens (from last response): {last_input_tokens}, Output tokens (sum): {total_output_tokens}")
+        logger.debug(
+            f"Input tokens (from last response): {last_input_tokens}, Output tokens (sum): {total_output_tokens}"
+        )
 
         # Create TokenAllocation model from the collected counts
         return TokenAllocation(
@@ -259,7 +273,9 @@ class ContextAnalyzer:
                             counts[category.value] += 1
 
         # Count hints from ui_message_history
-        hint_count = sum(1 for msg in ui_message_history if isinstance(msg, HintMessage))
+        hint_count = sum(
+            1 for msg in ui_message_history if isinstance(msg, HintMessage)
+        )
         counts["hints"] = hint_count
 
         # Use actual API usage data for accurate token counting (avoids synthetic message overhead)
@@ -304,16 +320,25 @@ class ContextAnalyzer:
 
         return ContextAnalysis(
             user_messages=MessageTypeStats(count=counts["user"], tokens=user_tokens),
-            agent_responses=MessageTypeStats(count=counts["agent_responses"], tokens=agent_response_tokens),
-            system_prompts=MessageTypeStats(count=counts["system_prompts"], tokens=system_prompt_tokens),
-            system_status=MessageTypeStats(count=counts["system_status"], tokens=system_status_tokens),
+            agent_responses=MessageTypeStats(
+                count=counts["agent_responses"], tokens=agent_response_tokens
+            ),
+            system_prompts=MessageTypeStats(
+                count=counts["system_prompts"], tokens=system_prompt_tokens
+            ),
+            system_status=MessageTypeStats(
+                count=counts["system_status"], tokens=system_status_tokens
+            ),
             codebase_understanding=MessageTypeStats(
-                count=counts["codebase_understanding"], tokens=codebase_understanding_tokens
+                count=counts["codebase_understanding"],
+                tokens=codebase_understanding_tokens,
             ),
             artifact_management=MessageTypeStats(
                 count=counts["artifact_management"], tokens=artifact_management_tokens
             ),
-            web_research=MessageTypeStats(count=counts["web_research"], tokens=web_research_tokens),
+            web_research=MessageTypeStats(
+                count=counts["web_research"], tokens=web_research_tokens
+            ),
             unknown=MessageTypeStats(count=counts["unknown"], tokens=unknown_tokens),
             hint_messages=MessageTypeStats(count=counts["hints"], tokens=hint_tokens),
             total_tokens=total_tokens,
@@ -327,7 +352,9 @@ class ContextAnalyzer:
 
     async def _count_tokens_for_parts(
         self,
-        parts: Sequence[UserPromptPart | SystemPromptPart | ToolReturnPart | ToolCallPart],
+        parts: Sequence[
+            UserPromptPart | SystemPromptPart | ToolReturnPart | ToolCallPart
+        ],
         part_type: str,
     ) -> int:
         """Count tokens for a list of parts by creating synthetic single-part messages.

@@ -741,7 +741,9 @@ class AgentManager(Widget):
         # Track context composition telemetry
         await self._track_context_analysis(
             compaction_occurred=compaction_occurred,
-            messages_before_compaction=messages_before_compaction if compaction_occurred else None,
+            messages_before_compaction=messages_before_compaction
+            if compaction_occurred
+            else None,
         )
 
         usage = result.usage()

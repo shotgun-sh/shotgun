@@ -75,9 +75,7 @@ async def analyze_context() -> ContextAnalysisOutput:
     conversation_file = Path.home() / ".shotgun-sh" / "conversation.json"
 
     if not conversation_file.exists():
-        raise FileNotFoundError(
-            f"Conversation file not found at {conversation_file}"
-        )
+        raise FileNotFoundError(f"Conversation file not found at {conversation_file}")
 
     # Load conversation
     manager = ConversationManager(conversation_file)
