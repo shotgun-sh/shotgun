@@ -8,6 +8,7 @@ from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.llm import shotgun_model_request
+from shotgun.agents.tools.registry import ToolCategory, tool_category
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.utils.datetime_utils import get_datetime_context
@@ -18,6 +19,7 @@ logger = get_logger(__name__)
 prompt_loader = PromptLoader()
 
 
+@tool_category(ToolCategory.WEB_RESEARCH)
 async def anthropic_web_search_tool(query: str) -> str:
     """Perform a web search using Anthropic's Claude API.
 

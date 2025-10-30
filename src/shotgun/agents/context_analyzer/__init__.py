@@ -5,7 +5,7 @@ token consumption by message type and tool category.
 """
 
 from .analyzer import ContextAnalyzer
-from .constants import TOOL_CATEGORIES, get_tool_category
+from .constants import ToolCategory, get_tool_category
 from .formatter import ContextFormatter
 from .models import ContextAnalysis, ContextAnalysisOutput, MessageTypeStats
 
@@ -15,6 +15,6 @@ __all__ = [
     "ContextAnalysisOutput",
     "ContextFormatter",
     "MessageTypeStats",
-    "TOOL_CATEGORIES",
+    "ToolCategory",
     "get_tool_category",
 ]

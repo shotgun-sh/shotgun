@@ -21,7 +21,7 @@ from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
-from .constants import get_tool_category
+from .constants import ToolCategory, get_tool_category
 from .models import ContextAnalysis, MessageTypeStats
 
 logger = get_logger(__name__)
@@ -107,8 +107,13 @@ class ContextAnalyzer:
                     elif isinstance(part, ToolReturnPart):
                         # Categorize tool results by tool category
                         category = get_tool_category(part.tool_name)
-                        if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
-                            part_type_sizes[category] += size
+                        if category in (
+                            ToolCategory.CODEBASE_UNDERSTANDING,
+                            ToolCategory.ARTIFACT_MANAGEMENT,
+                            ToolCategory.WEB_RESEARCH,
+                            ToolCategory.UNKNOWN,
+                        ):
+                            part_type_sizes[category.value] += size
 
         # Step 4: Calculate output proportions by tool category
         codebase_understanding_size = 0
@@ -119,20 +124,20 @@ class ContextAnalyzer:
 
         for msg in message_history:
             if isinstance(msg, ModelResponse):
-                for part in msg.parts:
+                for part in msg.parts:  # type: ignore[assignment]
                     if isinstance(part, ToolCallPart):
                         category = get_tool_category(part.tool_name)
                         size = len(str(part.args))
 
-                        if category == "agent_response":
+                        if category == ToolCategory.AGENT_RESPONSE:
                             agent_response_size += size
-                        elif category == "codebase_understanding":
+                        elif category == ToolCategory.CODEBASE_UNDERSTANDING:
                             codebase_understanding_size += size
-                        elif category == "artifact_management":
+                        elif category == ToolCategory.ARTIFACT_MANAGEMENT:
                             artifact_management_size += size
-                        elif category == "web_research":
+                        elif category == ToolCategory.WEB_RESEARCH:
                             web_research_size += size
-                        elif category == "unknown":
+                        elif category == ToolCategory.UNKNOWN:
                             unknown_size += size
                     elif isinstance(part, TextPart):
                         agent_response_size += len(part.content)
@@ -213,8 +218,13 @@ class ContextAnalyzer:
                     elif isinstance(part, ToolReturnPart):
                         # Categorize tool results by category
                         category = get_tool_category(part.tool_name)
-                        if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
-                            counts[category] += 1
+                        if category in (
+                            ToolCategory.CODEBASE_UNDERSTANDING,
+                            ToolCategory.ARTIFACT_MANAGEMENT,
+                            ToolCategory.WEB_RESEARCH,
+                            ToolCategory.UNKNOWN,
+                        ):
+                            counts[category.value] += 1
 
                 # Count the message types (only count once per message)
                 if has_system_prompt:
@@ -232,8 +242,13 @@ class ContextAnalyzer:
                 for part in msg.parts:  # type: ignore[assignment]
                     if isinstance(part, ToolCallPart):
                         category = get_tool_category(part.tool_name)
-                        if category in ("codebase_understanding", "artifact_management", "web_research", "unknown"):
-                            counts[category] += 1
+                        if category in (
+                            ToolCategory.CODEBASE_UNDERSTANDING,
+                            ToolCategory.ARTIFACT_MANAGEMENT,
+                            ToolCategory.WEB_RESEARCH,
+                            ToolCategory.UNKNOWN,
+                        ):
+                            counts[category.value] += 1
 
         # Count hints from ui_message_history
         hint_count = sum(1 for msg in ui_message_history if isinstance(msg, HintMessage))
