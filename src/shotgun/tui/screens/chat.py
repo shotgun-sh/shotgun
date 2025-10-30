@@ -656,7 +656,7 @@ class ChatScreen(Screen[None]):
         try:
             spinner = self.query_one("#spinner", Spinner)
             spinner.text = "Compacting Conversation..."
-        except Exception:
+        except Exception:  # noqa: S110
             # If spinner not found or any error, silently continue
             pass
 
@@ -666,7 +666,7 @@ class ChatScreen(Screen[None]):
         try:
             spinner = self.query_one("#spinner", Spinner)
             spinner.text = "Processing..."
-        except Exception:
+        except Exception:  # noqa: S110
             # If spinner not found or any error, silently continue
             pass
 
