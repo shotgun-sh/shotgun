@@ -161,6 +161,8 @@ class ContextAnalysis:
                 lines.append(
                     f"{label:<30} {percentage:>5.1f}%  ({stats.count} messages, ~{stats.tokens:,} tokens)"
                 )
+                # Add blank line to prevent Textual's Markdown widget from reflowing
+                lines.append("")
 
         return "\n".join(lines)
 
