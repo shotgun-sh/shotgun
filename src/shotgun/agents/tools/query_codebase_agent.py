@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import logfire
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps, AgentRuntimeOptions, CodebaseQueryResult
@@ -94,16 +95,35 @@ async def query_codebase(
         sub_deps.event_stream_handler = ctx.deps.event_stream_handler
         sub_deps.user_context = user_context
 
-        # Run the sub-agent with usage tracking
-        # The execution_id in deps will be picked up by the event stream handler
-        # The event_stream_handler will forward sub-agent events to the parent
-        # Pass parent's message history so sub-agent has full conversation context
-        result = await run_codebase_understanding_agent(
-            agent=sub_agent,
-            query=query,
-            deps=sub_deps,
-            message_history=ctx.messages,  # Pass parent conversation context
-        )
+        # Wrap sub-agent execution in Logfire span for proper tracing
+        with logfire.span(
+            "codebase_understanding_sub_agent",
+            execution_id=execution_id,
+            agent_name=sub_agent_name,
+            query=query[:200] if len(query) > 200 else query,  # Truncate long queries
+            user_context=(
+                user_context[:200] if user_context and len(user_context) > 200 else user_context
+            ),
+        ):
+            # Run the sub-agent with usage tracking
+            # The execution_id in deps will be picked up by the event stream handler
+            # The event_stream_handler will forward sub-agent events to the parent
+            # Pass parent's message history so sub-agent has full conversation context
+            result = await run_codebase_understanding_agent(
+                agent=sub_agent,
+                query=query,
+                deps=sub_deps,
+                message_history=ctx.messages,  # Pass parent conversation context
+            )
+
+            # Log completion with result metadata
+            logfire.info(
+                "Sub-agent completed",
+                success=True,
+                result_length=len(result.output.response)
+                if result.output.response
+                else 0,
+            )
 
         logger.debug(
             "✅ Codebase understanding sub-agent (execution_id=%s) completed successfully",
@@ -120,6 +140,15 @@ async def query_codebase(
     except Exception as e:
         error_msg = f"Codebase understanding sub-agent failed: {str(e)}"
         logger.error("❌ %s", error_msg)
+
+        # Log error to Logfire
+        logfire.error(
+            "Sub-agent failed",
+            execution_id=execution_id,
+            error=error_msg,
+            error_type=type(e).__name__,
+        )
+
         return CodebaseQueryResult(
             success=False,
             result="",
