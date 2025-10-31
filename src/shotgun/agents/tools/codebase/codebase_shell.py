@@ -49,7 +49,12 @@ DANGEROUS_PATTERNS = [
 ]
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@tool_category(
+    ToolCategory.CODEBASE_UNDERSTANDING,
+    display_template='Running shell: "{command}"',
+    fallback_text="Running shell",
+    key_arg="command",
+)
 async def codebase_shell(
     ctx: RunContext[AgentDeps],
     command: str,

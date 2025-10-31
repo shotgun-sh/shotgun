@@ -13,7 +13,12 @@ from .models import DirectoryListResult
 logger = get_logger(__name__)
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@tool_category(
+    ToolCategory.CODEBASE_UNDERSTANDING,
+    display_template='Listing directory: "{directory}"',
+    fallback_text="Listing directory",
+    key_arg="directory",
+)
 async def directory_lister(
     ctx: RunContext[AgentDeps], graph_id: str, directory: str = "."
 ) -> DirectoryListResult:

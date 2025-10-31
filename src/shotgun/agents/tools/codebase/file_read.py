@@ -14,7 +14,12 @@ from .models import FileReadResult
 logger = get_logger(__name__)
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@tool_category(
+    ToolCategory.CODEBASE_UNDERSTANDING,
+    display_template='Reading file: "{file_path}"',
+    fallback_text="Reading file",
+    key_arg="file_path",
+)
 async def file_read(
     ctx: RunContext[AgentDeps], graph_id: str, file_path: str
 ) -> FileReadResult:

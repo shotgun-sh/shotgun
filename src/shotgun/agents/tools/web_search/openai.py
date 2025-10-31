@@ -16,7 +16,12 @@ logger = get_logger(__name__)
 prompt_loader = PromptLoader()
 
 
-@tool_category(ToolCategory.WEB_RESEARCH)
+@tool_category(
+    ToolCategory.WEB_RESEARCH,
+    display_template='Searching web: "{query}"',
+    fallback_text="Searching web",
+    key_arg="query",
+)
 async def openai_web_search_tool(query: str) -> str:
     """Perform a web search and return results.
 

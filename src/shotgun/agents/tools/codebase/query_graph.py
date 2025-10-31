@@ -12,7 +12,12 @@ from .models import QueryGraphResult
 logger = get_logger(__name__)
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@tool_category(
+    ToolCategory.CODEBASE_UNDERSTANDING,
+    display_template='Querying code: "{query}"',
+    fallback_text="Querying code",
+    key_arg="query",
+)
 async def query_graph(
     ctx: RunContext[AgentDeps], graph_id: str, query: str
 ) -> QueryGraphResult:

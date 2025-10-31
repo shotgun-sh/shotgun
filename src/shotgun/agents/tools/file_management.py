@@ -158,7 +158,12 @@ def _validate_shotgun_path(filename: str) -> Path:
     return full_path
 
 
-@tool_category(ToolCategory.ARTIFACT_MANAGEMENT)
+@tool_category(
+    ToolCategory.ARTIFACT_MANAGEMENT,
+    display_template='Reading file: "{filename}"',
+    fallback_text="Reading file",
+    key_arg="filename",
+)
 async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
     """Read a file from the .shotgun directory.
 
@@ -190,7 +195,12 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
         return error_msg
 
 
-@tool_category(ToolCategory.ARTIFACT_MANAGEMENT)
+@tool_category(
+    ToolCategory.ARTIFACT_MANAGEMENT,
+    display_template='Writing file: "{filename}"',
+    fallback_text="Writing file",
+    key_arg="filename",
+)
 async def write_file(
     ctx: RunContext[AgentDeps],
     filename: str,
@@ -254,7 +264,12 @@ async def write_file(
         return error_msg
 
 
-@tool_category(ToolCategory.ARTIFACT_MANAGEMENT)
+@tool_category(
+    ToolCategory.ARTIFACT_MANAGEMENT,
+    display_template='Appending to file: "{filename}"',
+    fallback_text="Appending to file",
+    key_arg="filename",
+)
 async def append_file(ctx: RunContext[AgentDeps], filename: str, content: str) -> str:
     """Append content to a file in the .shotgun directory.
 

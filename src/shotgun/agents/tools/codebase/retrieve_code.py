@@ -15,7 +15,12 @@ from .models import CodeSnippetResult
 logger = get_logger(__name__)
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@tool_category(
+    ToolCategory.CODEBASE_UNDERSTANDING,
+    display_template='Retrieving code: "{qualified_name}"',
+    fallback_text="Retrieving code",
+    key_arg="qualified_name",
+)
 async def retrieve_code(
     ctx: RunContext[AgentDeps], graph_id: str, qualified_name: str
 ) -> CodeSnippetResult:
