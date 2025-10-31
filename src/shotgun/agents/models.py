@@ -43,6 +43,25 @@ Optional list of clarifying questions to ask the user.
     )
 
 
+class CodebaseQueryResult(BaseModel):
+    """Result from codebase understanding sub-agent.
+
+    This model is used for sub-agent responses to ensure clean serialization
+    between parent and delegate agents.
+    """
+
+    success: bool = Field(
+        description="Whether the codebase query was successful",
+    )
+    result: str = Field(
+        description="The result text from the codebase understanding agent",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Error message if the query failed",
+    )
+
+
 class AgentType(StrEnum):
     """Enumeration for available agent types."""
 

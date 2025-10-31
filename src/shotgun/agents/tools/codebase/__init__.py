@@ -11,6 +11,7 @@ from .models import (
     ShellCommandResult,
 )
 from .query_graph import query_graph
+from .registry import get_codebase_tools
 from .retrieve_code import retrieve_code
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "file_read",
     "directory_lister",
     "codebase_shell",
+    "get_codebase_tools",
     # Result models
     "QueryGraphResult",
     "CodeSnippetResult",

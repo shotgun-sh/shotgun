@@ -29,12 +29,9 @@ from .messages import AgentSystemPrompt, SystemStatusPrompt
 from .models import AgentDeps, AgentRuntimeOptions, PipelineConfigEntry
 from .tools import (
     append_file,
-    codebase_shell,
-    directory_lister,
-    file_read,
-    query_graph,
+    get_codebase_tools,
+    query_codebase,
     read_file,
-    retrieve_code,
     write_file,
 )
 from .tools.file_management import AGENT_DIRECTORIES
@@ -97,7 +94,8 @@ async def add_system_status_message(
 def create_base_agent(
     system_prompt_fn: Callable[[RunContext[AgentDeps]], str],
     agent_runtime_options: AgentRuntimeOptions,
-    load_codebase_understanding_tools: bool = True,
+    load_codebase_understanding_tools: bool = False,
+    load_codebase_agent_tool: bool = False,
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
@@ -107,7 +105,8 @@ def create_base_agent(
     Args:
         system_prompt_fn: Function that will be decorated as system_prompt
         agent_runtime_options: Agent runtime options for the agent
-        load_codebase_understanding_tools: Whether to load codebase understanding tools
+        load_codebase_understanding_tools: Whether to load individual codebase tools directly
+        load_codebase_agent_tool: Whether to load the codebase understanding sub-agent tool
         additional_tools: Optional list of additional tools
         provider: Optional provider override. If None, uses configured default
         agent_mode: The mode of the agent (research, plan, tasks, specify, export)
@@ -181,12 +180,12 @@ def create_base_agent(
 
     # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:
-        agent.tool(query_graph)
-        agent.tool(retrieve_code)
-        agent.tool(file_read)
-        agent.tool(directory_lister)
-        agent.tool(codebase_shell)
+        for tool in get_codebase_tools():
+            agent.tool(tool)
         logger.debug("🧠 Codebase understanding tools registered")
+    elif load_codebase_agent_tool:
+        agent.tool(query_codebase)
+        logger.debug("🧠 Codebase understanding sub-agent tool registered")
     else:
         logger.debug("🚫🧠 Codebase understanding tools not registered")
 

@@ -56,7 +56,8 @@ def create_research_agent(
     agent, deps = create_base_agent(
         system_prompt_fn,
         agent_runtime_options,
-        load_codebase_understanding_tools=True,
+        load_codebase_understanding_tools=False,
+        load_codebase_agent_tool=True,
         additional_tools=web_search_tools,
         provider=provider,
         agent_mode=AgentType.RESEARCH,

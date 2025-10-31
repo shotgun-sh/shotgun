@@ -54,7 +54,8 @@ def test_create_plan_agent(mock_create_base, mock_agent_runtime_options):
 
     # Check other arguments
     assert call_args[0][1] == mock_agent_runtime_options  # agent_runtime_options
-    assert call_args[1]["load_codebase_understanding_tools"] is True
+    assert call_args[1]["load_codebase_understanding_tools"] is False
+    assert call_args[1]["load_codebase_agent_tool"] is True
     assert call_args[1]["additional_tools"] is None
     assert call_args[1]["provider"] is None
 
@@ -134,7 +135,8 @@ def test_create_specify_agent(mock_create_base, mock_agent_runtime_options):
 
     # Check other arguments
     assert call_args[0][1] == mock_agent_runtime_options
-    assert call_args[1]["load_codebase_understanding_tools"] is True
+    assert call_args[1]["load_codebase_understanding_tools"] is False
+    assert call_args[1]["load_codebase_agent_tool"] is True
     assert call_args[1]["additional_tools"] is None
     assert call_args[1]["provider"] is None
 
@@ -187,7 +189,8 @@ def test_create_research_agent(
 
     # Check other arguments
     assert call_args[0][1] == mock_agent_runtime_options
-    assert call_args[1]["load_codebase_understanding_tools"] is True
+    assert call_args[1]["load_codebase_understanding_tools"] is False
+    assert call_args[1]["load_codebase_agent_tool"] is True
     assert call_args[1]["additional_tools"] == mock_tools
     assert call_args[1]["provider"] is None
 
