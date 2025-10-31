@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps, AgentType, FileOperationType
-from shotgun.agents.tools.registry import ToolCategory, tool_category
+from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
@@ -158,7 +158,11 @@ def _validate_shotgun_path(filename: str) -> Path:
     return full_path
 
 
-@tool_category(ToolCategory.ARTIFACT_MANAGEMENT)
+@register_tool(
+    category=ToolCategory.ARTIFACT_MANAGEMENT,
+    display_text="Reading file",
+    key_arg="filename",
+)
 async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
     """Read a file from the .shotgun directory.
 
@@ -190,7 +194,11 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
         return error_msg
 
 
-@tool_category(ToolCategory.ARTIFACT_MANAGEMENT)
+@register_tool(
+    category=ToolCategory.ARTIFACT_MANAGEMENT,
+    display_text="Writing file",
+    key_arg="filename",
+)
 async def write_file(
     ctx: RunContext[AgentDeps],
     filename: str,
@@ -254,7 +262,11 @@ async def write_file(
         return error_msg
 
 
-@tool_category(ToolCategory.ARTIFACT_MANAGEMENT)
+@register_tool(
+    category=ToolCategory.ARTIFACT_MANAGEMENT,
+    display_text="Appending to file",
+    key_arg="filename",
+)
 async def append_file(ctx: RunContext[AgentDeps], filename: str, content: str) -> str:
     """Append content to a file in the .shotgun directory.
 

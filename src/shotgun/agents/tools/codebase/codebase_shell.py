@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
-from shotgun.agents.tools.registry import ToolCategory, tool_category
+from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 
 from .models import ShellCommandResult
@@ -49,7 +49,11 @@ DANGEROUS_PATTERNS = [
 ]
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@register_tool(
+    category=ToolCategory.CODEBASE_UNDERSTANDING,
+    display_text="Running shell",
+    key_arg="command",
+)
 async def codebase_shell(
     ctx: RunContext[AgentDeps],
     command: str,

@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
-from shotgun.agents.tools.registry import ToolCategory, tool_category
+from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 
 from .models import DirectoryListResult
@@ -13,7 +13,11 @@ from .models import DirectoryListResult
 logger = get_logger(__name__)
 
 
-@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
+@register_tool(
+    category=ToolCategory.CODEBASE_UNDERSTANDING,
+    display_text="Listing directory",
+    key_arg="directory",
+)
 async def directory_lister(
     ctx: RunContext[AgentDeps], graph_id: str, directory: str = "."
 ) -> DirectoryListResult:
