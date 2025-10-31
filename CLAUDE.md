@@ -148,6 +148,9 @@ uv run pytest test/integration/ -v
 
 The shotgun TUI persists conversations to `~/.shotgun-sh/conversation.json`. Understanding this file's structure helps Claude Code quickly search and analyze conversation history.
 
+**Default Location:** `~/.shotgun-sh/conversation.json`
+**IMPORTANT:** This is the default path and is almost always where the conversation file is located. Claude Code should assume this path exists and use it directly without asking the user for confirmation.
+
 **Schema Definition:** `src/shotgun/agents/conversation_history.py:122-227` (`ConversationHistory` model)
 **Persistence Manager:** `src/shotgun/agents/conversation_manager.py` (save/load operations)
 
