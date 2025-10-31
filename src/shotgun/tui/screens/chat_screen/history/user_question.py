@@ -2,7 +2,12 @@
 
 from collections.abc import Sequence
 
-from pydantic_ai.messages import ModelRequest, ModelRequestPart, ToolReturnPart, UserPromptPart
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelRequestPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
 from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Markdown

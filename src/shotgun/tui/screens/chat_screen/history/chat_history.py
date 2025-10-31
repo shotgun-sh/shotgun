@@ -2,7 +2,12 @@
 
 from collections.abc import Generator, Sequence
 
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, UserPromptPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    UserPromptPart,
+)
 from textual.reactive import reactive
 from textual.widget import Widget
 
