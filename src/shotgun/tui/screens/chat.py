@@ -537,6 +537,9 @@ class ChatScreen(Screen[None]):
         self.partial_message = event.message
         history = self.query_one(ChatHistory)
 
+        # Update sub-agent contexts
+        history.sub_agent_contexts = event.sub_agent_contexts
+
         # Filter event.messages to exclude ModelRequest with only ToolReturnPart
         # These are intermediate tool results that would render as empty (UserQuestionWidget
         # filters out ToolReturnPart in format_prompt_parts), causing user messages to disappear

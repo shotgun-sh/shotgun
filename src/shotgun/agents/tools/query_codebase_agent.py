@@ -1,6 +1,7 @@
 """Tool wrapper for codebase understanding sub-agent delegation."""
 
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from pydantic_ai import RunContext
 
@@ -38,7 +39,15 @@ async def query_codebase(
     Returns:
         CodebaseQueryResult with success status, result text, and optional error
     """
-    logger.debug("🔧 Delegating to codebase understanding sub-agent: %s", query)
+    # Generate unique execution ID for this sub-agent invocation
+    execution_id = f"sub-agent-{uuid4().hex[:8]}"
+    sub_agent_name = "Codebase Understanding"
+
+    logger.debug(
+        "🔧 Delegating to codebase understanding sub-agent (execution_id=%s): %s",
+        execution_id,
+        query,
+    )
 
     try:
         # Import at runtime to avoid circular imports
@@ -64,8 +73,12 @@ async def query_codebase(
             provider=None,  # Use default provider
         )
 
+        # Tag sub-agent deps with execution context
+        sub_deps.sub_agent_execution_id = execution_id
+        sub_deps.sub_agent_name = sub_agent_name
+
         # Run the sub-agent with usage tracking
-        # Pass ctx.usage to ensure sub-agent usage counts toward parent limits
+        # The execution_id in deps will be picked up by the event stream handler
         result = await run_codebase_understanding_agent(
             agent=sub_agent,
             query=query,
@@ -74,7 +87,8 @@ async def query_codebase(
         )
 
         logger.debug(
-            "✅ Codebase understanding sub-agent completed successfully"
+            "✅ Codebase understanding sub-agent (execution_id=%s) completed successfully",
+            execution_id,
         )
 
         # Convert AgentResponse to CodebaseQueryResult

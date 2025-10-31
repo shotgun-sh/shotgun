@@ -49,6 +49,7 @@ class ChatHistory(Widget):
         self.vertical_tail: VerticalTail | None = None
         self.partial_response = None
         self._rendered_count = 0  # Track how many messages have been mounted
+        self.sub_agent_contexts: dict[int, dict[str, str]] = {}  # Sub-agent contexts
 
     def compose(self) -> ComposeResult:
         """Compose the chat history widget."""
@@ -63,9 +64,9 @@ class ChatHistory(Widget):
                     yield HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
                     yield AgentResponseWidget(item)
-            yield PartialResponseWidget(self.partial_response).data_bind(
-                item=ChatHistory.partial_response
-            )
+            yield PartialResponseWidget(
+                self.partial_response, self.sub_agent_contexts
+            ).data_bind(item=ChatHistory.partial_response)
 
         # Track how many messages were rendered during initial compose
         self._rendered_count = len(filtered)

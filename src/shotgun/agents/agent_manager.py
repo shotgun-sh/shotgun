@@ -124,12 +124,21 @@ class PartialResponseMessage(Message):
         message: ModelResponse | None,
         messages: list[ModelMessage],
         is_last: bool,
+        sub_agent_contexts: dict[int, dict[str, str]] | None = None,
     ) -> None:
-        """Initialize the partial response message."""
+        """Initialize the partial response message.
+
+        Args:
+            message: The partial response message
+            messages: List of all messages
+            is_last: Whether this is the last message
+            sub_agent_contexts: Dict mapping part indices to sub-agent context
+        """
         super().__init__()
         self.message = message
         self.messages = messages
         self.is_last = is_last
+        self.sub_agent_contexts = sub_agent_contexts or {}
 
 
 class ClarifyingQuestionsMessage(Message):
@@ -165,6 +174,9 @@ class _PartialStreamState:
 
     messages: list[ModelRequest | ModelResponse] = field(default_factory=list)
     current_response: ModelResponse | None = None
+    sub_agent_contexts: dict[int, dict[str, str]] = field(
+        default_factory=dict
+    )  # part_index -> {execution_id, agent_name}
 
 
 class AgentManager(Widget):
@@ -773,6 +785,10 @@ class AgentManager(Widget):
         if state is None:
             state = self._stream_state = _PartialStreamState()
 
+        # Check if this is a sub-agent execution
+        sub_agent_execution_id = _ctx.deps.sub_agent_execution_id
+        sub_agent_name = _ctx.deps.sub_agent_name
+
         if state.current_response is not None:
             partial_parts: list[ModelResponsePart | ToolCallPartDelta] = list(
                 state.current_response.parts
@@ -795,6 +811,26 @@ class AgentManager(Widget):
                             extra={"index": index, "current_len": len(partial_parts)},
                         )
                         partial_parts.append(event.part)
+
+                    # If from sub-agent and it's a tool call, store execution context
+                    if (
+                        sub_agent_execution_id
+                        and sub_agent_name
+                        and isinstance(event.part, ToolCallPart)
+                    ):
+                        state.sub_agent_contexts[index] = {
+                            "execution_id": sub_agent_execution_id,
+                            "agent_name": sub_agent_name,
+                        }
+                        logger.debug(
+                            "Captured sub-agent context for tool call at index %s",
+                            index,
+                            extra={
+                                "execution_id": sub_agent_execution_id,
+                                "agent_name": sub_agent_name,
+                                "tool_name": event.part.tool_name,
+                            },
+                        )
 
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
@@ -900,7 +936,26 @@ class AgentManager(Widget):
                             None,
                         )
                     else:
+                        # New tool call - append to parts and capture sub-agent context
+                        new_index = len(partial_parts)
                         partial_parts.append(event.part)
+
+                        # If from sub-agent, store execution context
+                        if sub_agent_execution_id and sub_agent_name:
+                            state.sub_agent_contexts[new_index] = {
+                                "execution_id": sub_agent_execution_id,
+                                "agent_name": sub_agent_name,
+                            }
+                            logger.debug(
+                                "Captured sub-agent context for FunctionToolCallEvent at index %s",
+                                new_index,
+                                extra={
+                                    "execution_id": sub_agent_execution_id,
+                                    "agent_name": sub_agent_name,
+                                    "tool_name": event.part.tool_name,
+                                },
+                            )
+
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
@@ -971,6 +1026,7 @@ class AgentManager(Widget):
                 else None,
                 self._stream_state.messages,
                 is_last,
+                self._stream_state.sub_agent_contexts,
             )
         )
 

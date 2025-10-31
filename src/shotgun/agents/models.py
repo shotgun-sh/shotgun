@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import RunContext
@@ -313,6 +313,26 @@ class FileOperationTracker(BaseModel):
         return common_path
 
 
+class SubAgentMarker(BaseModel):
+    """Marker to indicate sub-agent execution boundaries in message history.
+
+    These markers help the UI identify when a sub-agent starts and ends execution,
+    allowing for proper visual grouping of sub-agent tool calls.
+    """
+
+    execution_id: str = Field(
+        description="Unique ID for this sub-agent execution"
+    )
+
+    agent_name: str = Field(
+        description="Display name of the sub-agent (e.g., 'Codebase Understanding')"
+    )
+
+    event_type: Literal["start", "end"] = Field(
+        description="Whether this marks start or end of sub-agent execution"
+    )
+
+
 class AgentDeps(AgentRuntimeOptions):
     """Dependencies passed to all agents for configuration and runtime behavior."""
 
@@ -336,6 +356,16 @@ class AgentDeps(AgentRuntimeOptions):
     agent_mode: AgentType | None = Field(
         default=None,
         description="Current agent mode for file scoping",
+    )
+
+    sub_agent_execution_id: str | None = Field(
+        default=None,
+        description="Unique ID for this sub-agent execution context. All events from this sub-agent carry this ID for UI grouping.",
+    )
+
+    sub_agent_name: str | None = Field(
+        default=None,
+        description="Display name of the sub-agent (e.g., 'Codebase Understanding') for UI rendering",
     )
 
 
