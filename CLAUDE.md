@@ -141,3 +141,145 @@ uv run pytest test/integration/ -v
 8. Code coverage for a PR MUST be 70%+ excluding the cli/tui folders.
 9. Don't write tests that assert the logger, thats not useful.
 - Always use a Pydantic Model instead of a dict or dataclass when possible.
+
+## Conversation History Navigation
+
+### Overview
+
+The shotgun TUI persists conversations to `~/.shotgun-sh/conversation.json`. Understanding this file's structure helps Claude Code quickly search and analyze conversation history.
+
+**Default Location:** `~/.shotgun-sh/conversation.json`
+**IMPORTANT:** This is the default path and is almost always where the conversation file is located. Claude Code should assume this path exists and use it directly without asking the user for confirmation.
+
+**Schema Definition:** `src/shotgun/agents/conversation_history.py:122-227` (`ConversationHistory` model)
+**Persistence Manager:** `src/shotgun/agents/conversation_manager.py` (save/load operations)
+
+### Built-in Analysis Command
+
+The easiest way to analyze conversation context:
+
+```bash
+# View token usage breakdown by message type
+shotgun context --format markdown
+
+# Get JSON output for programmatic analysis
+shotgun context --format json
+```
+
+See implementation: `src/shotgun/cli/context.py:68-111`
+
+### JSON Structure
+
+```json
+{
+  "version": 1,
+  "agent_history": [...],     // Serialized pydantic_ai ModelMessage objects
+  "ui_history": [...],        // ModelMessage + HintMessage objects
+  "last_agent_model": "research|specify|plan|tasks|export",
+  "updated_at": "2025-10-31T..."
+}
+```
+
+### Quick Search Patterns with jq
+
+**Finding specific message types:**
+
+```bash
+# All user inputs (ModelRequest messages)
+jq '.agent_history[] | select(.kind == "request")' ~/.shotgun-sh/conversation.json
+
+# All agent responses (ModelResponse messages)
+jq '.agent_history[] | select(.kind == "response")' ~/.shotgun-sh/conversation.json
+
+# All tool calls across the conversation
+jq '.agent_history[].parts[]? | select(.kind == "tool-call") | {tool: .tool_name, args: .args}' ~/.shotgun-sh/conversation.json
+
+# Extract all text content from messages
+jq '.agent_history[].parts[]? | select(.kind == "text") | .content' ~/.shotgun-sh/conversation.json
+
+# Count messages by type
+jq '[.agent_history[] | .kind] | group_by(.) | map({kind: .[0], count: length})' ~/.shotgun-sh/conversation.json
+
+# Get the most recent N messages
+jq '.agent_history[-5:]' ~/.shotgun-sh/conversation.json
+```
+
+**Searching for specific content:**
+
+```bash
+# Find messages containing specific text
+jq '.agent_history[] | select(.parts[]?.content? // "" | contains("search term"))' ~/.shotgun-sh/conversation.json
+
+# Find tool calls by tool name
+jq '.agent_history[].parts[]? | select(.kind == "tool-call" and .tool_name == "file_read")' ~/.shotgun-sh/conversation.json
+```
+
+### Message Types Reference (pydantic_ai)
+
+The conversation uses `pydantic_ai` message types. Understanding these helps with searching:
+
+**Top-level message types:**
+- `ModelRequest` - User inputs to the agent (kind: "request")
+- `ModelResponse` - Agent responses including tool calls (kind: "response")
+
+**Message part types (in `.parts[]`):**
+- `TextPart` - Text content (kind: "text")
+- `ToolCallPart` - Tool invocations (kind: "tool-call")
+- `ToolReturnPart` - Tool results (kind: "tool-return")
+- `UserPromptPart` - User prompt content
+- `SystemPromptPart` - System prompts
+- `RetryPromptPart` - Retry instructions
+- `ThinkingPart` - Model thinking/reasoning content
+
+**Key fields:**
+- `message.kind` - Message type identifier
+- `part.kind` - Part type identifier
+- `part.content` - Text content (TextPart, UserPromptPart)
+- `part.tool_name` - Tool name (ToolCallPart)
+- `part.args` - Tool arguments (ToolCallPart)
+
+### Schema Details
+
+From `ConversationHistory` model (`src/shotgun/agents/conversation_history.py:122-133`):
+
+- **version** (int): Schema version (currently 1)
+- **agent_history** (list[SerializedMessage]): Core conversation messages sent to/from agent
+- **ui_history** (list[SerializedMessage]): UI-specific messages including `HintMessage` objects
+- **last_agent_model** (str): Last active agent type - one of:
+  - `research` - Research agent for exploratory tasks
+  - `specify` - Specification agent for requirements
+  - `plan` - Planning agent for implementation plans
+  - `tasks` - Task execution agent
+  - `export` - Export agent for deliverables
+- **updated_at** (datetime): Last modification timestamp
+
+### Helper Methods
+
+The `ConversationHistory` model provides methods to work with messages:
+
+```python
+# In Python code or tests:
+from shotgun.agents.conversation_manager import ConversationManager
+
+manager = ConversationManager()  # Uses ~/.shotgun-sh/conversation.json
+conversation = manager.load()
+
+if conversation:
+    # Get typed message objects
+    agent_messages = conversation.get_agent_messages()  # list[ModelMessage]
+    ui_messages = conversation.get_ui_messages()  # list[ModelMessage | HintMessage]
+
+    # Access raw serialized data
+    raw_agent = conversation.agent_history  # list[dict]
+    raw_ui = conversation.ui_history  # list[dict]
+```
+
+### Tips for Claude Code
+
+When asked to analyze or search conversation history:
+
+1. **Start with `shotgun context`** for token/usage analysis
+2. **Use `jq` patterns** for specific message searches
+3. **Read the schema files** (`conversation_history.py`) for understanding structure
+4. **Check message kinds first** - distinguishes between requests/responses/parts
+5. **Remember filtering** - `filter_incomplete_messages()` removes corrupted tool calls before saving
