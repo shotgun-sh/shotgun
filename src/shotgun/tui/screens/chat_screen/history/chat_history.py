@@ -8,6 +8,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     UserPromptPart,
 )
+from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widget import Widget
 
@@ -49,7 +50,7 @@ class ChatHistory(Widget):
         self.partial_response = None
         self._rendered_count = 0  # Track how many messages have been mounted
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the chat history widget."""
         self.vertical_tail = VerticalTail()
 
