@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
-from shotgun.agents.tools.registry import ToolCategory, tool_category
+from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.codebase.core.language_config import get_language_config
 from shotgun.logging_config import get_logger
 
@@ -14,10 +14,9 @@ from .models import FileReadResult
 logger = get_logger(__name__)
 
 
-@tool_category(
-    ToolCategory.CODEBASE_UNDERSTANDING,
-    display_template='Reading file: "{file_path}"',
-    fallback_text="Reading file",
+@register_tool(
+    category=ToolCategory.CODEBASE_UNDERSTANDING,
+    display_text="Reading file",
     key_arg="file_path",
 )
 async def file_read(

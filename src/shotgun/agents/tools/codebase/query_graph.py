@@ -3,7 +3,7 @@
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
-from shotgun.agents.tools.registry import ToolCategory, tool_category
+from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.codebase.models import QueryType
 from shotgun.logging_config import get_logger
 
@@ -12,10 +12,9 @@ from .models import QueryGraphResult
 logger = get_logger(__name__)
 
 
-@tool_category(
-    ToolCategory.CODEBASE_UNDERSTANDING,
-    display_template='Querying code: "{query}"',
-    fallback_text="Querying code",
+@register_tool(
+    category=ToolCategory.CODEBASE_UNDERSTANDING,
+    display_text="Querying code",
     key_arg="query",
 )
 async def query_graph(

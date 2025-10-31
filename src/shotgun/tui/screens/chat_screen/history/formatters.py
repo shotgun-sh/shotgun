@@ -43,44 +43,36 @@ class ToolFormatter:
             # Parse args
             args = cls.parse_args(part.args)
 
-            # Try to format using the template
-            if args and isinstance(args, dict):
-                try:
-                    # Special handling for codebase_shell which needs command + args
-                    if part.tool_name == "codebase_shell" and "command" in args:
-                        command = args.get("command", "")
-                        cmd_args = args.get("args", [])
-                        if isinstance(cmd_args, list):
-                            args_str = " ".join(str(arg) for arg in cmd_args)
-                        else:
-                            args_str = ""
-                        full_cmd = f"{command} {args_str}".strip()
-                        formatted_args = {"command": cls.truncate(full_cmd)}
+            # Get the key argument value
+            if args and isinstance(args, dict) and display_config.key_arg in args:
+                # Special handling for codebase_shell which needs command + args
+                if part.tool_name == "codebase_shell" and "command" in args:
+                    command = args.get("command", "")
+                    cmd_args = args.get("args", [])
+                    if isinstance(cmd_args, list):
+                        args_str = " ".join(str(arg) for arg in cmd_args)
                     else:
-                        # Truncate the key arg if specified
-                        formatted_args = {
-                            k: cls.truncate(str(v)) if k == display_config.key_arg else v
-                            for k, v in args.items()
-                        }
+                        args_str = ""
+                    key_value = f"{command} {args_str}".strip()
+                else:
+                    key_value = str(args[display_config.key_arg])
 
-                    return display_config.display_template.format(**formatted_args)
-                except (KeyError, ValueError):
-                    # Template formatting failed - use fallback
-                    return display_config.fallback_text
+                # Format: "display_text: key_value"
+                return f"{display_config.display_text}: {cls.truncate(key_value)}"
             else:
-                # No args available - use fallback
-                return display_config.fallback_text
+                # No key arg value available - show just display_text
+                return display_config.display_text
 
         # Tool not registered - use fallback formatting
         args = cls.parse_args(part.args)
         if args and isinstance(args, dict):
             # Try to extract common fields
             if "query" in args:
-                return f'{part.tool_name}: "{cls.truncate(str(args["query"]))}"'
+                return f"{part.tool_name}: {cls.truncate(str(args['query']))}"
             elif "question" in args:
-                return f'{part.tool_name}: "{cls.truncate(str(args["question"]))}"'
+                return f"{part.tool_name}: {cls.truncate(str(args['question']))}"
             elif "filename" in args:
-                return f'{part.tool_name}: "{args["filename"]}"'
+                return f"{part.tool_name}: {args['filename']}"
             else:
                 # Show tool name with truncated args
                 args_str = (
@@ -102,17 +94,14 @@ class ToolFormatter:
                 return ""
 
             args = cls.parse_args(part.args)
-            if args and isinstance(args, dict):
-                try:
-                    formatted_args = {
-                        k: cls.truncate(str(v)) if k == display_config.key_arg else v
-                        for k, v in args.items()
-                    }
-                    return display_config.display_template.format(**formatted_args)
-                except (KeyError, ValueError):
-                    return display_config.fallback_text
+            # Get the key argument value
+            if args and isinstance(args, dict) and display_config.key_arg in args:
+                key_value = str(args[display_config.key_arg])
+                # Format: "display_text: key_value"
+                return f"{display_config.display_text}: {cls.truncate(key_value)}"
             else:
-                return display_config.fallback_text
+                # No key arg value available - show just display_text
+                return display_config.display_text
         else:
             # Fallback for unregistered builtin tools
             if part.args:
