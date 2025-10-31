@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import logfire
 from pydantic_ai import RunContext
+from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 
 from shotgun.agents.models import AgentDeps, AgentRuntimeOptions, CodebaseQueryResult
 from shotgun.agents.tools.registry import ToolCategory, register_tool
@@ -17,6 +18,37 @@ if TYPE_CHECKING:
     )
 
 logger = get_logger(__name__)
+
+
+def filter_messages_for_sub_agent(messages: list[ModelMessage]) -> list[ModelMessage]:
+    """Filter messages to ensure all tool_use have corresponding tool_result.
+
+    Removes the last message if it's a ModelResponse with ToolCallPart
+    and there's no subsequent ModelRequest with ToolReturnPart.
+    This prevents passing incomplete tool calls to sub-agents which would
+    cause API errors about unpaired tool_use/tool_result blocks.
+
+    Args:
+        messages: List of messages from parent agent context
+
+    Returns:
+        Filtered list with incomplete tool calls removed
+    """
+    if not messages:
+        return messages
+
+    # Check if last message is a ModelResponse with tool calls
+    last_msg = messages[-1]
+    if isinstance(last_msg, ModelResponse):
+        has_tool_calls = any(isinstance(part, ToolCallPart) for part in last_msg.parts)
+        if has_tool_calls:
+            # This message has tool calls but no results yet, remove it
+            logger.debug(
+                "Filtering out last message with incomplete tool calls before passing to sub-agent"
+            )
+            return messages[:-1]
+
+    return messages
 
 
 @register_tool(
@@ -108,12 +140,14 @@ async def query_codebase(
             # Run the sub-agent with usage tracking
             # The execution_id in deps will be picked up by the event stream handler
             # The event_stream_handler will forward sub-agent events to the parent
-            # Pass parent's message history so sub-agent has full conversation context
+            # Filter message history to remove incomplete tool calls (tool_use without tool_result)
+            filtered_messages = filter_messages_for_sub_agent(ctx.messages)
+
             result = await run_codebase_understanding_agent(
                 agent=sub_agent,
                 query=query,
                 deps=sub_deps,
-                message_history=ctx.messages,  # Pass parent conversation context
+                message_history=filtered_messages,  # Pass filtered parent conversation context
             )
 
             # Log completion with result metadata
