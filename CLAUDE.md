@@ -283,3 +283,139 @@ When asked to analyze or search conversation history:
 3. **Read the schema files** (`conversation_history.py`) for understanding structure
 4. **Check message kinds first** - distinguishes between requests/responses/parts
 5. **Remember filtering** - `filter_incomplete_messages()` removes corrupted tool calls before saving
+
+## Logfire Observability and Debugging
+
+### Overview
+
+Shotgun uses Logfire for observability and tracing. All agent runs, tool calls, and sub-agent executions are automatically instrumented and sent to Logfire when configured.
+
+**Setup:** Logfire token is configured in `.env` file as `SHOTGUN_LOGFIRE_TOKEN`
+
+**Documentation:** See `docs/OBSERVABILITY.md` for full setup and configuration details
+
+### Using Logfire MCP for Debugging
+
+Claude Code has access to the Logfire MCP server which provides SQL query access to all Logfire logs and traces. Use this for debugging agent behavior, sub-agent issues, and performance problems.
+
+**Available MCP Tools:**
+- `mcp__logfire__arbitrary_query` - Run any SQL query on Logfire data
+- `mcp__logfire__schema_reference` - Get the database schema
+- `mcp__logfire__find_exceptions_in_file` - Find exceptions in specific files
+
+### Common Logfire Queries
+
+**Find all sub-agent executions:**
+```sql
+SELECT
+    span_name,
+    attributes->>'execution_id' as execution_id,
+    attributes->>'query' as query,
+    attributes->>'user_context' as user_context,
+    duration,
+    start_timestamp
+FROM records
+WHERE span_name = 'codebase_understanding_sub_agent'
+ORDER BY start_timestamp DESC
+LIMIT 20
+```
+
+**Find slow sub-agent calls (over 5 seconds):**
+```sql
+SELECT
+    attributes->>'execution_id' as execution_id,
+    duration,
+    attributes->>'query' as query,
+    start_timestamp
+FROM records
+WHERE span_name = 'codebase_understanding_sub_agent'
+  AND duration > 5.0
+ORDER BY duration DESC
+LIMIT 10
+```
+
+**Find sub-agent failures:**
+```sql
+SELECT
+    attributes->>'execution_id' as execution_id,
+    attributes->>'error' as error,
+    attributes->>'error_type' as error_type,
+    start_timestamp
+FROM records
+WHERE span_name = 'codebase_understanding_sub_agent'
+  AND attributes->>'success' = 'false'
+ORDER BY start_timestamp DESC
+```
+
+**Find all tool calls in recent runs:**
+```sql
+SELECT
+    span_name,
+    message,
+    duration,
+    start_timestamp
+FROM records
+WHERE span_name = 'running tool'
+  AND start_timestamp > NOW() - INTERVAL '1 hour'
+ORDER BY start_timestamp DESC
+LIMIT 50
+```
+
+**Find agent runs with their durations:**
+```sql
+SELECT
+    span_name,
+    attributes,
+    duration,
+    start_timestamp
+FROM records
+WHERE span_name LIKE '%agent run%'
+  OR span_name LIKE '%Running agent%'
+ORDER BY start_timestamp DESC
+LIMIT 20
+```
+
+**Most common span names (to understand what's being traced):**
+```sql
+SELECT
+    span_name,
+    COUNT(*) as count,
+    AVG(duration) as avg_duration,
+    MAX(start_timestamp) as latest
+FROM records
+WHERE start_timestamp > NOW() - INTERVAL '24 hours'
+GROUP BY span_name
+ORDER BY count DESC
+LIMIT 20
+```
+
+**Find logs for a specific time window:**
+```sql
+SELECT
+    span_name,
+    message,
+    attributes,
+    start_timestamp
+FROM records
+WHERE start_timestamp BETWEEN '2025-10-31 14:00:00' AND '2025-10-31 15:00:00'
+ORDER BY start_timestamp DESC
+```
+
+### Tips for Using Logfire
+
+1. **Time range parameter:** The `age` parameter in MCP queries is in minutes (e.g., `age=60` for last hour)
+2. **JSON attributes:** Use `->` for JSON objects, `->>` for text extraction (e.g., `attributes->>'execution_id'`)
+3. **Duration:** Duration is in seconds as a float (e.g., `5.0` = 5 seconds)
+4. **Timestamps:** Use `start_timestamp` for when spans started
+5. **User ID:** All logs automatically include `shotgun_instance_id` in attributes
+
+### Debugging Workflow
+
+When investigating sub-agent issues:
+
+1. **Find the execution** - Query for `span_name = 'codebase_understanding_sub_agent'` with recent timestamp
+2. **Get execution_id** - Extract the `execution_id` attribute from the span
+3. **Find all tool calls** - Query for tool calls with timestamps around the sub-agent execution
+4. **Check duration** - See if the sub-agent took too long
+5. **Look for errors** - Check for error attributes or failed spans
+6. **Review context** - See what `query` and `user_context` were passed to the sub-agent
