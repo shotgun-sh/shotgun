@@ -73,10 +73,26 @@ async def query_codebase(
             provider=None,  # Use default provider
         )
 
+        # Extract original user prompt from message history for context
+        user_context = None
+        if hasattr(ctx, "messages") and ctx.messages:
+            # Find the most recent user prompt from message history
+            from pydantic_ai.messages import ModelRequest, UserPromptPart
+
+            for message in reversed(ctx.messages):
+                if isinstance(message, ModelRequest):
+                    for part in message.parts:
+                        if isinstance(part, UserPromptPart):
+                            user_context = part.content
+                            break
+                if user_context:
+                    break
+
         # Tag sub-agent deps with execution context and event stream handler
         sub_deps.sub_agent_execution_id = execution_id
         sub_deps.sub_agent_name = sub_agent_name
         sub_deps.event_stream_handler = ctx.deps.event_stream_handler
+        sub_deps.user_context = user_context
 
         # Run the sub-agent with usage tracking
         # The execution_id in deps will be picked up by the event stream handler

@@ -458,6 +458,7 @@ def build_agent_system_prompt(
         f"agents/{agent_type}.j2",
         interactive_mode=ctx.deps.interactive_mode,
         mode=agent_type,
+        user_context=ctx.deps.user_context,
     )
 
     if agent_type == "research":

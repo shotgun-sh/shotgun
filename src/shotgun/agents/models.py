@@ -376,6 +376,11 @@ class AgentDeps(AgentRuntimeOptions):
         exclude=True,  # Don't include in serialization
     )
 
+    user_context: str | None = Field(
+        default=None,
+        description="Original user prompt/request for context. Helps sub-agents understand the broader goal and stay focused.",
+    )
+
 
 # Rebuild model to resolve forward references after imports are available
 try:
