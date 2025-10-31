@@ -2,11 +2,11 @@
 
 import os
 from asyncio import Future, Queue
-from collections.abc import Callable
+from collections.abc import AsyncIterable, Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import RunContext
@@ -366,6 +366,14 @@ class AgentDeps(AgentRuntimeOptions):
     sub_agent_name: str | None = Field(
         default=None,
         description="Display name of the sub-agent (e.g., 'Codebase Understanding') for UI rendering",
+    )
+
+    event_stream_handler: (
+        Callable[[RunContext["AgentDeps"], AsyncIterable[Any]], Any] | None
+    ) = Field(
+        default=None,
+        description="Optional event stream handler for forwarding sub-agent events to parent",
+        exclude=True,  # Don't include in serialization
     )
 
 

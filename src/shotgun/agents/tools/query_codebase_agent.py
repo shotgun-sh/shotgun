@@ -73,12 +73,14 @@ async def query_codebase(
             provider=None,  # Use default provider
         )
 
-        # Tag sub-agent deps with execution context
+        # Tag sub-agent deps with execution context and event stream handler
         sub_deps.sub_agent_execution_id = execution_id
         sub_deps.sub_agent_name = sub_agent_name
+        sub_deps.event_stream_handler = ctx.deps.event_stream_handler
 
         # Run the sub-agent with usage tracking
         # The execution_id in deps will be picked up by the event stream handler
+        # The event_stream_handler will forward sub-agent events to the parent
         result = await run_codebase_understanding_agent(
             agent=sub_agent,
             query=query,

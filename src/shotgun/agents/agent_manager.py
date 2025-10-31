@@ -304,9 +304,12 @@ class AgentManager(Widget):
             raise ValueError("Shared deps is None - this should not happen")
 
         # Create new deps with shared runtime state but agent's system_prompt_fn
-        # Use a copy of the shared deps and update the system_prompt_fn
+        # Use a copy of the shared deps and update the system_prompt_fn and event_stream_handler
         merged_deps = self.deps.model_copy(
-            update={"system_prompt_fn": agent_deps.system_prompt_fn}
+            update={
+                "system_prompt_fn": agent_deps.system_prompt_fn,
+                "event_stream_handler": self._handle_event_stream,
+            }
         )
 
         return merged_deps

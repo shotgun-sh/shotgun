@@ -99,6 +99,7 @@ def create_base_agent(
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
+    include_write_tools: bool = True,
 ) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
     """Create a base agent with common configuration.
 
@@ -110,6 +111,7 @@ def create_base_agent(
         additional_tools: Optional list of additional tools
         provider: Optional provider override. If None, uses configured default
         agent_mode: The mode of the agent (research, plan, tasks, specify, export)
+        include_write_tools: Whether to include write_file and append_file tools (default: True)
 
     Returns:
         Tuple of (Configured Pydantic AI agent, Agent dependencies)
@@ -173,10 +175,11 @@ def create_base_agent(
     for tool in additional_tools or []:
         agent.tool_plain(tool)
 
-    # Register common file management tools (always available)
-    agent.tool(write_file)
-    agent.tool(append_file)
-    agent.tool(read_file)
+    # Register file management tools
+    if include_write_tools:
+        agent.tool(write_file)
+        agent.tool(append_file)
+    agent.tool(read_file)  # Always include read-only access
 
     # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:
@@ -532,11 +535,13 @@ async def run_agent(
     # Add system prompt as first message
     message_history = await add_system_prompt_message(deps, message_history)
 
+    # Use event_stream_handler from deps if available (for sub-agents)
     result = await agent.run(
         prompt,
         deps=deps,
         usage_limits=usage_limits,
         message_history=message_history,
+        event_stream_handler=deps.event_stream_handler,
     )
 
     # Log file operations summary if any files were modified

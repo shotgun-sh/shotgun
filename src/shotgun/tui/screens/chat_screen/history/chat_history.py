@@ -63,7 +63,7 @@ class ChatHistory(Widget):
                 elif isinstance(item, HintMessage):
                     yield HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
-                    yield AgentResponseWidget(item)
+                    yield AgentResponseWidget(item, self.sub_agent_contexts)
             yield PartialResponseWidget(
                 self.partial_response, self.sub_agent_contexts
             ).data_bind(item=ChatHistory.partial_response)
@@ -104,7 +104,7 @@ class ChatHistory(Widget):
                 elif isinstance(item, HintMessage):
                     widget = HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
-                    widget = AgentResponseWidget(item)
+                    widget = AgentResponseWidget(item, self.sub_agent_contexts)
                 else:
                     continue
 

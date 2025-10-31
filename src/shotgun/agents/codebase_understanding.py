@@ -49,6 +49,7 @@ def create_codebase_understanding_agent(
         additional_tools=None,
         provider=provider,
         agent_mode=AgentType.RESEARCH,  # Use RESEARCH mode for now
+        include_write_tools=False,  # Read-only sub-agent
     )
 
     # For now, we return the agent as-is with AgentResponse output type

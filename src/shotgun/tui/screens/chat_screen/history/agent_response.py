@@ -55,16 +55,28 @@ class AgentResponseWidget(Widget):
             sub_agent_ctx = self.sub_agent_contexts.get(idx)
 
             if isinstance(part, TextPart):
-                # If we have accumulated sub-agent parts, flush them first
+                # Only flush sub-agent parts if this TextPart is NOT from the sub-agent
+                # (i.e., we're transitioning back to parent agent text)
                 if sub_agent_parts and current_sub_agent_id:
-                    acc += self._format_sub_agent_section(
-                        current_sub_agent_id, sub_agent_parts
-                    )
-                    sub_agent_parts = []
-                    current_sub_agent_id = None
+                    # Check if the next part is still from the same sub-agent
+                    should_flush = True
+                    if idx + 1 < len(self.item.parts):
+                        next_part_ctx = self.sub_agent_contexts.get(idx + 1)
+                        if (
+                            next_part_ctx
+                            and next_part_ctx.get("execution_id") == current_sub_agent_id
+                        ):
+                            should_flush = False  # Next part is still from same sub-agent
 
-                # Only show the circle prefix if there's actual content
-                if part.content and part.content.strip():
+                    if should_flush:
+                        acc += self._format_sub_agent_section(
+                            current_sub_agent_id, sub_agent_parts
+                        )
+                        sub_agent_parts = []
+                        current_sub_agent_id = None
+
+                # Only show TextPart if we're not currently in a sub-agent context
+                if not current_sub_agent_id and part.content and part.content.strip():
                     acc += f"**⏺** {part.content}\n\n"
 
             elif isinstance(part, ToolCallPart):
@@ -165,12 +177,13 @@ class AgentResponseWidget(Widget):
         # Build the section
         section = f"**🔧 Sub-Agent: {agent_name}**\n\n"
 
-        # Format each tool call with indentation
-        for _, part in parts:
+        # Format each tool call with tree-style indentation
+        for idx, (_, part) in enumerate(parts):
             formatted = ToolFormatter.format_tool_call_part(part)
             if formatted:
-                # Indent each line by 2 spaces for visual hierarchy
-                indented = "\n".join(f"  {line}" for line in formatted.split("\n"))
-                section += indented + "\n\n"
+                # Use tree-style box drawing: ├── for intermediate, └── for last
+                is_last = idx == len(parts) - 1
+                prefix = "└── " if is_last else "├── "
+                section += f"{prefix}{formatted}\n\n"
 
         return section
