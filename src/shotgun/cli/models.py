@@ -8,3 +8,4 @@ class OutputFormat(StrEnum):
 
     TEXT = "text"
     JSON = "json"
+    MARKDOWN = "markdown"

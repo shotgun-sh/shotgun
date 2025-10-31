@@ -59,17 +59,21 @@ async def apply_persistent_compaction(
                 f"({reduction_pct:.1f}% reduction)"
             )
 
-            # Track persistent compaction event
+            # Track persistent compaction event with simple metrics (fast, no token counting)
             track_event(
                 "persistent_compaction_applied",
                 {
+                    # Basic compaction metrics
                     "messages_before": original_size,
                     "messages_after": compacted_size,
-                    "tokens_before": estimated_tokens,
                     "reduction_percentage": round(reduction_pct, 2),
                     "agent_mode": deps.agent_mode.value
                     if hasattr(deps, "agent_mode") and deps.agent_mode
                     else "unknown",
+                    # Model and provider info (no computation needed)
+                    "model_name": deps.llm_model.name.value,
+                    "provider": deps.llm_model.provider.value,
+                    "key_provider": deps.llm_model.key_provider.value,
                 },
             )
         else:

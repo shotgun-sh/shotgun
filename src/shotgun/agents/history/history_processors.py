@@ -340,6 +340,7 @@ async def token_limit_compactor(
             else 0
         )
 
+        # Track incremental compaction with simple metrics (fast, no token counting)
         track_event(
             "context_compaction_triggered",
             {
@@ -352,6 +353,10 @@ async def token_limit_compactor(
                 "agent_mode": deps.agent_mode.value
                 if hasattr(deps, "agent_mode") and deps.agent_mode
                 else "unknown",
+                # Model and provider info (no computation needed)
+                "model_name": deps.llm_model.name.value,
+                "provider": deps.llm_model.provider.value,
+                "key_provider": deps.llm_model.key_provider.value,
             },
         )
 
@@ -468,6 +473,7 @@ async def _full_compaction(
     tokens_before = current_tokens  # Already calculated above
     tokens_after = summary_usage.output_tokens if summary_usage else 0
 
+    # Track full compaction with simple metrics (fast, no token counting)
     track_event(
         "context_compaction_triggered",
         {
@@ -480,6 +486,10 @@ async def _full_compaction(
             "agent_mode": deps.agent_mode.value
             if hasattr(deps, "agent_mode") and deps.agent_mode
             else "unknown",
+            # Model and provider info (no computation needed)
+            "model_name": deps.llm_model.name.value,
+            "provider": deps.llm_model.provider.value,
+            "key_provider": deps.llm_model.key_provider.value,
         },
     )
 

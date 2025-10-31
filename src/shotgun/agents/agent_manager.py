@@ -47,6 +47,7 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.config.models import KeyProvider
+from shotgun.agents.context_analyzer import ContextAnalyzer, ContextCompositionTelemetry
 from shotgun.agents.models import AgentResponse, AgentType, FileOperation
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -148,6 +149,14 @@ class ClarifyingQuestionsMessage(Message):
         super().__init__()
         self.questions = questions
         self.response_text = response_text
+
+
+class CompactionStartedMessage(Message):
+    """Event posted when conversation compaction starts."""
+
+
+class CompactionCompletedMessage(Message):
+    """Event posted when conversation compaction completes."""
 
 
 @dataclass(slots=True)
@@ -689,12 +698,25 @@ class AgentManager(Widget):
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
+        messages_before_compaction = len(all_messages)
+        compaction_occurred = False
+
         try:
             logger.debug(
                 "Starting message history compaction",
                 extra={"message_count": len(all_messages)},
             )
+            # Notify UI that compaction is starting
+            self.post_message(CompactionStartedMessage())
+
             self.message_history = await apply_persistent_compaction(all_messages, deps)
+
+            # Track if compaction actually modified the history
+            compaction_occurred = len(self.message_history) != len(all_messages)
+
+            # Notify UI that compaction is complete
+            self.post_message(CompactionCompletedMessage())
+
             logger.debug(
                 "Completed message history compaction",
                 extra={
@@ -715,6 +737,14 @@ class AgentManager(Widget):
             )
             # Fallback: use uncompacted messages to prevent data loss
             self.message_history = all_messages
+
+        # Track context composition telemetry
+        await self._track_context_analysis(
+            compaction_occurred=compaction_occurred,
+            messages_before_compaction=messages_before_compaction
+            if compaction_occurred
+            else None,
+        )
 
         usage = result.usage()
         if hasattr(deps, "llm_model") and deps.llm_model is not None:
@@ -1005,6 +1035,53 @@ class AgentManager(Widget):
     def get_usage_hint(self) -> str | None:
         return self.deps.usage_manager.build_usage_hint()
 
+    async def get_context_hint(self) -> str | None:
+        """Get conversation context analysis as a formatted hint.
+
+        Returns:
+            Markdown-formatted string with context composition statistics, or None if unavailable
+        """
+        from shotgun.agents.context_analyzer import ContextAnalyzer, ContextFormatter
+
+        try:
+            analyzer = ContextAnalyzer(self.deps.llm_model)
+            analysis = await analyzer.analyze_conversation(
+                self.message_history, self.ui_message_history
+            )
+            return ContextFormatter.format_markdown(analysis)
+        except Exception as e:
+            logger.error(f"Failed to generate context analysis: {e}")
+            return None
+
+    async def _track_context_analysis(
+        self,
+        compaction_occurred: bool = False,
+        messages_before_compaction: int | None = None,
+    ) -> None:
+        """Track context composition telemetry to PostHog.
+
+        Args:
+            compaction_occurred: Whether compaction was applied
+            messages_before_compaction: Message count before compaction, if it occurred
+        """
+        try:
+            analyzer = ContextAnalyzer(self.deps.llm_model)
+            analysis = await analyzer.analyze_conversation(
+                self.message_history, self.ui_message_history
+            )
+
+            # Create telemetry model from analysis
+            telemetry = ContextCompositionTelemetry.from_analysis(
+                analysis,
+                compaction_occurred=compaction_occurred,
+                messages_before_compaction=messages_before_compaction,
+            )
+
+            # Send to PostHog using model_dump() for dict conversion
+            track_event("agent_context_composition", telemetry.model_dump())
+        except Exception as e:
+            logger.warning(f"Failed to track context analysis: {e}")
+
     def get_conversation_state(self) -> "ConversationState":
         """Get the current conversation state.
 
@@ -1052,7 +1129,9 @@ class AgentManager(Widget):
 __all__ = [
     "AgentManager",
     "AgentType",
+    "ClarifyingQuestionsMessage",
+    "CompactionCompletedMessage",
+    "CompactionStartedMessage",
     "MessageHistoryUpdated",
     "PartialResponseMessage",
-    "ClarifyingQuestionsMessage",
 ]

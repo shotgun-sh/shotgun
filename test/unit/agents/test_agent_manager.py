@@ -368,8 +368,9 @@ async def test_agent_manager_run(
     assert len(manager.ui_message_history) > 0
     assert len(manager.message_history) == 2
 
-    # Verify post_message was called once (only after run, not before)
-    assert manager.post_message.call_count == 1
+    # Verify post_message was called (for UI updates and compaction messages)
+    # 3 calls: 1 for _post_messages_updated, 2 for compaction start/complete
+    assert manager.post_message.call_count == 3
 
 
 @pytest.mark.asyncio
@@ -433,8 +434,9 @@ async def test_agent_manager_run_no_prompt(
 
     assert result == mock_result
 
-    # One post_message call - only after run (no early update since no prompt)
-    assert manager.post_message.call_count == 1
+    # Verify post_message was called (for UI updates and compaction messages)
+    # 3 calls: 1 for _post_messages_updated, 2 for compaction start/complete
+    assert manager.post_message.call_count == 3
 
 
 @pytest.mark.asyncio

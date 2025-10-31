@@ -25,6 +25,8 @@ from textual.widgets import Button, Label, Static
 from shotgun.agents.agent_manager import (
     AgentManager,
     ClarifyingQuestionsMessage,
+    CompactionCompletedMessage,
+    CompactionStartedMessage,
     MessageHistoryUpdated,
     PartialResponseMessage,
 )
@@ -497,6 +499,13 @@ class ChatScreen(Screen[None]):
         else:
             self.notify("No usage hint available", severity="error")
 
+    async def action_show_context(self) -> None:
+        context_hint = await self.agent_manager.get_context_hint()
+        if context_hint:
+            self.mount_hint(context_hint)
+        else:
+            self.notify("No context analysis available", severity="error")
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
@@ -640,6 +649,26 @@ class ChatScreen(Screen[None]):
                             )
 
                     self.mount_hint(message)
+
+    @on(CompactionStartedMessage)
+    def handle_compaction_started(self, event: CompactionStartedMessage) -> None:
+        """Update spinner text when compaction starts."""
+        try:
+            spinner = self.query_one("#spinner", Spinner)
+            spinner.text = "Compacting Conversation..."
+        except Exception:  # noqa: S110
+            # If spinner not found or any error, silently continue
+            pass
+
+    @on(CompactionCompletedMessage)
+    def handle_compaction_completed(self, event: CompactionCompletedMessage) -> None:
+        """Reset spinner text when compaction completes."""
+        try:
+            spinner = self.query_one("#spinner", Spinner)
+            spinner.text = "Processing..."
+        except Exception:  # noqa: S110
+            # If spinner not found or any error, silently continue
+            pass
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:

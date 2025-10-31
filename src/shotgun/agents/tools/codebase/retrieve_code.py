@@ -5,6 +5,7 @@ from pathlib import Path
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
+from shotgun.agents.tools.registry import ToolCategory, tool_category
 from shotgun.codebase.core.code_retrieval import retrieve_code_by_qualified_name
 from shotgun.codebase.core.language_config import get_language_config
 from shotgun.logging_config import get_logger
@@ -14,6 +15,7 @@ from .models import CodeSnippetResult
 logger = get_logger(__name__)
 
 
+@tool_category(ToolCategory.CODEBASE_UNDERSTANDING)
 async def retrieve_code(
     ctx: RunContext[AgentDeps], graph_id: str, qualified_name: str
 ) -> CodeSnippetResult:
