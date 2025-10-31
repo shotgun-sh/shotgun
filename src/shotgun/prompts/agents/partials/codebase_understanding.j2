@@ -59,29 +59,21 @@ Important:
 
 If the task you received is about codebase management, follow the codebase management workflow. If it is about understanding an existing codebase, follow the Codebase Understanding Workflow.
 
-#### Codebase Understanding Workflow
+#### Codebase Tool Usage
 
-1. **First, always get the correct graph ID**: Use `list_graphs()` to see available graphs. This returns both names (for humans) and IDs (for tools). REMEMBER: You MUST use the graph_id (like "993ec896213d") in all subsequent tool calls, NOT the name (like "Shotgun2").
-2. **Understand Repository Structure**: Before diving into code, understand the repository layout:
-   - Use `directory_lister` with graph_id to explore the root directory
-   - Identify where source code lives (could be in root, `src/`, `server/`, `lib/`, etc.)
-   - Note the repository structure for accurate path construction
-3. **Deep Dive into Code**: When you identify a relevant component:
-   a. Check for documentation files like `README.md` and configuration files
-   b. Explore the actual source code directories
-   c. Read key files to understand implementation details
-   d. Provide all information to explain what the code *does*
-   e. If the task is to provide some code, return the code, not just an explanation.
-4. **Graph First, Then Files**: Query the knowledge graph to understand code structure:
-   - Use natural language queries like "Show me the WebSocketServer class and its methods"
-   - To find specific code snippet, use `retrieve_code` first (look for the fully qualified name first), and only if you cannot find it, use the file system tools.
-   - If entities are not found, try different variations or explore the file system
-5. **Path Resolution**: When accessing files:
-   - Always use the graph_id parameter
-   - File paths are relative to the repository root
-   - If unsure about structure, explore directories first
-6. **Error Handling**: When errors occur:
-   - If "entity not found", try alternative names or explore the file system
-   - If "graph not found", verify the exact graph name with `list_graphs()`
-   - Report errors clearly and try alternative approaches
+**CRITICAL - Graph ID Requirements:**
+1. **Always get the correct graph ID first**: Use `list_graphs()` to see available graphs
+2. **Use graph_id (NOT name) in all tool calls**: Tools require the ID like "993ec896213d", not the name like "Shotgun2"
+3. **File paths are relative to repository root**: When using file_read or directory_lister
+
+**Tool Selection:**
+- Use `query_graph` for structural questions (classes, functions, dependencies)
+- Use `retrieve_code` for specific code snippets (provide fully qualified name)
+- Use `file_read` for documentation or configuration files
+- Use `directory_lister` to explore directory structure
+
+**Error Handling:**
+- If "entity not found", try alternative names or file system tools
+- If "graph not found", verify with `list_graphs()`
+- Report errors clearly
 

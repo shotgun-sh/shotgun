@@ -97,11 +97,12 @@ async def query_codebase(
         # Run the sub-agent with usage tracking
         # The execution_id in deps will be picked up by the event stream handler
         # The event_stream_handler will forward sub-agent events to the parent
+        # Pass parent's message history so sub-agent has full conversation context
         result = await run_codebase_understanding_agent(
             agent=sub_agent,
             query=query,
             deps=sub_deps,
-            message_history=None,  # Sub-agent starts fresh
+            message_history=ctx.messages,  # Pass parent conversation context
         )
 
         logger.debug(
