@@ -46,7 +46,7 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
-        return ModelName.CLAUDE_HAIKU_4_5
+        return ModelName.GPT_5
 
     # Priority 2: Individual provider keys
     if _get_api_key(config.anthropic.api_key):
@@ -200,7 +200,7 @@ def get_provider_model(
             model_name = provider_or_model
         else:
             # No specific model requested - use selected or default
-            model_name = config.selected_model or ModelName.CLAUDE_HAIKU_4_5
+            model_name = config.selected_model or ModelName.GPT_5
 
         if model_name not in MODEL_SPECS:
             raise ValueError(f"Model '{model_name.value}' not found")
