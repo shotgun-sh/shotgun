@@ -7,13 +7,13 @@ from typing import Annotated
 
 import typer
 from pydantic_ai.messages import ModelMessage
+from pydantic_ai.usage import RequestUsage
 from rich.console import Console
 
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.conversation_manager import ConversationManager
-from shotgun.agents.history.compaction import apply_persistent_compaction
+from shotgun.agents.history.history_processors import token_limit_compactor
 from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
-from shotgun.agents.models import AgentDeps
 from shotgun.cli.models import OutputFormat
 from shotgun.logging_config import get_logger
 
@@ -98,10 +98,6 @@ async def compact_conversation() -> dict:
 
     # For CLI, we can call token_limit_compactor directly without full AgentDeps
     # since we only need the model config and message history
-    from pydantic_ai.usage import RequestUsage
-
-    from shotgun.agents.history.history_processors import token_limit_compactor
-
     # Create a minimal context object for compaction
     class CompactContext:
         def __init__(self, model_config, usage):

@@ -38,6 +38,8 @@ from shotgun.agents.conversation_history import (
     ConversationState,
 )
 from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.history.compaction import apply_persistent_compaction
+from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
 from shotgun.agents.models import (
     AgentDeps,
     AgentType,
@@ -514,16 +516,6 @@ class ChatScreen(Screen[None]):
     @work
     async def action_compact_conversation(self) -> None:
         """Compact the conversation history to reduce size."""
-        from shotgun.agents.agent_manager import (
-            CompactionCompletedMessage,
-            CompactionStartedMessage,
-            MessageHistoryUpdated,
-        )
-        from shotgun.agents.conversation_manager import ConversationManager
-        from shotgun.agents.history.compaction import apply_persistent_compaction
-        from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
-        from shotgun.utils.file_system_utils import get_shotgun_home
-
         try:
             # Get current message count and tokens
             original_count = len(self.agent_manager.message_history)
@@ -603,10 +595,6 @@ class ChatScreen(Screen[None]):
     @work
     async def action_clear_conversation(self) -> None:
         """Clear the conversation history."""
-        from shotgun.agents.agent_manager import MessageHistoryUpdated
-        from shotgun.agents.conversation_manager import ConversationManager
-        from shotgun.utils.file_system_utils import get_shotgun_home
-
         try:
             # Clear message histories
             self.agent_manager.message_history = []

@@ -60,7 +60,7 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
         patch("shotgun.cli.compact.Path.home", return_value=tmp_path),
         patch("shotgun.cli.compact.get_provider_model", return_value=model_config),
         patch(
-            "shotgun.agents.history.history_processors.token_limit_compactor",
+            "shotgun.cli.compact.token_limit_compactor",
             new_callable=AsyncMock,
             return_value=compacted_messages,
         ),
@@ -141,7 +141,7 @@ async def test_compact_conversation_no_reduction(tmp_path, mock_conversation_his
         patch("shotgun.cli.compact.Path.home", return_value=tmp_path),
         patch("shotgun.cli.compact.get_provider_model", return_value=model_config),
         patch(
-            "shotgun.agents.history.history_processors.token_limit_compactor",
+            "shotgun.cli.compact.token_limit_compactor",
             new_callable=AsyncMock,
             return_value=original_messages,
         ),
