@@ -1,0 +1,54 @@
+ChatHistory {
+  height: auto;
+}
+
+PromptInput {
+  min-height: 3;
+  max-height: 7;
+  height: auto;
+}
+
+StatusBar {
+  height: auto;
+}
+
+ModeIndicator {
+  height: auto;
+}
+
+#footer {
+  dock: bottom;
+  height: auto;
+  padding: 1 1 1 2;
+  max-height: 14;
+}
+
+#window {
+  align: left bottom;
+}
+
+.hidden {
+  display: none;
+}
+
+#footer > Grid {
+  height: auto;
+  grid-columns: 1fr auto;
+  grid-size: 2;
+}
+
+
+#right-footer-indicators {
+  width: auto;
+  height: auto;
+  layout: vertical;
+}
+
+#context-indicator {
+  text-align: end;
+  height: 1;
+}
+
+#indexing-job-display {
+  text-align: end;
+}

@@ -1,6 +1,7 @@
+"""Main chat screen implementation."""
+
 import asyncio
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -9,6 +10,7 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     TextPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 from textual import events, on, work
@@ -17,8 +19,8 @@ from textual.command import CommandPalette
 from textual.containers import Container, Grid
 from textual.keys import Keys
 from textual.reactive import reactive
-from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Label, Static
+from textual.screen import Screen
+from textual.widgets import Static
 
 from shotgun.agents.agent_manager import (
     AgentManager,
@@ -52,110 +54,29 @@ from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
 from shotgun.tui.components.status_bar import StatusBar
+from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
+    CodebaseIndexPromptScreen,
+)
+from shotgun.tui.screens.chat.codebase_index_selection import CodebaseIndexSelection
+from shotgun.tui.screens.chat.help_text import (
+    help_text_empty_dir,
+    help_text_with_codebase,
+)
+from shotgun.tui.screens.chat.prompt_history import PromptHistory
+from shotgun.tui.screens.chat_screen.command_providers import (
+    DeleteCodebasePaletteProvider,
+    UnifiedCommandProvider,
+)
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
+from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 
-from .chat_screen.command_providers import (
-    DeleteCodebasePaletteProvider,
-    UnifiedCommandProvider,
-)
-from .confirmation_dialog import ConfirmationDialog
-
 logger = logging.getLogger(__name__)
-
-
-class PromptHistory:
-    def __init__(self) -> None:
-        self.prompts: list[str] = ["Hello there!"]
-        self.curr: int | None = None
-
-    def next(self) -> str:
-        if self.curr is None:
-            self.curr = -1
-        else:
-            self.curr = -1
-        return self.prompts[self.curr]
-
-    def prev(self) -> str:
-        if self.curr is None:
-            raise Exception("current entry is none")
-        if self.curr == -1:
-            self.curr = None
-            return ""
-        self.curr += 1
-        return ""
-
-    def append(self, text: str) -> None:
-        self.prompts.append(text)
-        self.curr = None
-
-
-@dataclass
-class CodebaseIndexSelection:
-    """User-selected repository path and name for indexing."""
-
-    repo_path: Path
-    name: str
-
-
-class CodebaseIndexPromptScreen(ModalScreen[bool]):
-    """Modal dialog asking whether to index the detected codebase."""
-
-    DEFAULT_CSS = """
-        CodebaseIndexPromptScreen {
-            align: center middle;
-            background: rgba(0, 0, 0, 0.0);
-        }
-
-        CodebaseIndexPromptScreen > #index-prompt-dialog {
-            width: 60%;
-            max-width: 60;
-            height: auto;
-            border: wide $primary;
-            padding: 1 2;
-            layout: vertical;
-            background: $surface;
-            height: auto;
-        }
-
-        #index-prompt-buttons {
-            layout: horizontal;
-            align-horizontal: right;
-            height: auto;
-        }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Container(id="index-prompt-dialog"):
-            yield Label("Index this codebase?", id="index-prompt-title")
-            yield Static(
-                f"Would you like to index the codebase at:\n{Path.cwd()}\n\n"
-                "This is required for the agent to understand your code and answer "
-                "questions about it. Without indexing, the agent cannot analyze "
-                "your codebase."
-            )
-            with Container(id="index-prompt-buttons"):
-                yield Button(
-                    "Index now",
-                    id="index-prompt-confirm",
-                    variant="primary",
-                )
-                yield Button("Not now", id="index-prompt-cancel")
-
-    @on(Button.Pressed, "#index-prompt-cancel")
-    def handle_cancel(self, event: Button.Pressed) -> None:
-        event.stop()
-        self.dismiss(False)
-
-    @on(Button.Pressed, "#index-prompt-confirm")
-    def handle_confirm(self, event: Button.Pressed) -> None:
-        event.stop()
-        self.dismiss(True)
 
 
 class ChatScreen(Screen[None]):
@@ -422,8 +343,6 @@ class ChatScreen(Screen[None]):
             )
 
             # Check last response usage
-            from pydantic_ai.messages import ModelResponse
-
             last_response = next(
                 (
                     msg
@@ -618,8 +537,6 @@ class ChatScreen(Screen[None]):
         # Filter event.messages to exclude ModelRequest with only ToolReturnPart
         # These are intermediate tool results that would render as empty (UserQuestionWidget
         # filters out ToolReturnPart in format_prompt_parts), causing user messages to disappear
-        from pydantic_ai.messages import ToolReturnPart
-
         filtered_event_messages: list[ModelMessage] = []
         for msg in event.messages:
             if isinstance(msg, ModelRequest):
@@ -707,8 +624,6 @@ class ChatScreen(Screen[None]):
                 if display_path:
                     # Create a simple markdown message with the file path
                     # The terminal emulator will make this clickable automatically
-                    from pathlib import Path
-
                     path_obj = Path(display_path)
 
                     if len(event.file_operations) == 1:
@@ -1189,28 +1104,3 @@ class ChatScreen(Screen[None]):
         elif success and restored_type:
             # Update the current mode to match restored conversation
             self.mode = restored_type
-
-
-def help_text_with_codebase(already_indexed: bool = False) -> str:
-    return (
-        "Howdy! Welcome to Shotgun - the context tool for software engineering. \n\n"
-        "You can research, build specs, plan, create tasks, and export context to your "
-        "favorite code-gen agents.\n\n"
-        f"{'' if already_indexed else 'Once your codebase is indexed, '}I can help with:\n\n"
-        "- Speccing out a new feature\n"
-        "- Onboarding you onto this project\n"
-        "- Helping with a refactor spec\n"
-        "- Creating AGENTS.md file for this project\n"
-    )
-
-
-def help_text_empty_dir() -> str:
-    return (
-        "Howdy! Welcome to Shotgun - the context tool for software engineering.\n\n"
-        "You can research, build specs, plan, create tasks, and export context to your "
-        "favorite code-gen agents.\n\n"
-        "What would you like to build? Here are some examples:\n\n"
-        "- Research FastAPI vs Django\n"
-        "- Plan my new web app using React\n"
-        "- Create PRD for my planned product\n"
-    )
