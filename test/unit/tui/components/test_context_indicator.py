@@ -107,9 +107,12 @@ def test_context_indicator_display_with_zero_tokens():
 
     indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
 
-    # Should show just model name when no conversation content
+    # Should show full context display even with 0 tokens (0% (0/160K))
     assert indicator.context_analysis == analysis
     assert indicator.model_name == ModelName.CLAUDE_SONNET_4_5
+    # Percentage should be 0.0
+    percentage = (0 / 160_000) * 100
+    assert percentage == 0.0
 
 
 def test_context_indicator_display_calculation():

@@ -77,11 +77,8 @@ class ContextIndicator(Static):
 
     def _refresh_display(self) -> None:
         """Refresh the display with current context data."""
-        # If no analysis or no actual conversation content, show just model name or empty
-        if (
-            self.context_analysis is None
-            or self.context_analysis.agent_context_tokens == 0
-        ):
+        # If no analysis yet, show placeholder with model name or empty
+        if self.context_analysis is None:
             if self.model_name:
                 model_display = get_model_short_name(self.model_name)
                 self.update(f"[bold]{model_display}[/bold]")
@@ -106,7 +103,7 @@ class ContextIndicator(Static):
         # Get color based on percentage
         color = self._get_percentage_color(percentage)
 
-        # Build the display string
+        # Build the display string - always show full context info
         parts = [
             "[$foreground-muted]Context window:[/]",
             f"[{color}]{percentage}% ({current_tokens}/{max_tokens})[/]",

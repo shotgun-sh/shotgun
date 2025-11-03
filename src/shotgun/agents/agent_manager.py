@@ -757,8 +757,11 @@ class AgentManager(Widget):
                 extra={"agent_mode": self._current_agent_type.value},
             )
 
-        # UI updates are now posted immediately in each branch (Q&A or non-Q&A)
-        # before compaction, so no duplicate posting needed here
+        # Post final UI update after compaction completes
+        # This ensures widgets that depend on message_history (like context indicator)
+        # receive the updated history after compaction
+        logger.debug("Posting final UI update after compaction with updated message_history")
+        self._post_messages_updated(file_operations)
 
         return result
 
