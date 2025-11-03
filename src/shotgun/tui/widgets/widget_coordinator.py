@@ -76,7 +76,9 @@ class WidgetCoordinator:
         try:
             prompt_input = self.screen.query_one(PromptInput)
             if placeholder is None:
-                placeholder = self.screen._placeholder_for_mode(new_mode, force_new=True)
+                placeholder = self.screen._placeholder_for_mode(
+                    new_mode, force_new=True
+                )
             prompt_input.placeholder = placeholder
             prompt_input.refresh()
         except Exception as e:
