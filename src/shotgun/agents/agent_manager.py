@@ -46,8 +46,18 @@ from textual.message import Message
 from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
-from shotgun.agents.config.models import KeyProvider
-from shotgun.agents.context_analyzer import ContextAnalyzer, ContextCompositionTelemetry
+from shotgun.agents.config.models import (
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+)
+from shotgun.agents.context_analyzer import (
+    ContextAnalysis,
+    ContextAnalyzer,
+    ContextCompositionTelemetry,
+    ContextFormatter,
+)
 from shotgun.agents.models import AgentResponse, AgentType, FileOperation
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -157,6 +167,28 @@ class CompactionStartedMessage(Message):
 
 class CompactionCompletedMessage(Message):
     """Event posted when conversation compaction completes."""
+
+
+@dataclass(frozen=True)
+class ModelConfigUpdated:
+    """Data returned when AI model configuration changes.
+
+    Used as a return value from ModelPickerScreen to communicate model
+    selection back to the calling screen.
+
+    Attributes:
+        old_model: Previous model name (None if first selection)
+        new_model: New model name
+        provider: LLM provider (OpenAI, Anthropic, Google)
+        key_provider: Authentication method (BYOK or Shotgun)
+        model_config: Complete model configuration
+    """
+
+    old_model: ModelName | None
+    new_model: ModelName
+    provider: ProviderType
+    key_provider: KeyProvider
+    model_config: ModelConfig
 
 
 @dataclass(slots=True)
@@ -757,8 +789,13 @@ class AgentManager(Widget):
                 extra={"agent_mode": self._current_agent_type.value},
             )
 
-        # UI updates are now posted immediately in each branch (Q&A or non-Q&A)
-        # before compaction, so no duplicate posting needed here
+        # Post final UI update after compaction completes
+        # This ensures widgets that depend on message_history (like context indicator)
+        # receive the updated history after compaction
+        logger.debug(
+            "Posting final UI update after compaction with updated message_history"
+        )
+        self._post_messages_updated(file_operations)
 
         return result
 
@@ -1041,16 +1078,25 @@ class AgentManager(Widget):
         Returns:
             Markdown-formatted string with context composition statistics, or None if unavailable
         """
-        from shotgun.agents.context_analyzer import ContextAnalyzer, ContextFormatter
+        analysis = await self.get_context_analysis()
+        if analysis:
+            return ContextFormatter.format_markdown(analysis)
+        return None
+
+    async def get_context_analysis(self) -> ContextAnalysis | None:
+        """Get conversation context analysis as structured data.
+
+        Returns:
+            ContextAnalysis object with token usage data, or None if unavailable
+        """
 
         try:
             analyzer = ContextAnalyzer(self.deps.llm_model)
-            analysis = await analyzer.analyze_conversation(
+            return await analyzer.analyze_conversation(
                 self.message_history, self.ui_message_history
             )
-            return ContextFormatter.format_markdown(analysis)
         except Exception as e:
-            logger.error(f"Failed to generate context analysis: {e}")
+            logger.error(f"Failed to generate context analysis: {e}", exc_info=True)
             return None
 
     async def _track_context_analysis(

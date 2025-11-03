@@ -69,7 +69,9 @@ class ContextAnalysis(BaseModel):
     max_usable_tokens: int = Field(
         ge=0, description="80% of max_input_tokens (usable limit)"
     )
-    free_space_tokens: int = Field(ge=0, description="Remaining tokens available")
+    free_space_tokens: int = Field(
+        description="Remaining tokens available (negative if over capacity)"
+    )
 
     def get_percentage(self, stats: MessageTypeStats) -> float:
         """Calculate percentage of agent context tokens for a message type.

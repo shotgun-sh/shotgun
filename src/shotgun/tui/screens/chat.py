@@ -28,9 +28,11 @@ from shotgun.agents.agent_manager import (
     CompactionCompletedMessage,
     CompactionStartedMessage,
     MessageHistoryUpdated,
+    ModelConfigUpdated,
     PartialResponseMessage,
 )
 from shotgun.agents.config import get_provider_model
+from shotgun.agents.config.models import MODEL_SPECS
 from shotgun.agents.conversation_history import (
     ConversationHistory,
     ConversationState,
@@ -55,6 +57,7 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.utils import get_shotgun_home
 
+from ..components.context_indicator import ContextIndicator
 from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
 from ..utils.mode_progress import PlaceholderHints
@@ -338,6 +341,8 @@ class ChatScreen(Screen[None]):
             self._load_conversation()
 
         self.call_later(self.check_if_codebase_is_indexed)
+        # Initial update of context indicator
+        self.update_context_indicator()
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
@@ -506,6 +511,17 @@ class ChatScreen(Screen[None]):
         else:
             self.notify("No context analysis available", severity="error")
 
+    @work(exclusive=False)
+    async def update_context_indicator(self) -> None:
+        """Update the context indicator with current usage data."""
+        try:
+            context_indicator = self.query_one(ContextIndicator)
+            analysis = await self.agent_manager.get_context_analysis()
+            model_name = self.deps.llm_model.name
+            context_indicator.update_context(analysis, model_name)
+        except Exception as e:
+            logger.debug(f"Failed to update context indicator: {e}")
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
@@ -526,7 +542,9 @@ class ChatScreen(Screen[None]):
                 )
                 with Grid():
                     yield ModeIndicator(mode=self.mode)
-                    yield Static("", id="indexing-job-display")
+                    with Container(id="right-footer-indicators"):
+                        yield ContextIndicator(id="context-indicator")
+                        yield Static("", id="indexing-job-display")
 
     def mount_hint(self, markdown: str) -> None:
         hint = HintMessage(message=markdown)
@@ -620,6 +638,9 @@ class ChatScreen(Screen[None]):
         mode_indicator = self.query_one(ModeIndicator)
         mode_indicator.refresh()
 
+        # Update context indicator
+        self.update_context_indicator()
+
         # If there are file operations, add a message showing the modified files
         if event.file_operations:
             chat_history = self.query_one(ChatHistory)
@@ -669,6 +690,66 @@ class ChatScreen(Screen[None]):
         except Exception:  # noqa: S110
             # If spinner not found or any error, silently continue
             pass
+
+    async def handle_model_selected(self, result: ModelConfigUpdated | None) -> None:
+        """Handle model selection from ModelPickerScreen.
+
+        Called as a callback when the ModelPickerScreen is dismissed.
+
+        Args:
+            result: ModelConfigUpdated if a model was selected, None if cancelled
+        """
+        if result is None:
+            return
+
+        try:
+            # Update the model configuration in dependencies
+            self.deps.llm_model = result.model_config
+
+            # Update the agent manager's model configuration
+            self.agent_manager.deps.llm_model = result.model_config
+
+            # Directly update the context indicator with new model
+            # Get current analysis from agent manager
+            context_indicator = self.query_one(ContextIndicator)
+            analysis = await self.agent_manager.get_context_analysis()
+            context_indicator.update_context(analysis, result.new_model)
+
+            # Get model display name for user feedback
+            model_spec = MODEL_SPECS.get(result.new_model)
+            model_display = (
+                model_spec.short_name if model_spec else str(result.new_model)
+            )
+
+            # Format provider information
+            key_method = (
+                "Shotgun Account" if result.key_provider == "shotgun" else "BYOK"
+            )
+            provider_display = result.provider.value.title()
+
+            # Track model switch in telemetry
+            track_event(
+                "model_switched",
+                {
+                    "old_model": str(result.old_model) if result.old_model else None,
+                    "new_model": str(result.new_model),
+                    "provider": result.provider.value,
+                    "key_provider": result.key_provider.value,
+                },
+            )
+
+            # Show confirmation to user with provider info
+            self.agent_manager.add_hint_message(
+                HintMessage(
+                    message=f"✓ Switched to {model_display} ({provider_display}, {key_method})"
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to handle model selection: {e}")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"⚠ Failed to update model configuration: {e}")
+            )
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:

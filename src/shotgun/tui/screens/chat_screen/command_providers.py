@@ -177,7 +177,9 @@ class ProviderSetupProvider(Provider):
 
     def open_model_picker(self) -> None:
         """Show the model picker screen."""
-        self.chat_screen.app.push_screen(ModelPickerScreen())
+        self.chat_screen.app.push_screen(
+            ModelPickerScreen(), callback=self.chat_screen.handle_model_selected
+        )
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         yield DiscoveryHit(
@@ -320,7 +322,9 @@ class UnifiedCommandProvider(Provider):
 
     def open_model_picker(self) -> None:
         """Show the model picker screen."""
-        self.chat_screen.app.push_screen(ModelPickerScreen())
+        self.chat_screen.app.push_screen(
+            ModelPickerScreen(), callback=self.chat_screen.handle_model_selected
+        )
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         """Provide commands in alphabetical order when palette opens."""
