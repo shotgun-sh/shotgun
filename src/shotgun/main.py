@@ -23,7 +23,9 @@ from dotenv import load_dotenv
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
 from shotgun.cli import (
+    clear,
     codebase,
+    compact,
     config,
     context,
     export,
@@ -80,6 +82,8 @@ app.add_typer(
     codebase.app, name="codebase", help="Manage and query code knowledge graphs"
 )
 app.add_typer(context.app, name="context", help="Analyze conversation context usage")
+app.add_typer(compact.app, name="compact", help="Compact conversation history")
+app.add_typer(clear.app, name="clear", help="Clear conversation history")
 app.add_typer(research.app, name="research", help="Perform research with agentic loops")
 app.add_typer(plan.app, name="plan", help="Generate structured plans")
 app.add_typer(specify.app, name="specify", help="Generate comprehensive specifications")

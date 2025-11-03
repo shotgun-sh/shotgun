@@ -330,6 +330,11 @@ class UnifiedCommandProvider(Provider):
         """Provide commands in alphabetical order when palette opens."""
         # Alphabetically ordered commands
         yield DiscoveryHit(
+            "Clear Conversation",
+            self.chat_screen.action_clear_conversation,
+            help="Clear the entire conversation history",
+        )
+        yield DiscoveryHit(
             "Codebase: Delete Codebase Index",
             self.chat_screen.delete_codebase_command,
             help="Delete an existing codebase index",
@@ -338,6 +343,11 @@ class UnifiedCommandProvider(Provider):
             "Codebase: Index Codebase",
             self.chat_screen.index_codebase_command,
             help="Index a repository into the codebase graph",
+        )
+        yield DiscoveryHit(
+            "Compact Conversation",
+            self.chat_screen.action_compact_conversation,
+            help="Reduce conversation size by compacting message history",
         )
         yield DiscoveryHit(
             "Open Provider Setup",
@@ -367,6 +377,11 @@ class UnifiedCommandProvider(Provider):
         # Define all commands in alphabetical order
         commands = [
             (
+                "Clear Conversation",
+                self.chat_screen.action_clear_conversation,
+                "Clear the entire conversation history",
+            ),
+            (
                 "Codebase: Delete Codebase Index",
                 self.chat_screen.delete_codebase_command,
                 "Delete an existing codebase index",
@@ -375,6 +390,11 @@ class UnifiedCommandProvider(Provider):
                 "Codebase: Index Codebase",
                 self.chat_screen.index_codebase_command,
                 "Index a repository into the codebase graph",
+            ),
+            (
+                "Compact Conversation",
+                self.chat_screen.action_compact_conversation,
+                "Reduce conversation size by compacting message history",
             ),
             (
                 "Open Provider Setup",

@@ -511,6 +511,128 @@ class ChatScreen(Screen[None]):
         else:
             self.notify("No context analysis available", severity="error")
 
+    @work
+    async def action_compact_conversation(self) -> None:
+        """Compact the conversation history to reduce size."""
+        from shotgun.agents.agent_manager import (
+            CompactionCompletedMessage,
+            CompactionStartedMessage,
+            MessageHistoryUpdated,
+        )
+        from shotgun.agents.conversation_manager import ConversationManager
+        from shotgun.agents.history.compaction import apply_persistent_compaction
+        from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
+        from shotgun.utils.file_system_utils import get_shotgun_home
+
+        try:
+            # Get current message count and tokens
+            original_count = len(self.agent_manager.message_history)
+            original_tokens = await estimate_tokens_from_messages(
+                self.agent_manager.message_history, self.deps.llm_model
+            )
+
+            # Post compaction started event
+            self.agent_manager.post_message(CompactionStartedMessage())
+
+            # Apply compaction
+            compacted_messages = await apply_persistent_compaction(
+                self.agent_manager.message_history, self.deps
+            )
+
+            # Update agent manager's message history
+            self.agent_manager.message_history = compacted_messages
+
+            # Calculate after metrics
+            compacted_count = len(compacted_messages)
+            compacted_tokens = await estimate_tokens_from_messages(
+                compacted_messages, self.deps.llm_model
+            )
+
+            # Calculate reductions
+            message_reduction = (
+                ((original_count - compacted_count) / original_count) * 100
+                if original_count > 0
+                else 0
+            )
+            token_reduction = (
+                ((original_tokens - compacted_tokens) / original_tokens) * 100
+                if original_tokens > 0
+                else 0
+            )
+
+            # Save to conversation file
+            conversation_file = get_shotgun_home() / "conversation.json"
+            manager = ConversationManager(conversation_file)
+            conversation = manager.load()
+
+            if conversation:
+                conversation.set_agent_messages(compacted_messages)
+                manager.save(conversation)
+
+            # Post compaction completed event
+            self.agent_manager.post_message(CompactionCompletedMessage())
+
+            # Post message history updated event
+            self.agent_manager.post_message(
+                MessageHistoryUpdated(
+                    messages=self.agent_manager.ui_message_history.copy(),
+                    agent_type=self.agent_manager._current_agent_type,
+                    file_operations=None,
+                )
+            )
+
+            # Show notification
+            if compacted_count < original_count:
+                self.notify(
+                    f"✓ Compacted {original_count} → {compacted_count} messages "
+                    f"({message_reduction:.0f}% reduction, {token_reduction:.0f}% tokens)",
+                    severity="information",
+                    timeout=5,
+                )
+            else:
+                self.notify(
+                    "No compaction needed - conversation already optimized",
+                    severity="information",
+                    timeout=3,
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to compact conversation: {e}", exc_info=True)
+            self.notify(f"Failed to compact: {e}", severity="error")
+
+    @work
+    async def action_clear_conversation(self) -> None:
+        """Clear the conversation history."""
+        from shotgun.agents.agent_manager import MessageHistoryUpdated
+        from shotgun.agents.conversation_manager import ConversationManager
+        from shotgun.utils.file_system_utils import get_shotgun_home
+
+        try:
+            # Clear message histories
+            self.agent_manager.message_history = []
+            self.agent_manager.ui_message_history = []
+
+            # Delete conversation file
+            conversation_file = get_shotgun_home() / "conversation.json"
+            manager = ConversationManager(conversation_file)
+            manager.clear()
+
+            # Post message history updated event to refresh UI
+            self.agent_manager.post_message(
+                MessageHistoryUpdated(
+                    messages=[],
+                    agent_type=self.agent_manager._current_agent_type,
+                    file_operations=None,
+                )
+            )
+
+            # Show notification
+            self.notify("✓ Conversation cleared", severity="information", timeout=3)
+
+        except Exception as e:
+            logger.error(f"Failed to clear conversation: {e}", exc_info=True)
+            self.notify(f"Failed to clear: {e}", severity="error")
+
     @work(exclusive=False)
     async def update_context_indicator(self) -> None:
         """Update the context indicator with current usage data."""
