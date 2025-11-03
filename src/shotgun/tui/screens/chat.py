@@ -585,20 +585,19 @@ class ChatScreen(Screen[None]):
                 f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)"
             )
 
-            # Show notification
-            if compacted_count < original_count:
-                self.notify(
-                    f"✓ Compacted {original_count} → {compacted_count} messages "
-                    f"({message_reduction:.0f}% reduction, {token_reduction:.0f}% tokens)",
-                    severity="information",
-                    timeout=5,
-                )
-            else:
-                self.notify(
-                    "No compaction needed - conversation already optimized",
-                    severity="information",
-                    timeout=3,
-                )
+            # Show notification with stats (always)
+            self.notify(
+                f"✓ Compacted {original_count} → {compacted_count} messages "
+                f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)",
+                severity="information",
+                timeout=5,
+            )
+
+            # Add persistent hint message with stats (always)
+            self.mount_hint(
+                f"✓ Compacted conversation: {original_count} → {compacted_count} messages "
+                f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)"
+            )
 
         except Exception as e:
             logger.error(f"Failed to compact conversation: {e}", exc_info=True)
