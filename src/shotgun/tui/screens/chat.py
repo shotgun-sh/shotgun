@@ -524,6 +524,11 @@ class ChatScreen(Screen[None]):
                 self.agent_manager.message_history, self.deps.llm_model
             )
 
+            # Log compaction start
+            logger.info(
+                f"Starting conversation compaction - {original_count} messages, {original_tokens} tokens"
+            )
+
             # Post compaction started event
             self.agent_manager.post_message(CompactionStartedMessage())
 
@@ -572,6 +577,12 @@ class ChatScreen(Screen[None]):
                     agent_type=self.agent_manager._current_agent_type,
                     file_operations=None,
                 )
+            )
+
+            # Log compaction completion
+            logger.info(
+                f"Compaction completed: {original_count} → {compacted_count} messages "
+                f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)"
             )
 
             # Show notification
