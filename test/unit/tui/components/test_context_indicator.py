@@ -169,3 +169,26 @@ def test_context_indicator_display_with_different_models():
         indicator.update_context(analysis, model_name)
         assert indicator.model_name == model_name
         assert indicator.context_analysis == analysis
+
+
+def test_context_indicator_over_budget():
+    """Test display when tokens exceed model capacity (over 100%)."""
+    indicator = ContextIndicator()
+
+    # Simulate switching from GPT-5 (400K) to Haiku (200K) with full conversation
+    # 380K tokens exceeds Haiku's 160K usable capacity (200K * 0.8)
+    analysis = create_test_analysis(agent_context_tokens=380_000, max_usable_tokens=160_000)
+
+    indicator.update_context(analysis, ModelName.CLAUDE_HAIKU_4_5)
+
+    # Should handle gracefully without crashing
+    assert indicator.context_analysis == analysis
+    assert indicator.model_name == ModelName.CLAUDE_HAIKU_4_5
+
+    # Verify percentage calculation (will be >100%)
+    percentage = (380_000 / 160_000) * 100
+    assert percentage == 237.5
+
+    # Color should be red (since percentage > 85%)
+    color = indicator._get_percentage_color(percentage)
+    assert color == "#ff0000"

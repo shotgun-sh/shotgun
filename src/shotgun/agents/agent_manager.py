@@ -1094,7 +1094,7 @@ class AgentManager(Widget):
                 self.message_history, self.ui_message_history
             )
         except Exception as e:
-            logger.error(f"Failed to generate context analysis: {e}")
+            logger.error(f"Failed to generate context analysis: {e}", exc_info=True)
             return None
 
     async def _track_context_analysis(
