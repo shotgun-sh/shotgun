@@ -67,6 +67,7 @@ from .chat_screen.command_providers import (
     DeleteCodebasePaletteProvider,
     UnifiedCommandProvider,
 )
+from .confirmation_dialog import ConfirmationDialog
 
 logger = logging.getLogger(__name__)
 
@@ -595,6 +596,23 @@ class ChatScreen(Screen[None]):
     @work
     async def action_clear_conversation(self) -> None:
         """Clear the conversation history."""
+        # Show confirmation dialog
+        should_clear = await self.app.push_screen_wait(
+            ConfirmationDialog(
+                title="Clear conversation?",
+                message="This will permanently delete your entire conversation history. "
+                "All messages, context, and progress will be lost. "
+                "This action cannot be undone.",
+                confirm_label="Clear",
+                cancel_label="Keep",
+                confirm_variant="warning",
+                danger=True,
+            )
+        )
+
+        if not should_clear:
+            return  # User cancelled
+
         try:
             # Clear message histories
             self.agent_manager.message_history = []
@@ -614,8 +632,8 @@ class ChatScreen(Screen[None]):
                 )
             )
 
-            # Show notification
-            self.notify("✓ Conversation cleared", severity="information", timeout=3)
+            # Show persistent success message
+            self.mount_hint("✓ Conversation cleared - Starting fresh!")
 
         except Exception as e:
             logger.error(f"Failed to clear conversation: {e}", exc_info=True)
