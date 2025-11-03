@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from pydantic_ai import RunContext
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -31,7 +30,6 @@ from shotgun.agents.agent_manager import (
     ModelConfigUpdated,
     PartialResponseMessage,
 )
-from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.models import MODEL_SPECS
 from shotgun.agents.conversation_history import (
     ConversationHistory,
@@ -54,7 +52,7 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
-from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
+from shotgun.tui.dependencies import create_default_tui_deps
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.state.processing_state import ProcessingStateManager
@@ -305,36 +303,57 @@ class ChatScreen(Screen[None]):
     working = reactive(False)
 
     def __init__(
-        self, continue_session: bool = False, force_reindex: bool = False
+        self,
+        continue_session: bool = False,
+        force_reindex: bool = False,
+        agent_manager: AgentManager | None = None,
+        conversation_manager: ConversationManager | None = None,
+        processing_state: ProcessingStateManager | None = None,
+        command_handler: CommandHandler | None = None,
+        placeholder_hints: PlaceholderHints | None = None,
+        codebase_sdk: CodebaseSDK | None = None,
+        deps: AgentDeps | None = None,
     ) -> None:
+        """Initialize the ChatScreen.
+
+        Args:
+            continue_session: Whether to continue a previous session
+            force_reindex: Whether to force reindexing of codebases
+            agent_manager: Optional AgentManager instance (for testing)
+            conversation_manager: Optional ConversationManager instance (for testing)
+            processing_state: Optional ProcessingStateManager instance (for testing)
+            command_handler: Optional CommandHandler instance (for testing)
+            placeholder_hints: Optional PlaceholderHints instance (for testing)
+            codebase_sdk: Optional CodebaseSDK instance (for testing)
+            deps: Optional AgentDeps instance (for testing)
+        """
         super().__init__()
-        # Get the model configuration and services
-        model_config = get_provider_model()
-        # Use filtered service in TUI to restrict access to CWD codebase only
-        storage_dir = get_shotgun_home() / "codebases"
-        codebase_service = FilteredCodebaseService(storage_dir)
-        self.codebase_sdk = CodebaseSDK()
 
-        # Create shared deps without system_prompt_fn (agents provide their own)
-        # We need a placeholder system_prompt_fn to satisfy the field requirement
-        def _placeholder_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
-            raise RuntimeError(
-                "This should not be called - agents provide their own system_prompt_fn"
-            )
-
-        self.deps = AgentDeps(
-            interactive_mode=True,
-            is_tui_context=True,
-            llm_model=model_config,
-            codebase_service=codebase_service,
-            system_prompt_fn=_placeholder_system_prompt_fn,
+        # Create or use injected dependencies
+        self.deps = deps if deps is not None else create_default_tui_deps()
+        self.codebase_sdk = codebase_sdk if codebase_sdk is not None else CodebaseSDK()
+        self.agent_manager = (
+            agent_manager
+            if agent_manager is not None
+            else AgentManager(deps=self.deps, initial_type=self.mode)
         )
-        self.agent_manager = AgentManager(deps=self.deps, initial_type=self.mode)
-        self.command_handler = CommandHandler()
-        self.placeholder_hints = PlaceholderHints()
-        self.conversation_manager = ConversationManager()
-        self.processing_state = ProcessingStateManager(
-            self, telemetry_context={"agent_mode": self.mode.value}
+        self.command_handler = (
+            command_handler if command_handler is not None else CommandHandler()
+        )
+        self.placeholder_hints = (
+            placeholder_hints if placeholder_hints is not None else PlaceholderHints()
+        )
+        self.conversation_manager = (
+            conversation_manager
+            if conversation_manager is not None
+            else ConversationManager()
+        )
+        self.processing_state = (
+            processing_state
+            if processing_state is not None
+            else ProcessingStateManager(
+                self, telemetry_context={"agent_mode": self.mode.value}
+            )
         )
         self.continue_session = continue_session
         self.force_reindex = force_reindex
