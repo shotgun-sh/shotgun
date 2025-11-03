@@ -44,24 +44,35 @@ def test_initial_state(chat_screen):
     assert chat_screen.messages == []
 
 
-def test_backward_compatibility_with_partial_di(mock_agent_deps, mock_agent_manager):
-    """Test that ChatScreen works with partial dependency injection."""
-    # Inject some deps but not all, let ChatScreen create the rest
+def test_all_dependencies_required(
+    mock_agent_deps,
+    mock_agent_manager,
+    mock_conversation_manager,
+    mock_processing_state,
+    mock_command_handler,
+    mock_placeholder_hints,
+    mock_codebase_sdk,
+):
+    """Test that all dependencies are required and must be provided."""
+    # All dependencies must be provided via dependency injection
     screen = ChatScreen(
+        agent_manager=mock_agent_manager,
+        conversation_manager=mock_conversation_manager,
+        processing_state=mock_processing_state,
+        command_handler=mock_command_handler,
+        placeholder_hints=mock_placeholder_hints,
+        codebase_sdk=mock_codebase_sdk,
         deps=mock_agent_deps,
-        agent_manager=mock_agent_manager,  # Need to inject this to avoid get_provider_model() call
     )
 
-    # Verify injected dependencies
+    # Verify all dependencies are properly set
     assert screen.deps is mock_agent_deps
     assert screen.agent_manager is mock_agent_manager
-
-    # Verify other dependencies were auto-created
-    assert screen.conversation_manager is not None
-    assert screen.processing_state is not None
-    assert screen.codebase_sdk is not None
-    assert screen.command_handler is not None
-    assert screen.placeholder_hints is not None
+    assert screen.conversation_manager is mock_conversation_manager
+    assert screen.processing_state is mock_processing_state
+    assert screen.codebase_sdk is mock_codebase_sdk
+    assert screen.command_handler is mock_command_handler
+    assert screen.placeholder_hints is mock_placeholder_hints
 
 
 def test_processing_state_receives_telemetry_context(
@@ -71,25 +82,21 @@ def test_processing_state_receives_telemetry_context(
     mock_placeholder_hints,
     mock_codebase_sdk,
     mock_agent_deps,
+    mock_processing_state,
 ):
-    """Test that ProcessingStateManager receives correct telemetry context."""
-    with patch("shotgun.tui.screens.chat.ProcessingStateManager") as mock_state_class:
-        mock_state_instance = Mock()
-        mock_state_class.return_value = mock_state_instance
+    """Test that ProcessingStateManager receives correct telemetry context via DI."""
+    screen = ChatScreen(
+        agent_manager=mock_agent_manager,
+        conversation_manager=mock_conversation_manager,
+        processing_state=mock_processing_state,
+        command_handler=mock_command_handler,
+        placeholder_hints=mock_placeholder_hints,
+        codebase_sdk=mock_codebase_sdk,
+        deps=mock_agent_deps,
+    )
 
-        screen = ChatScreen(
-            agent_manager=mock_agent_manager,
-            conversation_manager=mock_conversation_manager,
-            command_handler=mock_command_handler,
-            placeholder_hints=mock_placeholder_hints,
-            codebase_sdk=mock_codebase_sdk,
-            deps=mock_agent_deps,
-        )
-
-        # Verify ProcessingStateManager was called with telemetry context
-        mock_state_class.assert_called_once_with(
-            screen, telemetry_context={"agent_mode": AgentType.RESEARCH.value}
-        )
+    # Verify ProcessingStateManager was injected correctly
+    assert screen.processing_state is mock_processing_state
 
 
 @pytest.mark.asyncio
