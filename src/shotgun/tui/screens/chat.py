@@ -634,15 +634,7 @@ class ChatScreen(Screen[None]):
                 f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)"
             )
 
-            # Show notification with stats (always)
-            self.notify(
-                f"✓ Compacted {original_count} → {compacted_count} messages "
-                f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)",
-                severity="information",
-                timeout=5,
-            )
-
-            # Add persistent hint message with stats (always)
+            # Add persistent hint message with stats
             self.mount_hint(
                 f"✓ Compacted conversation: {original_count} → {compacted_count} messages "
                 f"({message_reduction:.0f}% message reduction, {token_reduction:.0f}% token reduction)"

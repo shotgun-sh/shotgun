@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
 
 from shotgun.agents.config.models import ModelConfig
 from shotgun.agents.history.token_counting.utils import count_tokens_from_messages
+from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -37,7 +38,7 @@ class ContextAnalyzer:
         """
         self.model_config = model_config
 
-    def _allocate_tokens_from_usage(
+    async def _allocate_tokens_from_usage(
         self,
         message_history: list[ModelMessage],
     ) -> TokenAllocation:
@@ -50,6 +51,8 @@ class ContextAnalyzer:
         1. Use the LAST response's input_tokens as the ground truth total
         2. Calculate proportions based on content size across ALL requests
         3. Allocate the ground truth total proportionally
+
+        If usage data is missing or zero (e.g., after compaction), falls back to token estimation.
 
         Args:
             message_history: List of actual messages from conversation
@@ -78,6 +81,12 @@ class ContextAnalyzer:
                 f"message_count={len(message_history)}, "
                 f"response_count={sum(1 for m in message_history if isinstance(m, ModelResponse))}"
             )
+            # Fallback to token estimation
+            logger.info("[ANALYZER] Falling back to token estimation")
+            last_input_tokens = await estimate_tokens_from_messages(
+                message_history, self.model_config
+            )
+            logger.debug(f"[ANALYZER] Estimated tokens: {last_input_tokens}")
 
         # Step 2: Calculate total output tokens (sum across all responses)
         for msg in message_history:
@@ -347,7 +356,7 @@ class ContextAnalyzer:
         )
 
         # Use actual API usage data for accurate token counting (avoids synthetic message overhead)
-        usage_tokens = self._allocate_tokens_from_usage(message_history)
+        usage_tokens = await self._allocate_tokens_from_usage(message_history)
 
         user_tokens = usage_tokens.user
         agent_response_tokens = usage_tokens.agent_responses
