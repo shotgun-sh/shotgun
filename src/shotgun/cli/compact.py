@@ -3,7 +3,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from pydantic_ai.usage import RequestUsage
@@ -65,7 +65,7 @@ def compact(
         raise typer.Exit(code=1) from e
 
 
-async def compact_conversation() -> dict:
+async def compact_conversation() -> dict[str, Any]:
     """Compact the conversation and return statistics.
 
     Returns:
@@ -101,7 +101,7 @@ async def compact_conversation() -> dict:
     # since we only need the model config and message history
     # Create a minimal context object for compaction
     class CompactContext:
-        def __init__(self, model_config, usage):
+        def __init__(self, model_config: Any, usage: RequestUsage) -> None:
             self.deps = type("Deps", (), {"llm_model": model_config})()
             self.usage = usage
 
@@ -157,7 +157,7 @@ async def compact_conversation() -> dict:
     }
 
 
-def format_markdown(result: dict) -> str:
+def format_markdown(result: dict[str, Any]) -> str:
     """Format compaction result as markdown.
 
     Args:

@@ -1,10 +1,14 @@
 """Reusable confirmation dialog for destructive actions in the TUI."""
 
+from typing import Literal
+
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
+
+ButtonVariant = Literal["default", "primary", "success", "warning", "error"]
 
 
 class ConfirmationDialog(ModalScreen[bool]):
@@ -91,7 +95,7 @@ class ConfirmationDialog(ModalScreen[bool]):
         message: str,
         confirm_label: str = "Confirm",
         cancel_label: str = "Cancel",
-        confirm_variant: str = "warning",
+        confirm_variant: ButtonVariant = "warning",
         danger: bool = False,
     ) -> None:
         """Initialize the confirmation dialog.
