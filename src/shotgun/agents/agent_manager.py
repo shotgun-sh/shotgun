@@ -792,7 +792,9 @@ class AgentManager(Widget):
         # Post final UI update after compaction completes
         # This ensures widgets that depend on message_history (like context indicator)
         # receive the updated history after compaction
-        logger.debug("Posting final UI update after compaction with updated message_history")
+        logger.debug(
+            "Posting final UI update after compaction with updated message_history"
+        )
         self._post_messages_updated(file_operations)
 
         return result

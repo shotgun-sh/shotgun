@@ -717,10 +717,14 @@ class ChatScreen(Screen[None]):
 
             # Get model display name for user feedback
             model_spec = MODEL_SPECS.get(result.new_model)
-            model_display = model_spec.short_name if model_spec else str(result.new_model)
+            model_display = (
+                model_spec.short_name if model_spec else str(result.new_model)
+            )
 
             # Format provider information
-            key_method = "Shotgun Account" if result.key_provider == "shotgun" else "BYOK"
+            key_method = (
+                "Shotgun Account" if result.key_provider == "shotgun" else "BYOK"
+            )
             provider_display = result.provider.value.title()
 
             # Track model switch in telemetry

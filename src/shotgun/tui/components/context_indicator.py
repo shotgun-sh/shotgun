@@ -81,7 +81,9 @@ class ContextIndicator(Static):
         if self.context_analysis is None:
             if self.model_name:
                 model_spec = MODEL_SPECS.get(self.model_name)
-                model_display = model_spec.short_name if model_spec else str(self.model_name)
+                model_display = (
+                    model_spec.short_name if model_spec else str(self.model_name)
+                )
                 self.update(f"[bold]{model_display}[/bold]")
             else:
                 self.update("")
@@ -113,7 +115,9 @@ class ContextIndicator(Static):
         # Add model name if available
         if self.model_name:
             model_spec = MODEL_SPECS.get(self.model_name)
-            model_display = model_spec.short_name if model_spec else str(self.model_name)
+            model_display = (
+                model_spec.short_name if model_spec else str(self.model_name)
+            )
             parts.extend(
                 [
                     "[$foreground-muted]|[/]",
