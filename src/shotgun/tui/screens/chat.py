@@ -450,10 +450,17 @@ class ChatScreen(Screen[None]):
 
     def watch_working(self, is_working: bool) -> None:
         """Show or hide the spinner based on working state."""
+        logger.debug(f"[WATCH] watch_working called - is_working={is_working}")
         if self.is_mounted:
             spinner = self.query_one("#spinner")
+            logger.debug(
+                f"[WATCH] Before update - display={spinner.display}, classes={spinner.classes}"
+            )
             spinner.set_classes("" if is_working else "hidden")
             spinner.display = is_working
+            logger.debug(
+                f"[WATCH] After update - display={spinner.display}, classes={spinner.classes}"
+            )
 
             # Update the status bar to show/hide "ESC to stop"
             status_bar = self.query_one(StatusBar)
@@ -517,7 +524,16 @@ class ChatScreen(Screen[None]):
     @work
     async def action_compact_conversation(self) -> None:
         """Compact the conversation history to reduce size."""
+        logger.debug(f"[COMPACT] Starting compaction - working={self.working}")
+
         try:
+            # Show spinner and enable ESC cancellation
+            self.working = True
+            from textual.worker import get_current_worker
+
+            self._current_worker = get_current_worker()
+            logger.debug(f"[COMPACT] Set working=True - working={self.working}")
+
             # Get current message count and tokens
             original_count = len(self.agent_manager.message_history)
             original_tokens = await estimate_tokens_from_messages(
@@ -531,14 +547,42 @@ class ChatScreen(Screen[None]):
 
             # Post compaction started event
             self.agent_manager.post_message(CompactionStartedMessage())
+            logger.debug("[COMPACT] Posted CompactionStartedMessage")
 
             # Apply compaction with force=True to bypass threshold checks
             compacted_messages = await apply_persistent_compaction(
                 self.agent_manager.message_history, self.deps, force=True
             )
 
+            logger.debug(
+                f"[COMPACT] Compacted messages: count={len(compacted_messages)}, "
+                f"last_message_type={type(compacted_messages[-1]).__name__ if compacted_messages else 'None'}"
+            )
+
+            # Check last response usage
+            from pydantic_ai.messages import ModelResponse
+
+            last_response = next(
+                (
+                    msg
+                    for msg in reversed(compacted_messages)
+                    if isinstance(msg, ModelResponse)
+                ),
+                None,
+            )
+            if last_response:
+                logger.debug(
+                    f"[COMPACT] Last response has usage: {last_response.usage is not None}, "
+                    f"usage={last_response.usage if last_response.usage else 'None'}"
+                )
+            else:
+                logger.warning(
+                    "[COMPACT] No ModelResponse found in compacted messages!"
+                )
+
             # Update agent manager's message history
             self.agent_manager.message_history = compacted_messages
+            logger.debug("[COMPACT] Updated agent_manager.message_history")
 
             # Calculate after metrics
             compacted_count = len(compacted_messages)
@@ -578,6 +622,11 @@ class ChatScreen(Screen[None]):
                     file_operations=None,
                 )
             )
+            logger.debug("[COMPACT] Posted MessageHistoryUpdated event")
+
+            # Force immediate context indicator update
+            logger.debug("[COMPACT] Calling update_context_indicator()")
+            self.update_context_indicator()
 
             # Log compaction completion
             logger.info(
@@ -602,6 +651,11 @@ class ChatScreen(Screen[None]):
         except Exception as e:
             logger.error(f"Failed to compact conversation: {e}", exc_info=True)
             self.notify(f"Failed to compact: {e}", severity="error")
+        finally:
+            # Hide spinner
+            self.working = False
+            self._current_worker = None
+            logger.debug(f"[COMPACT] Set working=False - working={self.working}")
 
     @work
     async def action_clear_conversation(self) -> None:
@@ -652,13 +706,31 @@ class ChatScreen(Screen[None]):
     @work(exclusive=False)
     async def update_context_indicator(self) -> None:
         """Update the context indicator with current usage data."""
+        logger.debug("[CONTEXT] update_context_indicator called")
         try:
             context_indicator = self.query_one(ContextIndicator)
+            logger.debug(
+                f"[CONTEXT] Getting context analysis - "
+                f"message_history_count={len(self.agent_manager.message_history)}"
+            )
             analysis = await self.agent_manager.get_context_analysis()
+
+            if analysis:
+                logger.debug(
+                    f"[CONTEXT] Analysis received - "
+                    f"agent_context_tokens={analysis.agent_context_tokens}, "
+                    f"max_usable_tokens={analysis.max_usable_tokens}, "
+                    f"percentage={round((analysis.agent_context_tokens / analysis.max_usable_tokens) * 100, 1) if analysis.max_usable_tokens > 0 else 0}%"
+                )
+            else:
+                logger.warning("[CONTEXT] Analysis is None!")
+
             model_name = self.deps.llm_model.name
             context_indicator.update_context(analysis, model_name)
         except Exception as e:
-            logger.debug(f"Failed to update context indicator: {e}")
+            logger.error(
+                f"[CONTEXT] Failed to update context indicator: {e}", exc_info=True
+            )
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -814,10 +886,16 @@ class ChatScreen(Screen[None]):
         """Update spinner text when compaction starts."""
         try:
             spinner = self.query_one("#spinner", Spinner)
+            logger.debug(
+                f"[COMPACT] Spinner found - text={spinner.text}, display={spinner.display}"
+            )
             spinner.text = "Compacting Conversation..."
-        except Exception:  # noqa: S110
+            logger.debug(
+                f"[COMPACT] Spinner text updated - text={spinner.text}, display={spinner.display}"
+            )
+        except Exception as e:  # noqa: S110
             # If spinner not found or any error, silently continue
-            pass
+            logger.error(f"[COMPACT] Failed to update spinner: {e}")
 
     @on(CompactionCompletedMessage)
     def handle_compaction_completed(self, event: CompactionCompletedMessage) -> None:

@@ -64,7 +64,20 @@ class ContextAnalyzer:
         for msg in reversed(message_history):
             if isinstance(msg, ModelResponse) and msg.usage:
                 last_input_tokens = msg.usage.input_tokens + msg.usage.cache_read_tokens
+                logger.debug(
+                    f"[ANALYZER] Found last response with usage - "
+                    f"input_tokens={msg.usage.input_tokens}, "
+                    f"cache_read_tokens={msg.usage.cache_read_tokens}, "
+                    f"total={last_input_tokens}"
+                )
                 break
+
+        if last_input_tokens == 0:
+            logger.warning(
+                f"[ANALYZER] No usage data found in message history! "
+                f"message_count={len(message_history)}, "
+                f"response_count={sum(1 for m in message_history if isinstance(m, ModelResponse))}"
+            )
 
         # Step 2: Calculate total output tokens (sum across all responses)
         for msg in message_history:
