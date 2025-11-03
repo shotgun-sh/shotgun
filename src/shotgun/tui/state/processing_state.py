@@ -154,7 +154,9 @@ class ProcessingStateManager:
             text: New text to display in spinner
         """
         if not self._working:
-            logger.warning(f"Attempted to update spinner text while not working: {text}")
+            logger.warning(
+                f"Attempted to update spinner text while not working: {text}"
+            )
             return
 
         if self._spinner_widget:
