@@ -15,8 +15,13 @@ from pydantic_ai.messages import (
     TextPart,
 )
 
-from shotgun.agents.agent_manager import AgentManager, AgentType, MessageHistoryUpdated
-from shotgun.agents.config.models import ProviderType
+from shotgun.agents.agent_manager import (
+    AgentManager,
+    AgentType,
+    MessageHistoryUpdated,
+    ModelConfigUpdated,
+)
+from shotgun.agents.config.models import KeyProvider, ModelName, ProviderType
 from shotgun.agents.conversation_history import ConversationState
 from shotgun.agents.models import AgentDeps, AgentResponse
 from shotgun.agents.usage_manager import SessionUsageManager
@@ -563,6 +568,48 @@ def test_message_history_updated():
 
     assert event.messages == messages
     assert event.agent_type == AgentType.RESEARCH
+
+
+def test_model_config_updated():
+    """Test ModelConfigUpdated message."""
+    mock_model_config = MagicMock()
+    mock_model_config.provider = ProviderType.ANTHROPIC
+    mock_model_config.key_provider = KeyProvider.BYOK
+
+    event = ModelConfigUpdated(
+        old_model=ModelName.CLAUDE_OPUS_4_1,
+        new_model=ModelName.CLAUDE_SONNET_4_5,
+        provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
+        model_config=mock_model_config,
+    )
+
+    assert event.old_model == ModelName.CLAUDE_OPUS_4_1
+    assert event.new_model == ModelName.CLAUDE_SONNET_4_5
+    assert event.provider == ProviderType.ANTHROPIC
+    assert event.key_provider == KeyProvider.BYOK
+    assert event.model_config == mock_model_config
+
+
+def test_model_config_updated_no_old_model():
+    """Test ModelConfigUpdated message with no old model (first selection)."""
+    mock_model_config = MagicMock()
+    mock_model_config.provider = ProviderType.OPENAI
+    mock_model_config.key_provider = KeyProvider.SHOTGUN
+
+    event = ModelConfigUpdated(
+        old_model=None,
+        new_model=ModelName.GPT_5,
+        provider=ProviderType.OPENAI,
+        key_provider=KeyProvider.SHOTGUN,
+        model_config=mock_model_config,
+    )
+
+    assert event.old_model is None
+    assert event.new_model == ModelName.GPT_5
+    assert event.provider == ProviderType.OPENAI
+    assert event.key_provider == KeyProvider.SHOTGUN
+    assert event.model_config == mock_model_config
 
 
 @patch("shotgun.agents.agent_manager.create_export_agent")

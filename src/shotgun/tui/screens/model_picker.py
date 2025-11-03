@@ -11,9 +11,13 @@ from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import Button, Label, ListItem, ListView, Static
 
+from shotgun.agents.agent_manager import ModelConfigUpdated
 from shotgun.agents.config import ConfigManager
 from shotgun.agents.config.models import MODEL_SPECS, ModelName, ShotgunConfig
-from shotgun.agents.config.provider import get_default_model_for_provider
+from shotgun.agents.config.provider import (
+    get_default_model_for_provider,
+    get_provider_model,
+)
 from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -319,10 +323,29 @@ class ModelPickerScreen(Screen[None]):
     def _select_model(self) -> None:
         """Save the selected model."""
         try:
+            # Get old model before updating
+            config = self.config_manager.load()
+            old_model = config.selected_model
+
+            # Update the selected model in config
             self.config_manager.update_selected_model(self.selected_model)
             self.refresh_model_labels()
             self.notify(
                 f"Selected model: {self._model_display_name(self.selected_model)}"
+            )
+
+            # Get the full model config with provider information
+            model_config = get_provider_model(self.selected_model)
+
+            # Post event to app so it bubbles to all screens (including ChatScreen)
+            self.app.post_message(
+                ModelConfigUpdated(
+                    old_model=old_model,
+                    new_model=self.selected_model,
+                    provider=model_config.provider,
+                    key_provider=model_config.key_provider,
+                    model_config=model_config,
+                )
             )
         except Exception as exc:  # pragma: no cover - defensive; textual path
             self.notify(f"Failed to select model: {exc}", severity="error")

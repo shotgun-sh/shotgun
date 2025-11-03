@@ -28,9 +28,11 @@ from shotgun.agents.agent_manager import (
     CompactionCompletedMessage,
     CompactionStartedMessage,
     MessageHistoryUpdated,
+    ModelConfigUpdated,
     PartialResponseMessage,
 )
 from shotgun.agents.config import get_provider_model
+from shotgun.agents.config.models import MODEL_SPECS
 from shotgun.agents.conversation_history import (
     ConversationHistory,
     ConversationState,
@@ -688,6 +690,57 @@ class ChatScreen(Screen[None]):
         except Exception:  # noqa: S110
             # If spinner not found or any error, silently continue
             pass
+
+    @on(ModelConfigUpdated)
+    async def handle_model_config_updated(self, event: ModelConfigUpdated) -> None:
+        """Handle AI model configuration changes.
+
+        Updates the agent manager's model configuration and refreshes the context indicator.
+        """
+        try:
+            # Update the model configuration in dependencies
+            self.deps.llm_model = event.model_config
+
+            # Update the agent manager's model configuration
+            self.agent_manager.deps.llm_model = event.model_config
+
+            # Directly update the context indicator with new model
+            # Get current analysis from agent manager
+            context_indicator = self.query_one(ContextIndicator)
+            analysis = await self.agent_manager.get_context_analysis()
+            context_indicator.update_context(analysis, event.new_model)
+
+            # Get model display name for user feedback
+            model_spec = MODEL_SPECS.get(event.new_model)
+            model_display = model_spec.short_name if model_spec else str(event.new_model)
+
+            # Format provider information
+            key_method = "Shotgun Account" if event.key_provider == "shotgun" else "BYOK"
+            provider_display = event.provider.value.title()
+
+            # Track model switch in telemetry
+            track_event(
+                "model_switched",
+                {
+                    "old_model": str(event.old_model) if event.old_model else None,
+                    "new_model": str(event.new_model),
+                    "provider": event.provider.value,
+                    "key_provider": event.key_provider.value,
+                },
+            )
+
+            # Show confirmation to user with provider info
+            self.agent_manager.add_hint_message(
+                HintMessage(
+                    message=f"✓ Switched to {model_display} ({provider_display}, {key_method})"
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to handle model config update: {e}")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"⚠ Failed to update model configuration: {e}")
+            )
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:

@@ -46,7 +46,12 @@ from textual.message import Message
 from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
-from shotgun.agents.config.models import KeyProvider
+from shotgun.agents.config.models import (
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+)
 from shotgun.agents.context_analyzer import (
     ContextAnalysis,
     ContextAnalyzer,
@@ -162,6 +167,37 @@ class CompactionStartedMessage(Message):
 
 class CompactionCompletedMessage(Message):
     """Event posted when conversation compaction completes."""
+
+
+class ModelConfigUpdated(Message):
+    """Event posted when AI model configuration changes.
+
+    Includes provider information so handlers can react to provider-specific changes.
+    """
+
+    def __init__(
+        self,
+        old_model: ModelName | None,
+        new_model: ModelName,
+        provider: ProviderType,
+        key_provider: KeyProvider,
+        model_config: ModelConfig,
+    ) -> None:
+        """Initialize the model config updated event.
+
+        Args:
+            old_model: Previous model name (None if first selection)
+            new_model: New model name
+            provider: LLM provider (OpenAI, Anthropic, Google)
+            key_provider: Authentication method (BYOK or Shotgun)
+            model_config: Complete model configuration
+        """
+        super().__init__()
+        self.old_model = old_model
+        self.new_model = new_model
+        self.provider = provider
+        self.key_provider = key_provider
+        self.model_config = model_config
 
 
 @dataclass(slots=True)
