@@ -10,6 +10,7 @@ This module provides centralized management of processing state including:
 from typing import TYPE_CHECKING, Any
 
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 if TYPE_CHECKING:
     from textual.screen import Screen
@@ -44,17 +45,22 @@ class ProcessingStateManager:
         ```
     """
 
-    def __init__(self, screen: "Screen[Any]") -> None:
+    def __init__(
+        self, screen: "Screen[Any]", telemetry_context: dict[str, Any] | None = None
+    ) -> None:
         """Initialize the processing state manager.
 
         Args:
             screen: The Textual screen this manager is attached to
+            telemetry_context: Optional context to include in telemetry events
+                (e.g., {"agent_mode": "research"})
         """
         self.screen = screen
         self._working = False
         self._current_worker: Worker[Any] | None = None
         self._spinner_widget: Spinner | None = None
         self._default_spinner_text = "Processing..."
+        self._telemetry_context = telemetry_context or {}
 
     @property
     def is_working(self) -> bool:
@@ -129,8 +135,13 @@ class ProcessingStateManager:
         self._current_worker = worker
         logger.debug(f"Worker bound: {worker}")
 
-    def cancel_current_operation(self) -> bool:
+    def cancel_current_operation(self, cancel_key: str | None = None) -> bool:
         """Attempt to cancel the current operation if one is running.
+
+        Automatically tracks cancellation telemetry with context from initialization.
+
+        Args:
+            cancel_key: Optional key that triggered cancellation (e.g., "Escape")
 
         Returns:
             True if an operation was cancelled, False if no operation was running
@@ -142,6 +153,14 @@ class ProcessingStateManager:
         try:
             self._current_worker.cancel()
             logger.info("Operation cancelled successfully")
+
+            # Track cancellation event with context
+            event_data = {**self._telemetry_context}
+            if cancel_key:
+                event_data["cancel_key"] = cancel_key
+
+            track_event("agent_cancelled", event_data)
+
             return True
         except Exception as e:
             logger.error(f"Failed to cancel operation: {e}", exc_info=True)

@@ -333,7 +333,9 @@ class ChatScreen(Screen[None]):
         self.command_handler = CommandHandler()
         self.placeholder_hints = PlaceholderHints()
         self.conversation_manager = ConversationManager()
-        self.processing_state = ProcessingStateManager(self)
+        self.processing_state = ProcessingStateManager(
+            self, telemetry_context={"agent_mode": self.mode.value}
+        )
         self.continue_session = continue_session
         self.force_reindex = force_reindex
 
@@ -367,16 +369,7 @@ class ChatScreen(Screen[None]):
 
         # If escape or ctrl+c is pressed while agent is working, cancel the operation
         if event.key in (Keys.Escape, Keys.ControlC):
-            if self.processing_state.cancel_current_operation():
-                # Track cancellation event
-                track_event(
-                    "agent_cancelled",
-                    {
-                        "agent_mode": self.mode.value,
-                        "cancel_key": event.key,
-                    },
-                )
-
+            if self.processing_state.cancel_current_operation(cancel_key=event.key):
                 # Show cancellation message
                 self.mount_hint("⚠️ Cancelling operation...")
                 # Re-enable the input

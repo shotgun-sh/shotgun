@@ -1,6 +1,6 @@
 """Tests for ProcessingStateManager."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -110,7 +110,10 @@ def test_bind_worker(manager, mock_worker):
     assert manager._current_worker is mock_worker
 
 
-def test_cancel_current_operation_success(manager, mock_spinner, mock_worker):
+@patch("shotgun.tui.state.processing_state.track_event")
+def test_cancel_current_operation_success(
+    mock_track_event, manager, mock_spinner, mock_worker
+):
     """Test successfully cancelling a current operation."""
     manager.bind_spinner(mock_spinner)
     manager.start_processing("Working...")
@@ -120,6 +123,7 @@ def test_cancel_current_operation_success(manager, mock_spinner, mock_worker):
 
     assert result is True
     mock_worker.cancel.assert_called_once()
+    mock_track_event.assert_called_once_with("agent_cancelled", {})
 
 
 def test_cancel_when_not_working(manager):
@@ -202,7 +206,10 @@ def test_full_operation_lifecycle(manager, mock_spinner, mock_worker):
     assert mock_spinner.text == "Processing..."  # Reset to default
 
 
-def test_full_cancellation_lifecycle(manager, mock_spinner, mock_worker):
+@patch("shotgun.tui.state.processing_state.track_event")
+def test_full_cancellation_lifecycle(
+    mock_track_event, manager, mock_spinner, mock_worker
+):
     """Test a complete cancellation lifecycle."""
     # Setup
     manager.bind_spinner(mock_spinner)
@@ -219,3 +226,27 @@ def test_full_cancellation_lifecycle(manager, mock_spinner, mock_worker):
     # Clean up
     manager.stop_processing()
     assert manager.is_working is False
+
+
+@patch("shotgun.tui.state.processing_state.track_event")
+def test_cancel_with_telemetry_context(
+    mock_track_event, mock_screen, mock_spinner, mock_worker
+):
+    """Test cancellation tracks telemetry with context."""
+    # Create manager with telemetry context
+    manager = ProcessingStateManager(
+        mock_screen, telemetry_context={"agent_mode": "research", "extra": "data"}
+    )
+
+    manager.bind_spinner(mock_spinner)
+    manager.start_processing("Working...")
+    manager.bind_worker(mock_worker)
+
+    # Cancel with key
+    result = manager.cancel_current_operation(cancel_key="Escape")
+
+    assert result is True
+    mock_track_event.assert_called_once_with(
+        "agent_cancelled",
+        {"agent_mode": "research", "extra": "data", "cancel_key": "Escape"},
+    )
