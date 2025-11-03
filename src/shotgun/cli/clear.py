@@ -8,7 +8,9 @@ from rich.console import Console
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.logging_config import get_logger
 
-app = typer.Typer(name="clear", help="Clear the conversation history", no_args_is_help=False)
+app = typer.Typer(
+    name="clear", help="Clear the conversation history", no_args_is_help=False
+)
 logger = get_logger(__name__)
 console = Console()
 
@@ -37,10 +39,14 @@ def clear() -> None:
         manager = ConversationManager(conversation_file)
         manager.clear()
 
-        console.print("[green]✓[/green] Conversation cleared successfully", style="bold")
+        console.print(
+            "[green]✓[/green] Conversation cleared successfully", style="bold"
+        )
         logger.info("Conversation cleared successfully")
 
     except Exception as e:
-        console.print(f"[red]Error:[/red] Failed to clear conversation: {e}", style="bold")
+        console.print(
+            f"[red]Error:[/red] Failed to clear conversation: {e}", style="bold"
+        )
         logger.debug("Full traceback:", exc_info=True)
         raise typer.Exit(code=1) from e

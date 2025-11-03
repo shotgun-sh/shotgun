@@ -58,7 +58,9 @@ def compact(
         )
         raise typer.Exit(code=1) from e
     except Exception as e:
-        console.print(f"[red]Error:[/red] Failed to compact conversation: {e}", style="bold")
+        console.print(
+            f"[red]Error:[/red] Failed to compact conversation: {e}", style="bold"
+        )
         logger.debug("Full traceback:", exc_info=True)
         raise typer.Exit(code=1) from e
 
@@ -112,11 +114,14 @@ async def compact_conversation() -> dict:
 
     # Calculate after metrics
     compacted_message_count = len(compacted_messages)
-    compacted_tokens = await estimate_tokens_from_messages(compacted_messages, model_config)
+    compacted_tokens = await estimate_tokens_from_messages(
+        compacted_messages, model_config
+    )
 
     # Calculate reduction percentages
     message_reduction = (
-        ((original_message_count - compacted_message_count) / original_message_count) * 100
+        ((original_message_count - compacted_message_count) / original_message_count)
+        * 100
         if original_message_count > 0
         else 0
     )
@@ -168,14 +173,14 @@ def format_markdown(result: dict) -> str:
     return f"""# Conversation Compacted ✓
 
 ## Before
-- **Messages:** {before['messages']:,}
-- **Estimated Tokens:** {before['estimated_tokens']:,}
+- **Messages:** {before["messages"]:,}
+- **Estimated Tokens:** {before["estimated_tokens"]:,}
 
 ## After
-- **Messages:** {after['messages']:,}
-- **Estimated Tokens:** {after['estimated_tokens']:,}
+- **Messages:** {after["messages"]:,}
+- **Estimated Tokens:** {after["estimated_tokens"]:,}
 
 ## Reduction
-- **Messages:** {reduction['messages_percent']}%
-- **Tokens:** {reduction['tokens_percent']}%
+- **Messages:** {reduction["messages_percent"]}%
+- **Tokens:** {reduction["tokens_percent"]}%
 """
