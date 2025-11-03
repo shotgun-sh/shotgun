@@ -55,6 +55,7 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.utils import get_shotgun_home
 
+from ..components.context_indicator import ContextIndicator
 from ..components.prompt_input import PromptInput
 from ..components.spinner import Spinner
 from ..utils.mode_progress import PlaceholderHints
@@ -338,6 +339,8 @@ class ChatScreen(Screen[None]):
             self._load_conversation()
 
         self.call_later(self.check_if_codebase_is_indexed)
+        # Initial update of context indicator
+        self.update_context_indicator()
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
@@ -506,6 +509,17 @@ class ChatScreen(Screen[None]):
         else:
             self.notify("No context analysis available", severity="error")
 
+    @work(exclusive=False)
+    async def update_context_indicator(self) -> None:
+        """Update the context indicator with current usage data."""
+        try:
+            context_indicator = self.query_one(ContextIndicator)
+            analysis = await self.agent_manager.get_context_analysis()
+            model_name = self.deps.llm_model.name
+            context_indicator.update_context(analysis, model_name)
+        except Exception as e:
+            logger.debug(f"Failed to update context indicator: {e}")
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
@@ -526,7 +540,9 @@ class ChatScreen(Screen[None]):
                 )
                 with Grid():
                     yield ModeIndicator(mode=self.mode)
-                    yield Static("", id="indexing-job-display")
+                    with Container(id="right-footer-indicators"):
+                        yield ContextIndicator(id="context-indicator")
+                        yield Static("", id="indexing-job-display")
 
     def mount_hint(self, markdown: str) -> None:
         hint = HintMessage(message=markdown)
@@ -619,6 +635,9 @@ class ChatScreen(Screen[None]):
 
         mode_indicator = self.query_one(ModeIndicator)
         mode_indicator.refresh()
+
+        # Update context indicator
+        self.update_context_indicator()
 
         # If there are file operations, add a message showing the modified files
         if event.file_operations:

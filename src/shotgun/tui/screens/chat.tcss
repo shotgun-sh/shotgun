@@ -38,6 +38,17 @@ ModeIndicator {
 }
 
 
+#right-footer-indicators {
+  width: auto;
+  height: auto;
+  layout: vertical;
+}
+
+#context-indicator {
+  text-align: end;
+  height: 1;
+}
+
 #indexing-job-display {
   text-align: end;
 }

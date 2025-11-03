@@ -181,3 +181,24 @@ class ShotgunConfig(BaseModel):
         default=False,
         description="Whether the welcome screen has been shown to the user",
     )
+
+
+def get_model_short_name(model_name: ModelName) -> str:
+    """Convert ModelName enum to a short display name for UI.
+
+    Args:
+        model_name: The ModelName enum value
+
+    Returns:
+        Short display name suitable for UI (e.g., "Sonnet 4.5", "GPT-5")
+    """
+    short_names = {
+        ModelName.CLAUDE_SONNET_4_5: "Sonnet 4.5",
+        ModelName.CLAUDE_OPUS_4_1: "Opus 4.1",
+        ModelName.CLAUDE_HAIKU_4_5: "Haiku 4.5",
+        ModelName.GPT_5: "GPT-5",
+        ModelName.GPT_5_MINI: "GPT-5 Mini",
+        ModelName.GEMINI_2_5_PRO: "Gemini 2.5 Pro",
+        ModelName.GEMINI_2_5_FLASH: "Gemini 2.5 Flash",
+    }
+    return short_names.get(model_name, str(model_name))
