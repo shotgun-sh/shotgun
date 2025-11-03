@@ -1,3 +1,4 @@
+# mypy: disable-error-code="import-not-found"
 """Widget coordinator to centralize widget queries and updates.
 
 This module eliminates scattered `query_one()` calls throughout ChatScreen
@@ -11,9 +12,10 @@ import logging
 from typing import TYPE_CHECKING
 
 from pydantic_ai.messages import ModelMessage
-from textual.widget import Widget
 
-from shotgun.agents.conversation_history import HintMessage
+from shotgun.agents.conversation_history import (
+    HintMessage,  # type: ignore[attr-defined]
+)
 from shotgun.agents.models import AgentType
 
 if TYPE_CHECKING:

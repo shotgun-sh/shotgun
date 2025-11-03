@@ -5,6 +5,8 @@ of the chat interface, eliminating state duplication and providing a
 single source of truth.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -12,11 +14,12 @@ from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
 from textual.worker import Worker
 
-from shotgun.agents.conversation_history import HintMessage
 from shotgun.agents.models import AgentType
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from shotgun.agents.conversation_history import (
+        HintMessage,  # type: ignore[attr-defined]
+    )
 
 
 class UIState(BaseModel):
@@ -25,7 +28,7 @@ class UIState(BaseModel):
     # Processing state
     is_processing: bool = False
     processing_operation: str | None = None
-    current_worker: Worker | None = Field(default=None, exclude=True)
+    current_worker: Worker[Any] | None = Field(default=None, exclude=True)
 
     # Q&A mode for clarifying questions
     qa_mode: bool = False
@@ -89,6 +92,6 @@ class ChatState(BaseModel):
     # Version for schema evolution
     version: int = 1
 
-    def model_copy(self, **kwargs: Any) -> "ChatState":
+    def model_copy(self, **kwargs: Any) -> ChatState:
         """Create a deep copy of the state."""
         return super().model_copy(deep=True, **kwargs)

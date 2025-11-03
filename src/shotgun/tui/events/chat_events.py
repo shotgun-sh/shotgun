@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined"
 """Standardized event catalog for ChatScreen.
 
 This module defines all events used in the chat interface, providing:

@@ -8,13 +8,13 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from shotgun.agents.conversation_history import ConversationHistory
+from shotgun.agents.conversation_history import ConversationHistory, ConversationState
 from shotgun.agents.conversation_manager import ConversationManager
-from shotgun.agents.models import AgentType, ConversationState
+from shotgun.agents.models import AgentType
 
 if TYPE_CHECKING:
     from shotgun.agents.agent_manager import AgentManager
-    from shotgun.agents.usage_manager import UsageManager
+    from shotgun.agents.usage_manager import SessionUsageManager
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class ConversationService:
     def restore_conversation(
         self,
         agent_manager: "AgentManager",
-        usage_manager: "UsageManager | None" = None,
+        usage_manager: "SessionUsageManager | None" = None,
     ) -> tuple[bool, str | None, AgentType | None]:
         """Restore conversation state from disk.
 

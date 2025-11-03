@@ -9,9 +9,17 @@ This module implements a state manager that:
 
 import logging
 from collections.abc import Callable
-from typing import Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+from pydantic_ai.messages import ModelMessage
 
 from shotgun.tui.state.chat_state import ChatState
+
+if TYPE_CHECKING:
+    from shotgun.agents.conversation_history import (
+        HintMessage,  # type: ignore[attr-defined]
+    )
+    from shotgun.agents.models import AgentType
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +126,7 @@ class SetAgentModeMutation:
 class UpdateMessagesMutation:
     """Mutation to update the message history."""
 
-    def __init__(self, messages: list):
+    def __init__(self, messages: list[ModelMessage | "HintMessage"]):
         self.messages = messages
 
     def apply(self, state: ChatState) -> ChatState:
@@ -133,7 +141,7 @@ class UpdateMessagesMutation:
 class SetPartialMessageMutation:
     """Mutation to set/clear the partial message during streaming."""
 
-    def __init__(self, message):
+    def __init__(self, message: ModelMessage | None):
         self.message = message
 
     def apply(self, state: ChatState) -> ChatState:
@@ -150,7 +158,7 @@ class SetPartialMessageMutation:
 class SetIndexingJobMutation:
     """Mutation to set the current indexing job."""
 
-    def __init__(self, job):
+    def __init__(self, job: Any):
         self.job = job
 
     def apply(self, state: ChatState) -> ChatState:

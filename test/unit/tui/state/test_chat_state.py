@@ -1,6 +1,5 @@
 """Tests for ChatState models."""
 
-import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from shotgun.agents.models import AgentType

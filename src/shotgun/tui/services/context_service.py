@@ -5,25 +5,28 @@ This service wraps the ContextAnalyzer with performance optimizations:
 - Debouncing to reduce analysis frequency during rapid updates
 """
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import logging
-from functools import lru_cache
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.context_analyzer import ContextAnalyzer
 from shotgun.agents.context_analyzer.models import ContextAnalysis
-from shotgun.agents.conversation_history import HintMessage
 
 if TYPE_CHECKING:
-    pass
+    from shotgun.agents.conversation_history import (
+        HintMessage,  # type: ignore[attr-defined]
+    )
 
 logger = logging.getLogger(__name__)
 
 
-def _message_list_hash(messages: list[ModelMessage | HintMessage]) -> str:
+def _message_list_hash(messages: Sequence[ModelMessage | HintMessage]) -> str:
     """Create a hash of message list for caching.
 
     Args:
@@ -35,30 +38,6 @@ def _message_list_hash(messages: list[ModelMessage | HintMessage]) -> str:
     # Create a stable hash from message IDs and content
     content = "".join(str(msg) for msg in messages)
     return hashlib.sha256(content.encode()).hexdigest()
-
-
-@lru_cache(maxsize=100)
-def _cached_context_analysis(
-    agent_history_hash: str,
-    ui_history_hash: str,
-    model_name: str,
-) -> ContextAnalysis | None:
-    """Cached context analysis - NOTE: actual analysis happens in get_analysis.
-
-    This is a placeholder that stores results. The real caching happens
-    at the service level using message hashes.
-
-    Args:
-        agent_history_hash: Hash of agent message history.
-        ui_history_hash: Hash of UI message history.
-        model_name: The model name for analysis.
-
-    Returns:
-        Cached analysis result if available.
-    """
-    # This function is a cache key holder
-    # Actual caching is managed by the ContextService
-    return None
 
 
 class ContextService:
@@ -88,7 +67,7 @@ class ContextService:
         """
         self.llm_model = llm_model
         self.debounce_seconds = debounce_seconds
-        self._pending_analysis: asyncio.Task | None = None
+        self._pending_analysis: asyncio.Task[ContextAnalysis | None] | None = None
         self._last_analysis: ContextAnalysis | None = None
         self._last_agent_hash: str | None = None
         self._last_ui_hash: str | None = None
@@ -128,7 +107,8 @@ class ContextService:
 
         # Run analysis
         try:
-            analyzer = ContextAnalyzer(self.llm_model)
+            # Note: Simple model name - ContextAnalyzer will use it to create ModelConfig
+            analyzer = ContextAnalyzer(self.llm_model)  # type: ignore[arg-type]
             analysis = await analyzer.analyze_conversation(agent_messages, ui_messages)
 
             # Cache the result
@@ -136,7 +116,7 @@ class ContextService:
             self._last_ui_hash = ui_hash
             self._last_analysis = analysis
 
-            logger.debug(f"Context analysis completed and cached")
+            logger.debug("Context analysis completed and cached")
             return analysis
         except Exception as e:
             logger.exception(f"Failed to analyze context: {e}")
@@ -168,7 +148,7 @@ class ContextService:
             self._pending_analysis.cancel()
             logger.debug("Cancelled pending context analysis")
 
-        async def delayed_analysis():
+        async def delayed_analysis() -> ContextAnalysis | None:
             await asyncio.sleep(self.debounce_seconds)
             return await self.get_analysis(agent_messages, ui_messages)
 

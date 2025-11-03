@@ -1,6 +1,5 @@
 """Tests for ChatStateManager and mutations."""
 
-import pytest
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 from shotgun.agents.models import AgentType
