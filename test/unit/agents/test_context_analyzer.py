@@ -98,7 +98,9 @@ async def test_analyze_system_status(model_config: ModelConfig) -> None:
 
     # Create test messages with system status
     message_history = [
-        ModelRequest(parts=[SystemStatusPrompt(content="Current files: main.py, test.py")]),
+        ModelRequest(
+            parts=[SystemStatusPrompt(content="Current files: main.py, test.py")]
+        ),
         ModelRequest(parts=[UserPromptPart(content="What files are available?")]),
         ModelResponse(parts=[TextPart(content="You have main.py and test.py")]),
     ]
@@ -127,7 +129,15 @@ async def test_analyze_tool_calls(model_config: ModelConfig) -> None:
                 )
             ]
         ),
-        ModelRequest(parts=[ToolReturnPart(tool_name="file_read", content="# main.py content", tool_call_id="call_1")]),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="file_read",
+                    content="# main.py content",
+                    tool_call_id="call_1",
+                )
+            ]
+        ),
         ModelResponse(parts=[TextPart(content="Here's the content of main.py")]),
     ]
 
@@ -278,7 +288,9 @@ def test_format_analysis_excludes_zero_counts() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_analyze_multi_part_message_no_double_counting(model_config: ModelConfig) -> None:
+async def test_analyze_multi_part_message_no_double_counting(
+    model_config: ModelConfig,
+) -> None:
     """Test that messages with multiple parts are not double-counted.
 
     This is a regression test for a bug where a ModelRequest containing both
@@ -297,7 +309,9 @@ async def test_analyze_multi_part_message_no_double_counting(model_config: Model
     )
 
     # Create a simple assistant response
-    assistant_message = ModelResponse(parts=[TextPart(content="I'm doing well, thank you!")])
+    assistant_message = ModelResponse(
+        parts=[TextPart(content="I'm doing well, thank you!")]
+    )
 
     message_history = [multi_part_message, assistant_message]
 

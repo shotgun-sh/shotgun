@@ -42,7 +42,9 @@ def test_context_indicator_update_context():
     """Test updating context indicator with analysis data."""
     indicator = ContextIndicator()
 
-    analysis = create_test_analysis(agent_context_tokens=72_000, max_usable_tokens=160_000)
+    analysis = create_test_analysis(
+        agent_context_tokens=72_000, max_usable_tokens=160_000
+    )
 
     indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
 
@@ -123,7 +125,9 @@ def test_context_indicator_display_calculation():
     """
     indicator = ContextIndicator()
 
-    analysis = create_test_analysis(agent_context_tokens=80_000, max_usable_tokens=160_000)
+    analysis = create_test_analysis(
+        agent_context_tokens=80_000, max_usable_tokens=160_000
+    )
 
     indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
 
@@ -140,7 +144,9 @@ def test_context_indicator_display_without_model():
     """Test display without model name."""
     indicator = ContextIndicator()
 
-    analysis = create_test_analysis(agent_context_tokens=72_000, max_usable_tokens=160_000)
+    analysis = create_test_analysis(
+        agent_context_tokens=72_000, max_usable_tokens=160_000
+    )
 
     indicator.update_context(analysis, None)
 
@@ -157,7 +163,9 @@ def test_context_indicator_display_with_different_models():
     """Test display with different model names."""
     indicator = ContextIndicator()
 
-    analysis = create_test_analysis(agent_context_tokens=50_000, max_usable_tokens=160_000)
+    analysis = create_test_analysis(
+        agent_context_tokens=50_000, max_usable_tokens=160_000
+    )
 
     # Test with different models
     for model_name in [
@@ -177,7 +185,9 @@ def test_context_indicator_over_budget():
 
     # Simulate switching from GPT-5 (400K) to Haiku (200K) with full conversation
     # 380K tokens exceeds Haiku's 160K usable capacity (200K * 0.8)
-    analysis = create_test_analysis(agent_context_tokens=380_000, max_usable_tokens=160_000)
+    analysis = create_test_analysis(
+        agent_context_tokens=380_000, max_usable_tokens=160_000
+    )
 
     indicator.update_context(analysis, ModelName.CLAUDE_HAIKU_4_5)
 

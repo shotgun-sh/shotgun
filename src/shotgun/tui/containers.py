@@ -17,7 +17,15 @@ from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.utils import get_shotgun_home
 
 if TYPE_CHECKING:
-    from shotgun.tui.screens.chat import ChatScreen
+    pass
+
+
+# Placeholder system prompt function (agents provide their own)
+# Using Object provider to pass the function itself, not call it
+def _placeholder_system_prompt(ctx: "RunContext[AgentDeps]") -> str:
+    raise RuntimeError(
+        "This should not be called - agents provide their own system_prompt_fn"
+    )
 
 
 class TUIContainer(containers.DeclarativeContainer):
@@ -39,14 +47,7 @@ class TUIContainer(containers.DeclarativeContainer):
         FilteredCodebaseService, storage_dir=storage_dir
     )
 
-    # Placeholder system prompt function (agents provide their own)
-    system_prompt_fn = providers.Callable(
-        lambda ctx: (_ for _ in ()).throw(
-            RuntimeError(
-                "This should not be called - agents provide their own system_prompt_fn"
-            )
-        )
-    )
+    system_prompt_fn = providers.Object(_placeholder_system_prompt)
 
     # AgentDeps singleton
     agent_deps = providers.Singleton(

@@ -53,7 +53,7 @@ def test_telemetry_settings_from_env(monkeypatch):
     assert settings.posthog_api_key == "test-posthog-key"
     assert settings.posthog_project_id == "test-project-id"
     assert settings.logfire_enabled is True
-    assert settings.logfire_token == "test-logfire-token"
+    assert settings.logfire_token == "test-logfire-token"  # noqa: S105
 
 
 def test_telemetry_logfire_enabled_bool_parsing(monkeypatch):
@@ -148,17 +148,14 @@ def test_api_settings_defaults():
 
     assert settings.web_base_url == "https://api-219702594231.us-east4.run.app"
     assert (
-        settings.account_llm_base_url
-        == "https://litellm-219702594231.us-east4.run.app"
+        settings.account_llm_base_url == "https://litellm-219702594231.us-east4.run.app"
     )
 
 
 def test_api_settings_from_env(monkeypatch):
     """Test ApiSettings loads from SHOTGUN_ prefixed environment variables."""
     monkeypatch.setenv("SHOTGUN_WEB_BASE_URL", "https://custom-api.example.com")
-    monkeypatch.setenv(
-        "SHOTGUN_ACCOUNT_LLM_BASE_URL", "https://custom-llm.example.com"
-    )
+    monkeypatch.setenv("SHOTGUN_ACCOUNT_LLM_BASE_URL", "https://custom-llm.example.com")
 
     from shotgun.settings import ApiSettings
 
