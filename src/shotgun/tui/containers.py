@@ -12,8 +12,10 @@ from shotgun.agents.models import AgentDeps, AgentType
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
+from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 
 if TYPE_CHECKING:
@@ -68,6 +70,10 @@ class TUIContainer(containers.DeclarativeContainer):
 
     conversation_manager = providers.Singleton(ConversationManager)
 
+    conversation_service = providers.Factory(
+        ConversationService, conversation_manager=conversation_manager
+    )
+
     # Factory for AgentManager (needs agent_type parameter)
     agent_manager_factory = providers.Factory(
         AgentManager, deps=agent_deps, initial_type=providers.Object(AgentType.RESEARCH)
@@ -78,4 +84,10 @@ class TUIContainer(containers.DeclarativeContainer):
         ProcessingStateManager,
         screen=providers.Object(None),  # Will be overridden when creating ChatScreen
         telemetry_context=providers.Object({}),  # Will be overridden when creating
+    )
+
+    # Factory for WidgetCoordinator (needs ChatScreen reference)
+    widget_coordinator_factory = providers.Factory(
+        WidgetCoordinator,
+        screen=providers.Object(None),  # Will be overridden when creating ChatScreen
     )

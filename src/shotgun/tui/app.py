@@ -135,6 +135,8 @@ class ShotgunApp(App[None]):
         chat_screen = ChatScreen(
             agent_manager=agent_manager,
             conversation_manager=self.container.conversation_manager(),
+            conversation_service=self.container.conversation_service(),
+            widget_coordinator=self.container.widget_coordinator_factory(screen=None),
             processing_state=self.container.processing_state_factory(
                 screen=None,  # Will be set after ChatScreen is created
                 telemetry_context={"agent_mode": agent_mode.value},
@@ -147,8 +149,9 @@ class ShotgunApp(App[None]):
             force_reindex=self.force_reindex,
         )
 
-        # Update the ProcessingStateManager with the actual ChatScreen instance
+        # Update the ProcessingStateManager and WidgetCoordinator with the actual ChatScreen instance
         chat_screen.processing_state.screen = chat_screen
+        chat_screen.widget_coordinator.screen = chat_screen
 
         self.push_screen(chat_screen)
 

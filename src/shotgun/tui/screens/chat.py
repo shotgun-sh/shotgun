@@ -191,6 +191,8 @@ class ChatScreen(Screen[None]):
         self,
         agent_manager: AgentManager,
         conversation_manager: ConversationManager,
+        conversation_service: ConversationService,
+        widget_coordinator: WidgetCoordinator,
         processing_state: ProcessingStateManager,
         command_handler: CommandHandler,
         placeholder_hints: PlaceholderHints,
@@ -207,6 +209,8 @@ class ChatScreen(Screen[None]):
         Args:
             agent_manager: AgentManager instance for managing agent interactions
             conversation_manager: ConversationManager for conversation persistence
+            conversation_service: ConversationService for conversation save/load/restore
+            widget_coordinator: WidgetCoordinator for centralized widget updates
             processing_state: ProcessingStateManager for managing processing state
             command_handler: CommandHandler for handling slash commands
             placeholder_hints: PlaceholderHints for providing input hints
@@ -224,15 +228,11 @@ class ChatScreen(Screen[None]):
         self.command_handler = command_handler
         self.placeholder_hints = placeholder_hints
         self.conversation_manager = conversation_manager
+        self.conversation_service = conversation_service
+        self.widget_coordinator = widget_coordinator
         self.processing_state = processing_state
         self.continue_session = continue_session
         self.force_reindex = force_reindex
-
-        # Initialize widget coordinator for centralized widget updates
-        self.widget_coordinator = WidgetCoordinator(self)
-
-        # Initialize conversation service for persistence
-        self.conversation_service = ConversationService(conversation_manager)
 
     def on_mount(self) -> None:
         # Use widget coordinator to focus input
