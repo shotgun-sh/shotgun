@@ -304,6 +304,26 @@ class ChatScreen(Screen[None]):
     # Working state - keep reactive for Textual watchers
     working = reactive(False)
 
+    @staticmethod
+    def _create_default_deps() -> AgentDeps:
+        """Create default AgentDeps for production use."""
+        model_config = get_provider_model()
+        storage_dir = get_shotgun_home() / "codebases"
+        codebase_service = FilteredCodebaseService(storage_dir)
+
+        def _placeholder_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
+            raise RuntimeError(
+                "This should not be called - agents provide their own system_prompt_fn"
+            )
+
+        return AgentDeps(
+            interactive_mode=True,
+            is_tui_context=True,
+            llm_model=model_config,
+            codebase_service=codebase_service,
+            system_prompt_fn=_placeholder_system_prompt_fn,
+        )
+
     def __init__(
         self,
         continue_session: bool = False,
@@ -332,29 +352,7 @@ class ChatScreen(Screen[None]):
         super().__init__()
 
         # Create or use injected dependencies
-        if deps is None:
-            # Get the model configuration and services
-            model_config = get_provider_model()
-            # Use filtered service in TUI to restrict access to CWD codebase only
-            storage_dir = get_shotgun_home() / "codebases"
-            codebase_service = FilteredCodebaseService(storage_dir)
-
-            # Create shared deps without system_prompt_fn (agents provide their own)
-            # We need a placeholder system_prompt_fn to satisfy the field requirement
-            def _placeholder_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
-                raise RuntimeError(
-                    "This should not be called - agents provide their own system_prompt_fn"
-                )
-
-            deps = AgentDeps(
-                interactive_mode=True,
-                is_tui_context=True,
-                llm_model=model_config,
-                codebase_service=codebase_service,
-                system_prompt_fn=_placeholder_system_prompt_fn,
-            )
-
-        self.deps = deps
+        self.deps = deps if deps is not None else self._create_default_deps()
         self.codebase_sdk = codebase_sdk if codebase_sdk is not None else CodebaseSDK()
         self.agent_manager = (
             agent_manager
