@@ -44,19 +44,24 @@ def test_initial_state(chat_screen):
     assert chat_screen.messages == []
 
 
-def test_backward_compatibility_with_deps(mock_agent_deps):
-    """Test that ChatScreen works with only deps injected (partial DI)."""
-    # Inject only deps, let ChatScreen create the rest
-    screen = ChatScreen(deps=mock_agent_deps)
+def test_backward_compatibility_with_partial_di(mock_agent_deps, mock_agent_manager):
+    """Test that ChatScreen works with partial dependency injection."""
+    # Inject some deps but not all, let ChatScreen create the rest
+    screen = ChatScreen(
+        deps=mock_agent_deps,
+        agent_manager=mock_agent_manager,  # Need to inject this to avoid get_provider_model() call
+    )
 
-    # Verify deps is set
+    # Verify injected dependencies
     assert screen.deps is mock_agent_deps
+    assert screen.agent_manager is mock_agent_manager
 
     # Verify other dependencies were auto-created
-    assert screen.agent_manager is not None
     assert screen.conversation_manager is not None
     assert screen.processing_state is not None
     assert screen.codebase_sdk is not None
+    assert screen.command_handler is not None
+    assert screen.placeholder_hints is not None
 
 
 def test_processing_state_receives_telemetry_context(
