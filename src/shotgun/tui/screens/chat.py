@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from pydantic_ai import RunContext
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -31,7 +30,6 @@ from shotgun.agents.agent_manager import (
     ModelConfigUpdated,
     PartialResponseMessage,
 )
-from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.models import MODEL_SPECS
 from shotgun.agents.conversation_history import (
     ConversationHistory,
@@ -54,7 +52,7 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
-from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
+from shotgun.tui.dependencies import create_default_tui_deps
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.state.processing_state import ProcessingStateManager
@@ -71,30 +69,6 @@ from .chat_screen.command_providers import (
 from .confirmation_dialog import ConfirmationDialog
 
 logger = logging.getLogger(__name__)
-
-
-def _create_default_agent_deps() -> AgentDeps:
-    """Create default AgentDeps for ChatScreen production use.
-
-    Returns:
-        Configured AgentDeps with production settings for the TUI.
-    """
-    model_config = get_provider_model()
-    storage_dir = get_shotgun_home() / "codebases"
-    codebase_service = FilteredCodebaseService(storage_dir)
-
-    def _placeholder_system_prompt_fn(ctx: RunContext[AgentDeps]) -> str:
-        raise RuntimeError(
-            "This should not be called - agents provide their own system_prompt_fn"
-        )
-
-    return AgentDeps(
-        interactive_mode=True,
-        is_tui_context=True,
-        llm_model=model_config,
-        codebase_service=codebase_service,
-        system_prompt_fn=_placeholder_system_prompt_fn,
-    )
 
 
 class PromptHistory:
@@ -356,7 +330,7 @@ class ChatScreen(Screen[None]):
         super().__init__()
 
         # Create or use injected dependencies
-        self.deps = deps if deps is not None else _create_default_agent_deps()
+        self.deps = deps if deps is not None else create_default_tui_deps()
         self.codebase_sdk = codebase_sdk if codebase_sdk is not None else CodebaseSDK()
         self.agent_manager = (
             agent_manager
