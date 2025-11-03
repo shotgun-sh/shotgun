@@ -6,7 +6,9 @@ from textual.binding import Binding
 from textual.screen import Screen
 
 from shotgun.agents.config import ConfigManager, get_config_manager
+from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
+from shotgun.tui.containers import TUIContainer
 from shotgun.tui.screens.splash import SplashScreen
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 from shotgun.utils.update_checker import (
@@ -26,8 +28,9 @@ logger = get_logger(__name__)
 
 
 class ShotgunApp(App[None]):
+    # ChatScreen removed from SCREENS dict since it requires dependency injection
+    # and is instantiated manually in refresh_startup_screen()
     SCREENS = {
-        "chat": ChatScreen,
         "provider_config": ProviderConfigScreen,
         "model_picker": ModelPickerScreen,
         "directory_setup": DirectorySetupScreen,
@@ -50,6 +53,9 @@ class ShotgunApp(App[None]):
         self.no_update_check = no_update_check
         self.continue_session = continue_session
         self.force_reindex = force_reindex
+
+        # Initialize dependency injection container
+        self.container = TUIContainer()
 
         # Start async update check and install
         if not no_update_check:
@@ -116,12 +122,35 @@ class ShotgunApp(App[None]):
 
         if isinstance(self.screen, ChatScreen):
             return
-        # Pass continue_session and force_reindex flags to ChatScreen
-        self.push_screen(
-            ChatScreen(
-                continue_session=self.continue_session, force_reindex=self.force_reindex
-            )
+
+        # Create ChatScreen with all dependencies injected from container
+        # Get the default agent mode (RESEARCH)
+        agent_mode = AgentType.RESEARCH
+
+        # Create AgentManager with the correct mode
+        agent_manager = self.container.agent_manager_factory(initial_type=agent_mode)
+
+        # Create ProcessingStateManager - we'll pass the screen after creation
+        # For now, create with None and the ChatScreen will set itself
+        chat_screen = ChatScreen(
+            agent_manager=agent_manager,
+            conversation_manager=self.container.conversation_manager(),
+            processing_state=self.container.processing_state_factory(
+                screen=None,  # Will be set after ChatScreen is created
+                telemetry_context={"agent_mode": agent_mode.value},
+            ),
+            command_handler=self.container.command_handler(),
+            placeholder_hints=self.container.placeholder_hints(),
+            codebase_sdk=self.container.codebase_sdk(),
+            deps=self.container.agent_deps(),
+            continue_session=self.continue_session,
+            force_reindex=self.force_reindex,
         )
+
+        # Update the ProcessingStateManager with the actual ChatScreen instance
+        chat_screen.processing_state.screen = chat_screen
+
+        self.push_screen(chat_screen)
 
     def check_local_shotgun_directory_exists(self) -> bool:
         shotgun_dir = get_shotgun_base_path()

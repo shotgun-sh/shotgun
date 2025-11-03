@@ -1,6 +1,5 @@
 """Unit tests for the clear CLI command."""
 
-from pathlib import Path
 from unittest.mock import patch
 
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart

@@ -1,6 +1,5 @@
 """Test fixtures for TUI tests."""
 
-from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
 import pytest

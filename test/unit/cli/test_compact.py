@@ -1,13 +1,16 @@
 """Unit tests for the compact CLI command."""
 
-import json
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
-from shotgun.agents.config.models import KeyProvider, ModelConfig, ModelName, ProviderType
+from shotgun.agents.config.models import (
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+)
 from shotgun.agents.conversation_history import ConversationHistory
 from shotgun.cli.compact import compact_conversation, format_markdown
 
@@ -70,7 +73,6 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
             side_effect=[1000, 500],  # Original and compacted token counts
         ),
     ):
-
         result = await compact_conversation()
 
         assert result["success"] is True
@@ -151,7 +153,6 @@ async def test_compact_conversation_no_reduction(tmp_path, mock_conversation_his
             return_value=1000,
         ),
     ):
-
         result = await compact_conversation()
 
         assert result["success"] is True

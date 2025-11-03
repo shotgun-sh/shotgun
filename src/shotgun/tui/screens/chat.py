@@ -52,7 +52,6 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
-from shotgun.tui.dependencies import create_default_tui_deps
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.state.processing_state import ProcessingStateManager
@@ -304,57 +303,42 @@ class ChatScreen(Screen[None]):
 
     def __init__(
         self,
+        agent_manager: AgentManager,
+        conversation_manager: ConversationManager,
+        processing_state: ProcessingStateManager,
+        command_handler: CommandHandler,
+        placeholder_hints: PlaceholderHints,
+        codebase_sdk: CodebaseSDK,
+        deps: AgentDeps,
         continue_session: bool = False,
         force_reindex: bool = False,
-        agent_manager: AgentManager | None = None,
-        conversation_manager: ConversationManager | None = None,
-        processing_state: ProcessingStateManager | None = None,
-        command_handler: CommandHandler | None = None,
-        placeholder_hints: PlaceholderHints | None = None,
-        codebase_sdk: CodebaseSDK | None = None,
-        deps: AgentDeps | None = None,
     ) -> None:
         """Initialize the ChatScreen.
 
+        All dependencies must be provided via dependency injection.
+        No objects are created in the constructor.
+
         Args:
+            agent_manager: AgentManager instance for managing agent interactions
+            conversation_manager: ConversationManager for conversation persistence
+            processing_state: ProcessingStateManager for managing processing state
+            command_handler: CommandHandler for handling slash commands
+            placeholder_hints: PlaceholderHints for providing input hints
+            codebase_sdk: CodebaseSDK for codebase indexing operations
+            deps: AgentDeps configuration for agent dependencies
             continue_session: Whether to continue a previous session
             force_reindex: Whether to force reindexing of codebases
-            agent_manager: Optional AgentManager instance (for testing)
-            conversation_manager: Optional ConversationManager instance (for testing)
-            processing_state: Optional ProcessingStateManager instance (for testing)
-            command_handler: Optional CommandHandler instance (for testing)
-            placeholder_hints: Optional PlaceholderHints instance (for testing)
-            codebase_sdk: Optional CodebaseSDK instance (for testing)
-            deps: Optional AgentDeps instance (for testing)
         """
         super().__init__()
 
-        # Create or use injected dependencies
-        self.deps = deps if deps is not None else create_default_tui_deps()
-        self.codebase_sdk = codebase_sdk if codebase_sdk is not None else CodebaseSDK()
-        self.agent_manager = (
-            agent_manager
-            if agent_manager is not None
-            else AgentManager(deps=self.deps, initial_type=self.mode)
-        )
-        self.command_handler = (
-            command_handler if command_handler is not None else CommandHandler()
-        )
-        self.placeholder_hints = (
-            placeholder_hints if placeholder_hints is not None else PlaceholderHints()
-        )
-        self.conversation_manager = (
-            conversation_manager
-            if conversation_manager is not None
-            else ConversationManager()
-        )
-        self.processing_state = (
-            processing_state
-            if processing_state is not None
-            else ProcessingStateManager(
-                self, telemetry_context={"agent_mode": self.mode.value}
-            )
-        )
+        # All dependencies are now required and injected
+        self.deps = deps
+        self.codebase_sdk = codebase_sdk
+        self.agent_manager = agent_manager
+        self.command_handler = command_handler
+        self.placeholder_hints = placeholder_hints
+        self.conversation_manager = conversation_manager
+        self.processing_state = processing_state
         self.continue_session = continue_session
         self.force_reindex = force_reindex
 
