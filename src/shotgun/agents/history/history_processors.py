@@ -127,6 +127,7 @@ calculate_max_summarization_tokens = _calculate_max_summarization_tokens
 async def token_limit_compactor(
     ctx: ContextProtocol,
     messages: list[ModelMessage],
+    force: bool = False,
 ) -> list[ModelMessage]:
     """Compact message history based on token limits with incremental processing.
 
@@ -139,6 +140,7 @@ async def token_limit_compactor(
     Args:
         ctx: Run context with usage information and dependencies
         messages: Current conversation history
+        force: If True, force compaction even if below token threshold
 
     Returns:
         Compacted list of messages within token limits
@@ -169,7 +171,7 @@ async def token_limit_compactor(
         )
 
         # Only do incremental compaction if post-summary conversation exceeds threshold
-        if post_summary_tokens < max_tokens:
+        if post_summary_tokens < max_tokens and not force:
             logger.debug(
                 f"Post-summary conversation under threshold ({post_summary_tokens} < {max_tokens}), "
                 f"keeping all {len(messages)} messages"
@@ -373,7 +375,7 @@ async def token_limit_compactor(
         )
 
         # Only do full compaction if total conversation exceeds threshold
-        if total_tokens < max_tokens:
+        if total_tokens < max_tokens and not force:
             logger.debug(
                 f"Total conversation under threshold ({total_tokens} < {max_tokens}), "
                 f"keeping all {len(messages)} messages"

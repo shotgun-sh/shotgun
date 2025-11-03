@@ -109,8 +109,8 @@ async def compact_conversation() -> dict[str, Any]:
     usage = RequestUsage(input_tokens=original_tokens, output_tokens=0)
     ctx = CompactContext(model_config, usage)
 
-    # Apply compaction
-    compacted_messages = await token_limit_compactor(ctx, agent_messages)
+    # Apply compaction with force=True to bypass threshold checks
+    compacted_messages = await token_limit_compactor(ctx, agent_messages, force=True)
 
     # Calculate after metrics
     compacted_message_count = len(compacted_messages)

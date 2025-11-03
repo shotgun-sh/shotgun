@@ -527,9 +527,9 @@ class ChatScreen(Screen[None]):
             # Post compaction started event
             self.agent_manager.post_message(CompactionStartedMessage())
 
-            # Apply compaction
+            # Apply compaction with force=True to bypass threshold checks
             compacted_messages = await apply_persistent_compaction(
-                self.agent_manager.message_history, self.deps
+                self.agent_manager.message_history, self.deps, force=True
             )
 
             # Update agent manager's message history
