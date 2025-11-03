@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic_ai.messages import ModelMessage
 
-from shotgun.agents.conversation_history import HintMessage  # type: ignore[attr-defined]
+from shotgun.agents.conversation_history import HintMessage
 from shotgun.tui.state.chat_state import ChatState
 
 if TYPE_CHECKING:

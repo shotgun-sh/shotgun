@@ -8,17 +8,14 @@ single source of truth.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
 from textual.worker import Worker
 
-from shotgun.agents.conversation_history import HintMessage  # type: ignore[attr-defined]
+from shotgun.agents.conversation_history import HintMessage
 from shotgun.agents.models import AgentType
-
-if TYPE_CHECKING:
-    pass
 
 
 class UIState(BaseModel):

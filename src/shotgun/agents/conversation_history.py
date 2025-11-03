@@ -16,6 +16,8 @@ from pydantic_core import to_jsonable_python
 
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
+__all__ = ["HintMessage", "ConversationHistory"]
+
 logger = logging.getLogger(__name__)
 
 SerializedMessage = dict[str, Any]
