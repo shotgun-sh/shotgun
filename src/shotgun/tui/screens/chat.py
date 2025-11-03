@@ -30,10 +30,6 @@ from shotgun.agents.agent_manager import (
     PartialResponseMessage,
 )
 from shotgun.agents.config.models import MODEL_SPECS
-from shotgun.agents.conversation_history import (
-    ConversationHistory,
-    ConversationState,
-)
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.agents.history.compaction import apply_persistent_compaction
 from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
@@ -58,6 +54,7 @@ from shotgun.tui.components.spinner import Spinner
 from shotgun.tui.components.status_bar import StatusBar
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
+from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
@@ -233,6 +230,9 @@ class ChatScreen(Screen[None]):
 
         # Initialize widget coordinator for centralized widget updates
         self.widget_coordinator = WidgetCoordinator(self)
+
+        # Initialize conversation service for persistence
+        self.conversation_service = ConversationService(conversation_manager)
 
     def on_mount(self) -> None:
         # Use widget coordinator to focus input
@@ -535,10 +535,8 @@ class ChatScreen(Screen[None]):
             self.agent_manager.message_history = []
             self.agent_manager.ui_message_history = []
 
-            # Delete conversation file
-            conversation_file = get_shotgun_home() / "conversation.json"
-            manager = ConversationManager(conversation_file)
-            manager.clear()
+            # Use conversation service to clear conversation
+            self.conversation_service.clear_conversation()
 
             # Post message history updated event to refresh UI
             self.agent_manager.post_message(
@@ -1176,58 +1174,21 @@ class ChatScreen(Screen[None]):
 
     def _save_conversation(self) -> None:
         """Save the current conversation to persistent storage."""
-        # Get conversation state from agent manager
-        state = self.agent_manager.get_conversation_state()
-
-        # Create conversation history object
-        conversation = ConversationHistory(
-            last_agent_model=state.agent_type,
-        )
-        conversation.set_agent_messages(state.agent_messages)
-        conversation.set_ui_messages(state.ui_messages)
-
-        # Save to file
-        self.conversation_manager.save(conversation)
+        # Use conversation service for saving
+        self.conversation_service.save_conversation(self.agent_manager)
 
     def _load_conversation(self) -> None:
         """Load conversation from persistent storage."""
-        conversation = self.conversation_manager.load()
-        if conversation is None:
-            # Check if file existed but was corrupted (backup was created)
-            backup_path = self.conversation_manager.conversation_path.with_suffix(
-                ".json.backup"
-            )
-            if backup_path.exists():
-                # File was corrupted - show friendly notification
-                self.mount_hint(
-                    "⚠️ Previous session was corrupted and has been backed up. Starting fresh conversation."
-                )
-            return
+        # Use conversation service for restoration
+        success, error_msg, restored_type = self.conversation_service.restore_conversation(
+            self.agent_manager, self.deps.usage_manager
+        )
 
-        try:
-            # Restore agent state
-            agent_messages = conversation.get_agent_messages()
-            ui_messages = conversation.get_ui_messages()
-
-            # Create ConversationState for restoration
-            state = ConversationState(
-                agent_messages=agent_messages,
-                ui_messages=ui_messages,
-                agent_type=conversation.last_agent_model,
-            )
-
-            self.agent_manager.restore_conversation_state(state)
-
-            # Update the current mode
-            self.mode = AgentType(conversation.last_agent_model)
-            self.deps.usage_manager.restore_usage_state()
-
-        except Exception as e:  # pragma: no cover
-            # If anything goes wrong during restoration, log it and continue
-            logger.error("Failed to restore conversation state: %s", e)
-            self.mount_hint(
-                "⚠️ Could not restore previous session. Starting fresh conversation."
-            )
+        if not success and error_msg:
+            self.mount_hint(error_msg)
+        elif success and restored_type:
+            # Update the current mode to match restored conversation
+            self.mode = restored_type
 
 
 def help_text_with_codebase(already_indexed: bool = False) -> str:
