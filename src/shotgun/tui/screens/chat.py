@@ -60,6 +60,7 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 
 from .chat_screen.command_providers import (
@@ -230,8 +231,12 @@ class ChatScreen(Screen[None]):
         self.continue_session = continue_session
         self.force_reindex = force_reindex
 
+        # Initialize widget coordinator for centralized widget updates
+        self.widget_coordinator = WidgetCoordinator(self)
+
     def on_mount(self) -> None:
-        self.query_one(PromptInput).focus(scroll_visible=True)
+        # Use widget coordinator to focus input
+        self.widget_coordinator.update_prompt_input(focus=True)
         # Hide spinner initially
         self.query_one("#spinner").display = False
 
@@ -252,8 +257,7 @@ class ChatScreen(Screen[None]):
         if event.key in (Keys.Escape, Keys.ControlC) and self.qa_mode:
             self._exit_qa_mode()
             # Re-enable the input
-            prompt_input = self.query_one(PromptInput)
-            prompt_input.focus()
+            self.widget_coordinator.update_prompt_input(focus=True)
             # Prevent the event from propagating (don't quit the app)
             event.stop()
             return
@@ -264,8 +268,7 @@ class ChatScreen(Screen[None]):
                 # Show cancellation message
                 self.mount_hint("⚠️ Cancelling operation...")
                 # Re-enable the input
-                prompt_input = self.query_one(PromptInput)
-                prompt_input.focus()
+                self.widget_coordinator.update_prompt_input(focus=True)
                 # Prevent the event from propagating (don't quit the app)
                 event.stop()
 
@@ -321,53 +324,27 @@ class ChatScreen(Screen[None]):
 
         if self.is_mounted:
             self.agent_manager.set_agent(new_mode)
-
-            mode_indicator = self.query_one(ModeIndicator)
-            mode_indicator.mode = new_mode
-            mode_indicator.refresh()
-
-            prompt_input = self.query_one(PromptInput)
-            # Force new hint selection when mode changes
-            prompt_input.placeholder = self._placeholder_for_mode(
-                new_mode, force_new=True
-            )
-            prompt_input.refresh()
+            # Use widget coordinator for all widget updates
+            self.widget_coordinator.update_for_mode_change(new_mode)
 
     def watch_working(self, is_working: bool) -> None:
         """Show or hide the spinner based on working state."""
         logger.debug(f"[WATCH] watch_working called - is_working={is_working}")
         if self.is_mounted:
-            spinner = self.query_one("#spinner")
-            logger.debug(
-                f"[WATCH] Before update - display={spinner.display}, classes={spinner.classes}"
-            )
-            spinner.set_classes("" if is_working else "hidden")
-            spinner.display = is_working
-            logger.debug(
-                f"[WATCH] After update - display={spinner.display}, classes={spinner.classes}"
-            )
-
-            # Update the status bar to show/hide "ESC to stop"
-            status_bar = self.query_one(StatusBar)
-            status_bar.working = is_working
-            status_bar.refresh()
+            # Use widget coordinator for all widget updates
+            self.widget_coordinator.update_for_processing_state(is_working)
 
     def watch_qa_mode(self, qa_mode_active: bool) -> None:
         """Update UI when Q&A mode state changes."""
         if self.is_mounted:
-            # Update status bar to show "ESC to exit Q&A mode"
-            status_bar = self.query_one(StatusBar)
-            status_bar.refresh()
-
-            # Update mode indicator to show "Q&A mode"
-            mode_indicator = self.query_one(ModeIndicator)
-            mode_indicator.refresh()
+            # Use widget coordinator for all widget updates
+            self.widget_coordinator.update_for_qa_mode(qa_mode_active)
 
     def watch_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the chat history when messages change."""
         if self.is_mounted:
-            chat_history = self.query_one(ChatHistory)
-            chat_history.update_messages(messages)
+            # Use widget coordinator for all widget updates
+            self.widget_coordinator.update_messages(messages)
 
     def action_toggle_mode(self) -> None:
         # Prevent mode switching during Q&A
@@ -388,8 +365,8 @@ class ChatScreen(Screen[None]):
         ]
         self.mode = modes[(modes.index(self.mode) + 1) % len(modes)]
         self.agent_manager.set_agent(self.mode)
-        # whoops it actually changes focus. Let's be brutal for now
-        self.call_later(lambda: self.query_one(PromptInput).focus())
+        # Re-focus input after mode change
+        self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
 
     def action_show_usage(self) -> None:
         usage_hint = self.agent_manager.get_usage_hint()
@@ -584,7 +561,6 @@ class ChatScreen(Screen[None]):
         """Update the context indicator with current usage data."""
         logger.debug("[CONTEXT] update_context_indicator called")
         try:
-            context_indicator = self.query_one(ContextIndicator)
             logger.debug(
                 f"[CONTEXT] Getting context analysis - "
                 f"message_history_count={len(self.agent_manager.message_history)}"
@@ -602,7 +578,8 @@ class ChatScreen(Screen[None]):
                 logger.warning("[CONTEXT] Analysis is None!")
 
             model_name = self.deps.llm_model.name
-            context_indicator.update_context(analysis, model_name)
+            # Use widget coordinator for context indicator update
+            self.widget_coordinator.update_context_indicator(analysis, model_name)
         except Exception as e:
             logger.error(
                 f"[CONTEXT] Failed to update context indicator: {e}", exc_info=True
@@ -639,7 +616,6 @@ class ChatScreen(Screen[None]):
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
         self.partial_message = event.message
-        history = self.query_one(ChatHistory)
 
         # Filter event.messages to exclude ModelRequest with only ToolReturnPart
         # These are intermediate tool results that would render as empty (UserQuestionWidget
@@ -660,19 +636,17 @@ class ChatScreen(Screen[None]):
                 # Keep all ModelResponse and other message types
                 filtered_event_messages.append(msg)
 
-        # Only update messages if the message list changed
+        # Build new message list
         new_message_list = self.messages + cast(
             list[ModelMessage | HintMessage], filtered_event_messages
         )
-        if len(new_message_list) != len(history.items):
-            history.update_messages(new_message_list)
 
-        # Always update the partial response (reactive property handles the update)
-        history.partial_response = self.partial_message
+        # Use widget coordinator to set partial response
+        self.widget_coordinator.set_partial_response(self.partial_message, new_message_list)
 
     def _clear_partial_response(self) -> None:
-        partial_response_widget = self.query_one(ChatHistory)
-        partial_response_widget.partial_response = None
+        # Use widget coordinator to clear partial response
+        self.widget_coordinator.set_partial_response(None, self.messages)
 
     def _exit_qa_mode(self) -> None:
         """Exit Q&A mode and clean up state."""
@@ -716,13 +690,11 @@ class ChatScreen(Screen[None]):
         self._clear_partial_response()
         self.messages = event.messages
 
-        # Refresh placeholder and mode indicator in case artifacts were created
-        prompt_input = self.query_one(PromptInput)
-        prompt_input.placeholder = self._placeholder_for_mode(self.mode)
-        prompt_input.refresh()
-
-        mode_indicator = self.query_one(ModeIndicator)
-        mode_indicator.refresh()
+        # Use widget coordinator to refresh placeholder and mode indicator
+        self.widget_coordinator.update_prompt_input(
+            placeholder=self._placeholder_for_mode(self.mode)
+        )
+        self.widget_coordinator.refresh_mode_indicator()
 
         # Update context indicator
         self.update_context_indicator()
@@ -760,28 +732,14 @@ class ChatScreen(Screen[None]):
     @on(CompactionStartedMessage)
     def handle_compaction_started(self, event: CompactionStartedMessage) -> None:
         """Update spinner text when compaction starts."""
-        try:
-            spinner = self.query_one("#spinner", Spinner)
-            logger.debug(
-                f"[COMPACT] Spinner found - text={spinner.text}, display={spinner.display}"
-            )
-            spinner.text = "Compacting Conversation..."
-            logger.debug(
-                f"[COMPACT] Spinner text updated - text={spinner.text}, display={spinner.display}"
-            )
-        except Exception as e:  # noqa: S110
-            # If spinner not found or any error, silently continue
-            logger.error(f"[COMPACT] Failed to update spinner: {e}")
+        # Use widget coordinator to update spinner text
+        self.widget_coordinator.update_spinner_text("Compacting Conversation...")
 
     @on(CompactionCompletedMessage)
     def handle_compaction_completed(self, event: CompactionCompletedMessage) -> None:
         """Reset spinner text when compaction completes."""
-        try:
-            spinner = self.query_one("#spinner", Spinner)
-            spinner.text = "Processing..."
-        except Exception:  # noqa: S110
-            # If spinner not found or any error, silently continue
-            pass
+        # Use widget coordinator to update spinner text
+        self.widget_coordinator.update_spinner_text("Processing...")
 
     async def handle_model_selected(self, result: ModelConfigUpdated | None) -> None:
         """Handle model selection from ModelPickerScreen.
@@ -801,11 +759,9 @@ class ChatScreen(Screen[None]):
             # Update the agent manager's model configuration
             self.agent_manager.deps.llm_model = result.model_config
 
-            # Directly update the context indicator with new model
-            # Get current analysis from agent manager
-            context_indicator = self.query_one(ContextIndicator)
+            # Get current analysis and update context indicator via coordinator
             analysis = await self.agent_manager.get_context_analysis()
-            context_indicator.update_context(analysis, result.new_model)
+            self.widget_coordinator.update_context_indicator(analysis, result.new_model)
 
             # Get model display name for user feedback
             model_spec = MODEL_SPECS.get(result.new_model)
@@ -849,8 +805,7 @@ class ChatScreen(Screen[None]):
 
         # If empty text, just clear input and return
         if not text:
-            prompt_input = self.query_one(PromptInput)
-            prompt_input.clear()
+            self.widget_coordinator.update_prompt_input(clear=True)
             self.value = ""
             return
 
@@ -904,8 +859,7 @@ class ChatScreen(Screen[None]):
                 self.run_agent(formatted_qa)
 
             # Clear input
-            prompt_input = self.query_one(PromptInput)
-            prompt_input.clear()
+            self.widget_coordinator.update_prompt_input(clear=True)
             self.value = ""
             return
 
@@ -925,8 +879,7 @@ class ChatScreen(Screen[None]):
             self.messages = self.messages + [response_message]
 
             # Clear the input
-            prompt_input = self.query_one(PromptInput)
-            prompt_input.clear()
+            self.widget_coordinator.update_prompt_input(clear=True)
             self.value = ""
             return
 
@@ -943,8 +896,7 @@ class ChatScreen(Screen[None]):
         self.value = ""
         self.run_agent(text)  # Use stripped text
 
-        prompt_input = self.query_one(PromptInput)
-        prompt_input.clear()
+        self.widget_coordinator.update_prompt_input(clear=True)
 
     def _placeholder_for_mode(self, mode: AgentType, force_new: bool = False) -> str:
         """Return the placeholder text appropriate for the current mode.
@@ -1220,8 +1172,7 @@ class ChatScreen(Screen[None]):
         # Save conversation after each interaction
         self._save_conversation()
 
-        prompt_input = self.query_one(PromptInput)
-        prompt_input.focus()
+        self.widget_coordinator.update_prompt_input(focus=True)
 
     def _save_conversation(self) -> None:
         """Save the current conversation to persistent storage."""
