@@ -333,9 +333,6 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             # Update the selected model in config
             self.config_manager.update_selected_model(self.selected_model)
             self.refresh_model_labels()
-            self.notify(
-                f"Selected model: {self._model_display_name(self.selected_model)}"
-            )
 
             # Get the full model config with provider information
             model_config = get_provider_model(self.selected_model)
