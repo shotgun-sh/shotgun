@@ -94,9 +94,22 @@ def test_context_indicator_display_with_no_data():
     indicator = ContextIndicator()
     indicator._refresh_display()
 
-    # The internal renderable attribute should be accessible through render_str
-    # For now, just verify the widget doesn't crash with no data
+    # Should show empty when no data and no model
     assert indicator.context_analysis is None
+
+
+def test_context_indicator_display_with_zero_tokens():
+    """Test display when context has 0 tokens (no conversation yet)."""
+    indicator = ContextIndicator()
+
+    # Create analysis with 0 tokens (empty conversation)
+    analysis = create_test_analysis(agent_context_tokens=0, max_usable_tokens=160_000)
+
+    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
+
+    # Should show just model name when no conversation content
+    assert indicator.context_analysis == analysis
+    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_5
 
 
 def test_context_indicator_display_calculation():
