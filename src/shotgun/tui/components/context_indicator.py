@@ -3,7 +3,7 @@
 from textual.reactive import reactive
 from textual.widgets import Static
 
-from shotgun.agents.config.models import ModelName, get_model_short_name
+from shotgun.agents.config.models import MODEL_SPECS, ModelName
 from shotgun.agents.context_analyzer.models import ContextAnalysis
 
 
@@ -80,7 +80,8 @@ class ContextIndicator(Static):
         # If no analysis yet, show placeholder with model name or empty
         if self.context_analysis is None:
             if self.model_name:
-                model_display = get_model_short_name(self.model_name)
+                model_spec = MODEL_SPECS.get(self.model_name)
+                model_display = model_spec.short_name if model_spec else str(self.model_name)
                 self.update(f"[bold]{model_display}[/bold]")
             else:
                 self.update("")
@@ -111,7 +112,8 @@ class ContextIndicator(Static):
 
         # Add model name if available
         if self.model_name:
-            model_display = get_model_short_name(self.model_name)
+            model_spec = MODEL_SPECS.get(self.model_name)
+            model_display = model_spec.short_name if model_spec else str(self.model_name)
             parts.extend(
                 [
                     "[$foreground-muted]|[/]",

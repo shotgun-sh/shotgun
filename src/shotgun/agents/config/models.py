@@ -43,6 +43,7 @@ class ModelSpec(BaseModel):
     litellm_proxy_model_name: (
         str  # LiteLLM format (e.g., "openai/gpt-5", "gemini/gemini-2-pro")
     )
+    short_name: str  # Display name for UI (e.g., "Sonnet 4.5", "GPT-5")
 
 
 class ModelConfig(BaseModel):
@@ -89,6 +90,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=400_000,
         max_output_tokens=128_000,
         litellm_proxy_model_name="openai/gpt-5",
+        short_name="GPT-5",
     ),
     ModelName.GPT_5_MINI: ModelSpec(
         name=ModelName.GPT_5_MINI,
@@ -96,6 +98,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=400_000,
         max_output_tokens=128_000,
         litellm_proxy_model_name="openai/gpt-5-mini",
+        short_name="GPT-5 Mini",
     ),
     ModelName.CLAUDE_OPUS_4_1: ModelSpec(
         name=ModelName.CLAUDE_OPUS_4_1,
@@ -103,6 +106,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=200_000,
         max_output_tokens=32_000,
         litellm_proxy_model_name="anthropic/claude-opus-4-1",
+        short_name="Opus 4.1",
     ),
     ModelName.CLAUDE_SONNET_4_5: ModelSpec(
         name=ModelName.CLAUDE_SONNET_4_5,
@@ -110,6 +114,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=200_000,
         max_output_tokens=16_000,
         litellm_proxy_model_name="anthropic/claude-sonnet-4-5",
+        short_name="Sonnet 4.5",
     ),
     ModelName.CLAUDE_HAIKU_4_5: ModelSpec(
         name=ModelName.CLAUDE_HAIKU_4_5,
@@ -117,6 +122,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=200_000,
         max_output_tokens=64_000,
         litellm_proxy_model_name="anthropic/claude-haiku-4-5",
+        short_name="Haiku 4.5",
     ),
     ModelName.GEMINI_2_5_PRO: ModelSpec(
         name=ModelName.GEMINI_2_5_PRO,
@@ -124,6 +130,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=1_000_000,
         max_output_tokens=64_000,
         litellm_proxy_model_name="gemini/gemini-2.5-pro",
+        short_name="Gemini 2.5 Pro",
     ),
     ModelName.GEMINI_2_5_FLASH: ModelSpec(
         name=ModelName.GEMINI_2_5_FLASH,
@@ -131,6 +138,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=1_000_000,
         max_output_tokens=64_000,
         litellm_proxy_model_name="gemini/gemini-2.5-flash",
+        short_name="Gemini 2.5 Flash",
     ),
 }
 
@@ -181,24 +189,3 @@ class ShotgunConfig(BaseModel):
         default=False,
         description="Whether the welcome screen has been shown to the user",
     )
-
-
-def get_model_short_name(model_name: ModelName) -> str:
-    """Convert ModelName enum to a short display name for UI.
-
-    Args:
-        model_name: The ModelName enum value
-
-    Returns:
-        Short display name suitable for UI (e.g., "Sonnet 4.5", "GPT-5")
-    """
-    short_names = {
-        ModelName.CLAUDE_SONNET_4_5: "Sonnet 4.5",
-        ModelName.CLAUDE_OPUS_4_1: "Opus 4.1",
-        ModelName.CLAUDE_HAIKU_4_5: "Haiku 4.5",
-        ModelName.GPT_5: "GPT-5",
-        ModelName.GPT_5_MINI: "GPT-5 Mini",
-        ModelName.GEMINI_2_5_PRO: "Gemini 2.5 Pro",
-        ModelName.GEMINI_2_5_FLASH: "Gemini 2.5 Flash",
-    }
-    return short_names.get(model_name, str(model_name))

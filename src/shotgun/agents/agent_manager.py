@@ -47,7 +47,12 @@ from textual.widget import Widget
 
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.config.models import KeyProvider
-from shotgun.agents.context_analyzer import ContextAnalyzer, ContextCompositionTelemetry
+from shotgun.agents.context_analyzer import (
+    ContextAnalysis,
+    ContextAnalyzer,
+    ContextCompositionTelemetry,
+    ContextFormatter,
+)
 from shotgun.agents.models import AgentResponse, AgentType, FileOperation
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -1044,20 +1049,17 @@ class AgentManager(Widget):
         Returns:
             Markdown-formatted string with context composition statistics, or None if unavailable
         """
-        from shotgun.agents.context_analyzer import ContextFormatter
-
         analysis = await self.get_context_analysis()
         if analysis:
             return ContextFormatter.format_markdown(analysis)
         return None
 
-    async def get_context_analysis(self) -> "ContextAnalysis | None":
+    async def get_context_analysis(self) -> ContextAnalysis | None:
         """Get conversation context analysis as structured data.
 
         Returns:
             ContextAnalysis object with token usage data, or None if unavailable
         """
-        from shotgun.agents.context_analyzer import ContextAnalyzer
 
         try:
             analyzer = ContextAnalyzer(self.deps.llm_model)
