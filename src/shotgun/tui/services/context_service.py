@@ -17,11 +17,10 @@ from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.context_analyzer import ContextAnalyzer
 from shotgun.agents.context_analyzer.models import ContextAnalysis
+from shotgun.agents.conversation_history import HintMessage  # type: ignore[attr-defined]
 
 if TYPE_CHECKING:
-    from shotgun.agents.conversation_history import (
-        HintMessage,  # type: ignore[attr-defined]
-    )
+    pass
 
 logger = logging.getLogger(__name__)
 

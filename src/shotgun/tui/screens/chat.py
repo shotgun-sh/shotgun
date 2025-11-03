@@ -18,7 +18,6 @@ from textual.containers import Container, Grid
 from textual.keys import Keys
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
-from textual.widget import Widget
 from textual.widgets import Button, Label, Static
 
 from shotgun.agents.agent_manager import (
@@ -52,15 +51,17 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
+from shotgun.tui.components.context_indicator import ContextIndicator
+from shotgun.tui.components.mode_indicator import ModeIndicator
+from shotgun.tui.components.prompt_input import PromptInput
+from shotgun.tui.components.spinner import Spinner
+from shotgun.tui.components.status_bar import StatusBar
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.state.processing_state import ProcessingStateManager
+from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.utils import get_shotgun_home
 
-from ..components.context_indicator import ContextIndicator
-from ..components.prompt_input import PromptInput
-from ..components.spinner import Spinner
-from ..utils.mode_progress import PlaceholderHints
 from .chat_screen.command_providers import (
     DeleteCodebasePaletteProvider,
     UnifiedCommandProvider,
@@ -102,119 +103,6 @@ class CodebaseIndexSelection:
 
     repo_path: Path
     name: str
-
-
-class StatusBar(Widget):
-    DEFAULT_CSS = """
-        StatusBar {
-            text-wrap: wrap;
-            padding-left: 1;
-        }
-    """
-
-    def __init__(self, working: bool = False) -> None:
-        """Initialize the status bar.
-
-        Args:
-            working: Whether an agent is currently working.
-        """
-        super().__init__()
-        self.working = working
-
-    def render(self) -> str:
-        # Check if in Q&A mode first (highest priority)
-        try:
-            chat_screen = self.screen
-            if isinstance(chat_screen, ChatScreen) and chat_screen.qa_mode:
-                return (
-                    "[$foreground-muted][bold $text]esc[/] to exit Q&A mode • "
-                    "[bold $text]enter[/] to send answer • [bold $text]ctrl+j[/] for newline[/]"
-                )
-        except Exception:  # noqa: S110
-            # If we can't access chat screen, continue with normal display
-            pass
-
-        if self.working:
-            return (
-                "[$foreground-muted][bold $text]esc[/] to stop • "
-                "[bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • "
-                "[bold $text]ctrl+p[/] command palette • [bold $text]shift+tab[/] cycle modes • "
-                "/help for commands[/]"
-            )
-        else:
-            return (
-                "[$foreground-muted][bold $text]enter[/] to send • "
-                "[bold $text]ctrl+j[/] for newline • [bold $text]ctrl+p[/] command palette • "
-                "[bold $text]shift+tab[/] cycle modes • /help for commands[/]"
-            )
-
-
-class ModeIndicator(Widget):
-    """Widget to display the current agent mode."""
-
-    DEFAULT_CSS = """
-        ModeIndicator {
-            text-wrap: wrap;
-            padding-left: 1;
-        }
-    """
-
-    def __init__(self, mode: AgentType) -> None:
-        """Initialize the mode indicator.
-
-        Args:
-            mode: The current agent type/mode.
-        """
-        super().__init__()
-        self.mode = mode
-        self.progress_checker = PlaceholderHints().progress_checker
-
-    def render(self) -> str:
-        """Render the mode indicator."""
-        # Check if in Q&A mode first
-        try:
-            chat_screen = self.screen
-            if isinstance(chat_screen, ChatScreen) and chat_screen.qa_mode:
-                return (
-                    "[bold $text-accent]Q&A mode[/]"
-                    "[$foreground-muted] (Answer the clarifying questions or ESC to cancel)[/]"
-                )
-        except Exception:  # noqa: S110
-            # If we can't access chat screen, continue with normal display
-            pass
-
-        mode_display = {
-            AgentType.RESEARCH: "Research",
-            AgentType.PLAN: "Planning",
-            AgentType.TASKS: "Tasks",
-            AgentType.SPECIFY: "Specify",
-            AgentType.EXPORT: "Export",
-        }
-        mode_description = {
-            AgentType.RESEARCH: (
-                "Research topics with web search and synthesize findings"
-            ),
-            AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
-            AgentType.TASKS: (
-                "Generate specific, actionable tasks from research and plans"
-            ),
-            AgentType.SPECIFY: (
-                "Create detailed specifications and requirements documents"
-            ),
-            AgentType.EXPORT: "Export artifacts and findings to various formats",
-        }
-
-        mode_title = mode_display.get(self.mode, self.mode.value.title())
-        description = mode_description.get(self.mode, "")
-
-        # Check if mode has content
-        has_content = self.progress_checker.has_mode_content(self.mode)
-        status_icon = " ✓" if has_content else ""
-
-        return (
-            f"[bold $text-accent]{mode_title}{status_icon} mode[/]"
-            f"[$foreground-muted] ({description})[/]"
-        )
 
 
 class CodebaseIndexPromptScreen(ModalScreen[bool]):

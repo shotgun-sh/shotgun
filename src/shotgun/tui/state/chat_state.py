@@ -14,12 +14,11 @@ from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
 from textual.worker import Worker
 
+from shotgun.agents.conversation_history import HintMessage  # type: ignore[attr-defined]
 from shotgun.agents.models import AgentType
 
 if TYPE_CHECKING:
-    from shotgun.agents.conversation_history import (
-        HintMessage,  # type: ignore[attr-defined]
-    )
+    pass
 
 
 class UIState(BaseModel):

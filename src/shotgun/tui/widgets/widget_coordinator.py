@@ -13,13 +13,20 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai.messages import ModelMessage
 
-from shotgun.agents.conversation_history import (
-    HintMessage,  # type: ignore[attr-defined]
-)
+from shotgun.agents.config.models import ModelName
 from shotgun.agents.models import AgentType
+from shotgun.tui.components.context_indicator import ContextIndicator
+from shotgun.tui.components.mode_indicator import ModeIndicator
+from shotgun.tui.components.prompt_input import PromptInput
+from shotgun.tui.components.spinner import Spinner
+from shotgun.tui.components.status_bar import StatusBar
+from shotgun.tui.screens.chat_screen.history.chat_history import ChatHistory
 
 if TYPE_CHECKING:
     from shotgun.agents.context_analyzer.models import ContextAnalysis
+    from shotgun.agents.conversation_history import (
+        HintMessage,  # type: ignore[attr-defined]
+    )
     from shotgun.tui.screens.chat import ChatScreen
 
 logger = logging.getLogger(__name__)
@@ -61,8 +68,6 @@ class WidgetCoordinator:
 
         # Update mode indicator
         try:
-            from shotgun.tui.screens.chat_screen.mode_indicator import ModeIndicator
-
             mode_indicator = self.screen.query_one(ModeIndicator)
             mode_indicator.mode = new_mode
             mode_indicator.refresh()
@@ -71,8 +76,6 @@ class WidgetCoordinator:
 
         # Update prompt input placeholder
         try:
-            from shotgun.tui.screens.chat_screen.prompt_input import PromptInput
-
             prompt_input = self.screen.query_one(PromptInput)
             if placeholder is None:
                 placeholder = self.screen._placeholder_for_mode(new_mode, force_new=True)
@@ -95,20 +98,16 @@ class WidgetCoordinator:
 
         # Update spinner visibility
         try:
-            from shotgun.tui.screens.chat_screen.spinner import Spinner
-
             spinner = self.screen.query_one("#spinner", Spinner)
             spinner.set_classes("" if is_processing else "hidden")
             spinner.display = is_processing
             if spinner_text and is_processing:
-                spinner.update(spinner_text)
+                spinner.text = spinner_text
         except Exception as e:
             logger.exception(f"Failed to update spinner: {e}")
 
         # Update status bar
         try:
-            from shotgun.tui.screens.chat import StatusBar
-
             status_bar = self.screen.query_one(StatusBar)
             status_bar.working = is_processing
             status_bar.refresh()
@@ -126,8 +125,6 @@ class WidgetCoordinator:
 
         # Update status bar
         try:
-            from shotgun.tui.screens.chat import StatusBar
-
             status_bar = self.screen.query_one(StatusBar)
             status_bar.refresh()
         except Exception as e:
@@ -135,14 +132,12 @@ class WidgetCoordinator:
 
         # Update mode indicator
         try:
-            from shotgun.tui.screens.chat_screen.mode_indicator import ModeIndicator
-
             mode_indicator = self.screen.query_one(ModeIndicator)
             mode_indicator.refresh()
         except Exception as e:
             logger.exception(f"Failed to update mode indicator for Q&A: {e}")
 
-    def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
+    def update_messages(self, messages: list[ModelMessage | "HintMessage"]) -> None:
         """Update chat history with new messages.
 
         Args:
@@ -152,15 +147,13 @@ class WidgetCoordinator:
             return
 
         try:
-            from shotgun.tui.screens.chat_screen.chat_history import ChatHistory
-
             chat_history = self.screen.query_one(ChatHistory)
             chat_history.update_messages(messages)
         except Exception as e:
             logger.exception(f"Failed to update messages: {e}")
 
     def set_partial_response(
-        self, message: ModelMessage | None, messages: list[ModelMessage | HintMessage]
+        self, message: ModelMessage | None, messages: list[ModelMessage | "HintMessage"]
     ) -> None:
         """Update chat history with partial streaming response.
 
@@ -172,8 +165,6 @@ class WidgetCoordinator:
             return
 
         try:
-            from shotgun.tui.screens.chat_screen.chat_history import ChatHistory
-
             chat_history = self.screen.query_one(ChatHistory)
             if message:
                 chat_history.partial_response = message
@@ -194,12 +185,10 @@ class WidgetCoordinator:
             return
 
         try:
-            from shotgun.tui.screens.chat_screen.context_indicator import (
-                ContextIndicator,
-            )
-
             context_indicator = self.screen.query_one(ContextIndicator)
-            context_indicator.update_context(analysis, model_name)
+            # Cast the string model name to ModelName type
+            model = ModelName(model_name) if model_name else None
+            context_indicator.update_context(analysis, model)
         except Exception as e:
             logger.exception(f"Failed to update context indicator: {e}")
 
@@ -220,8 +209,6 @@ class WidgetCoordinator:
             return
 
         try:
-            from shotgun.tui.screens.chat_screen.prompt_input import PromptInput
-
             prompt_input = self.screen.query_one(PromptInput)
             if placeholder is not None:
                 prompt_input.placeholder = placeholder
@@ -238,8 +225,6 @@ class WidgetCoordinator:
             return
 
         try:
-            from shotgun.tui.screens.chat_screen.mode_indicator import ModeIndicator
-
             mode_indicator = self.screen.query_one(ModeIndicator)
             mode_indicator.refresh()
         except Exception as e:
@@ -255,10 +240,8 @@ class WidgetCoordinator:
             return
 
         try:
-            from shotgun.tui.screens.chat_screen.spinner import Spinner
-
             spinner = self.screen.query_one("#spinner", Spinner)
             if spinner.display:  # Only update if visible
-                spinner.update(text)
+                spinner.text = text
         except Exception as e:
             logger.exception(f"Failed to update spinner text: {e}")
