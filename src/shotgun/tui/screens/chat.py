@@ -57,6 +57,7 @@ from shotgun.tui.commands import CommandHandler
 from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
+from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.utils import get_shotgun_home
 
 from ..components.context_indicator import ContextIndicator
@@ -291,16 +292,17 @@ class ChatScreen(Screen[None]):
     mode = reactive(AgentType.RESEARCH)
     history: PromptHistory = PromptHistory()
     messages = reactive(list[ModelMessage | HintMessage]())
-    working = reactive(False)
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
     partial_message: reactive[ModelMessage | None] = reactive(None)
-    _current_worker = None  # Track the current running worker for cancellation
 
     # Q&A mode state (for structured output clarifying questions)
     qa_mode = reactive(False)
     qa_questions: list[str] = []
     qa_current_index = reactive(0)
     qa_answers: list[str] = []
+
+    # Working state - keep reactive for Textual watchers
+    working = reactive(False)
 
     def __init__(
         self, continue_session: bool = False, force_reindex: bool = False
@@ -331,6 +333,9 @@ class ChatScreen(Screen[None]):
         self.command_handler = CommandHandler()
         self.placeholder_hints = PlaceholderHints()
         self.conversation_manager = ConversationManager()
+        self.processing_state = ProcessingStateManager(
+            self, telemetry_context={"agent_mode": self.mode.value}
+        )
         self.continue_session = continue_session
         self.force_reindex = force_reindex
 
@@ -338,6 +343,9 @@ class ChatScreen(Screen[None]):
         self.query_one(PromptInput).focus(scroll_visible=True)
         # Hide spinner initially
         self.query_one("#spinner").display = False
+
+        # Bind spinner to processing state manager
+        self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
 
         # Load conversation history if --continue flag was provided
         if self.continue_session and self.conversation_manager.exists():
@@ -360,29 +368,15 @@ class ChatScreen(Screen[None]):
             return
 
         # If escape or ctrl+c is pressed while agent is working, cancel the operation
-        if (
-            event.key in (Keys.Escape, Keys.ControlC)
-            and self.working
-            and self._current_worker
-        ):
-            # Track cancellation event
-            track_event(
-                "agent_cancelled",
-                {
-                    "agent_mode": self.mode.value,
-                    "cancel_key": event.key,
-                },
-            )
-
-            # Cancel the running agent worker
-            self._current_worker.cancel()
-            # Show cancellation message
-            self.mount_hint("⚠️ Cancelling operation...")
-            # Re-enable the input
-            prompt_input = self.query_one(PromptInput)
-            prompt_input.focus()
-            # Prevent the event from propagating (don't quit the app)
-            event.stop()
+        if event.key in (Keys.Escape, Keys.ControlC):
+            if self.processing_state.cancel_current_operation(cancel_key=event.key):
+                # Show cancellation message
+                self.mount_hint("⚠️ Cancelling operation...")
+                # Re-enable the input
+                prompt_input = self.query_one(PromptInput)
+                prompt_input.focus()
+                # Prevent the event from propagating (don't quit the app)
+                event.stop()
 
     @work
     async def check_if_codebase_is_indexed(self) -> None:
@@ -528,11 +522,11 @@ class ChatScreen(Screen[None]):
 
         try:
             # Show spinner and enable ESC cancellation
-            self.working = True
             from textual.worker import get_current_worker
 
-            self._current_worker = get_current_worker()
-            logger.debug(f"[COMPACT] Set working=True - working={self.working}")
+            self.processing_state.start_processing("Compacting Conversation...")
+            self.processing_state.bind_worker(get_current_worker())
+            logger.debug(f"[COMPACT] Processing started - working={self.working}")
 
             # Get current message count and tokens
             original_count = len(self.agent_manager.message_history)
@@ -645,9 +639,8 @@ class ChatScreen(Screen[None]):
             self.notify(f"Failed to compact: {e}", severity="error")
         finally:
             # Hide spinner
-            self.working = False
-            self._current_worker = None
-            logger.debug(f"[COMPACT] Set working=False - working={self.working}")
+            self.processing_state.stop_processing()
+            logger.debug(f"[COMPACT] Processing stopped - working={self.working}")
 
     @work
     async def action_clear_conversation(self) -> None:
@@ -1290,12 +1283,12 @@ class ChatScreen(Screen[None]):
     @work
     async def run_agent(self, message: str) -> None:
         prompt = None
-        self.working = True
 
-        # Store the worker so we can cancel it if needed
+        # Start processing with spinner
         from textual.worker import get_current_worker
 
-        self._current_worker = get_current_worker()
+        self.processing_state.start_processing("Processing...")
+        self.processing_state.bind_worker(get_current_worker())
 
         prompt = message
 
@@ -1331,8 +1324,7 @@ class ChatScreen(Screen[None]):
 
             self.mount_hint(hint)
         finally:
-            self.working = False
-            self._current_worker = None
+            self.processing_state.stop_processing()
 
         # Save conversation after each interaction
         self._save_conversation()
