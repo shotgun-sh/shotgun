@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 async def apply_persistent_compaction(
-    messages: list[ModelMessage], deps: AgentDeps
+    messages: list[ModelMessage], deps: AgentDeps, force: bool = False
 ) -> list[ModelMessage]:
     """Apply compaction to message history for persistent storage.
 
@@ -23,6 +23,7 @@ async def apply_persistent_compaction(
     Args:
         messages: Full message history from agent run
         deps: Agent dependencies containing model config
+        force: If True, force compaction even if below token threshold
 
     Returns:
         Compacted message history that should be stored as conversation state
@@ -46,7 +47,7 @@ async def apply_persistent_compaction(
                 self.usage = usage
 
         ctx = MockContext(deps, usage)
-        compacted_messages = await token_limit_compactor(ctx, messages)
+        compacted_messages = await token_limit_compactor(ctx, messages, force=force)
 
         # Log the result for monitoring
         original_size = len(messages)
