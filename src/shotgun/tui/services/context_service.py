@@ -14,6 +14,7 @@ from collections.abc import Sequence
 
 from pydantic_ai.messages import ModelMessage
 
+from shotgun.agents.config.models import ModelConfig
 from shotgun.agents.context_analyzer import ContextAnalyzer
 from shotgun.agents.context_analyzer.models import ContextAnalysis
 from shotgun.agents.conversation_history import HintMessage
@@ -44,7 +45,7 @@ class ContextService:
     - Async analysis (non-blocking)
 
     Example:
-        service = ContextService(llm_model="claude-sonnet-4")
+        service = ContextService(model_config=ModelConfig(...))
 
         # Get analysis (cached if messages unchanged)
         analysis = await service.get_analysis(agent_messages, ui_messages)
@@ -53,14 +54,14 @@ class ContextService:
         service.clear_cache()
     """
 
-    def __init__(self, llm_model: str, debounce_seconds: float = 0.5):
+    def __init__(self, model_config: ModelConfig, debounce_seconds: float = 0.5):
         """Initialize the context service.
 
         Args:
-            llm_model: The LLM model name for token counting.
+            model_config: Model configuration for accurate token counting.
             debounce_seconds: Time to wait before analyzing (reduces rapid updates).
         """
-        self.llm_model = llm_model
+        self.model_config = model_config
         self.debounce_seconds = debounce_seconds
         self._pending_analysis: asyncio.Task[ContextAnalysis | None] | None = None
         self._last_analysis: ContextAnalysis | None = None
@@ -102,8 +103,7 @@ class ContextService:
 
         # Run analysis
         try:
-            # Note: Simple model name - ContextAnalyzer will use it to create ModelConfig
-            analyzer = ContextAnalyzer(self.llm_model)  # type: ignore[arg-type]
+            analyzer = ContextAnalyzer(self.model_config)
             analysis = await analyzer.analyze_conversation(agent_messages, ui_messages)
 
             # Cache the result
@@ -167,13 +167,13 @@ class ContextService:
         self._last_analysis = None
         logger.debug("Context analysis cache cleared")
 
-    def update_model(self, llm_model: str) -> None:
-        """Update the LLM model and clear cache.
+    def update_model(self, model_config: ModelConfig) -> None:
+        """Update the LLM model configuration and clear cache.
 
         Args:
-            llm_model: The new LLM model name.
+            model_config: The new model configuration.
         """
-        if self.llm_model != llm_model:
-            self.llm_model = llm_model
+        if self.model_config != model_config:
+            self.model_config = model_config
             self.clear_cache()
-            logger.debug(f"LLM model updated to {llm_model}, cache cleared")
+            logger.debug(f"Model config updated to {model_config.name}, cache cleared")
