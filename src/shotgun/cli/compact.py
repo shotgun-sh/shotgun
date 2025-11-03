@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from pydantic_ai.messages import ModelMessage
 from pydantic_ai.usage import RequestUsage
 from rich.console import Console
 
