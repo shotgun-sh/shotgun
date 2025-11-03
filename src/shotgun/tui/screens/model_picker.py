@@ -35,8 +35,11 @@ def _sanitize_model_name_for_id(model_name: ModelName) -> str:
     return model_name.value.replace(".", "-")
 
 
-class ModelPickerScreen(Screen[None]):
-    """Select AI model to use."""
+class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
+    """Select AI model to use.
+
+    Returns ModelConfigUpdated when a model is selected, None if cancelled.
+    """
 
     CSS = """
         ModelPicker {
@@ -337,8 +340,8 @@ class ModelPickerScreen(Screen[None]):
             # Get the full model config with provider information
             model_config = get_provider_model(self.selected_model)
 
-            # Post event to app so it bubbles to all screens (including ChatScreen)
-            self.app.post_message(
+            # Dismiss the screen and return the model config update to the caller
+            self.dismiss(
                 ModelConfigUpdated(
                     old_model=old_model,
                     new_model=self.selected_model,

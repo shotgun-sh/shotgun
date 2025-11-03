@@ -691,41 +691,46 @@ class ChatScreen(Screen[None]):
             # If spinner not found or any error, silently continue
             pass
 
-    @on(ModelConfigUpdated)
-    async def handle_model_config_updated(self, event: ModelConfigUpdated) -> None:
-        """Handle AI model configuration changes.
+    async def handle_model_selected(self, result: ModelConfigUpdated | None) -> None:
+        """Handle model selection from ModelPickerScreen.
 
-        Updates the agent manager's model configuration and refreshes the context indicator.
+        Called as a callback when the ModelPickerScreen is dismissed.
+
+        Args:
+            result: ModelConfigUpdated if a model was selected, None if cancelled
         """
+        if result is None:
+            return
+
         try:
             # Update the model configuration in dependencies
-            self.deps.llm_model = event.model_config
+            self.deps.llm_model = result.model_config
 
             # Update the agent manager's model configuration
-            self.agent_manager.deps.llm_model = event.model_config
+            self.agent_manager.deps.llm_model = result.model_config
 
             # Directly update the context indicator with new model
             # Get current analysis from agent manager
             context_indicator = self.query_one(ContextIndicator)
             analysis = await self.agent_manager.get_context_analysis()
-            context_indicator.update_context(analysis, event.new_model)
+            context_indicator.update_context(analysis, result.new_model)
 
             # Get model display name for user feedback
-            model_spec = MODEL_SPECS.get(event.new_model)
-            model_display = model_spec.short_name if model_spec else str(event.new_model)
+            model_spec = MODEL_SPECS.get(result.new_model)
+            model_display = model_spec.short_name if model_spec else str(result.new_model)
 
             # Format provider information
-            key_method = "Shotgun Account" if event.key_provider == "shotgun" else "BYOK"
-            provider_display = event.provider.value.title()
+            key_method = "Shotgun Account" if result.key_provider == "shotgun" else "BYOK"
+            provider_display = result.provider.value.title()
 
             # Track model switch in telemetry
             track_event(
                 "model_switched",
                 {
-                    "old_model": str(event.old_model) if event.old_model else None,
-                    "new_model": str(event.new_model),
-                    "provider": event.provider.value,
-                    "key_provider": event.key_provider.value,
+                    "old_model": str(result.old_model) if result.old_model else None,
+                    "new_model": str(result.new_model),
+                    "provider": result.provider.value,
+                    "key_provider": result.key_provider.value,
                 },
             )
 
@@ -737,7 +742,7 @@ class ChatScreen(Screen[None]):
             )
 
         except Exception as e:
-            logger.error(f"Failed to handle model config update: {e}")
+            logger.error(f"Failed to handle model selection: {e}")
             self.agent_manager.add_hint_message(
                 HintMessage(message=f"⚠ Failed to update model configuration: {e}")
             )

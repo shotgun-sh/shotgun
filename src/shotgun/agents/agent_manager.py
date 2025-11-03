@@ -169,35 +169,26 @@ class CompactionCompletedMessage(Message):
     """Event posted when conversation compaction completes."""
 
 
-class ModelConfigUpdated(Message):
-    """Event posted when AI model configuration changes.
+@dataclass(frozen=True)
+class ModelConfigUpdated:
+    """Data returned when AI model configuration changes.
 
-    Includes provider information so handlers can react to provider-specific changes.
+    Used as a return value from ModelPickerScreen to communicate model
+    selection back to the calling screen.
+
+    Attributes:
+        old_model: Previous model name (None if first selection)
+        new_model: New model name
+        provider: LLM provider (OpenAI, Anthropic, Google)
+        key_provider: Authentication method (BYOK or Shotgun)
+        model_config: Complete model configuration
     """
 
-    def __init__(
-        self,
-        old_model: ModelName | None,
-        new_model: ModelName,
-        provider: ProviderType,
-        key_provider: KeyProvider,
-        model_config: ModelConfig,
-    ) -> None:
-        """Initialize the model config updated event.
-
-        Args:
-            old_model: Previous model name (None if first selection)
-            new_model: New model name
-            provider: LLM provider (OpenAI, Anthropic, Google)
-            key_provider: Authentication method (BYOK or Shotgun)
-            model_config: Complete model configuration
-        """
-        super().__init__()
-        self.old_model = old_model
-        self.new_model = new_model
-        self.provider = provider
-        self.key_provider = key_provider
-        self.model_config = model_config
+    old_model: ModelName | None
+    new_model: ModelName
+    provider: ProviderType
+    key_provider: KeyProvider
+    model_config: ModelConfig
 
 
 @dataclass(slots=True)
