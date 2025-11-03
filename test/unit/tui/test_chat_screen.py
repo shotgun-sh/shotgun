@@ -12,6 +12,8 @@ from shotgun.tui.screens.chat import ChatScreen
 def chat_screen(
     mock_agent_manager,
     mock_conversation_manager,
+    mock_conversation_service,
+    mock_widget_coordinator,
     mock_processing_state,
     mock_command_handler,
     mock_placeholder_hints,
@@ -22,6 +24,8 @@ def chat_screen(
     return ChatScreen(
         agent_manager=mock_agent_manager,
         conversation_manager=mock_conversation_manager,
+        conversation_service=mock_conversation_service,
+        widget_coordinator=mock_widget_coordinator,
         processing_state=mock_processing_state,
         command_handler=mock_command_handler,
         placeholder_hints=mock_placeholder_hints,
@@ -48,6 +52,8 @@ def test_all_dependencies_required(
     mock_agent_deps,
     mock_agent_manager,
     mock_conversation_manager,
+    mock_conversation_service,
+    mock_widget_coordinator,
     mock_processing_state,
     mock_command_handler,
     mock_placeholder_hints,
@@ -58,6 +64,8 @@ def test_all_dependencies_required(
     screen = ChatScreen(
         agent_manager=mock_agent_manager,
         conversation_manager=mock_conversation_manager,
+        conversation_service=mock_conversation_service,
+        widget_coordinator=mock_widget_coordinator,
         processing_state=mock_processing_state,
         command_handler=mock_command_handler,
         placeholder_hints=mock_placeholder_hints,
@@ -69,6 +77,8 @@ def test_all_dependencies_required(
     assert screen.deps is mock_agent_deps
     assert screen.agent_manager is mock_agent_manager
     assert screen.conversation_manager is mock_conversation_manager
+    assert screen.conversation_service is mock_conversation_service
+    assert screen.widget_coordinator is mock_widget_coordinator
     assert screen.processing_state is mock_processing_state
     assert screen.codebase_sdk is mock_codebase_sdk
     assert screen.command_handler is mock_command_handler
@@ -78,6 +88,8 @@ def test_all_dependencies_required(
 def test_processing_state_receives_telemetry_context(
     mock_agent_manager,
     mock_conversation_manager,
+    mock_conversation_service,
+    mock_widget_coordinator,
     mock_command_handler,
     mock_placeholder_hints,
     mock_codebase_sdk,
@@ -88,6 +100,8 @@ def test_processing_state_receives_telemetry_context(
     screen = ChatScreen(
         agent_manager=mock_agent_manager,
         conversation_manager=mock_conversation_manager,
+        conversation_service=mock_conversation_service,
+        widget_coordinator=mock_widget_coordinator,
         processing_state=mock_processing_state,
         command_handler=mock_command_handler,
         placeholder_hints=mock_placeholder_hints,

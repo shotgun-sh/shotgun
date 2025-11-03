@@ -17,8 +17,10 @@ from shotgun.agents.models import AgentDeps, AgentType
 from shotgun.codebase.service import CodebaseService
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.tui.commands import CommandHandler
+from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 
 
 @pytest.fixture
@@ -116,3 +118,31 @@ def mock_codebase_sdk():
     sdk.list_codebases_for_directory = AsyncMock(return_value=Mock(graphs=[]))
     sdk.delete_codebase = AsyncMock()
     return sdk
+
+
+@pytest.fixture
+def mock_conversation_service():
+    """Create a mock ConversationService for testing."""
+    service = Mock(spec=ConversationService)
+    service.save_conversation = Mock(return_value=True)
+    service.load_conversation = Mock(return_value=None)
+    service.restore_conversation = Mock(return_value=(True, None, None))
+    service.clear_conversation = Mock(return_value=True)
+    service.check_for_corrupted_conversation = Mock(return_value=False)
+    return service
+
+
+@pytest.fixture
+def mock_widget_coordinator():
+    """Create a mock WidgetCoordinator for testing."""
+    coordinator = Mock(spec=WidgetCoordinator)
+    coordinator.update_for_mode_change = Mock()
+    coordinator.update_for_processing_state = Mock()
+    coordinator.update_for_qa_mode = Mock()
+    coordinator.update_messages = Mock()
+    coordinator.set_partial_response = Mock()
+    coordinator.update_context_indicator = Mock()
+    coordinator.update_prompt_input = Mock()
+    coordinator.refresh_mode_indicator = Mock()
+    coordinator.update_spinner_text = Mock()
+    return coordinator
