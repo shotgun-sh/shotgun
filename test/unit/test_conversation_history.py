@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 
+import pytest
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
@@ -93,7 +94,8 @@ def test_conversation_history_json_serialization():
     assert isinstance(json_str, str)
 
 
-def test_conversation_manager_save_load(tmp_path):
+@pytest.mark.asyncio
+async def test_conversation_manager_save_load(tmp_path):
     """Test ConversationManager save and load functionality."""
     # Create a manager with custom path
     conv_path = tmp_path / "test_conversation.json"
@@ -112,13 +114,13 @@ def test_conversation_manager_save_load(tmp_path):
     hint_messages = [HintMessage(message="Remember to add docs")]
     history.set_ui_messages(messages + hint_messages)
 
-    manager.save(history)
+    await manager.save(history)
 
     # Verify file was created
     assert conv_path.exists()
 
     # Load the conversation
-    loaded_history = manager.load()
+    loaded_history = await manager.load()
     assert loaded_history is not None
     assert len(loaded_history.agent_history) == 1
     assert loaded_history.last_agent_model == "research"
@@ -134,35 +136,38 @@ def test_conversation_manager_save_load(tmp_path):
     assert isinstance(loaded_ui_messages[1], HintMessage)
 
 
-def test_conversation_manager_nonexistent_file(tmp_path):
+@pytest.mark.asyncio
+async def test_conversation_manager_nonexistent_file(tmp_path):
     """Test ConversationManager with nonexistent file."""
     conv_path = tmp_path / "nonexistent.json"
     manager = ConversationManager(conversation_path=conv_path)
 
     # Should return None for nonexistent file
-    loaded = manager.load()
+    loaded = await manager.load()
     assert loaded is None
 
     # Check exists method
     assert not manager.exists()
 
 
-def test_conversation_manager_clear(tmp_path):
+@pytest.mark.asyncio
+async def test_conversation_manager_clear(tmp_path):
     """Test ConversationManager clear functionality."""
     conv_path = tmp_path / "test_conversation.json"
     manager = ConversationManager(conversation_path=conv_path)
 
     # Save a conversation
     history = ConversationHistory()
-    manager.save(history)
+    await manager.save(history)
     assert conv_path.exists()
 
     # Clear the conversation
-    manager.clear()
+    await manager.clear()
     assert not conv_path.exists()
 
 
-def test_conversation_manager_corrupt_file(tmp_path):
+@pytest.mark.asyncio
+async def test_conversation_manager_corrupt_file(tmp_path):
     """Test ConversationManager with corrupt JSON file."""
     conv_path = tmp_path / "corrupt.json"
 
@@ -173,7 +178,7 @@ def test_conversation_manager_corrupt_file(tmp_path):
     manager = ConversationManager(conversation_path=conv_path)
 
     # Should return None for corrupt file
-    loaded = manager.load()
+    loaded = await manager.load()
     assert loaded is None
 
 

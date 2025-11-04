@@ -48,13 +48,14 @@ def test_init_custom_path():
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_config_not_exists(mock_logger):
+@pytest.mark.asyncio
+async def test_load_config_not_exists(mock_logger):
     """Test loading config when file doesn't exist."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "nonexistent.json"
         manager = ConfigManager(config_path=config_path)
 
-        config = manager.load()
+        config = await manager.load()
 
         assert isinstance(config, ShotgunConfig)
         assert config.selected_model is None
@@ -68,15 +69,16 @@ def test_load_config_not_exists(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_config_cached(mock_logger):
+@pytest.mark.asyncio
+async def test_load_config_cached(mock_logger):
     """Test loading config returns cached version when force_reload=False."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "nonexistent.json"
         manager = ConfigManager(config_path=config_path)
 
         # Use force_reload=False to test caching behavior
-        config1 = manager.load(force_reload=False)
-        config2 = manager.load(force_reload=False)
+        config1 = await manager.load(force_reload=False)
+        config2 = await manager.load(force_reload=False)
 
         assert config1 is config2
         # First load creates config with user_id (2 log messages)
@@ -85,7 +87,8 @@ def test_load_config_cached(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_config_valid_file(mock_logger):
+@pytest.mark.asyncio
+async def test_load_config_valid_file(mock_logger):
     """Test loading config from valid file."""
     import uuid
 
@@ -107,7 +110,7 @@ def test_load_config_valid_file(mock_logger):
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             assert isinstance(config, ShotgunConfig)
             assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
@@ -126,7 +129,8 @@ def test_load_config_valid_file(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_config_invalid_json(mock_logger):
+@pytest.mark.asyncio
+async def test_load_config_invalid_json(mock_logger):
     """Test loading config from invalid JSON file."""
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False
@@ -136,7 +140,7 @@ def test_load_config_invalid_json(mock_logger):
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             assert isinstance(config, ShotgunConfig)
             assert config.selected_model is None
@@ -150,7 +154,8 @@ def test_load_config_invalid_json(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_save_config_with_argument(mock_logger):
+@pytest.mark.asyncio
+async def test_save_config_with_argument(mock_logger):
     """Test saving config with explicit config argument."""
     import uuid
 
@@ -164,7 +169,7 @@ def test_save_config_with_argument(mock_logger):
             shotgun_instance_id=str(uuid.uuid4()),
         )
 
-        manager.save(config)
+        await manager.save(config)
 
         assert config_path.exists()
         with open(config_path, encoding="utf-8") as f:
@@ -179,16 +184,17 @@ def test_save_config_with_argument(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_save_config_without_argument(mock_logger):
+@pytest.mark.asyncio
+async def test_save_config_without_argument(mock_logger):
     """Test saving config without explicit config argument."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "test_config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Load default config first
-        manager.load()
+        await manager.load()
 
-        manager.save()
+        await manager.save()
 
         assert config_path.exists()
         # Multiple log calls due to initialize() and save()
@@ -196,7 +202,8 @@ def test_save_config_without_argument(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_save_config_creates_directory(mock_logger):
+@pytest.mark.asyncio
+async def test_save_config_creates_directory(mock_logger):
     """Test saving config creates parent directory if it doesn't exist."""
     import uuid
 
@@ -207,14 +214,15 @@ def test_save_config_creates_directory(mock_logger):
         config = ShotgunConfig(
             shotgun_instance_id=str(uuid.uuid4()),
         )
-        manager.save(config)
+        await manager.save(config)
 
         assert config_path.exists()
         assert config_path.parent.exists()
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_save_config_failure(mock_logger):
+@pytest.mark.asyncio
+async def test_save_config_failure(mock_logger):
     """Test save config handles file write errors."""
     import uuid
 
@@ -231,7 +239,7 @@ def test_save_config_failure(mock_logger):
 
         try:
             with pytest.raises((OSError, PermissionError)):
-                manager.save(config)
+                await manager.save(config)
 
             mock_logger.error.assert_called_once()
         finally:
@@ -420,13 +428,14 @@ async def test_get_provider_model_unsupported_provider(mock_get_config_manager):
             await get_provider_model("unsupported")
 
 
-def test_update_provider_openai():
+@pytest.mark.asyncio
+async def test_update_provider_openai():
     """Test updating OpenAI provider configuration."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.OPENAI, **{API_KEY_FIELD: "new-openai-key"}
         )
 
@@ -438,13 +447,14 @@ def test_update_provider_openai():
         assert saved_data["openai"]["api_key"] == "new-openai-key"
 
 
-def test_update_provider_anthropic_string():
+@pytest.mark.asyncio
+async def test_update_provider_anthropic_string():
     """Test updating Anthropic provider with string provider type."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        manager.update_provider("anthropic", **{API_KEY_FIELD: "new-anthropic-key"})
+        await manager.update_provider("anthropic", **{API_KEY_FIELD: "new-anthropic-key"})
 
         # Verify config was updated and saved
         assert config_path.exists()
@@ -454,13 +464,14 @@ def test_update_provider_anthropic_string():
         assert saved_data["anthropic"]["api_key"] == "new-anthropic-key"
 
 
-def test_update_provider_google():
+@pytest.mark.asyncio
+async def test_update_provider_google():
     """Test updating Google provider configuration."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.GOOGLE, **{API_KEY_FIELD: "new-google-key"}
         )
 
@@ -472,53 +483,57 @@ def test_update_provider_google():
         assert saved_data["google"]["api_key"] == "new-google-key"
 
 
-def test_update_provider_none_api_key():
+@pytest.mark.asyncio
+async def test_update_provider_none_api_key():
     """Test updating provider with None API key is ignored."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # This should not raise an error and should save default config
-        manager.update_provider(ProviderType.OPENAI, **{API_KEY_FIELD: None})
+        await manager.update_provider(ProviderType.OPENAI, **{API_KEY_FIELD: None})
 
         assert config_path.exists()
 
 
-def test_update_provider_unsupported_fields():
+@pytest.mark.asyncio
+async def test_update_provider_unsupported_fields():
     """Test updating provider with unsupported fields raises error."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         with pytest.raises(ValueError, match="Unsupported configuration fields"):
-            manager.update_provider(ProviderType.OPENAI, api_key="key", model="gpt-4")
+            await manager.update_provider(ProviderType.OPENAI, api_key="key", model="gpt-4")
 
 
-def test_update_provider_unsupported_provider():
+@pytest.mark.asyncio
+async def test_update_provider_unsupported_provider():
     """Test updating unsupported provider raises error."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         with pytest.raises(ValueError, match="is not a valid ProviderType"):
-            manager.update_provider("unsupported", api_key="key")
+            await manager.update_provider("unsupported", api_key="key")
 
 
-def test_clear_provider_key_openai():
+@pytest.mark.asyncio
+async def test_clear_provider_key_openai():
     """Test clearing OpenAI provider API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # First set a key
-        manager.update_provider(ProviderType.OPENAI, api_key="test-key")
-        assert manager.has_provider_key(ProviderType.OPENAI)
+        await manager.update_provider(ProviderType.OPENAI, api_key="test-key")
+        assert await manager.has_provider_key(ProviderType.OPENAI)
 
         # Now clear it
-        manager.clear_provider_key(ProviderType.OPENAI)
+        await manager.clear_provider_key(ProviderType.OPENAI)
 
         # Verify key is cleared
-        assert not manager.has_provider_key(ProviderType.OPENAI)
+        assert not await manager.has_provider_key(ProviderType.OPENAI)
 
         # Verify config file was updated
         with open(config_path, encoding="utf-8") as f:
@@ -526,21 +541,22 @@ def test_clear_provider_key_openai():
         assert saved_data["openai"]["api_key"] is None
 
 
-def test_clear_provider_key_anthropic():
+@pytest.mark.asyncio
+async def test_clear_provider_key_anthropic():
     """Test clearing Anthropic provider API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # First set a key
-        manager.update_provider(ProviderType.ANTHROPIC, api_key="test-key")
-        assert manager.has_provider_key(ProviderType.ANTHROPIC)
+        await manager.update_provider(ProviderType.ANTHROPIC, api_key="test-key")
+        assert await manager.has_provider_key(ProviderType.ANTHROPIC)
 
         # Now clear it
-        manager.clear_provider_key(ProviderType.ANTHROPIC)
+        await manager.clear_provider_key(ProviderType.ANTHROPIC)
 
         # Verify key is cleared
-        assert not manager.has_provider_key(ProviderType.ANTHROPIC)
+        assert not await manager.has_provider_key(ProviderType.ANTHROPIC)
 
         # Verify config file was updated
         with open(config_path, encoding="utf-8") as f:
@@ -548,21 +564,22 @@ def test_clear_provider_key_anthropic():
         assert saved_data["anthropic"]["api_key"] is None
 
 
-def test_clear_provider_key_google():
+@pytest.mark.asyncio
+async def test_clear_provider_key_google():
     """Test clearing Google provider API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # First set a key
-        manager.update_provider(ProviderType.GOOGLE, api_key="test-key")
-        assert manager.has_provider_key(ProviderType.GOOGLE)
+        await manager.update_provider(ProviderType.GOOGLE, api_key="test-key")
+        assert await manager.has_provider_key(ProviderType.GOOGLE)
 
         # Now clear it
-        manager.clear_provider_key(ProviderType.GOOGLE)
+        await manager.clear_provider_key(ProviderType.GOOGLE)
 
         # Verify key is cleared
-        assert not manager.has_provider_key(ProviderType.GOOGLE)
+        assert not await manager.has_provider_key(ProviderType.GOOGLE)
 
         # Verify config file was updated
         with open(config_path, encoding="utf-8") as f:
@@ -570,28 +587,29 @@ def test_clear_provider_key_google():
         assert saved_data["google"]["api_key"] is None
 
 
-def test_clear_provider_key_shotgun():
+@pytest.mark.asyncio
+async def test_clear_provider_key_shotgun():
     """Test clearing Shotgun Account API key and JWT."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # First set both api_key and supabase_jwt using update_shotgun_account
-        manager.update_shotgun_account(
+        await manager.update_shotgun_account(
             api_key="test-api-key", supabase_jwt="test-jwt-token"
         )
 
         # Verify both are set by checking config directly
-        config = manager.load(force_reload=True)
+        config = await manager.load(force_reload=True)
         assert manager._provider_has_api_key(config.shotgun)
         assert config.shotgun.supabase_jwt is not None
         assert config.shotgun.supabase_jwt.get_secret_value() == "test-jwt-token"
 
         # Now clear it
-        manager.clear_provider_key("shotgun")
+        await manager.clear_provider_key("shotgun")
 
         # Verify both api_key and supabase_jwt are cleared
-        config = manager.load(force_reload=True)
+        config = await manager.load(force_reload=True)
         assert not manager._provider_has_api_key(config.shotgun)
         assert config.shotgun.supabase_jwt is None
 
@@ -602,31 +620,33 @@ def test_clear_provider_key_shotgun():
         assert saved_data["shotgun"]["supabase_jwt"] is None
 
 
-def test_clear_provider_key_string_provider():
+@pytest.mark.asyncio
+async def test_clear_provider_key_string_provider():
     """Test clearing provider key with string provider type."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # First set a key using string
-        manager.update_provider("anthropic", api_key="test-key")
-        assert manager.has_provider_key("anthropic")
+        await manager.update_provider("anthropic", api_key="test-key")
+        assert await manager.has_provider_key("anthropic")
 
         # Now clear it using string
-        manager.clear_provider_key("anthropic")
+        await manager.clear_provider_key("anthropic")
 
         # Verify key is cleared
-        assert not manager.has_provider_key("anthropic")
+        assert not await manager.has_provider_key("anthropic")
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_initialize(mock_logger):
+@pytest.mark.asyncio
+async def test_initialize(mock_logger):
     """Test initialize method creates default config and saves it."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        config = manager.initialize()
+        config = await manager.initialize()
 
         assert isinstance(config, ShotgunConfig)
         assert config.selected_model is None
@@ -744,14 +764,15 @@ def test_get_config_manager_singleton():
         manager_module._config_manager_instance = original_instance
 
 
-def test_config_manager_force_reload():
+@pytest.mark.asyncio
+async def test_config_manager_force_reload():
     """Test ConfigManager force_reload parameter and caching behavior."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Load config with force_reload=False to enable caching
-        config1 = manager.load(force_reload=False)
+        config1 = await manager.load(force_reload=False)
         assert config1.google.api_key is None
 
         # Manually modify the config file
@@ -770,96 +791,101 @@ def test_config_manager_force_reload():
             json.dump(config_data, f)
 
         # Load with force_reload=False should return cached config
-        config2 = manager.load(force_reload=False)
+        config2 = await manager.load(force_reload=False)
         assert config2.google.api_key is None  # Still cached
 
         # Load with force_reload=True (default) should read from disk
-        config3 = manager.load(force_reload=True)
+        config3 = await manager.load(force_reload=True)
         assert config3.google.api_key is not None
         assert config3.google.api_key.get_secret_value() == "new-google-key"
 
 
-def test_update_provider_sets_selected_model_when_first_key():
+@pytest.mark.asyncio
+async def test_update_provider_sets_selected_model_when_first_key():
     """Test that adding the first API key sets selected_model to that provider's default."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Initially, selected_model is None
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model is None
 
         # Add API key to Anthropic when no other keys exist
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.ANTHROPIC, **{API_KEY_FIELD: "test-anthropic-key"}
         )
 
         # Verify selected_model is now set to Anthropic's default
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
-def test_update_provider_keeps_selected_model_when_other_keys_exist():
+@pytest.mark.asyncio
+async def test_update_provider_keeps_selected_model_when_other_keys_exist():
     """Test that adding a key when others exist doesn't change selected_model."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # First, add OpenAI key (should set selected_model to OpenAI default)
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.OPENAI, **{API_KEY_FIELD: "test-openai-key"}
         )
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model == ModelName.GPT_5
 
         # Now add Anthropic key (should NOT change selected_model)
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.ANTHROPIC, **{API_KEY_FIELD: "test-anthropic-key"}
         )
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model == ModelName.GPT_5  # Still GPT-5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
-def test_update_provider_sets_selected_model_for_google():
+@pytest.mark.asyncio
+async def test_update_provider_sets_selected_model_for_google():
     """Test that Google selected_model is set when it's the first key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Add API key to Google when no other keys exist
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.GOOGLE, **{API_KEY_FIELD: "test-google-key"}
         )
 
         # Verify selected_model is now set to Google's default
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model == ModelName.GEMINI_2_5_PRO
         assert config.google.api_key.get_secret_value() == "test-google-key"
 
 
-def test_update_provider_with_none_key_doesnt_set_selected_model():
+@pytest.mark.asyncio
+async def test_update_provider_with_none_key_doesnt_set_selected_model():
     """Test that setting a None API key doesn't change selected_model."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Initially selected_model is None
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model is None
 
         # Try to update Anthropic with None key
-        manager.update_provider(ProviderType.ANTHROPIC, **{API_KEY_FIELD: None})
+        await manager.update_provider(ProviderType.ANTHROPIC, **{API_KEY_FIELD: None})
 
         # selected_model should still be None
-        config = manager.load()
+        config = await manager.load()
         assert config.selected_model is None
         assert config.anthropic.api_key is None
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
+@pytest.mark.asyncio
+async def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
     """Test that load() updates selected_model when its provider has no API key."""
     import uuid
 
@@ -881,7 +907,7 @@ def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             # selected_model should now be Anthropic's default since OpenAI has no key
             assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
@@ -898,7 +924,8 @@ def test_load_updates_selected_model_when_provider_has_no_key(mock_logger):
 
 
 @patch("shotgun.agents.config.manager.logger")
-def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
+@pytest.mark.asyncio
+async def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
     """Test that load() keeps selected_model when its provider has an API key."""
     import uuid
 
@@ -920,7 +947,7 @@ def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             # selected_model should still be GPT-5 since it has a key
             assert config.selected_model == ModelName.GPT_5
@@ -938,26 +965,27 @@ def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
             os.unlink(temp_file.name)
 
 
-def test_clear_provider_key_updates_selected_model():
+@pytest.mark.asyncio
+async def test_clear_provider_key_updates_selected_model():
     """Test that clearing provider key updates selected_model to available provider."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Set up multiple providers
-        manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
-        manager.update_provider(ProviderType.ANTHROPIC, api_key="test-anthropic-key")
+        await manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
+        await manager.update_provider(ProviderType.ANTHROPIC, api_key="test-anthropic-key")
 
         # Manually set selected_model to Anthropic model
-        manager.update_selected_model(ModelName.CLAUDE_HAIKU_4_5)
-        config = manager.load(force_reload=True)
+        await manager.update_selected_model(ModelName.CLAUDE_HAIKU_4_5)
+        config = await manager.load(force_reload=True)
         assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
 
         # Clear Anthropic provider key
-        manager.clear_provider_key(ProviderType.ANTHROPIC)
+        await manager.clear_provider_key(ProviderType.ANTHROPIC)
 
         # Reload config and verify selected_model is updated to available provider
-        config = manager.load(force_reload=True)
+        config = await manager.load(force_reload=True)
 
         # selected_model should be updated to an OpenAI model or set to None then to OpenAI on load
         # The load() method should detect that the selected model's provider has no key
@@ -966,30 +994,32 @@ def test_clear_provider_key_updates_selected_model():
         assert config.selected_model == ModelName.GPT_5  # Should switch to OpenAI
 
 
-def test_clear_all_provider_keys_sets_selected_model_to_none():
+@pytest.mark.asyncio
+async def test_clear_all_provider_keys_sets_selected_model_to_none():
     """Test that clearing all provider keys sets selected_model appropriately."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Set up a provider
-        manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
-        config = manager.load(force_reload=True)
+        await manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
+        config = await manager.load(force_reload=True)
         assert config.selected_model == ModelName.GPT_5
 
         # Clear the only provider key
-        manager.clear_provider_key(ProviderType.OPENAI)
+        await manager.clear_provider_key(ProviderType.OPENAI)
 
         # Reload config
-        config = manager.load(force_reload=True)
+        config = await manager.load(force_reload=True)
 
         # selected_model should be None since no providers have keys
         # The load() method will try to find an available provider but won't find any
         assert config.selected_model is None
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.config.manager.logger")
-def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(mock_logger):
+async def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(mock_logger):
     """Test that load() sets shown_welcome_screen=False for existing BYOK users."""
     import uuid
 
@@ -1013,7 +1043,7 @@ def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(mock_l
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             # shown_welcome_screen should be set to False for existing BYOK user
             assert config.shown_welcome_screen is False
@@ -1027,8 +1057,9 @@ def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(mock_l
             os.unlink(temp_file.name)
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.config.manager.logger")
-def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(mock_logger):
+async def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(mock_logger):
     """Test that load() does not set shown_welcome_screen for new users without BYOK keys."""
     import uuid
 
@@ -1052,7 +1083,7 @@ def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(mock_log
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             # shown_welcome_screen should use default (False) from the model
             assert config.shown_welcome_screen is False
@@ -1066,8 +1097,9 @@ def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(mock_log
             os.unlink(temp_file.name)
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.config.manager.logger")
-def test_load_migration_respects_existing_shown_welcome_screen(mock_logger):
+async def test_load_migration_respects_existing_shown_welcome_screen(mock_logger):
     """Test that load() does not override existing shown_welcome_screen value."""
     import uuid
 
@@ -1091,7 +1123,7 @@ def test_load_migration_respects_existing_shown_welcome_screen(mock_logger):
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
-            config = manager.load()
+            config = await manager.load()
 
             # shown_welcome_screen should remain True
             assert config.shown_welcome_screen is True
@@ -1105,23 +1137,24 @@ def test_load_migration_respects_existing_shown_welcome_screen(mock_logger):
             os.unlink(temp_file.name)
 
 
-def test_update_provider_sets_shown_welcome_screen_for_byok():
+@pytest.mark.asyncio
+async def test_update_provider_sets_shown_welcome_screen_for_byok():
     """Test that update_provider sets shown_welcome_screen=True when BYOK provider is configured."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Initially, shown_welcome_screen should be False (default)
-        config = manager.load()
+        config = await manager.load()
         assert config.shown_welcome_screen is False
 
         # Add API key to OpenAI (BYOK provider)
-        manager.update_provider(
+        await manager.update_provider(
             ProviderType.OPENAI, **{API_KEY_FIELD: "test-openai-key"}
         )
 
         # Verify shown_welcome_screen is now True
-        config = manager.load()
+        config = await manager.load()
         assert config.shown_welcome_screen is True
         assert config.openai.api_key.get_secret_value() == "test-openai-key"
 
@@ -1131,7 +1164,8 @@ def test_update_provider_sets_shown_welcome_screen_for_byok():
         assert saved_data["shown_welcome_screen"] is True
 
 
-def test_update_provider_sets_shown_welcome_screen_for_all_byok_providers():
+@pytest.mark.asyncio
+async def test_update_provider_sets_shown_welcome_screen_for_all_byok_providers():
     """Test that update_provider sets shown_welcome_screen=True for all BYOK providers."""
     providers = [
         (ProviderType.OPENAI, "test-openai-key"),
@@ -1145,51 +1179,53 @@ def test_update_provider_sets_shown_welcome_screen_for_all_byok_providers():
             manager = ConfigManager(config_path=config_path)
 
             # Initially, shown_welcome_screen should be False
-            config = manager.load()
+            config = await manager.load()
             assert config.shown_welcome_screen is False
 
             # Add API key to the provider
-            manager.update_provider(provider, **{API_KEY_FIELD: api_key})
+            await manager.update_provider(provider, **{API_KEY_FIELD: api_key})
 
             # Verify shown_welcome_screen is now True
-            config = manager.load()
+            config = await manager.load()
             assert config.shown_welcome_screen is True
 
 
-def test_update_provider_does_not_set_shown_welcome_screen_for_none_key():
+@pytest.mark.asyncio
+async def test_update_provider_does_not_set_shown_welcome_screen_for_none_key():
     """Test that update_provider does not set shown_welcome_screen when setting None API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Initially, shown_welcome_screen should be False
-        config = manager.load()
+        config = await manager.load()
         assert config.shown_welcome_screen is False
 
         # Try to update OpenAI with None key
-        manager.update_provider(ProviderType.OPENAI, **{API_KEY_FIELD: None})
+        await manager.update_provider(ProviderType.OPENAI, **{API_KEY_FIELD: None})
 
         # shown_welcome_screen should still be False
-        config = manager.load()
+        config = await manager.load()
         assert config.shown_welcome_screen is False
 
 
-def test_update_shotgun_account_does_not_set_shown_welcome_screen():
+@pytest.mark.asyncio
+async def test_update_shotgun_account_does_not_set_shown_welcome_screen():
     """Test that update_shotgun_account does not set shown_welcome_screen."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
         # Initially, shown_welcome_screen should be False
-        config = manager.load()
+        config = await manager.load()
         assert config.shown_welcome_screen is False
 
         # Update Shotgun Account credentials
-        manager.update_shotgun_account(
+        await manager.update_shotgun_account(
             api_key="test-api-key", supabase_jwt="test-jwt-token"
         )
 
         # shown_welcome_screen should still be False
         # (Shotgun Account setup is handled differently in the welcome screen flow)
-        config = manager.load()
+        config = await manager.load()
         assert config.shown_welcome_screen is False
