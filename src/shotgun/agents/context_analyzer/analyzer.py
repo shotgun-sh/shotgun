@@ -67,32 +67,13 @@ class ContextAnalyzer:
         for msg in reversed(message_history):
             if isinstance(msg, ModelResponse) and msg.usage:
                 last_input_tokens = msg.usage.input_tokens + msg.usage.cache_read_tokens
-                logger.debug(
-                    f"[ANALYZER] Found last response with usage - "
-                    f"input_tokens={msg.usage.input_tokens}, "
-                    f"cache_read_tokens={msg.usage.cache_read_tokens}, "
-                    f"total={last_input_tokens}"
-                )
                 break
 
         if last_input_tokens == 0:
-            # Only warn if there are actual messages that should have usage data
-            if len(message_history) > 0:
-                logger.warning(
-                    f"[ANALYZER] No usage data found in message history! "
-                    f"message_count={len(message_history)}, "
-                    f"response_count={sum(1 for m in message_history if isinstance(m, ModelResponse))}"
-                )
-                logger.info("[ANALYZER] Falling back to token estimation")
-
-            # Fallback to token estimation
+            # Fallback to token estimation (no logging to reduce verbosity)
             last_input_tokens = await estimate_tokens_from_messages(
                 message_history, self.model_config
             )
-
-            # Only log if we actually estimated non-zero tokens
-            if last_input_tokens > 0:
-                logger.debug(f"[ANALYZER] Estimated tokens: {last_input_tokens}")
 
         # Step 2: Calculate total output tokens (sum across all responses)
         for msg in message_history:
@@ -253,18 +234,7 @@ class ContextAnalyzer:
             # If no content, put all in agent responses
             agent_response_tokens = total_output_tokens
 
-        # Only log token allocation if there are meaningful non-zero values
-        if last_input_tokens > 0 or total_output_tokens > 0:
-            logger.debug(
-                f"Token allocation complete: user={user_tokens}, agent_responses={agent_response_tokens}, "
-                f"system_prompts={system_prompt_tokens}, system_status={system_status_tokens}, "
-                f"codebase_understanding={codebase_understanding_tokens}, "
-                f"artifact_management={artifact_management_tokens}, web_research={web_research_tokens}, "
-                f"unknown={unknown_tokens}"
-            )
-            logger.debug(
-                f"Input tokens (from last response): {last_input_tokens}, Output tokens (sum): {total_output_tokens}"
-            )
+        # Token allocation complete (no logging to reduce verbosity)
 
         # Create TokenAllocation model
         return TokenAllocation(
