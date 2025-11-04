@@ -1,0 +1,12 @@
+# Security Policy
+
+## Reporting a Vulnerability
+
+**Do not open public issues for security vulnerabilities.**
+
+Email contact@shotgun.sh with:
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+
+We'll respond within 48 hours.
