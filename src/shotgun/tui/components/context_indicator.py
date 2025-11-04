@@ -76,7 +76,9 @@ class ContextIndicator(Static):
 
     def _animate_frame(self) -> None:
         """Advance the animation frame."""
-        self._animation_index = (self._animation_index + 1) % len(self._animation_frames)
+        self._animation_index = (self._animation_index + 1) % len(
+            self._animation_frames
+        )
         self._refresh_display()
 
     def _get_percentage_color(self, percentage: float) -> str:
