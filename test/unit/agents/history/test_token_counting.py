@@ -1,8 +1,9 @@
 """Unit tests for token counting with empty messages."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+
+import pytest
+from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 from shotgun.agents.history.token_counting.anthropic import AnthropicTokenCounter
 from shotgun.agents.history.token_counting.openai import OpenAITokenCounter
