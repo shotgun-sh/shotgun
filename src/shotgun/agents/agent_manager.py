@@ -1056,14 +1056,35 @@ class AgentManager(Widget):
         # Create content hash of current response
         current_hash = self._hash_response_content(current)
 
+        # Log what we're about to post for debugging
+        logger.debug(
+            "Preparing to post partial message",
+            extra={
+                "is_last": is_last,
+                "current_hash": current_hash,
+                "last_posted_hash": last_posted_hash,
+                "will_skip": not is_last and current_hash == last_posted_hash and current_hash is not None,
+                "num_parts": len(current.parts) if current else 0,
+            }
+        )
+
         # Skip posting if the current response content hasn't changed since last post
         # This prevents duplicate tool calls from being shown multiple times
         if not is_last and current_hash == last_posted_hash and current_hash is not None:
-            logger.debug(
-                "Skipping duplicate partial response post",
-                extra={"content_hash": current_hash}
+            logger.info(
+                "⏭️  SKIPPED duplicate partial response post",
+                extra={"content_hash": current_hash, "num_parts": len(current.parts) if current else 0}
             )
             return last_posted_hash  # No change, return the same hash
+
+        logger.info(
+            "✉️  POSTING partial response",
+            extra={
+                "content_hash": current_hash,
+                "is_last": is_last,
+                "num_parts": len(current.parts) if current else 0,
+            }
+        )
 
         self.post_message(
             PartialResponseMessage(
