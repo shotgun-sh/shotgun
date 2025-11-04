@@ -59,8 +59,10 @@ def setup_posthog_observability() -> bool:
 
         # Set user context with anonymous shotgun instance ID from config
         try:
+            import asyncio
+
             config_manager = get_config_manager()
-            shotgun_instance_id = config_manager.get_shotgun_instance_id_sync()
+            shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
 
             # Identify the user in PostHog
             posthog.identify(  # type: ignore[attr-defined]
@@ -107,9 +109,11 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         return
 
     try:
+        import asyncio
+
         # Get shotgun instance ID for tracking
         config_manager = get_config_manager()
-        shotgun_instance_id = config_manager.get_shotgun_instance_id_sync()
+        shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
 
         # Add version and environment to properties
         if properties is None:
@@ -168,13 +172,13 @@ def submit_feedback_survey(feedback: Feedback) -> None:
         logger.debug("PostHog not initialized, skipping feedback survey")
         return
 
+    import asyncio
+
     config_manager = get_config_manager()
-    config = config_manager.load_sync()
+    config = asyncio.run(config_manager.load())
     conversation_manager = ConversationManager()
-    # Note: ConversationManager.load() is async, but we don't need it for feedback
     conversation = None
     try:
-        import asyncio
         conversation = asyncio.run(conversation_manager.load())
     except Exception:
         pass

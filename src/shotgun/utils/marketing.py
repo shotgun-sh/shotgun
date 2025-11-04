@@ -93,7 +93,9 @@ class MarketingManager:
             file_operations: List of file operations from the current agent run
             display_callback: Callback function to display messages to the user
         """
-        config = config_manager.load_sync()
+        import asyncio
+
+        config = asyncio.run(config_manager.load())
 
         # Check GitHub star message
         if MarketingManager.should_show_github_star_message(

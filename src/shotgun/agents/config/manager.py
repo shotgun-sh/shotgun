@@ -176,75 +176,6 @@ class ConfigManager:
             self._config = await self.initialize()
             return self._config
 
-    def load_sync(self, force_reload: bool = False) -> ShotgunConfig:
-        """Synchronous version of load() that uses cache or falls back to blocking I/O.
-
-        This is provided for backward compatibility with synchronous code paths.
-        New code should prefer the async load() method.
-
-        Args:
-            force_reload: If True, reload from disk even if cached (default: False for sync)
-
-        Returns:
-            ShotgunConfig: Loaded configuration or default config if file doesn't exist
-
-        Note:
-            This method will perform blocking I/O if config is not cached.
-            Prefer using async load() in async contexts to avoid blocking.
-        """
-        # If cached and not forcing reload, return cached config
-        if self._config is not None and not force_reload:
-            return self._config
-
-        # Otherwise, perform synchronous I/O (blocking)
-        if not self.config_path.exists():
-            logger.info(
-                "Configuration file not found, creating new config at: %s",
-                self.config_path,
-            )
-            # Create new config with generated shotgun_instance_id (sync)
-            self._config = ShotgunConfig(shotgun_instance_id=str(uuid.uuid4()))
-            return self._config
-
-        try:
-            with open(self.config_path, encoding="utf-8") as f:
-                content = f.read()
-                data = json.loads(content)
-
-            # Apply same migrations as async version
-            if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
-                data[SHOTGUN_INSTANCE_ID_FIELD] = data.pop("user_id")
-                data["config_version"] = 3
-
-            if "shown_welcome_screen" not in data:
-                has_byok_key = False
-                for section in ["openai", "anthropic", "google"]:
-                    if (
-                        section in data
-                        and isinstance(data[section], dict)
-                        and data[section].get("api_key")
-                    ):
-                        has_byok_key = True
-                        break
-                if has_byok_key:
-                    data["shown_welcome_screen"] = False
-
-            if "marketing" not in data:
-                data["marketing"] = {"messages": {}}
-                data["config_version"] = 4
-
-            self._convert_secrets_to_secretstr(data)
-            self._config = ShotgunConfig.model_validate(data)
-            logger.debug("Configuration loaded successfully from %s", self.config_path)
-            return self._config
-
-        except Exception as e:
-            logger.error(
-                "Failed to load configuration from %s: %s", self.config_path, e
-            )
-            logger.info("Creating new configuration with generated shotgun_instance_id")
-            self._config = ShotgunConfig(shotgun_instance_id=str(uuid.uuid4()))
-            return self._config
 
     async def save(self, config: ShotgunConfig | None = None) -> None:
         """Save configuration to file.
@@ -547,17 +478,6 @@ class ConfigManager:
         config = await self.load()
         return config.shotgun_instance_id
 
-    def get_shotgun_instance_id_sync(self) -> str:
-        """Get the shotgun instance ID from configuration (synchronous).
-
-        Uses cached config when available to avoid blocking I/O.
-        Used in synchronous contexts like telemetry setup.
-
-        Returns:
-            The unique shotgun instance ID string
-        """
-        config = self.load_sync()
-        return config.shotgun_instance_id
 
     async def update_shotgun_account(
         self, api_key: str | None = None, supabase_jwt: str | None = None

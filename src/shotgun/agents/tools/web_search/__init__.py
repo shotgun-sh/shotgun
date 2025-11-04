@@ -41,9 +41,11 @@ def get_available_web_search_tools() -> list[WebSearchTool]:
     """
     tools: list[WebSearchTool] = []
 
+    import asyncio
+
     # Check if using Shotgun Account
     config_manager = get_config_manager()
-    config = config_manager.load_sync()
+    config = asyncio.run(config_manager.load())
     has_shotgun_key = config.shotgun.api_key is not None
 
     if has_shotgun_key:

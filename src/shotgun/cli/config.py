@@ -133,8 +133,10 @@ def get(
     ] = False,
 ) -> None:
     """Display current configuration."""
+    import asyncio
+
     config_manager = get_config_manager()
-    config = config_manager.load_sync()
+    config = asyncio.run(config_manager.load())
 
     if json_output:
         # Convert to dict and mask secrets

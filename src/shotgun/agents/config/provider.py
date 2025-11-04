@@ -187,10 +187,12 @@ def get_provider_model(
     Raises:
         ValueError: If provider is not configured properly or model not found
     """
+    import asyncio
+
     config_manager = get_config_manager()
     # Use cached config for read-only access (performance)
-    # Use load_sync() for backward compatibility with synchronous code
-    config = config_manager.load_sync(force_reload=False)
+    # Run async load() in synchronous context
+    config = asyncio.run(config_manager.load(force_reload=False))
 
     # Priority 1: Check if Shotgun key exists - if so, use it for ANY model
     shotgun_api_key = _get_api_key(config.shotgun.api_key)
