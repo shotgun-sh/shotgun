@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import aiofiles
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
@@ -93,7 +94,8 @@ async def file_read(
         # Read file contents
         encoding_used = "utf-8"
         try:
-            content = full_file_path.read_text(encoding="utf-8")
+            async with aiofiles.open(full_file_path, encoding="utf-8") as f:
+                content = await f.read()
             size_bytes = full_file_path.stat().st_size
 
             logger.debug(
@@ -119,7 +121,8 @@ async def file_read(
             try:
                 # Try with different encoding
                 encoding_used = "latin-1"
-                content = full_file_path.read_text(encoding="latin-1")
+                async with aiofiles.open(full_file_path, encoding="latin-1") as f:
+                    content = await f.read()
                 size_bytes = full_file_path.stat().st_size
 
                 # Detect language from file extension

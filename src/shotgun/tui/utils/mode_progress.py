@@ -3,6 +3,8 @@
 import random
 from pathlib import Path
 
+import aiofiles
+
 from shotgun.agents.models import AgentType
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
@@ -30,7 +32,7 @@ class ModeProgressChecker:
         """
         self.base_path = base_path or get_shotgun_base_path()
 
-    def has_mode_content(self, mode: AgentType) -> bool:
+    async def has_mode_content(self, mode: AgentType) -> bool:
         """Check if a mode has meaningful content.
 
         Args:
@@ -52,7 +54,8 @@ class ModeProgressChecker:
                 for item in export_path.glob("*"):
                     if item.is_file() and not item.name.startswith("."):
                         try:
-                            content = item.read_text(encoding="utf-8")
+                            async with aiofiles.open(item, encoding="utf-8") as f:
+                                content = await f.read()
                             if len(content.strip()) > self.MIN_CONTENT_SIZE:
                                 return True
                         except (OSError, UnicodeDecodeError):
@@ -65,13 +68,14 @@ class ModeProgressChecker:
             return False
 
         try:
-            content = file_path.read_text(encoding="utf-8")
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
+                content = await f.read()
             # Check if file has meaningful content
             return len(content.strip()) > self.MIN_CONTENT_SIZE
         except (OSError, UnicodeDecodeError):
             return False
 
-    def get_next_suggested_mode(self, current_mode: AgentType) -> AgentType | None:
+    async def get_next_suggested_mode(self, current_mode: AgentType) -> AgentType | None:
         """Get the next suggested mode based on current progress.
 
         Args:
@@ -94,7 +98,7 @@ class ModeProgressChecker:
             return None
 
         # Check if current mode has content
-        if not self.has_mode_content(current_mode):
+        if not await self.has_mode_content(current_mode):
             # Current mode is empty, no suggestion for next mode
             return None
 
@@ -208,7 +212,7 @@ class PlaceholderHints:
         self._cached_hints: dict[tuple[AgentType, bool], str] = {}
         self._hint_indices: dict[tuple[AgentType, bool], int] = {}
 
-    def get_hint(self, current_mode: AgentType, force_refresh: bool = False) -> str:
+    async def get_hint(self, current_mode: AgentType, force_refresh: bool = False) -> str:
         """Get a dynamic hint based on current mode and progress.
 
         Args:
@@ -223,7 +227,7 @@ class PlaceholderHints:
             return f"Enter your {current_mode.value} mode prompt (SHIFT+TAB to switch modes)"
 
         # Determine if mode has content
-        has_content = self.progress_checker.has_mode_content(current_mode)
+        has_content = await self.progress_checker.has_mode_content(current_mode)
 
         # Get hint variations for this mode and state
         hints_list = self.HINTS[current_mode][has_content]
@@ -243,7 +247,7 @@ class PlaceholderHints:
 
         return self._cached_hints[cache_key]
 
-    def get_placeholder_for_mode(self, current_mode: AgentType) -> str:
+    async def get_placeholder_for_mode(self, current_mode: AgentType) -> str:
         """Get placeholder text for a given mode.
 
         This is an alias for get_hint() to maintain compatibility.
@@ -254,4 +258,4 @@ class PlaceholderHints:
         Returns:
             A contextual hint string for the placeholder.
         """
-        return self.get_hint(current_mode)
+        return await self.get_hint(current_mode)

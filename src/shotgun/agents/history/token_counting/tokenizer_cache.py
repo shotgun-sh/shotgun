@@ -3,6 +3,7 @@
 import hashlib
 from pathlib import Path
 
+import aiofiles
 import httpx
 
 from shotgun.logging_config import get_logger
@@ -78,7 +79,8 @@ async def download_gemini_tokenizer() -> Path:
 
         # Atomic write: write to temp file first, then rename
         temp_path = cache_path.with_suffix(".tmp")
-        temp_path.write_bytes(content)
+        async with aiofiles.open(temp_path, "wb") as f:
+            await f.write(content)
         temp_path.rename(cache_path)
 
         logger.info(f"Gemini tokenizer downloaded and cached at {cache_path}")

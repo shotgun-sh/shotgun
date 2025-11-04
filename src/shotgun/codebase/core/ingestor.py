@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+import aiofiles
 import kuzu
 from tree_sitter import Node, Parser, QueryCursor
 
@@ -832,7 +833,7 @@ class SimpleGraphBuilder:
             phase_complete=True,
         )
 
-    def _process_single_file(self, filepath: Path, language: str) -> None:
+    async def _process_single_file(self, filepath: Path, language: str) -> None:
         """Process a single file."""
         relative_path = filepath.relative_to(self.repo_path)
         relative_path_str = str(relative_path).replace(os.sep, "/")
@@ -873,8 +874,8 @@ class SimpleGraphBuilder:
 
         # Parse file
         try:
-            with open(filepath, "rb") as f:
-                content = f.read()
+            async with aiofiles.open(filepath, "rb") as f:
+                content = await f.read()
 
             parser = self.parsers[language]
             tree = parser.parse(content)

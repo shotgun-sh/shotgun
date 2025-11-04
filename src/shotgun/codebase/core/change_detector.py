@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, cast
 
+import aiofiles
 import kuzu
 
 from shotgun.logging_config import get_logger
@@ -301,7 +302,7 @@ class ChangeDetector:
             # Direct substring match
             return pattern in filepath
 
-    def _calculate_file_hash(self, filepath: Path) -> str:
+    async def _calculate_file_hash(self, filepath: Path) -> str:
         """Calculate hash of file contents.
 
         Args:
@@ -311,8 +312,9 @@ class ChangeDetector:
             SHA256 hash of file contents
         """
         try:
-            with open(filepath, "rb") as f:
-                return hashlib.sha256(f.read()).hexdigest()
+            async with aiofiles.open(filepath, "rb") as f:
+                content = await f.read()
+                return hashlib.sha256(content).hexdigest()
         except Exception as e:
             logger.error(f"Failed to calculate hash for {filepath}: {e}")
             return ""

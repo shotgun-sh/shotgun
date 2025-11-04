@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import aiofiles
 from pydantic_ai import (
     Agent,
     RunContext,
@@ -194,7 +195,7 @@ def create_base_agent(
     return agent, deps
 
 
-def _extract_file_toc_content(
+async def _extract_file_toc_content(
     file_path: Path, max_depth: int | None = None, max_chars: int = 500
 ) -> str | None:
     """Extract TOC from a single file with depth and character limits.
@@ -211,7 +212,8 @@ def _extract_file_toc_content(
         return None
 
     try:
-        content = file_path.read_text(encoding="utf-8")
+        async with aiofiles.open(file_path, encoding="utf-8") as f:
+            content = await f.read()
         lines = content.split("\n")
 
         # Extract headings
@@ -257,7 +259,7 @@ def _extract_file_toc_content(
         return None
 
 
-def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
+async def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
     """Extract TOCs from current and prior agents' files in the pipeline.
 
     Shows full TOC of agent's own file and high-level summaries of prior agents'
@@ -309,7 +311,7 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
     for prior_file in config.prior_files:
         file_path = base_path / prior_file
         # Only show # and ## headings from prior files, max 500 chars each
-        prior_toc = _extract_file_toc_content(file_path, max_depth=2, max_chars=500)
+        prior_toc = await _extract_file_toc_content(file_path, max_depth=2, max_chars=500)
         if prior_toc:
             # Add section with XML tags
             toc_sections.append(
@@ -321,7 +323,7 @@ def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
     # Extract TOC from own file (full detail)
     if config.own_file:
         own_path = base_path / config.own_file
-        own_toc = _extract_file_toc_content(own_path, max_depth=None, max_chars=2000)
+        own_toc = await _extract_file_toc_content(own_path, max_depth=None, max_chars=2000)
         if own_toc:
             # Put own file TOC at the beginning with XML tags
             toc_sections.insert(
