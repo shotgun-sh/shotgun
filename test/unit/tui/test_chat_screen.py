@@ -139,18 +139,20 @@ def test_mocked_cancellation(chat_screen, mock_processing_state):
     )
 
 
-def test_mocked_conversation_save(chat_screen, mock_conversation_manager):
+@pytest.mark.asyncio
+async def test_mocked_conversation_save(chat_screen, mock_conversation_manager):
     """Test that conversation saving can be tested without filesystem access."""
-    chat_screen.conversation_manager.save()
+    await chat_screen.conversation_manager.save()
 
     mock_conversation_manager.save.assert_called_once()
 
 
-def test_mocked_conversation_load(chat_screen, mock_conversation_manager):
+@pytest.mark.asyncio
+async def test_mocked_conversation_load(chat_screen, mock_conversation_manager):
     """Test that conversation loading can be tested without filesystem access."""
     mock_conversation_manager.load.return_value = None
 
-    result = chat_screen.conversation_manager.load()
+    result = await chat_screen.conversation_manager.load()
 
     assert result is None
     mock_conversation_manager.load.assert_called_once()
