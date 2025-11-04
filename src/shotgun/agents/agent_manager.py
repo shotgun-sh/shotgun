@@ -835,8 +835,9 @@ class AgentManager(Widget):
         else:
             partial_parts = []
 
-        # Track last posted response to avoid posting duplicates
-        last_posted_response: ModelResponse | None = None
+        # Track last posted response hash to avoid posting duplicates
+        # Use content-based hash instead of object comparison
+        last_posted_hash: str | None = None
 
         async for event in stream:
             try:
@@ -856,7 +857,7 @@ class AgentManager(Widget):
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
-                        last_posted_response = self._post_partial_message(False, last_posted_response)
+                        last_posted_hash = self._post_partial_message(False, last_posted_hash)
 
                 elif isinstance(event, PartDeltaEvent):
                     index = event.index
@@ -882,7 +883,7 @@ class AgentManager(Widget):
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
-                        last_posted_response = self._post_partial_message(False, last_posted_response)
+                        last_posted_hash = self._post_partial_message(False, last_posted_hash)
 
                 elif isinstance(event, FunctionToolCallEvent):
                     # Track tool call event
@@ -961,7 +962,7 @@ class AgentManager(Widget):
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
-                        last_posted_response = self._post_partial_message(False, last_posted_response)
+                        last_posted_hash = self._post_partial_message(False, last_posted_hash)
                 elif isinstance(event, FunctionToolResultEvent):
                     # Track tool completion event
 
@@ -991,7 +992,7 @@ class AgentManager(Widget):
                     ):
                         state.messages.append(request_message)
                         ## this is what the user responded with
-                        last_posted_response = self._post_partial_message(is_last=False, last_posted_response=last_posted_response)
+                        last_posted_hash = self._post_partial_message(is_last=False, last_posted_hash=last_posted_hash)
 
                 elif isinstance(event, FinalResultEvent):
                     pass
@@ -1008,7 +1009,7 @@ class AgentManager(Widget):
             if final_message not in state.messages:
                 state.messages.append(final_message)
             state.current_response = None
-            last_posted_response = self._post_partial_message(True, last_posted_response)
+            last_posted_hash = self._post_partial_message(True, last_posted_hash)
         state.current_response = None
 
         # Notify UI that streaming has completed
@@ -1027,16 +1028,16 @@ class AgentManager(Widget):
         return ModelResponse(parts=list(completed_parts))
 
     def _post_partial_message(
-        self, is_last: bool, last_posted_response: ModelResponse | None = None
-    ) -> ModelResponse | None:
+        self, is_last: bool, last_posted_hash: str | None = None
+    ) -> str | None:
         """Post a partial message to the UI.
 
         Args:
             is_last: Whether this is the last partial message
-            last_posted_response: The last response that was posted (to avoid duplicates)
+            last_posted_hash: Content hash of the last posted response (to avoid duplicates)
 
         Returns:
-            The current_response that was posted, or None if nothing was posted
+            Content hash of the current_response that was posted, or None if nothing was posted
         """
         if self._stream_state is None:
             return None
@@ -1052,15 +1053,17 @@ class AgentManager(Widget):
 
         current = self._stream_state.current_response
 
-        # Skip posting if the current response hasn't changed since last post
+        # Create content hash of current response
+        current_hash = self._hash_response_content(current)
+
+        # Skip posting if the current response content hasn't changed since last post
         # This prevents duplicate tool calls from being shown multiple times
-        if (
-            not is_last
-            and current is not None
-            and last_posted_response is not None
-            and current.parts == last_posted_response.parts
-        ):
-            return last_posted_response  # No change, return the same response
+        if not is_last and current_hash == last_posted_hash and current_hash is not None:
+            logger.debug(
+                "Skipping duplicate partial response post",
+                extra={"content_hash": current_hash}
+            )
+            return last_posted_hash  # No change, return the same hash
 
         self.post_message(
             PartialResponseMessage(
@@ -1070,7 +1073,7 @@ class AgentManager(Widget):
             )
         )
 
-        return current
+        return current_hash
 
     def _post_messages_updated(
         self, file_operations: list[FileOperation] | None = None
@@ -1129,6 +1132,48 @@ class AgentManager(Widget):
             else:
                 filtered_messages.append(msg)
         return filtered_messages
+
+    def _hash_response_content(self, response: ModelResponse | None) -> str | None:
+        """Create a content-based hash of a ModelResponse.
+
+        This ignores timestamps and other metadata, focusing only on the actual content
+        (tool calls, text, etc.) to detect true duplicates.
+
+        Args:
+            response: The ModelResponse to hash
+
+        Returns:
+            A hash string representing the content, or None if response is None
+        """
+        if response is None:
+            return None
+
+        # Create a stable string representation of the parts
+        # We can't use hash() because ModelResponse is unhashable
+        import hashlib
+        import json
+
+        parts_data = []
+        for part in response.parts:
+            # Create a dict with just the essential content, excluding timestamps
+            if hasattr(part, "tool_name"):  # ToolCallPart
+                parts_data.append({
+                    "type": "tool_call",
+                    "tool_name": getattr(part, "tool_name", None),
+                    "args": getattr(part, "args", None),
+                })
+            elif hasattr(part, "content"):  # TextPart, etc
+                parts_data.append({
+                    "type": "text",
+                    "content": getattr(part, "content", None),
+                })
+            else:
+                # Fallback: use repr
+                parts_data.append({"type": "other", "repr": repr(part)})
+
+        # Create deterministic hash
+        content_str = json.dumps(parts_data, sort_keys=True)
+        return hashlib.sha256(content_str.encode()).hexdigest()[:16]  # First 16 chars is enough
 
     def _is_message_duplicate(
         self,
