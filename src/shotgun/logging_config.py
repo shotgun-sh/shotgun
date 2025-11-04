@@ -70,10 +70,7 @@ def setup_logger(
     logger = logging.getLogger(name)
 
     # Check if we already have a file handler
-    has_file_handler = any(
-        isinstance(h, logging.FileHandler)
-        for h in logger.handlers
-    )
+    has_file_handler = any(isinstance(h, logging.FileHandler) for h in logger.handlers)
 
     # If we already have a file handler, just return the logger
     if has_file_handler:
@@ -188,10 +185,7 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
 
     # Check if we have a file handler already
-    has_file_handler = any(
-        isinstance(h, logging.FileHandler)
-        for h in logger.handlers
-    )
+    has_file_handler = any(isinstance(h, logging.FileHandler) for h in logger.handlers)
 
     # If no file handler, set up the logger (will add file handler)
     if not has_file_handler:
