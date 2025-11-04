@@ -73,14 +73,21 @@ class AnthropicTokenCounter(TokenCounter):
             RuntimeError: If API call fails
         """
         # Handle empty text to avoid unnecessary API calls
+        # Anthropic API requires non-empty content, so we need a strict check
         if not text or not text.strip():
+            return 0
+
+        # Additional validation: ensure the text has actual content
+        # Some edge cases might have only whitespace or control characters
+        cleaned_text = text.strip()
+        if not cleaned_text:
             return 0
 
         try:
             # Anthropic API expects messages format and model parameter
             # Use await with async client
             result = await self.client.messages.count_tokens(
-                messages=[{"role": "user", "content": text}], model=self.model_name
+                messages=[{"role": "user", "content": cleaned_text}], model=self.model_name
             )
             return result.input_tokens
         except Exception as e:
