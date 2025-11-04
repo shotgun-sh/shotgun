@@ -64,7 +64,7 @@ def test_load_config_not_exists(mock_logger):
         assert hasattr(config, "shotgun_instance_id")
         assert config.shotgun_instance_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 3
+        assert config.config_version == 4
 
 
 @patch("shotgun.agents.config.manager.logger")
@@ -625,7 +625,7 @@ def test_initialize(mock_logger):
         assert hasattr(config, "shotgun_instance_id")
         assert config.shotgun_instance_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 3
+        assert config.config_version == 4
         # The log message now includes user_id
         assert mock_logger.info.call_count == 1
         call_args = mock_logger.info.call_args[0]

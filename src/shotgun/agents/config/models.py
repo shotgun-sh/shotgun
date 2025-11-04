@@ -1,5 +1,6 @@
 """Pydantic models for configuration."""
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, PrivateAttr, SecretStr
@@ -170,6 +171,21 @@ class ShotgunAccountConfig(BaseModel):
     )
 
 
+class MarketingMessageRecord(BaseModel):
+    """Record of when a marketing message was shown to the user."""
+
+    shown_at: datetime = Field(description="Timestamp when the message was shown")
+
+
+class MarketingConfig(BaseModel):
+    """Configuration for marketing messages shown to users."""
+
+    messages: dict[str, MarketingMessageRecord] = Field(
+        default_factory=dict,
+        description="Tracking which marketing messages have been shown. Key is message ID (e.g., 'github_star_v1')",
+    )
+
+
 class ShotgunConfig(BaseModel):
     """Main configuration for Shotgun CLI."""
 
@@ -184,8 +200,12 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=3, description="Configuration schema version")
+    config_version: int = Field(default=4, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",
+    )
+    marketing: MarketingConfig = Field(
+        default_factory=MarketingConfig,
+        description="Marketing messages configuration and tracking",
     )

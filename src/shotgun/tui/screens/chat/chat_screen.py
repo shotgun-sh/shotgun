@@ -75,6 +75,10 @@ from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.marketing import (
+    GITHUB_STAR_MESSAGE_ID,
+    MarketingManager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -678,6 +682,25 @@ class ChatScreen(Screen[None]):
                             )
 
                     self.mount_hint(message)
+
+                    # Check if we should show marketing message
+                    from shotgun.tui.app import ShotgunApp
+
+                    app = cast(ShotgunApp, self.app)
+                    config = app.config_manager.load()
+
+                    if MarketingManager.should_show_github_star_message(
+                        config.marketing, event.file_operations
+                    ):
+                        # Show the marketing message
+                        marketing_message = MarketingManager.get_github_star_message()
+                        self.mount_hint(marketing_message)
+
+                        # Mark message as shown and save config
+                        MarketingManager.mark_message_shown(
+                            config.marketing, GITHUB_STAR_MESSAGE_ID
+                        )
+                        app.config_manager.save(config)
 
     @on(CompactionStartedMessage)
     def handle_compaction_started(self, event: CompactionStartedMessage) -> None:
