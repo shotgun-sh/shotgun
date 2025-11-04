@@ -633,9 +633,22 @@ class ChatScreen(Screen[None]):
                     for s in seen:
                         if isinstance(s, type(msg)) and hasattr(s, "parts"):
                             s_parts = getattr(s, "parts", None)
-                            if s_parts is not None and msg_parts == s_parts:
-                                is_duplicate = True
-                                break
+                            if s_parts is not None:
+                                # Debug: log when we're comparing parts
+                                if len(msg_parts) > 0 and hasattr(msg_parts[0], 'tool_name'):
+                                    tool_names_msg = [getattr(p, 'tool_name', None) for p in msg_parts]
+                                    tool_names_s = [getattr(p, 'tool_name', None) for p in s_parts]
+                                    parts_equal = msg_parts == s_parts
+
+                                    logging.debug(
+                                        f"Comparing tool call messages: msg_tools={tool_names_msg}, "
+                                        f"seen_tools={tool_names_s}, parts_equal={parts_equal}, "
+                                        f"msg_type={type(msg).__name__}"
+                                    )
+
+                                if msg_parts == s_parts:
+                                    is_duplicate = True
+                                    break
 
             if not is_duplicate:
                 result.append(msg)
