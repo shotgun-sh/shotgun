@@ -8,6 +8,7 @@ import aiofiles
 
 from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.file_system_utils import async_copy_file
 
 from .conversation_history import ConversationHistory
 
@@ -93,7 +94,7 @@ class ConversationManager:
             # Create a backup of the corrupted file for debugging
             backup_path = self.conversation_path.with_suffix(".json.backup")
             try:
-                await self._async_copy_file(self.conversation_path, backup_path)
+                await async_copy_file(self.conversation_path, backup_path)
                 logger.info("Backed up corrupted conversation to %s", backup_path)
             except Exception as backup_error:  # pragma: no cover
                 logger.warning("Failed to backup corrupted file: %s", backup_error)
@@ -130,15 +131,3 @@ class ConversationManager:
             True if conversation file exists, False otherwise
         """
         return self.conversation_path.exists()
-
-    async def _async_copy_file(self, src: Path, dst: Path) -> None:
-        """Async copy file helper.
-
-        Args:
-            src: Source file path
-            dst: Destination file path
-        """
-        async with aiofiles.open(src, "rb") as src_file:
-            content = await src_file.read()
-        async with aiofiles.open(dst, "wb") as dst_file:
-            await dst_file.write(content)
