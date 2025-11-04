@@ -72,6 +72,10 @@ class AnthropicTokenCounter(TokenCounter):
         Raises:
             RuntimeError: If API call fails
         """
+        # Return 0 for empty text to avoid Anthropic API error
+        if not text or not text.strip():
+            return 0
+
         try:
             # Anthropic API expects messages format and model parameter
             # Use await with async client
