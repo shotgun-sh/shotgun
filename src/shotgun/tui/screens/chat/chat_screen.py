@@ -699,6 +699,7 @@ class ChatScreen(Screen[None]):
         self.update_context_indicator()
 
         # If there are file operations, add a message showing the modified files
+        # Check if we've already shown this exact set of file operations to avoid duplicates
         if event.file_operations:
             chat_history = self.query_one(ChatHistory)
             if chat_history.vertical_tail:
@@ -724,7 +725,14 @@ class ChatScreen(Screen[None]):
                                 f"📁 Modified {num_files} files in: `{path_obj.parent}`"
                             )
 
-                    self.mount_hint(message)
+                    # Only mount if this exact message isn't already in the last message
+                    # This prevents duplicate file operation hints from multiple MessageHistoryUpdated events
+                    if (
+                        not self.messages
+                        or not isinstance(self.messages[-1], HintMessage)
+                        or self.messages[-1].message != message
+                    ):
+                        self.mount_hint(message)
 
     @on(CompactionStartedMessage)
     def handle_compaction_started(self, event: CompactionStartedMessage) -> None:
