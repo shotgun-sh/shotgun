@@ -1254,9 +1254,20 @@ class AgentManager(Widget):
         """
 
         try:
+            # Filter out messages with empty parts to avoid Anthropic API errors
+            # During streaming, message_history can contain incomplete messages with no parts
+            filtered_message_history = [
+                msg for msg in self.message_history
+                if not hasattr(msg, 'parts') or len(getattr(msg, 'parts', [])) > 0
+            ]
+            filtered_ui_history = [
+                msg for msg in self.ui_message_history
+                if not hasattr(msg, 'parts') or len(getattr(msg, 'parts', [])) > 0
+            ]
+
             analyzer = ContextAnalyzer(self.deps.llm_model)
             return await analyzer.analyze_conversation(
-                self.message_history, self.ui_message_history
+                filtered_message_history, filtered_ui_history
             )
         except Exception as e:
             logger.error(f"Failed to generate context analysis: {e}", exc_info=True)
