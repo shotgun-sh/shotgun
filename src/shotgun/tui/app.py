@@ -95,65 +95,68 @@ class ShotgunApp(App[None]):
                 )
                 return
 
-        # Show welcome screen if no providers are configured OR if user hasn't seen it yet
-        config = self.config_manager.load()
-        if (
-            not self.config_manager.has_any_provider_key()
-            or not config.shown_welcome_screen
-        ):
-            if isinstance(self.screen, WelcomeScreen):
+        # Run async config loading in worker
+        async def _check_config() -> None:
+            # Show welcome screen if no providers are configured OR if user hasn't seen it yet
+            config = await self.config_manager.load()
+            has_any_key = await self.config_manager.has_any_provider_key()
+            if not has_any_key or not config.shown_welcome_screen:
+                if isinstance(self.screen, WelcomeScreen):
+                    return
+
+                self.push_screen(
+                    WelcomeScreen(),
+                    callback=lambda _arg: self.refresh_startup_screen(),
+                )
                 return
 
-            self.push_screen(
-                WelcomeScreen(),
-                callback=lambda _arg: self.refresh_startup_screen(),
-            )
-            return
+            if not self.check_local_shotgun_directory_exists():
+                if isinstance(self.screen, DirectorySetupScreen):
+                    return
 
-        if not self.check_local_shotgun_directory_exists():
-            if isinstance(self.screen, DirectorySetupScreen):
+                self.push_screen(
+                    DirectorySetupScreen(),
+                    callback=lambda _arg: self.refresh_startup_screen(),
+                )
                 return
 
-            self.push_screen(
-                DirectorySetupScreen(),
-                callback=lambda _arg: self.refresh_startup_screen(),
+            if isinstance(self.screen, ChatScreen):
+                return
+
+            # Create ChatScreen with all dependencies injected from container
+            # Get the default agent mode (RESEARCH)
+            agent_mode = AgentType.RESEARCH
+
+            # Create AgentManager with the correct mode
+            agent_manager = self.container.agent_manager_factory(initial_type=agent_mode)
+
+            # Create ProcessingStateManager - we'll pass the screen after creation
+            # For now, create with None and the ChatScreen will set itself
+            chat_screen = ChatScreen(
+                agent_manager=agent_manager,
+                conversation_manager=self.container.conversation_manager(),
+                conversation_service=self.container.conversation_service(),
+                widget_coordinator=self.container.widget_coordinator_factory(screen=None),
+                processing_state=self.container.processing_state_factory(
+                    screen=None,  # Will be set after ChatScreen is created
+                    telemetry_context={"agent_mode": agent_mode.value},
+                ),
+                command_handler=self.container.command_handler(),
+                placeholder_hints=self.container.placeholder_hints(),
+                codebase_sdk=self.container.codebase_sdk(),
+                deps=self.container.agent_deps(),
+                continue_session=self.continue_session,
+                force_reindex=self.force_reindex,
             )
-            return
 
-        if isinstance(self.screen, ChatScreen):
-            return
+            # Update the ProcessingStateManager and WidgetCoordinator with the actual ChatScreen instance
+            chat_screen.processing_state.screen = chat_screen
+            chat_screen.widget_coordinator.screen = chat_screen
 
-        # Create ChatScreen with all dependencies injected from container
-        # Get the default agent mode (RESEARCH)
-        agent_mode = AgentType.RESEARCH
+            self.push_screen(chat_screen)
 
-        # Create AgentManager with the correct mode
-        agent_manager = self.container.agent_manager_factory(initial_type=agent_mode)
-
-        # Create ProcessingStateManager - we'll pass the screen after creation
-        # For now, create with None and the ChatScreen will set itself
-        chat_screen = ChatScreen(
-            agent_manager=agent_manager,
-            conversation_manager=self.container.conversation_manager(),
-            conversation_service=self.container.conversation_service(),
-            widget_coordinator=self.container.widget_coordinator_factory(screen=None),
-            processing_state=self.container.processing_state_factory(
-                screen=None,  # Will be set after ChatScreen is created
-                telemetry_context={"agent_mode": agent_mode.value},
-            ),
-            command_handler=self.container.command_handler(),
-            placeholder_hints=self.container.placeholder_hints(),
-            codebase_sdk=self.container.codebase_sdk(),
-            deps=self.container.agent_deps(),
-            continue_session=self.continue_session,
-            force_reindex=self.force_reindex,
-        )
-
-        # Update the ProcessingStateManager and WidgetCoordinator with the actual ChatScreen instance
-        chat_screen.processing_state.screen = chat_screen
-        chat_screen.widget_coordinator.screen = chat_screen
-
-        self.push_screen(chat_screen)
+        # Run the async config check in a worker
+        self.run_worker(_check_config(), exclusive=False)
 
     def check_local_shotgun_directory_exists(self) -> bool:
         shotgun_dir = get_shotgun_base_path()

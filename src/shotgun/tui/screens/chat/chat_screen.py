@@ -1140,20 +1140,24 @@ class ChatScreen(Screen[None]):
 
     def _save_conversation(self) -> None:
         """Save the current conversation to persistent storage."""
-        # Use conversation service for saving
-        self.conversation_service.save_conversation(self.agent_manager)
+        # Use conversation service for saving (run async in background)
+        self.run_worker(
+            self.conversation_service.save_conversation(self.agent_manager),
+            exclusive=False,
+        )
 
     def _load_conversation(self) -> None:
         """Load conversation from persistent storage."""
-        # Use conversation service for restoration
-        success, error_msg, restored_type = (
-            self.conversation_service.restore_conversation(
+        # Use conversation service for restoration (run async)
+        async def _do_load() -> None:
+            success, error_msg, restored_type = await self.conversation_service.restore_conversation(
                 self.agent_manager, self.deps.usage_manager
             )
-        )
 
-        if not success and error_msg:
-            self.mount_hint(error_msg)
-        elif success and restored_type:
-            # Update the current mode to match restored conversation
-            self.mode = restored_type
+            if not success and error_msg:
+                self.mount_hint(error_msg)
+            elif success and restored_type:
+                # Update the current mode to match restored conversation
+                self.mode = restored_type
+
+        self.run_worker(_do_load(), exclusive=False)

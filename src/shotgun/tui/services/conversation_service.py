@@ -48,7 +48,7 @@ class ConversationService:
         else:
             self.conversation_manager = ConversationManager()
 
-    def save_conversation(self, agent_manager: "AgentManager") -> bool:
+    async def save_conversation(self, agent_manager: "AgentManager") -> bool:
         """Save the current conversation to persistent storage.
 
         Args:
@@ -68,15 +68,15 @@ class ConversationService:
             conversation.set_agent_messages(state.agent_messages)
             conversation.set_ui_messages(state.ui_messages)
 
-            # Save to file
-            self.conversation_manager.save(conversation)
+            # Save to file (now async)
+            await self.conversation_manager.save(conversation)
             logger.debug("Conversation saved successfully")
             return True
         except Exception as e:
             logger.exception(f"Failed to save conversation: {e}")
             return False
 
-    def load_conversation(self) -> ConversationHistory | None:
+    async def load_conversation(self) -> ConversationHistory | None:
         """Load conversation from persistent storage.
 
         Returns:
@@ -84,7 +84,7 @@ class ConversationService:
             or if loading failed.
         """
         try:
-            conversation = self.conversation_manager.load()
+            conversation = await self.conversation_manager.load()
             if conversation is None:
                 logger.debug("No conversation file found")
                 return None
@@ -106,7 +106,7 @@ class ConversationService:
         )
         return backup_path.exists()
 
-    def restore_conversation(
+    async def restore_conversation(
         self,
         agent_manager: "AgentManager",
         usage_manager: "SessionUsageManager | None" = None,
@@ -123,7 +123,7 @@ class ConversationService:
             - error_message: Error message if restoration failed, None otherwise
             - restored_agent_type: The agent type from restored conversation
         """
-        conversation = self.load_conversation()
+        conversation = await self.load_conversation()
 
         if conversation is None:
             # Check for corruption
@@ -151,7 +151,7 @@ class ConversationService:
 
             # Restore usage state if manager provided
             if usage_manager:
-                usage_manager.restore_usage_state()
+                await usage_manager.restore_usage_state()
 
             restored_type = AgentType(conversation.last_agent_model)
             logger.info(f"Conversation restored successfully (mode: {restored_type})")
