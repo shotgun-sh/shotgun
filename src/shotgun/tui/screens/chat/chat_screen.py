@@ -613,6 +613,8 @@ class ChatScreen(Screen[None]):
         Returns:
             Deduplicated list of messages in original order
         """
+        logging.debug(f"[DEDUP] Starting deduplication with {len(messages)} messages")
+
         seen: list[ModelMessage | HintMessage] = []
         result: list[ModelMessage | HintMessage] = []
 
@@ -653,7 +655,19 @@ class ChatScreen(Screen[None]):
             if not is_duplicate:
                 result.append(msg)
                 seen.append(msg)
+            else:
+                # Log when we skip a duplicate
+                msg_type = type(msg).__name__
+                if hasattr(msg, 'parts') and len(getattr(msg, 'parts', [])) > 0:
+                    first_part = getattr(msg, 'parts')[0]
+                    if hasattr(first_part, 'tool_name'):
+                        logging.debug(f"[DEDUP] SKIPPED duplicate {msg_type} with tool: {getattr(first_part, 'tool_name', None)}")
+                    else:
+                        logging.debug(f"[DEDUP] SKIPPED duplicate {msg_type}")
+                else:
+                    logging.debug(f"[DEDUP] SKIPPED duplicate {msg_type}")
 
+        logging.debug(f"[DEDUP] Finished: {len(messages)} -> {len(result)} messages ({len(messages) - len(result)} duplicates removed)")
         return result
 
     def _clear_partial_response(self) -> None:
