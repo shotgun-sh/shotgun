@@ -1,188 +1,310 @@
+<div align="center">
+<img width="400" height="150" alt="Shotgun logo transparent background" src="https://github.com/user-attachments/assets/08f9ccd5-f2e8-4bf4-9cb2-2f0de866a76a" />  
+
+### Spec-Driven Development
+
+**Write codebase-aware specs for AI coding agents (Codex, Cursor, Claude Code) so they don't derail.**
 <p align="center">
-  <a href="https://discord.com/invite/5RmY6J2N7s">
-    <img src="https://img.shields.io/badge/Discord-Join%20Us-5865F2?logo=discord&logoColor=white" />
+  <a href="https://github.com/shotgun-sh/shotgun">
+    <img src="https://img.shields.io/badge/python-3.11+-blue?style=flat&logo=python&logoColor=white" />
   </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-green.svg" />
+  <a href="https://www.producthunt.com/products/shotgun-cli/launches/shotgun-cli">
+    <img src="https://img.shields.io/badge/Product%20Hunt-%237%20Product%20of%20the%20Day-FF6154?style=flat&logo=producthunt&logoColor=white" />
+  </a>
+  <a href="https://github.com/shotgun-sh/shotgun?tab=contributing-ov-file">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat" />
+  </a>
+  <a href="https://github.com/shotgun-sh/shotgun?tab=MIT-1-ov-file">
+    <img src="https://img.shields.io/badge/license-MIT-blue?style=flat" />
+  </a>
+  <a href="https://discord.com/invite/5RmY6J2N7s">
+    <img src="https://img.shields.io/badge/discord-150+%20online-5865F2?style=flat&logo=discord&logoColor=white" />
   </a>
 </p>
 
-<div align="center">
-
-# SHOTGUN — Beta
-
-<img width="600" height="200" alt="Shotgun Logo" src="docs/shotgun_logo.png" />
-
-### Shotgun is a CLI that turns what you want to work on into _research → specs → plans → tasks → implementation_ with full codebase understanding and agents doing the heavy lifting.
-
-It produces clean, reusable artifacts and exports to the [agents.md](https://github.com/openai/agents.md) ecosystem to help you get the most out of code-gen tools and Agents.
-
-```bash
-uvx shotgun-sh@latest
-```
-
+[Website](https://shotgun.sh) • [X.com](https://x.com/ShotgunCLI) • [YouTube](https://www.youtube.com/@shotgunCLI)
 </div>
 
 ---
 
-## Table of Contents
+<table>
+<tr>
+<td>
+  
+**Shotgun is a CLI tool** that generates codebase-aware specs for AI coding agents like Cursor, Claude Code, and Lovable. **It reads your entire repository**, researches how new features should fit your architecture, and produces technical specifications that keep AI agents on track—so they build what you actually want instead of derailing halfway through.
 
-- [Quickstart](#quickstart)
-- [Why Shotgun?](#why-shotgun)
-- [How It Works](#how-it-works)
-- [Core Features](#core-features)
-- [Use Cases](#use-cases)
-- [Demo](#demo)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Auto-Updates](#auto-updates)
-- [Docker](#docker)
-- [Roadmap](#roadmap)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [Support](#support)
+It includes research on existing patterns, implementation plans that respect your architecture, and task breakdowns ready to export as **AGENTS.md** files. Each spec is complete enough that your AI agent can work longer and further without losing context or creating conflicts.
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=3e7kxhANXWA">
+    <img src="https://img.youtube.com/vi/3e7kxhANXWA/maxresdefault.jpg" alt="Watch the Shotgun demo" width="720" height="450">
+  </a>
+</p>
+
+</td>
+</tr>
+</table>
 
 ---
 
-<h2 id="quickstart">Quickstart</h2>
-
-Shotgun is installed via `uvx` or `uv tool install`. First, install uv for your platform:
+# 📦 Installation
 
 > [!WARNING]
-> If you tried out an alpha version of shotgun, make sure to uninstall it:
-> `npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server`
+> **Upgrading from alpha?** Uninstall the old version first:
+> ```bash
+> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
+> ```
 
-### Step 1: Install uv
+### 1. Install uv
 
-#### macOS
+Shotgun runs via `uvx` or `uv tool install`. First, install `uv` for your platform:
 
-**Using Homebrew (recommended):**
+<table>
+<tr>
+<th>Platform</th>
+<th>Installation Command</th>
+</tr>
+<tr>
+<td><strong>macOS</strong> (Homebrew)</td>
+<td>
+
 ```bash
 brew install uv
 ```
-
-**Using curl:**
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-#### Linux
+</td>
+</tr>
+<tr>
+<td><strong>macOS/Linux</strong> (curl)</td>
+<td>
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-
-#### Windows
+</td>
+</tr>
+<tr>
+<td><strong>Windows</strong> (PowerShell)</td>
+<td>
 
 ```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       
 ```
+</td>
+</tr>
+</table>
 
-_Restart your terminal after installation_
+_💡 Restart your terminal after installation_
 
----
+### 2. Run Shotgun
 
-### Step 2: Run Shotgun
+<table>
+<tr>
+<th>🚀 Try It Out (Ephemeral)</th>
+<th>⚡ Regular Use (Permanent)</th>
+</tr>
+<tr>
+<td>
+  
+**Best for:** Testing Shotgun first
 
-Once uv is installed, run shotgun using one of these methods:
-
-**Option 1: Ephemeral execution (recommended for trying out)**
 ```bash
-uvx shotgun-sh@latest
+uvx shotgun-sh@latest    
 ```
 
-**Option 2: Permanent installation (recommended for regular use)**
+No installation needed, runs immediately
+
+</td>
+<td>
+
+**Best for:** Daily use
+
 ```bash
-uv tool install shotgun-sh
+uv tool install shotgun-sh       
 ```
 
-Then run:
+Then run anywhere: ``` shotgun ```
+
+</td>
+</tr>
+</table>
+
+_**Why uv?** It's 10-100x faster than pip and handles binary wheels reliably—no cmake/build tool errors._
+
+### 3. Get Started
+
+When you launch Shotgun, it will guide you through:
+
+| Step | What Happens |
+|------|--------------|
+| **1. Codebase Indexing** | Builds a searchable graph of your entire repository |
+| **2. LLM Setup** | Configure OpenAI, Anthropic, or Gemini |
+| **3. First Research** | Start generating codebase-aware specs |
+
+_**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
+
+---
+
+# 🎯 Usage
+
+Shotgun guides you through **5 phases** that turn ideas into implementation-ready specs with full codebase understanding.
+
+### The 5-Phase Workflow
+
+<table>
+<tr>
+<th width="15%">Mode</th>
+<th width="40%">What It Does</th>
+<th width="45%">Command</th>
+</tr>
+
+<tr>
+<td><strong>1️⃣ Research</strong></td>
+<td>
+Searches your codebase and the web to understand what exists, find patterns, and identify constraints before you write anything.
+</td>
+<td>
+
 ```bash
-shotgun
+shotgun research "add real-time collaboration"
 ```
+</td>
+</tr>
 
-**Why uv?** It's 10-100x faster than other package managers and handles binary wheels reliably, preventing build errors on systems without cmake/build tools.
+<tr>
+<td><strong>2️⃣ Specify</strong></td>
+<td>
+Creates technical specifications based on research findings, aware of your existing architecture and patterns.
+</td>
+<td>
 
----
+```bash
+shotgun spec "Add OAuth2 authentication"
+```
+</td>
+</tr>
 
-### Step 3: Get Started
+<tr>
+<td><strong>3️⃣ Plan</strong></td>
+<td>
+Generates implementation plans that respect your codebase structure, dependencies, and discovered constraints.
+</td>
+<td>
 
-**Shotgun will guide you through:**
+```bash
+shotgun plan "Build user dashboard"
+```
+</td>
+</tr>
 
-- Indexing your codebase into a searchable graph
-- Setting up your LLM provider (OpenAI, Anthropic, or Gemini)
-- Starting your first research session
+<tr>
+<td><strong>4️⃣ Tasks</strong></td>
+<td>
+Breaks down the plan into dependency-aware, actionable tasks with clear sequencing and priorities.
+</td>
+<td>
 
-**Pro tip:** Run Shotgun in your IDE's terminal for the best experience.
+```bash
+shotgun tasks "Implement payment system"
+```
+</td>
+</tr>
 
----
+<tr>
+<td><strong>5️⃣ Export</strong></td>
+<td>
+Exports specs and tasks as <code>AGENTS.md</code> files formatted for Cursor, Claude Code, Windsurf, or Lovable.
+</td>
+<td>
 
-## What You Get Today
+```bash
+shotgun export
+```
+</td>
+</tr>
+</table>
 
-- **Spec-driven workflow** across five Modes: `research → specify → plan → tasks → implement`
-- **Deterministic artifacts** you can version in Git
-- **Export to agents.md** so outputs plug into many code-generation tools (Codex, Cursor, Warp, Devin, opencode, Jules and so on)
-- **Local-first CLI** with minimal setup
+**Result:** Your AI coding agent now has complete context—what exists, why decisions were made, and exactly what to build.
 
-> Shotgun sits _under_ your codegen tools: it creates the structured inputs those tools need and keeps them consistent across the lifecycle.
+### Quick Mode Switching
 
----
+**Navigate between phases instantly using `Shift+Tab`** or by running the phase command directly.
 
-## Why Shotgun?
-
-### 🎯 **Know your code. Decide faster.**
-
-- Answers grounded in your actual repo via a live code graph—no guessing or stale context
-- Cut research time: query your codebase, web, GitHub, and docs in one place
-- Turn clarity into action with specs and plans that stay in sync with your project
-
-### 🚀 **From idea to shipped—without chaos.**
-
-- Five guided modes: Research → Spec → Plan → Tasks → Export
-- Structured, editable artifacts live in your repo for review and clean handoffs
-- Export specs/tasks to any AI tool or workflow and keep a single source of truth
-
-### 🛡️ **AI speed with production-grade safety.**
-
-- Codebase-aware guardrails, conflict detection, and architecture constraints keep work on track
-- Human-in-the-loop checkpoints and streamed progress give control when it matters
-- Telemetry and change tracking reduce rework and late-night incidents
-
----
-
-## How It Works
-
-1. **Install & Connect** - Point at your repo. Shotgun builds a live code graph.
-2. **Research What Exists** - Ask in plain English: "How do we handle auth?" Shotgun queries your code graph AND searches npm, GitHub, docs.
-3. **Choose Your Mode** - Research → Specify → Plan → Tasks → Export. Start anywhere. Each mode has specialized agents.
-4. **Review & Guide** - Watch agents work in your terminal. See what they find. Approve key decisions.
-5. **Export to Any Tool** - Export artifacts into agents.md format to drive downstream tools
-
----
-
-## Core Features
-
-### 📊 **Complete Codebase Understanding**
-
-Before writing a single line, Shotgun reads all of it. Your patterns. Your dependencies. Your technical debt. Whether you're adding features, onboarding devs, planning migrations, or refactoring - Shotgun knows what you're working with.
-
-### 🔄 **Five Modes. One Journey. Zero Gaps.**
-
-**Research** (what exists) → **Specify** (what to build) → **Plan** (how to build) → **Tasks** (break it down) → **Export** (to any tool)
-
-Not another chatbot. A complete workflow where each mode feeds the next.
-
-### 📝 **Specs That Don't Die in Slack**
-
-Every research finding, every architectural decision, every "here's why we didn't use that library" - captured as markdown in your repo. Version controlled. Searchable.
-
-### ➡️ **Export to agents.md**
-
-Outputs plug into many code-generation tools including Codex, Cursor, Warp, Devin, opencode, Jules, and more.
+_**💡 Visual indicator:** Shotgun's CLI shows your current phase at the bottom of the screen._
 
 ---
 
-## Use Cases
+# ✨ Features
+
+### What Makes Shotgun Different
+
+<table>
+<tr>
+<th width="25%">Feature</th>
+<th width="35%">Shotgun</th>
+<th width="40%">Other Tools</th>
+</tr>
+
+<tr>
+<td><strong>Codebase Understanding</strong></td>
+<td>
+Reads your <strong>entire repository</strong> before generating specs. Finds existing patterns, dependencies, and architecture.
+</td>
+<td>
+Require manual context or search each time. No persistent understanding of your codebase structure.
+</td>
+</tr>
+
+<tr>
+<td><strong>Research Phase</strong></td>
+<td>
+Starts with research—discovers what you already have AND what exists externally before writing anything.
+</td>
+<td>
+Start at specification. Build first, discover problems later.
+</td>
+</tr>
+
+<tr>
+<td><strong>Multi-Agent Coordination</strong></td>
+<td>
+15+ specialized agents work in parallel (research, security, architecture) with coordinated outputs.
+</td>
+<td>
+Single-agent or one-size-fits-all prompts.
+</td>
+</tr>
+
+<tr>
+<td><strong>Structured Workflow</strong></td>
+<td>
+5-phase journey with checkpoints: Research → Spec → Plan → Tasks → Export
+</td>
+<td>
+No structure. Just "prompt and hope."
+</td>
+</tr>
+
+<tr>
+<td><strong>Export Formats</strong></td>
+<td>
+<code>AGENTS.md</code> files ready for Cursor, Claude Code, Windsurf, Lovable—your choice of tool.
+</td>
+<td>
+Locked into specific IDE or coding agent.
+</td>
+</tr>
+
+</table>
+
+### Why It Matters
+
+**The Problem:** AI coding agents are fast at generating code but have no idea what you already built or why past decisions were made.
+
+**The Solution:** Shotgun gives AI agents the full picture—your codebase context, architectural patterns, and research findings—so they build what you actually need instead of creating conflicts.
+
+---
+
+# Use Cases
 
 - **🚀 Onboarding** - New developer? Shotgun maps your entire architecture and generates docs that actually match the code
 - **🔧 Refactoring** - Understand all dependencies before touching anything. Keep your refactor from becoming a rewrite
@@ -192,222 +314,46 @@ Outputs plug into many code-generation tools including Codex, Cursor, Warp, Devi
 
 ---
 
-<h2 id="demo">Demo</h2>
-
-**See Shotgun in action:**
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=3e7kxhANXWA">
-    <img src="https://img.youtube.com/vi/3e7kxhANXWA/maxresdefault.jpg" alt="Watch the Shotgun demo" width="720" height="450">
-  </a>
-</p>
-
-**Give Shotgun a spin:**
-
-```bash
-Onboard me to this codebase.
-```
-
----
-
-## Installation
-
-### Using uvx (Recommended)
-
-**Quick start (ephemeral):**
-```bash
-uvx shotgun-sh@latest
-```
-
-**Install permanently:**
-```bash
-uv tool install shotgun-sh
-```
-
-If you don't have `uv` installed, get it at [astral.sh/uv](https://astral.sh/uv) or:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-### From Source
-
-```bash
-git clone https://github.com/shotgun-sh/shotgun.git
-cd shotgun
-uv sync --all-extras
-```
-
-After installation from source, you can use either method:
-
-**Method 1: Direct command (after uv sync)**
-```bash
-shotgun --help
-```
-
-**Method 2: Via uv run**
-```bash
-uv run shotgun --help
-```
-
-### Virtual Environment Setup (Optional)
-
-If you prefer using a local virtual environment:
-
-```bash
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv sync --all-extras
-shotgun --help
-```
-
----
-
-## Usage
-
-### Using Direct Commands (after uv sync)
-
-```bash
-# Research a topic
-shotgun research "What is quantum computing?"
-
-# Generate a specification
-shotgun spec "Add OAuth2 authentication"
-
-# Create a plan
-shotgun plan "Build a web application"
-
-# Generate tasks for a project
-shotgun tasks "Create a machine learning model"
-
-# Export to agents.md
-shotgun export
-```
-
-### Using uv run
-
-```bash
-# Research a topic
-uv run shotgun research "What is quantum computing?"
-
-# Generate a plan
-uv run shotgun plan "Build a web application"
-
-# Generate tasks for a project
-uv run shotgun tasks "Create a machine learning model"
-```
-
----
-
-## Auto-Updates
-
-Shotgun automatically checks for updates to keep you on the latest version.
-
-### How it works
-
-- Checks for updates on startup (runs in background, non-blocking)
-- Caches results for 24 hours to minimize API calls
-- Shows notification after command execution if an update is available
-- Never auto-updates development versions
-
-### Update Commands
-
-```bash
-# Check for available updates
-shotgun update --check
-
-# Install available updates
-shotgun update
-
-# Force update (even for dev versions with confirmation)
-shotgun update --force
-```
-
-### Disable Update Checks
-
-```bash
-# Disable for a single command
-shotgun --no-update-check research "topic"
-```
-
-### Installation Methods
-
-The update command automatically detects and uses the appropriate method:
-- **uvx**: Run `uvx shotgun-sh@latest` again or use `uv tool install shotgun-sh` for permanent installation
-- **uv tool**: `uv tool upgrade shotgun-sh`
-- **venv**: Updates within the virtual environment
-
----
-
-## Docker
-
-Run Shotgun in a Docker container with web access. Perfect for deployment and isolated environments.
-
-### Quick Start
-
-```bash
-cd /path/to/your/project
-
-docker run -p 8000:8000 \
-  -v $(pwd):/workspace \
-  -v ~/.shotgun-sh:/home/shotgun/.shotgun-sh \
-  ghcr.io/shotgun-sh/shotgun:latest
-```
-
-Access the web interface at **http://localhost:8000**
-
-### Available Images
-
-- **`latest`** - ✅ **Recommended** - Latest stable release
-- **`v0.1.0`** - Specific version tags
-- **`dev`** - ❌ **Not recommended** - Development version (for developers only)
-
-For detailed Docker documentation including custom ports, background mode, troubleshooting, and more, see [Docker Guide](docs/DOCKER.md).
-
----
-
-<h2 id="roadmap">Roadmap</h2>
-
-### 🚧 Coming Soon
-
-- [ ] Token usage display & spend tracking
-- [ ] Support for local LLMs
-- [ ] Linear agents integration
-- [ ] Attachments: add screenshots / PDFs / files to Shotgun
-- [ ] Performance improvements (make Shotgun faster)
-
----
-
-## FAQ
+# FAQ
 
 **Q: Does Shotgun collect any stats or data?**
+
 A: We only gather minimal, anonymous events (e.g., install, server start, tool call). We don't collect the content itself—only that an event occurred. We use Sentry for error reporting to improve stability.
 
 **Q: Local LLMs?**
+
 A: Planned. We'll publish compatibility notes and local provider integrations.
 
 **Q: What LLM providers are supported?**
+
 A: Currently OpenAI, Anthropic (Claude), and Google Gemini. Local LLM support is on the roadmap.
 
 **Q: Can I use Shotgun offline?**
+
 A: You need an internet connection for LLM API calls, but your codebase stays local.
 
 **Q: How does the code graph work?**
+
 A: Shotgun indexes your codebase using tree-sitter for accurate parsing and creates a searchable graph of your code structure, dependencies, and relationships.
 
 ---
+# Contributing
 
-<h2 id="contributing">Contributing</h2>
+Shotgun is open-source and we welcome contributions. Whether you're fixing bugs, proposing features, improving docs, or spreading the word—we'd love to have you as part of the community.
 
-Shotgun is in Beta — we'd love your feedback and support!
+### Ways to contribute:
 
-We welcome contributions! Whether you're fixing bugs, adding features, or improving documentation, your help makes Shotgun better.
+- **Bug Report:** Found an issue? [Create a bug report](https://github.com/shotgun-sh/shotgun/issues/new?template=bug_report.md)
+- **Feature Request:** Have an idea to make Shotgun better? [Submit a feature request](https://github.com/shotgun-sh/shotgun/issues/new?template=feature_request.md)
+- **Documentation:** See something missing in the docs? [Request documentation](https://github.com/shotgun-sh/shotgun/issues/new?template=documentation.md)
 
-### Get Started
+**Not sure where to start?** Join our Discord and we'll help you get started!
 
-- Join our [Discord community](https://discord.gg/5RmY6J2N7s)
-- Read the [Contributing Guide](docs/CONTRIBUTING.md)
-- Check out [open issues](https://github.com/shotgun-sh/shotgun/issues)
-- Review the [Git Hooks documentation](docs/GIT_HOOKS.md)
+<div align="left">
+  <a href="https://discord.com/invite/5RmY6J2N7s">
+    <img src="https://img.shields.io/badge/Join%20our%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord" />
+  </a>
+</div>
 
 ### Development Resources
 
@@ -419,43 +365,31 @@ We welcome contributions! Whether you're fixing bugs, adding features, or improv
 
 ---
 
-## Support
-
-**Join our community:**
-- [Discord](https://discord.gg/5RmY6J2N7s) - Get help and discuss Shotgun
-- [GitHub Issues](https://github.com/shotgun-sh/shotgun/issues) - Report bugs and request features
-- [Website](https://shotgun.sh) - Learn more about Shotgun
-- [Product Hunt](https://www.producthunt.com/posts/shotgun) - We hit #7 on Product Hunt!
-
-### Uninstall
+## Uninstall
 
 ```bash
 uv tool uninstall shotgun-sh
-```
-
-### Troubleshooting
-
-**Do you have the old version of Shotgun? (shotgun-alpha)**
-
-Uninstall the shotgun alpha (previous version):
-
-```bash
-npm uninstall -g @proofs-io/shotgun --loglevel=error
-npm uninstall -g @proofs-io/shotgun-server --loglevel=error
 ```
 
 ---
 
 <div align="center">
 
-<h2>🚀 Ready to write specs that truly capture your intents?</h2>
+## 🚀 Ready to Stop AI Agents from Derailing?
 
-<p><strong>Research (what exists) → Specify (what to build) → Plan (how to build) → Tasks (break it down) → Export (to any tool)</strong></p>
+**Research → Specify → Plan → Tasks → Export** — Five phases that give AI agents the full picture.
 
-<pre><code>uvx shotgun-sh@latest</code></pre>
+```bash
+uvx shotgun-sh@latest
+```
 
-<p>⚡ Takes 30 seconds to install.<br>
-🤠 Join the posse on <a href="https://discord.com/invite/5RmY6J2N7s">Discord</a> to share what you build.</p>
+
+### ⭐ Star us on GitHub
+
+
+<a href="https://github.com/shotgun-sh/shotgun">
+  <img src="https://img.shields.io/badge/⭐%20Star%20on%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Star Shotgun Repo" />
+</a>
 
 </div>
 
