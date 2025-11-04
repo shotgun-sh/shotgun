@@ -38,19 +38,16 @@ pytest test/unit/ --cov=src/shotgun --cov-report=html
 
 Integration tests verify the complete functionality of the CodebaseService, including:
 - Real graph creation from codebases
-- Actual LLM queries (natural language to Cypher)
 - End-to-end query execution
 - Error handling and edge cases
 
 **Characteristics:**
 - Slower execution (several seconds to minutes)
-- Requires LLM API configuration
 - Creates real databases and graphs
 - Tests complete workflows
-- May be skipped in some CI environments
+- Part of CI/CD pipeline
 
 **Requirements:**
-- LLM API keys (OpenAI or Anthropic)
 - Proper Shotgun configuration
 - More disk space and memory
 
@@ -81,32 +78,17 @@ uv sync --all-extras
 ```
 
 ### For Integration Tests
-1. Install dependencies:
-   ```bash
-   uv sync --all-extras
-   ```
-
-2. Configure LLM provider (one of):
-   ```bash
-   # For OpenAI
-   export OPENAI_API_KEY="your_api_key"
-   
-   # For Anthropic
-   export ANTHROPIC_API_KEY="your_api_key"
-   ```
-
-3. Run environment check:
-   ```bash
-   python test/integration/run_integration_tests.py --smoke-only
-   ```
+Install dependencies:
+```bash
+uv sync --all-extras
+```
 
 ## Test Markers
 
 Tests use pytest markers to categorize them:
 
-- `@pytest.mark.integration` - Integration test requiring LLM
-- `@pytest.mark.slow` - Test that takes significant time  
-- `@pytest.mark.llm` - Test that makes actual LLM API calls
+- `@pytest.mark.integration` - Integration test
+- `@pytest.mark.slow` - Test that takes significant time
 
 ## Running Specific Test Categories
 
@@ -116,9 +98,6 @@ pytest -m integration
 
 # Run only fast tests (exclude slow ones)
 pytest -m "not slow"
-
-# Run tests that don't require LLM calls
-pytest -m "not llm"
 ```
 
 ## CI/CD Integration
@@ -135,14 +114,11 @@ Unit tests should run on every commit and PR:
 ```
 
 ### Integration Tests in CI
-Integration tests can be run on specific branches or with environment variables:
+Integration tests run on all PRs:
 ```yaml
 - name: Run integration tests
-  if: github.ref == 'refs/heads/main' && env.OPENAI_API_KEY != ''
-  env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   run: |
-    uv run python test/integration/run_integration_tests.py
+    uv run pytest test/integration/ --cov=src/shotgun --cov-report=xml
 ```
 
 ## Writing New Tests

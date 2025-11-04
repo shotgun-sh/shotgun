@@ -87,38 +87,12 @@ refactor: restructure project components
 The project has two types of tests:
 
 1. **Unit Tests** (`test/unit/`): Fast, isolated tests with no external dependencies
-2. **Integration Tests** (`test/integration/`): Tests that may interact with external services
-
-### LLM Tests (Not Run in CI)
-
-Tests that make actual LLM API calls are marked with `@pytest.mark.llm` but are **not run in CI/CD** because they are flaky and expensive. This policy ensures:
-
-- External contributors don't need API keys to submit PRs
-- LLM API costs are controlled
-- CI/CD remains fast and reliable
-- All PRs still require maintainer approval (via CODEOWNERS)
+2. **Integration Tests** (`test/integration/`): Tests that verify complete workflows with real databases
 
 **For Contributors:**
-- You don't need LLM API keys to contribute
-- Only unit tests and CLI command tests are required to pass for your PRs
-
-**For Maintainers:**
-- LLM tests can be run manually locally when needed
-- Not required for PR approval
-
-**Running LLM Tests Locally:**
-```bash
-# Set your API keys
-export OPENAI_API_KEY="your-key"
-export ANTHROPIC_API_KEY="your-key"
-export GEMINI_API_KEY="your-key"
-
-# Run only LLM-marked tests
-uv run pytest test/ -v -m llm
-
-# Run all integration tests
-uv run pytest test/integration/ -v
-```
+- All tests run in CI/CD for every PR
+- Both unit and integration tests must pass
+- No API keys required for tests - all external services are mocked
 
 ## Commands for Development
 
