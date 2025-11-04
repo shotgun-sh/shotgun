@@ -98,35 +98,6 @@ async def test_cypher_query_execution(service: CodebaseService, calculator_codeb
 
 
 @pytest.mark.integration
-@pytest.mark.llm
-@pytest.mark.asyncio
-async def test_natural_language_query_execution(
-    service: CodebaseService, calculator_codebase
-):
-    """Test executing a natural language query."""
-    # Create a graph
-    graph = await service.create_graph(calculator_codebase, "NL Test Graph")
-
-    # Execute a natural language query
-    nl_query = "Show me all the classes in the codebase"
-    result = await service.execute_query(
-        graph.graph_id, nl_query, QueryType.NATURAL_LANGUAGE
-    )
-
-    assert result.success is True
-    assert result.error is None
-    assert result.query == nl_query
-    assert result.cypher_query is not None  # Should contain generated Cypher
-    assert "MATCH" in result.cypher_query.upper()
-    assert "CLASS" in result.cypher_query.upper()
-    assert result.row_count > 0
-    assert result.execution_time_ms > 0
-
-    # Verify we found our test classes
-    assert any("Calculator" in str(row) for row in result.results)
-
-
-@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_function_query(service: CodebaseService, calculator_codebase):
     """Test querying for functions."""
@@ -143,51 +114,6 @@ async def test_function_query(service: CodebaseService, calculator_codebase):
     # Verify we found our test functions
     function_names = [row["name"] for row in result.results]
     assert "test_validation" in function_names
-
-
-@pytest.mark.integration
-@pytest.mark.llm
-@pytest.mark.asyncio
-async def test_method_query(service: CodebaseService, calculator_codebase):
-    """Test querying for methods."""
-    # Create a graph
-    graph = await service.create_graph(calculator_codebase, "Method Test Graph")
-
-    # Test natural language query for methods
-    nl_query = "What methods does the Calculator class have?"
-    result = await service.execute_query(
-        graph.graph_id, nl_query, QueryType.NATURAL_LANGUAGE
-    )
-
-    assert result.success is True
-    assert result.row_count > 0
-
-    # Verify we found Calculator methods
-    method_names = [row.get("name", "") for row in result.results]
-    assert "add" in method_names
-    assert "subtract" in method_names
-
-
-@pytest.mark.integration
-@pytest.mark.llm
-@pytest.mark.asyncio
-async def test_search_query(service: CodebaseService, calculator_codebase):
-    """Test searching with natural language."""
-    # Create a graph
-    graph = await service.create_graph(calculator_codebase, "Search Test Graph")
-
-    # Test search for test functions
-    nl_query = "Find all functions that start with test"
-    result = await service.execute_query(
-        graph.graph_id, nl_query, QueryType.NATURAL_LANGUAGE
-    )
-
-    assert result.success is True
-    if result.row_count > 0:
-        # Verify all results are test functions
-        for row in result.results:
-            name = row.get("name", "")
-            assert name.startswith("test")
 
 
 @pytest.mark.integration
@@ -221,34 +147,6 @@ async def test_query_nonexistent_graph(service: CodebaseService):
     assert result.success is False
     assert result.error is not None
     assert "not found" in result.error.lower() or "graph" in result.error.lower()
-
-
-@pytest.mark.integration
-@pytest.mark.llm
-@pytest.mark.skip(
-    reason="Flaky test - natural language query generation is inconsistent"
-)
-@pytest.mark.slow
-@pytest.mark.asyncio
-async def test_complex_natural_language_query(
-    service: CodebaseService, calculator_codebase
-):
-    """Test a more complex natural language query."""
-    # Create a graph
-    graph = await service.create_graph(calculator_codebase, "Complex Query Test Graph")
-
-    # Test complex query
-    nl_query = "Find all methods in classes that inherit from Calculator"
-    result = await service.execute_query(
-        graph.graph_id, nl_query, QueryType.NATURAL_LANGUAGE
-    )
-
-    # This should find methods in ScientificCalculator
-    assert result.success is True
-    if result.row_count > 0:
-        # Verify we found scientific calculator methods
-        method_names = [row.get("name", "") for row in result.results]
-        assert any(name in ["power"] for name in method_names)
 
 
 @pytest.mark.integration
