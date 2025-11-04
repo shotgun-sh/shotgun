@@ -5,6 +5,13 @@ across both unit and integration tests, particularly for Kuzu database
 resource management.
 """
 
+# IMPORTANT: Set environment variables BEFORE any imports to ensure
+# they're available when settings are loaded during module import
+import os
+
+os.environ["SHOTGUN_LOGGING_TO_FILE"] = "false"
+
+# Now safe to import modules that depend on settings
 import asyncio
 import gc
 import shutil
