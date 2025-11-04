@@ -87,7 +87,8 @@ class AnthropicTokenCounter(TokenCounter):
             # Anthropic API expects messages format and model parameter
             # Use await with async client
             result = await self.client.messages.count_tokens(
-                messages=[{"role": "user", "content": cleaned_text}], model=self.model_name
+                messages=[{"role": "user", "content": cleaned_text}],
+                model=self.model_name,
             )
             return result.input_tokens
         except Exception as e:
