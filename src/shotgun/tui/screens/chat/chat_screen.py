@@ -1082,11 +1082,12 @@ class ChatScreen(Screen[None]):
                 logger.info(
                     f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
                 )
-                self.notify(
-                    f"Indexed codebase '{result.name}' (ID: {result.graph_id})",
-                    severity="information",
-                    timeout=8,
+
+                # Add a hint message to the conversation instead of a toast notification
+                self.mount_hint(
+                    f"✅ Indexed codebase: `{result.name}` (ID: {result.graph_id})"
                 )
+
                 break  # Success - exit retry loop
 
             except CodebaseAlreadyIndexedError as exc:
