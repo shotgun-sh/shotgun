@@ -169,9 +169,15 @@ def submit_feedback_survey(feedback: Feedback) -> None:
         return
 
     config_manager = get_config_manager()
-    config = config_manager.load()
+    config = config_manager.load_sync()
     conversation_manager = ConversationManager()
-    conversation = conversation_manager.load()
+    # Note: ConversationManager.load() is async, but we don't need it for feedback
+    conversation = None
+    try:
+        import asyncio
+        conversation = asyncio.run(conversation_manager.load())
+    except Exception:
+        pass
     last_10_messages = []
     if conversation is not None:
         last_10_messages = conversation.get_agent_messages()[:10]

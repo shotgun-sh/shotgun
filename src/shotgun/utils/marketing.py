@@ -93,7 +93,7 @@ class MarketingManager:
             file_operations: List of file operations from the current agent run
             display_callback: Callback function to display messages to the user
         """
-        config = config_manager.load()
+        config = config_manager.load_sync()
 
         # Check GitHub star message
         if MarketingManager.should_show_github_star_message(

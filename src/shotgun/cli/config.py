@@ -134,7 +134,7 @@ def get(
 ) -> None:
     """Display current configuration."""
     config_manager = get_config_manager()
-    config = config_manager.load()
+    config = config_manager.load_sync()
 
     if json_output:
         # Convert to dict and mask secrets

@@ -29,8 +29,8 @@ def send_feedback(
 ) -> None:
     """Initialize Shotgun configuration."""
     config_manager = get_config_manager()
-    config_manager.load()
-    shotgun_instance_id = config_manager.get_shotgun_instance_id()
+    config_manager.load_sync()
+    shotgun_instance_id = config_manager.get_shotgun_instance_id_sync()
 
     if not description:
         console.print(
