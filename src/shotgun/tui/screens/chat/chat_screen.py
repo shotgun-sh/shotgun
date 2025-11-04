@@ -519,9 +519,7 @@ class ChatScreen(Screen[None]):
 
             analyzer = ContextAnalyzer(self.deps.llm_model)
             # Analyze the combined message histories for accurate progressive token counts
-            analysis = await analyzer.analyze_conversation(
-                agent_messages, ui_messages
-            )
+            analysis = await analyzer.analyze_conversation(agent_messages, ui_messages)
 
             if analysis:
                 model_name = self.deps.llm_model.name
@@ -593,9 +591,7 @@ class ChatScreen(Screen[None]):
 
         # Update context indicator with full message history including streaming messages
         # Combine existing agent history with new streaming messages for accurate token count
-        combined_agent_history = (
-            self.agent_manager.message_history + event.messages
-        )
+        combined_agent_history = self.agent_manager.message_history + event.messages
         self.update_context_indicator_with_messages(
             combined_agent_history, new_message_list
         )
