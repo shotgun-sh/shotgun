@@ -598,7 +598,12 @@ class ChatScreen(Screen[None]):
 
         # Update context indicator with full message history including streaming messages
         # Combine existing agent history with new streaming messages for accurate token count
-        combined_agent_history = self.agent_manager.message_history + event.messages
+        # Filter out messages with empty content to avoid Anthropic API errors
+        non_empty_event_messages = [
+            msg for msg in event.messages
+            if hasattr(msg, 'parts') and len(getattr(msg, 'parts', [])) > 0
+        ]
+        combined_agent_history = self.agent_manager.message_history + non_empty_event_messages
         self.update_context_indicator_with_messages(
             combined_agent_history, new_message_list
         )
