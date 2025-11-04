@@ -57,7 +57,7 @@ async def test_add_system_status_message_empty_history(mock_deps):
     with patch("shotgun.agents.common.prompt_loader") as mock_loader:
         with patch("shotgun.agents.common.get_agent_existing_files") as mock_get_files:
             with patch(
-                "shotgun.agents.common.extract_markdown_toc"
+                "shotgun.agents.common.extract_markdown_toc", new_callable=AsyncMock
             ) as mock_extract_toc:
                 with patch(
                     "shotgun.agents.common.get_datetime_context"
@@ -108,7 +108,7 @@ async def test_add_system_status_message_existing_history(mock_deps):
     with patch("shotgun.agents.common.prompt_loader") as mock_loader:
         with patch("shotgun.agents.common.get_agent_existing_files") as mock_get_files:
             with patch(
-                "shotgun.agents.common.extract_markdown_toc"
+                "shotgun.agents.common.extract_markdown_toc", new_callable=AsyncMock
             ) as mock_extract_toc:
                 with patch(
                     "shotgun.agents.common.get_datetime_context"
@@ -258,8 +258,9 @@ def test_create_usage_limits():
     assert limits.tool_calls_limit == 100
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.common.get_provider_model")
-def test_create_base_agent_provider_failure(
+async def test_create_base_agent_provider_failure(
     mock_get_provider, mock_agent_runtime_options
 ):
     """Test create_base_agent when provider configuration fails."""
@@ -273,4 +274,4 @@ def test_create_base_agent_provider_failure(
     system_prompt_fn = partial(build_agent_system_prompt, "research")
 
     with pytest.raises(ValueError, match="Configured model is required"):
-        create_base_agent(system_prompt_fn, mock_agent_runtime_options)
+        await create_base_agent(system_prompt_fn, mock_agent_runtime_options)

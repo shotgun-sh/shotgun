@@ -41,7 +41,7 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
     from shotgun.agents.conversation_manager import ConversationManager
 
     manager = ConversationManager(conversation_file)
-    manager.save(mock_conversation_history)
+    await manager.save(mock_conversation_history)
 
     # Mock the compaction to return fewer messages
     compacted_messages = [
@@ -84,7 +84,7 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
         assert result["reduction"]["tokens_percent"] == 50.0
 
         # Verify the conversation was saved
-        loaded = manager.load()
+        loaded = await manager.load()
         assert loaded is not None
         assert len(loaded.get_agent_messages()) == 2
 
@@ -108,7 +108,7 @@ async def test_compact_conversation_empty_history(tmp_path):
     from shotgun.agents.conversation_manager import ConversationManager
 
     manager = ConversationManager(conversation_file)
-    manager.save(history)
+    await manager.save(history)
 
     with patch("shotgun.cli.compact.Path.home", return_value=tmp_path):
         with pytest.raises(ValueError, match="No agent messages found"):
@@ -124,7 +124,7 @@ async def test_compact_conversation_no_reduction(tmp_path, mock_conversation_his
     from shotgun.agents.conversation_manager import ConversationManager
 
     manager = ConversationManager(conversation_file)
-    manager.save(mock_conversation_history)
+    await manager.save(mock_conversation_history)
 
     # Mock compaction to return same messages (no compaction needed)
     original_messages = mock_conversation_history.get_agent_messages()

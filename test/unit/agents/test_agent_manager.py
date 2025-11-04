@@ -58,7 +58,7 @@ def mock_agent_deps():
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt")
 
     usage_manager_mock = MagicMock(spec=SessionUsageManager)
-    usage_manager_mock.add_usage = MagicMock()
+    usage_manager_mock.add_usage = AsyncMock()
     usage_manager_mock.build_usage_hint = MagicMock(
         return_value="| Model | Provider | Input | Output | Cached |\n| --- | --- | ---: | ---: | ---: |\n| `test-model` | anthropic | 10 | 5 | 2 |\n| **Total** |  | **10** | **5** | **2** |\n"
     )
@@ -198,12 +198,13 @@ async def test_agent_manager_current_agent(
     assert manager.current_agent == tasks_agent
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
-def test_agent_manager_get_agent(
+async def test_agent_manager_get_agent(
     mock_create_export,
     mock_create_specify,
     mock_create_tasks,
@@ -223,17 +224,21 @@ def test_agent_manager_get_agent(
 
     manager = AgentManager(deps=mock_agent_deps)
 
+    # Initialize agents before accessing them
+    await manager._ensure_agents_initialized()
+
     assert manager._get_agent(AgentType.RESEARCH) == research_agent
     assert manager._get_agent(AgentType.PLAN) == plan_agent
     assert manager._get_agent(AgentType.TASKS) == tasks_agent
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
-def test_agent_manager_set_agent(
+async def test_agent_manager_set_agent(
     mock_create_export,
     mock_create_specify,
     mock_create_tasks,
@@ -253,6 +258,9 @@ def test_agent_manager_set_agent(
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
+    # Initialize agents
+    await manager._ensure_agents_initialized()
+
     # Test setting valid agent types
     manager.set_agent(AgentType.PLAN)
     assert manager._current_agent_type == AgentType.PLAN
@@ -265,12 +273,13 @@ def test_agent_manager_set_agent(
     assert manager._current_agent_type == AgentType.RESEARCH
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
-def test_agent_manager_set_agent_invalid(
+async def test_agent_manager_set_agent_invalid(
     mock_create_export,
     mock_create_specify,
     mock_create_tasks,
@@ -289,6 +298,9 @@ def test_agent_manager_set_agent_invalid(
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps)
+
+    # Initialize agents
+    await manager._ensure_agents_initialized()
 
     with pytest.raises(ValueError, match="Invalid agent type: invalid"):
         manager.set_agent("invalid")
@@ -523,12 +535,13 @@ async def test_agent_manager_run_with_custom_deps(
     assert call_kwargs["deps"] == custom_deps
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
-def test_agent_manager_post_messages_updated(
+async def test_agent_manager_post_messages_updated(
     mock_create_export,
     mock_create_specify,
     mock_create_tasks,
@@ -547,6 +560,10 @@ def test_agent_manager_post_messages_updated(
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Initialize agents
+    await manager._ensure_agents_initialized()
+
     manager.post_message = MagicMock()
 
     manager._post_messages_updated()
@@ -621,12 +638,13 @@ def test_model_config_updated_no_old_model():
     assert event.model_config == mock_model_config
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
-def test_restore_conversation_state_filters_system_prompt(
+async def test_restore_conversation_state_filters_system_prompt(
     mock_create_specify,
     mock_create_tasks,
     mock_create_plan,
@@ -645,6 +663,9 @@ def test_restore_conversation_state_filters_system_prompt(
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Initialize agents
+    await manager._ensure_agents_initialized()
 
     system_message = ModelRequest(parts=[SystemPromptPart(content="sys")])
     user_message = ModelRequest.user_text_prompt("Hi")

@@ -69,7 +69,7 @@ async def add_system_status_message(
     existing_files = get_agent_existing_files(deps.agent_mode)
 
     # Extract table of contents from the agent's markdown file
-    markdown_toc = extract_markdown_toc(deps.agent_mode)
+    markdown_toc = await extract_markdown_toc(deps.agent_mode)
 
     # Get current datetime with timezone information
     dt_context = get_datetime_context()

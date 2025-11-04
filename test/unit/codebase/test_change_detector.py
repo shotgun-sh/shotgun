@@ -498,7 +498,8 @@ def test_matches_pattern_substring():
         assert detector._matches_pattern("src/test/file.py", "test")
 
 
-def test_calculate_file_hash_success():
+@pytest.mark.asyncio
+async def test_calculate_file_hash_success():
     """Test _calculate_file_hash success case."""
     mock_conn = Mock()
 
@@ -511,12 +512,13 @@ def test_calculate_file_hash_success():
         test_file.write_text(content)
 
         expected_hash = hashlib.sha256(content.encode()).hexdigest()
-        result = detector._calculate_file_hash(test_file)
+        result = await detector._calculate_file_hash(test_file)
 
         assert result == expected_hash
 
 
-def test_calculate_file_hash_nonexistent_file():
+@pytest.mark.asyncio
+async def test_calculate_file_hash_nonexistent_file():
     """Test _calculate_file_hash with nonexistent file."""
     mock_conn = Mock()
 
@@ -526,12 +528,13 @@ def test_calculate_file_hash_nonexistent_file():
 
         nonexistent = repo_path / "nonexistent.py"
 
-        result = detector._calculate_file_hash(nonexistent)
+        result = await detector._calculate_file_hash(nonexistent)
 
         assert result == ""
 
 
-def test_calculate_file_hash_permission_error():
+@pytest.mark.asyncio
+async def test_calculate_file_hash_permission_error():
     """Test _calculate_file_hash with permission error."""
     mock_conn = Mock()
 
@@ -539,11 +542,11 @@ def test_calculate_file_hash_permission_error():
         repo_path = Path(temp_dir)
         detector = ChangeDetector(mock_conn, repo_path)
 
-        with patch("builtins.open", side_effect=PermissionError("Access denied")):
+        with patch("aiofiles.open", side_effect=PermissionError("Access denied")):
             test_file = repo_path / "test.py"
             test_file.write_text("content")
 
-            result = detector._calculate_file_hash(test_file)
+            result = await detector._calculate_file_hash(test_file)
 
             assert result == ""
 
