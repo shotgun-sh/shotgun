@@ -75,6 +75,7 @@ from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.marketing import MarketingManager
 
 logger = logging.getLogger(__name__)
 
@@ -678,6 +679,14 @@ class ChatScreen(Screen[None]):
                             )
 
                     self.mount_hint(message)
+
+                    # Check and display any marketing messages
+                    from shotgun.tui.app import ShotgunApp
+
+                    app = cast(ShotgunApp, self.app)
+                    MarketingManager.check_and_display_messages(
+                        app.config_manager, event.file_operations, self.mount_hint
+                    )
 
     @on(CompactionStartedMessage)
     def handle_compaction_started(self, event: CompactionStartedMessage) -> None:

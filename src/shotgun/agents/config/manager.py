@@ -101,6 +101,12 @@ class ConfigManager:
                         "Existing BYOK user detected: set shown_welcome_screen=False to show welcome screen"
                     )
 
+            # Migration: Add marketing config for v3 -> v4
+            if "marketing" not in data:
+                data["marketing"] = {"messages": {}}
+                data["config_version"] = 4
+                logger.info("Migrated config v3->v4: added marketing configuration")
+
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
 
@@ -190,6 +196,7 @@ class ConfigManager:
             # Convert SecretStr to plain text for JSON serialization
             data = config.model_dump()
             self._convert_secretstr_to_plain(data)
+            self._convert_datetime_to_isoformat(data)
 
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -376,6 +383,24 @@ class ConfigManager:
                         data[section.value][SUPABASE_JWT_FIELD] = data[section.value][
                             SUPABASE_JWT_FIELD
                         ].get_secret_value()
+
+    def _convert_datetime_to_isoformat(self, data: dict[str, Any]) -> None:
+        """Convert datetime objects in data to ISO8601 format strings for JSON serialization."""
+        from datetime import datetime
+
+        def convert_dict(d: dict[str, Any]) -> None:
+            """Recursively convert datetime objects in a dict."""
+            for key, value in d.items():
+                if isinstance(value, datetime):
+                    d[key] = value.isoformat()
+                elif isinstance(value, dict):
+                    convert_dict(value)
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            convert_dict(item)
+
+        convert_dict(data)
 
     def _ensure_provider_enum(self, provider: ProviderType | str) -> ProviderType:
         """Normalize provider values to ProviderType enum."""
