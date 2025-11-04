@@ -623,7 +623,8 @@ class ChatScreen(Screen[None]):
             # For HintMessage, compare message content
             if isinstance(msg, HintMessage):
                 is_duplicate = any(
-                    isinstance(s, HintMessage) and s.message == msg.message for s in seen
+                    isinstance(s, HintMessage) and s.message == msg.message
+                    for s in seen
                 )
             # For ModelRequest/ModelResponse, compare parts
             elif hasattr(msg, "parts"):

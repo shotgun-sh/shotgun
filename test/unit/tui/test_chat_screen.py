@@ -227,6 +227,7 @@ def test_deduplicate_messages_preserves_order(chat_screen):
         TextPart,
         UserPromptPart,
     )
+
     from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
     # Create shared parts to simulate duplicates

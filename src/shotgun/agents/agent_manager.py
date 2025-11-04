@@ -610,7 +610,7 @@ class AgentManager(Widget):
         )
 
         # Get messages that were already added during streaming
-        streaming_messages = (
+        streaming_messages: list[ModelMessage] = (
             self._stream_state.messages.copy() if self._stream_state else []
         )
 
@@ -618,7 +618,9 @@ class AgentManager(Widget):
         deduplicated_new_messages = []
         for msg in new_messages:
             # Skip if this exact message was already added during streaming
-            if self._is_message_duplicate(msg, streaming_messages):
+            if self._is_message_duplicate(
+                msg, cast(list[ModelMessage | HintMessage], streaming_messages)
+            ):
                 logger.debug(
                     "Skipping duplicate message from streaming",
                     extra={"message_type": type(msg).__name__},
@@ -1021,16 +1023,17 @@ class AgentManager(Widget):
 
         # Deduplicate state.messages before sending to UI
         # This prevents duplicate tool results from appearing during streaming
-        deduplicated_messages = []
+        deduplicated_messages: list[ModelMessage] = []
         for msg in self._stream_state.messages:
-            if not self._is_message_duplicate(msg, deduplicated_messages):
+            if not self._is_message_duplicate(
+                msg, cast(list[ModelMessage | HintMessage], deduplicated_messages)
+            ):
                 deduplicated_messages.append(msg)
 
         self.post_message(
             PartialResponseMessage(
                 self._stream_state.current_response
-                if self._stream_state.current_response
-                not in deduplicated_messages
+                if self._stream_state.current_response not in deduplicated_messages
                 else None,
                 deduplicated_messages,
                 is_last,
