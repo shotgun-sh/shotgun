@@ -1,10 +1,15 @@
 """Marketing message management for Shotgun CLI."""
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from shotgun.agents.config.models import MarketingConfig, MarketingMessageRecord
 from shotgun.agents.models import FileOperation
+
+if TYPE_CHECKING:
+    from shotgun.agents.config.manager import ConfigManager
 
 # Marketing message IDs
 GITHUB_STAR_MESSAGE_ID = "github_star_v1"
@@ -69,3 +74,37 @@ class MarketingManager:
     def get_github_star_message() -> str:
         """Get the GitHub star marketing message text."""
         return "⭐ Enjoying Shotgun? Star us on GitHub: https://github.com/shotgun-sh/shotgun"
+
+    @staticmethod
+    def check_and_display_messages(
+        config_manager: "ConfigManager",
+        file_operations: list[FileOperation],
+        display_callback: Callable[[str], None],
+    ) -> None:
+        """
+        Check if any marketing messages should be shown and display them.
+
+        This is the main entry point for marketing message handling. It checks
+        all configured messages, displays them if appropriate, and updates the
+        config to mark them as shown.
+
+        Args:
+            config_manager: Config manager to load/save configuration
+            file_operations: List of file operations from the current agent run
+            display_callback: Callback function to display messages to the user
+        """
+        config = config_manager.load()
+
+        # Check GitHub star message
+        if MarketingManager.should_show_github_star_message(
+            config.marketing, file_operations
+        ):
+            # Display the message
+            message = MarketingManager.get_github_star_message()
+            display_callback(message)
+
+            # Mark as shown and save
+            MarketingManager.mark_message_shown(
+                config.marketing, GITHUB_STAR_MESSAGE_ID
+            )
+            config_manager.save(config)

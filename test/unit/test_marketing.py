@@ -172,3 +172,104 @@ def test_get_github_star_message():
     assert "GitHub" in message
     assert "github.com/shotgun-sh/shotgun" in message
     assert "⭐" in message
+
+
+def test_check_and_display_messages_shows_message(tmp_path):
+    """Test that check_and_display_messages shows message and marks it as shown."""
+    from shotgun.agents.config.manager import ConfigManager
+
+    # Setup config manager with temp config file
+    config_file = tmp_path / "config.json"
+    config_manager = ConfigManager(config_file)
+
+    # Create file operations with spec file
+    file_operations = [
+        FileOperation(
+            file_path="/path/to/research.md",
+            operation=FileOperationType.CREATED,
+        )
+    ]
+
+    # Track messages displayed
+    displayed_messages = []
+
+    def display_callback(message: str) -> None:
+        displayed_messages.append(message)
+
+    # Call the method
+    MarketingManager.check_and_display_messages(
+        config_manager, file_operations, display_callback
+    )
+
+    # Verify message was displayed
+    assert len(displayed_messages) == 1
+    assert "GitHub" in displayed_messages[0]
+
+    # Verify message was marked as shown in config
+    config = config_manager.load()
+    assert GITHUB_STAR_MESSAGE_ID in config.marketing.messages
+
+
+def test_check_and_display_messages_does_not_show_twice(tmp_path):
+    """Test that message is not shown twice."""
+    from shotgun.agents.config.manager import ConfigManager
+
+    # Setup config manager with temp config file
+    config_file = tmp_path / "config.json"
+    config_manager = ConfigManager(config_file)
+
+    # Create file operations with spec file
+    file_operations = [
+        FileOperation(
+            file_path="/path/to/research.md",
+            operation=FileOperationType.CREATED,
+        )
+    ]
+
+    # Track messages displayed
+    displayed_messages = []
+
+    def display_callback(message: str) -> None:
+        displayed_messages.append(message)
+
+    # Call the method twice
+    MarketingManager.check_and_display_messages(
+        config_manager, file_operations, display_callback
+    )
+    MarketingManager.check_and_display_messages(
+        config_manager, file_operations, display_callback
+    )
+
+    # Verify message was only displayed once
+    assert len(displayed_messages) == 1
+
+
+def test_check_and_display_messages_no_spec_files(tmp_path):
+    """Test that message is not shown when no spec files are written."""
+    from shotgun.agents.config.manager import ConfigManager
+
+    # Setup config manager with temp config file
+    config_file = tmp_path / "config.json"
+    config_manager = ConfigManager(config_file)
+
+    # Create file operations without spec file
+    file_operations = [
+        FileOperation(
+            file_path="/path/to/random.txt",
+            operation=FileOperationType.CREATED,
+        )
+    ]
+
+    # Track messages displayed
+    displayed_messages = []
+
+    def display_callback(message: str) -> None:
+        displayed_messages.append(message)
+
+    # Call the method
+    MarketingManager.check_and_display_messages(
+        config_manager, file_operations, display_callback
+    )
+
+    # Verify no message was displayed
+    assert len(displayed_messages) == 0
