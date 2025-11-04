@@ -504,21 +504,23 @@ class ChatScreen(Screen[None]):
 
     @work(exclusive=False)
     async def update_context_indicator_with_messages(
-        self, messages: list[ModelMessage]
+        self,
+        agent_messages: list[ModelMessage],
+        ui_messages: list[ModelMessage | HintMessage],
     ) -> None:
-        """Update the context indicator with specific message set (for streaming updates).
+        """Update the context indicator with specific message sets (for streaming updates).
 
         Args:
-            messages: The messages to analyze (typically includes partial streaming response)
+            agent_messages: Agent message history including streaming messages (for token counting)
+            ui_messages: UI message history including hints and streaming messages
         """
         try:
             from shotgun.agents.context_analyzer.analyzer import ContextAnalyzer
 
             analyzer = ContextAnalyzer(self.deps.llm_model)
-            # Analyze the provided messages against UI history
-            # (UI history is used for hint messages which aren't in agent history)
+            # Analyze the combined message histories for accurate progressive token counts
             analysis = await analyzer.analyze_conversation(
-                messages, self.agent_manager.ui_message_history
+                agent_messages, ui_messages
             )
 
             if analysis:
@@ -579,7 +581,7 @@ class ChatScreen(Screen[None]):
                 # Keep all ModelResponse and other message types
                 filtered_event_messages.append(msg)
 
-        # Build new message list
+        # Build new message list combining existing messages with new streaming content
         new_message_list = self.messages + cast(
             list[ModelMessage | HintMessage], filtered_event_messages
         )
@@ -589,9 +591,14 @@ class ChatScreen(Screen[None]):
             self.partial_message, new_message_list
         )
 
-        # Update context indicator with current streaming messages
-        # This analyzes event.messages which includes the partial response
-        self.update_context_indicator_with_messages(event.messages)
+        # Update context indicator with full message history including streaming messages
+        # Combine existing agent history with new streaming messages for accurate token count
+        combined_agent_history = (
+            self.agent_manager.message_history + event.messages
+        )
+        self.update_context_indicator_with_messages(
+            combined_agent_history, new_message_list
+        )
 
     def _clear_partial_response(self) -> None:
         # Use widget coordinator to clear partial response
