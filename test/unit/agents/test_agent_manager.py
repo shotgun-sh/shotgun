@@ -670,3 +670,131 @@ def test_restore_conversation_state_filters_system_prompt(
 
     # Hint messages should not appear in the agent message history
     assert all(not isinstance(msg, HintMessage) for msg in manager.message_history)
+
+
+@patch("shotgun.agents.agent_manager.create_export_agent")
+@patch("shotgun.agents.agent_manager.create_research_agent")
+@patch("shotgun.agents.agent_manager.create_plan_agent")
+@patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
+def test_is_message_duplicate_detects_duplicate_tool_results(
+    mock_create_specify,
+    mock_create_tasks,
+    mock_create_plan,
+    mock_create_research,
+    mock_create_export,
+    mock_agent_deps,
+    mock_agents,
+):
+    """Test that _is_message_duplicate correctly identifies duplicate tool result messages.
+
+    In production, when the same tool result appears in both streaming messages and
+    new_messages(), it's the same ToolReturnPart instance wrapped in different ModelRequest
+    objects. This test simulates that scenario.
+    """
+    from pydantic_ai.messages import ToolReturnPart
+
+    research_agent, plan_agent, tasks_agent = mock_agents
+
+    mock_create_research.return_value = (research_agent, mock_agent_deps)
+    mock_create_plan.return_value = (plan_agent, mock_agent_deps)
+    mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_export.return_value = (tasks_agent, mock_agent_deps)
+
+    manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Create a tool result part (same instance used in both messages, as in production)
+    tool_result = ToolReturnPart(
+        tool_name="web_search", content="Search results", tool_call_id="call_1"
+    )
+
+    # Wrap the same tool result in two different ModelRequest instances
+    # This simulates how streaming and new_messages() return the same parts
+    msg1 = ModelRequest(parts=[tool_result])
+    msg2 = ModelRequest(parts=[tool_result])
+
+    # Test that duplicate is detected (same parts list)
+    assert manager._is_message_duplicate(msg2, [msg1]) is True
+
+    # Test that different tool results are not duplicates
+    different_tool_result = ToolReturnPart(
+        tool_name="file_read", content="File contents", tool_call_id="call_2"
+    )
+    msg3 = ModelRequest(parts=[different_tool_result])
+
+    assert manager._is_message_duplicate(msg3, [msg1]) is False
+
+
+@patch("shotgun.agents.agent_manager.create_export_agent")
+@patch("shotgun.agents.agent_manager.create_research_agent")
+@patch("shotgun.agents.agent_manager.create_plan_agent")
+@patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
+def test_is_message_duplicate_detects_duplicate_hint_messages(
+    mock_create_specify,
+    mock_create_tasks,
+    mock_create_plan,
+    mock_create_research,
+    mock_create_export,
+    mock_agent_deps,
+    mock_agents,
+):
+    """Test that _is_message_duplicate correctly identifies duplicate HintMessages."""
+    research_agent, plan_agent, tasks_agent = mock_agents
+
+    mock_create_research.return_value = (research_agent, mock_agent_deps)
+    mock_create_plan.return_value = (plan_agent, mock_agent_deps)
+    mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_export.return_value = (tasks_agent, mock_agent_deps)
+
+    manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Create identical hint messages
+    hint1 = HintMessage(message="Task completed successfully")
+    hint2 = HintMessage(message="Task completed successfully")
+
+    # Test that duplicate is detected
+    assert manager._is_message_duplicate(hint2, [hint1]) is True
+
+    # Test that different hints are not duplicates
+    hint3 = HintMessage(message="Starting new task")
+    assert manager._is_message_duplicate(hint3, [hint1]) is False
+
+
+@patch("shotgun.agents.agent_manager.create_export_agent")
+@patch("shotgun.agents.agent_manager.create_research_agent")
+@patch("shotgun.agents.agent_manager.create_plan_agent")
+@patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
+def test_is_message_duplicate_detects_duplicate_responses(
+    mock_create_specify,
+    mock_create_tasks,
+    mock_create_plan,
+    mock_create_research,
+    mock_create_export,
+    mock_agent_deps,
+    mock_agents,
+):
+    """Test that _is_message_duplicate correctly identifies duplicate ModelResponse messages."""
+    research_agent, plan_agent, tasks_agent = mock_agents
+
+    mock_create_research.return_value = (research_agent, mock_agent_deps)
+    mock_create_plan.return_value = (plan_agent, mock_agent_deps)
+    mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
+    mock_create_export.return_value = (tasks_agent, mock_agent_deps)
+
+    manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Create identical response messages
+    response1 = ModelResponse(parts=[TextPart(content="Hello, how can I help?")])
+    response2 = ModelResponse(parts=[TextPart(content="Hello, how can I help?")])
+
+    # Test that duplicate is detected
+    assert manager._is_message_duplicate(response2, [response1]) is True
+
+    # Test that different responses are not duplicates
+    response3 = ModelResponse(parts=[TextPart(content="Different response")])
+    assert manager._is_message_duplicate(response3, [response1]) is False

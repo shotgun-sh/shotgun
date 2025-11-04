@@ -175,3 +175,79 @@ def test_codebase_sdk_mocked(chat_screen, mock_codebase_sdk):
     mock_codebase_sdk.list_codebases_for_directory.return_value = AsyncMock(
         return_value=Mock(graphs=[])
     )
+
+
+def test_deduplicate_messages_removes_duplicate_tool_results(chat_screen):
+    """Test that _deduplicate_messages removes duplicate tool result messages.
+
+    In production, when the same tool result appears twice (from streaming and new_messages),
+    it's the same ToolReturnPart instance wrapped in ModelRequest objects.
+    """
+    from pydantic_ai.messages import ModelRequest, ToolReturnPart
+
+    # Create a tool result part (same instance used in both messages)
+    tool_result = ToolReturnPart(
+        tool_name="web_search", content="Search results", tool_call_id="call_1"
+    )
+
+    # Wrap same tool result in two different ModelRequest instances
+    msg1 = ModelRequest(parts=[tool_result])
+    msg2 = ModelRequest(parts=[tool_result])
+
+    # Test deduplication
+    messages = [msg1, msg2]
+    deduplicated = chat_screen._deduplicate_messages(messages)
+
+    # Should only have one message
+    assert len(deduplicated) == 1
+    assert deduplicated[0] == msg1
+
+
+def test_deduplicate_messages_removes_duplicate_hints(chat_screen):
+    """Test that _deduplicate_messages removes duplicate HintMessages."""
+    from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+
+    # Create identical hint messages
+    hint1 = HintMessage(message="Task completed successfully")
+    hint2 = HintMessage(message="Task completed successfully")
+
+    messages = [hint1, hint2]
+    deduplicated = chat_screen._deduplicate_messages(messages)
+
+    # Should only have one message
+    assert len(deduplicated) == 1
+    assert deduplicated[0] == hint1
+
+
+def test_deduplicate_messages_preserves_order(chat_screen):
+    """Test that _deduplicate_messages preserves the order of unique messages."""
+    from pydantic_ai.messages import (
+        ModelRequest,
+        ModelResponse,
+        TextPart,
+        UserPromptPart,
+    )
+    from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+
+    # Create shared parts to simulate duplicates
+    user_prompt = UserPromptPart(content="Hello")
+    response1_parts = [TextPart(content="Hi there")]
+    response2_parts = [TextPart(content="How can I help?")]
+
+    # Create a mix of messages with some duplicates
+    msg1 = ModelRequest(parts=[user_prompt])
+    msg2 = ModelResponse(parts=response1_parts)
+    hint1 = HintMessage(message="Processing")
+    msg3 = ModelRequest(parts=[user_prompt])  # Duplicate of msg1 (same parts)
+    hint2 = HintMessage(message="Processing")  # Duplicate of hint1
+    msg4 = ModelResponse(parts=response2_parts)
+
+    messages = [msg1, msg2, hint1, msg3, hint2, msg4]
+    deduplicated = chat_screen._deduplicate_messages(messages)
+
+    # Should have 4 unique messages in original order
+    assert len(deduplicated) == 4
+    assert deduplicated[0] == msg1
+    assert deduplicated[1] == msg2
+    assert deduplicated[2] == hint1
+    assert deduplicated[3] == msg4

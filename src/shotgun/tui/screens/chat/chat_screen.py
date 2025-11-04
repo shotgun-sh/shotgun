@@ -580,9 +580,12 @@ class ChatScreen(Screen[None]):
                 filtered_event_messages.append(msg)
 
         # Build new message list combining existing messages with new streaming content
-        new_message_list = self.messages + cast(
+        combined_messages = self.messages + cast(
             list[ModelMessage | HintMessage], filtered_event_messages
         )
+
+        # Deduplicate messages to prevent duplicate tool calls from appearing
+        new_message_list = self._deduplicate_messages(combined_messages)
 
         # Use widget coordinator to set partial response
         self.widget_coordinator.set_partial_response(
@@ -595,6 +598,49 @@ class ChatScreen(Screen[None]):
         self.update_context_indicator_with_messages(
             combined_agent_history, new_message_list
         )
+
+    def _deduplicate_messages(
+        self, messages: list[ModelMessage | HintMessage]
+    ) -> list[ModelMessage | HintMessage]:
+        """Remove duplicate messages from the list while preserving order.
+
+        This prevents duplicate tool calls and responses from appearing in the UI
+        when messages are added both during streaming and from final results.
+
+        Args:
+            messages: List of messages that may contain duplicates
+
+        Returns:
+            Deduplicated list of messages in original order
+        """
+        seen: list[ModelMessage | HintMessage] = []
+        result: list[ModelMessage | HintMessage] = []
+
+        for msg in messages:
+            # Check if this message is a duplicate
+            is_duplicate = False
+
+            # For HintMessage, compare message content
+            if isinstance(msg, HintMessage):
+                is_duplicate = any(
+                    isinstance(s, HintMessage) and s.message == msg.message for s in seen
+                )
+            # For ModelRequest/ModelResponse, compare parts
+            elif hasattr(msg, "parts"):
+                msg_parts = getattr(msg, "parts", None)
+                if msg_parts is not None:
+                    for s in seen:
+                        if isinstance(s, type(msg)) and hasattr(s, "parts"):
+                            s_parts = getattr(s, "parts", None)
+                            if s_parts is not None and msg_parts == s_parts:
+                                is_duplicate = True
+                                break
+
+            if not is_duplicate:
+                result.append(msg)
+                seen.append(msg)
+
+        return result
 
     def _clear_partial_response(self) -> None:
         # Use widget coordinator to clear partial response

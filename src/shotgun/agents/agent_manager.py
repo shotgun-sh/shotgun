@@ -40,7 +40,6 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     ToolCallPart,
     ToolCallPartDelta,
-    UserPromptPart,
 )
 from textual.message import Message
 from textual.widget import Widget
@@ -610,24 +609,29 @@ class AgentManager(Widget):
             list[ModelRequest | ModelResponse | HintMessage], result.new_messages()
         )
 
-        # Deduplicate: skip user prompts that are already in original_messages
+        # Get messages that were already added during streaming
+        streaming_messages = (
+            self._stream_state.messages.copy() if self._stream_state else []
+        )
+
+        # Deduplicate: skip messages that are already in original_messages or streaming_messages
         deduplicated_new_messages = []
         for msg in new_messages:
-            # Check if this is a user prompt that's already in original_messages
-            if isinstance(msg, ModelRequest) and any(
-                isinstance(part, UserPromptPart) for part in msg.parts
-            ):
-                # Check if an identical user prompt is already in original_messages
-                already_exists = any(
-                    isinstance(existing, ModelRequest)
-                    and any(isinstance(p, UserPromptPart) for p in existing.parts)
-                    and existing.parts == msg.parts
-                    for existing in original_messages[
-                        -5:
-                    ]  # Check last 5 messages for efficiency
+            # Skip if this exact message was already added during streaming
+            if self._is_message_duplicate(msg, streaming_messages):
+                logger.debug(
+                    "Skipping duplicate message from streaming",
+                    extra={"message_type": type(msg).__name__},
                 )
-                if already_exists:
-                    continue  # Skip this duplicate user prompt
+                continue
+
+            # Skip if this message is already in original_messages
+            if self._is_message_duplicate(msg, original_messages[-10:]):
+                logger.debug(
+                    "Skipping duplicate message from history",
+                    extra={"message_type": type(msg).__name__},
+                )
+                continue
 
             deduplicated_new_messages.append(msg)
 
@@ -1082,6 +1086,52 @@ class AgentManager(Widget):
             else:
                 filtered_messages.append(msg)
         return filtered_messages
+
+    def _is_message_duplicate(
+        self,
+        msg: ModelMessage | HintMessage,
+        existing_messages: list[ModelMessage | HintMessage],
+    ) -> bool:
+        """Check if a message is a duplicate of any message in the existing list.
+
+        This compares message structure and content to detect duplicates across all
+        message types (ModelRequest, ModelResponse, HintMessage).
+
+        Args:
+            msg: The message to check for duplication
+            existing_messages: List of messages to check against
+
+        Returns:
+            True if msg is a duplicate of any message in existing_messages
+        """
+        # For HintMessage, compare message content
+        if isinstance(msg, HintMessage):
+            return any(
+                isinstance(existing, HintMessage) and existing.message == msg.message
+                for existing in existing_messages
+            )
+
+        # For ModelRequest/ModelResponse, compare parts
+        if not hasattr(msg, "parts"):
+            return False
+
+        msg_parts = getattr(msg, "parts", None)
+        if msg_parts is None:
+            return False
+
+        for existing in existing_messages:
+            if not isinstance(existing, type(msg)):
+                continue
+
+            existing_parts = getattr(existing, "parts", None)
+            if existing_parts is None:
+                continue
+
+            # Compare parts lists - if all parts are identical, it's a duplicate
+            if msg_parts == existing_parts:
+                return True
+
+        return False
 
     def get_usage_hint(self) -> str | None:
         return self.deps.usage_manager.build_usage_hint()
