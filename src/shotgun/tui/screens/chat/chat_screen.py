@@ -560,6 +560,7 @@ class ChatScreen(Screen[None]):
 
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
+        logging.debug(f"[PARTIAL] handle_partial_response called with {len(event.messages)} messages")
         self.partial_message = event.message
 
         # Filter event.messages to exclude ModelRequest with only ToolReturnPart
