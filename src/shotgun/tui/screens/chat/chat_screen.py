@@ -502,6 +502,34 @@ class ChatScreen(Screen[None]):
                 f"[CONTEXT] Failed to update context indicator: {e}", exc_info=True
             )
 
+    @work(exclusive=False)
+    async def update_context_indicator_with_messages(
+        self,
+        agent_messages: list[ModelMessage],
+        ui_messages: list[ModelMessage | HintMessage],
+    ) -> None:
+        """Update the context indicator with specific message sets (for streaming updates).
+
+        Args:
+            agent_messages: Agent message history including streaming messages (for token counting)
+            ui_messages: UI message history including hints and streaming messages
+        """
+        try:
+            from shotgun.agents.context_analyzer.analyzer import ContextAnalyzer
+
+            analyzer = ContextAnalyzer(self.deps.llm_model)
+            # Analyze the combined message histories for accurate progressive token counts
+            analysis = await analyzer.analyze_conversation(agent_messages, ui_messages)
+
+            if analysis:
+                model_name = self.deps.llm_model.name
+                self.widget_coordinator.update_context_indicator(analysis, model_name)
+        except Exception as e:
+            logger.error(
+                f"Failed to update context indicator with streaming messages: {e}",
+                exc_info=True,
+            )
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
@@ -551,7 +579,7 @@ class ChatScreen(Screen[None]):
                 # Keep all ModelResponse and other message types
                 filtered_event_messages.append(msg)
 
-        # Build new message list
+        # Build new message list combining existing messages with new streaming content
         new_message_list = self.messages + cast(
             list[ModelMessage | HintMessage], filtered_event_messages
         )
@@ -559,6 +587,13 @@ class ChatScreen(Screen[None]):
         # Use widget coordinator to set partial response
         self.widget_coordinator.set_partial_response(
             self.partial_message, new_message_list
+        )
+
+        # Update context indicator with full message history including streaming messages
+        # Combine existing agent history with new streaming messages for accurate token count
+        combined_agent_history = self.agent_manager.message_history + event.messages
+        self.update_context_indicator_with_messages(
+            combined_agent_history, new_message_list
         )
 
     def _clear_partial_response(self) -> None:
@@ -1048,6 +1083,9 @@ class ChatScreen(Screen[None]):
         self.processing_state.start_processing("Processing...")
         self.processing_state.bind_worker(get_current_worker())
 
+        # Start context indicator animation immediately
+        self.widget_coordinator.set_context_streaming(True)
+
         prompt = message
 
         try:
@@ -1083,6 +1121,8 @@ class ChatScreen(Screen[None]):
             self.mount_hint(hint)
         finally:
             self.processing_state.stop_processing()
+            # Stop context indicator animation
+            self.widget_coordinator.set_context_streaming(False)
 
         # Save conversation after each interaction
         self._save_conversation()
