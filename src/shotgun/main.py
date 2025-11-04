@@ -57,7 +57,7 @@ logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 # Initialize configuration
 try:
     config_manager = get_config_manager()
-    config_manager.load()  # Ensure config is loaded at startup
+    config_manager.load_sync()  # Ensure config is loaded at startup (uses cache)
 except Exception as e:
     logger.debug("Configuration initialization warning: %s", e)
 

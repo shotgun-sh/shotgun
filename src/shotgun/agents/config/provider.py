@@ -189,7 +189,8 @@ def get_provider_model(
     """
     config_manager = get_config_manager()
     # Use cached config for read-only access (performance)
-    config = config_manager.load(force_reload=False)
+    # Use load_sync() for backward compatibility with synchronous code
+    config = config_manager.load_sync(force_reload=False)
 
     # Priority 1: Check if Shotgun key exists - if so, use it for ANY model
     shotgun_api_key = _get_api_key(config.shotgun.api_key)

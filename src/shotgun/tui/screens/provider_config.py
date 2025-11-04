@@ -97,7 +97,7 @@ class ProviderConfigScreen(Screen[None]):
                 "Don't have an API Key? Use these links to get one: [OpenAI](https://platform.openai.com/api-keys) | [Anthropic](https://console.anthropic.com) | [Google Gemini](https://aistudio.google.com)",
                 id="provider-links",
             )
-        yield ListView(*self._build_provider_items(), id="provider-list")
+        yield ListView(*self._build_provider_items_sync(), id="provider-list")
         yield Input(
             placeholder=self._input_placeholder(self.selected_provider),
             password=True,
@@ -110,8 +110,6 @@ class ProviderConfigScreen(Screen[None]):
             yield Button("Done \\[ESC]", id="done")
 
     def on_mount(self) -> None:
-        self.refresh_provider_status()
-        self._update_done_button_visibility()
         list_view = self.query_one(ListView)
         if list_view.children:
             list_view.index = 0
@@ -121,13 +119,20 @@ class ProviderConfigScreen(Screen[None]):
         self.query_one("#authenticate", Button).display = False
         self.set_focus(self.query_one("#api-key", Input))
 
+        # Refresh UI asynchronously
+        self.run_worker(self._refresh_ui(), exclusive=False)
+
     def on_screenresume(self) -> None:
         """Refresh provider status when screen is resumed.
 
         This ensures the UI reflects any provider changes made elsewhere.
         """
-        self.refresh_provider_status()
-        self._update_done_button_visibility()
+        self.run_worker(self._refresh_ui(), exclusive=False)
+
+    async def _refresh_ui(self) -> None:
+        """Refresh provider status and button visibility."""
+        await self.refresh_provider_status()
+        await self._update_done_button_visibility()
 
     def action_done(self) -> None:
         self.dismiss()
@@ -170,7 +175,11 @@ class ProviderConfigScreen(Screen[None]):
         if not self.is_mounted:
             return
 
-        # Show/hide UI elements based on provider type
+        # Show/hide UI elements based on provider type asynchronously
+        self.run_worker(self._update_provider_ui(provider), exclusive=False)
+
+    async def _update_provider_ui(self, provider: ProviderType) -> None:
+        """Update UI elements based on selected provider."""
         is_shotgun = provider == "shotgun"
 
         input_widget = self.query_one("#api-key", Input)
@@ -183,7 +192,7 @@ class ProviderConfigScreen(Screen[None]):
             save_button.display = False
 
             # Only show Authenticate button if shotgun is NOT already configured
-            if self._has_provider_key("shotgun"):
+            if await self._has_provider_key("shotgun"):
                 auth_button.display = False
             else:
                 auth_button.display = True
@@ -200,22 +209,29 @@ class ProviderConfigScreen(Screen[None]):
         app = cast("ShotgunApp", self.app)
         return app.config_manager
 
-    def refresh_provider_status(self) -> None:
+    async def refresh_provider_status(self) -> None:
         """Update the list view entries to reflect configured providers."""
         for provider_id in get_configurable_providers():
             label = self.query_one(f"#label-{provider_id}", Label)
-            label.update(self._provider_label(provider_id))
+            label.update(await self._provider_label(provider_id))
 
-    def _update_done_button_visibility(self) -> None:
+    async def _update_done_button_visibility(self) -> None:
         """Show/hide Done button based on whether any provider keys are configured."""
         done_button = self.query_one("#done", Button)
-        has_keys = self.config_manager.has_any_provider_key()
+        has_keys = await self.config_manager.has_any_provider_key()
         done_button.display = has_keys
 
-    def _build_provider_items(self) -> list[ListItem]:
+    def _build_provider_items_sync(self) -> list[ListItem]:
+        """Build provider items synchronously for compose().
+
+        Labels will be populated with status asynchronously in on_mount().
+        """
         items: list[ListItem] = []
         for provider_id in get_configurable_providers():
-            label = Label(self._provider_label(provider_id), id=f"label-{provider_id}")
+            # Create labels with placeholder text - will be updated in on_mount()
+            label = Label(
+                self._provider_display_name(provider_id), id=f"label-{provider_id}"
+            )
             items.append(ListItem(label, id=f"provider-{provider_id}"))
         return items
 
@@ -225,11 +241,10 @@ class ProviderConfigScreen(Screen[None]):
         provider_id = item.id.removeprefix("provider-")
         return provider_id if provider_id in get_configurable_providers() else None
 
-    def _provider_label(self, provider_id: str) -> str:
+    async def _provider_label(self, provider_id: str) -> str:
         display = self._provider_display_name(provider_id)
-        status = (
-            "Configured" if self._has_provider_key(provider_id) else "Not configured"
-        )
+        has_key = await self._has_provider_key(provider_id)
+        status = "Configured" if has_key else "Not configured"
         return f"{display} · {status}"
 
     def _provider_display_name(self, provider_id: str) -> str:
@@ -244,21 +259,25 @@ class ProviderConfigScreen(Screen[None]):
     def _input_placeholder(self, provider_id: str) -> str:
         return f"{self._provider_display_name(provider_id)} API key"
 
-    def _has_provider_key(self, provider_id: str) -> bool:
+    async def _has_provider_key(self, provider_id: str) -> bool:
         """Check if provider has a configured API key."""
         if provider_id == "shotgun":
             # Check shotgun key directly
-            config = self.config_manager.load()
+            config = await self.config_manager.load()
             return self.config_manager._provider_has_api_key(config.shotgun)
         else:
             # Check LLM provider key
             try:
                 provider = ProviderType(provider_id)
-                return self.config_manager.has_provider_key(provider)
+                return await self.config_manager.has_provider_key(provider)
             except ValueError:
                 return False
 
     def _save_api_key(self) -> None:
+        self.run_worker(self._do_save_api_key(), exclusive=True)
+
+    async def _do_save_api_key(self) -> None:
+        """Async implementation of API key saving."""
         input_widget = self.query_one("#api-key", Input)
         api_key = input_widget.value.strip()
 
@@ -267,7 +286,7 @@ class ProviderConfigScreen(Screen[None]):
             return
 
         try:
-            self.config_manager.update_provider(
+            await self.config_manager.update_provider(
                 self.selected_provider,
                 api_key=api_key,
             )
@@ -276,21 +295,25 @@ class ProviderConfigScreen(Screen[None]):
             return
 
         input_widget.value = ""
-        self.refresh_provider_status()
-        self._update_done_button_visibility()
+        await self.refresh_provider_status()
+        await self._update_done_button_visibility()
         self.notify(
             f"Saved API key for {self._provider_display_name(self.selected_provider)}."
         )
 
     def _clear_api_key(self) -> None:
+        self.run_worker(self._do_clear_api_key(), exclusive=True)
+
+    async def _do_clear_api_key(self) -> None:
+        """Async implementation of API key clearing."""
         try:
-            self.config_manager.clear_provider_key(self.selected_provider)
+            await self.config_manager.clear_provider_key(self.selected_provider)
         except Exception as exc:  # pragma: no cover - defensive; textual path
             self.notify(f"Failed to clear key: {exc}", severity="error")
             return
 
-        self.refresh_provider_status()
-        self._update_done_button_visibility()
+        await self.refresh_provider_status()
+        await self._update_done_button_visibility()
         self.query_one("#api-key", Input).value = ""
 
         # If we just cleared shotgun, show the Authenticate button
@@ -311,5 +334,5 @@ class ProviderConfigScreen(Screen[None]):
 
         # Refresh provider status after auth completes
         if result:
-            self.refresh_provider_status()
+            await self.refresh_provider_status()
             # Notify handled by auth screen

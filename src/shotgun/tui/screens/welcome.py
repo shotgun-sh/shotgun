@@ -136,13 +136,16 @@ class WelcomeScreen(Screen[None]):
 
     def on_mount(self) -> None:
         """Focus the first button on mount."""
-        # Update BYOK button text based on whether user has existing providers
+        self.query_one("#shotgun-button", Button).focus()
+        # Update BYOK button text asynchronously
+        self.run_worker(self._update_byok_button_text(), exclusive=False)
+
+    async def _update_byok_button_text(self) -> None:
+        """Update BYOK button text based on whether user has existing providers."""
         byok_button = self.query_one("#byok-button", Button)
         app = cast("ShotgunApp", self.app)
-        if app.config_manager.has_any_provider_key():
+        if await app.config_manager.has_any_provider_key():
             byok_button.label = "I'll stick with my BYOK setup"
-
-        self.query_one("#shotgun-button", Button).focus()
 
     @on(Button.Pressed, "#shotgun-button")
     def _on_shotgun_pressed(self) -> None:
@@ -156,12 +159,12 @@ class WelcomeScreen(Screen[None]):
 
     async def _start_byok_config(self) -> None:
         """Launch BYOK provider configuration flow."""
-        self._mark_welcome_shown()
+        await self._mark_welcome_shown()
 
         app = cast("ShotgunApp", self.app)
 
         # If user already has providers, just dismiss and continue to chat
-        if app.config_manager.has_any_provider_key():
+        if await app.config_manager.has_any_provider_key():
             self.dismiss()
             return
 
@@ -171,7 +174,7 @@ class WelcomeScreen(Screen[None]):
         await self.app.push_screen_wait(ProviderConfigScreen())
 
         # Dismiss welcome screen after config if providers are now configured
-        if app.config_manager.has_any_provider_key():
+        if await app.config_manager.has_any_provider_key():
             self.dismiss()
 
     async def _start_shotgun_auth(self) -> None:
@@ -179,7 +182,7 @@ class WelcomeScreen(Screen[None]):
         from .shotgun_auth import ShotgunAuthScreen
 
         # Mark welcome screen as shown before auth
-        self._mark_welcome_shown()
+        await self._mark_welcome_shown()
 
         # Push the auth screen and wait for result
         await self.app.push_screen_wait(ShotgunAuthScreen())
@@ -187,9 +190,9 @@ class WelcomeScreen(Screen[None]):
         # Dismiss welcome screen after auth
         self.dismiss()
 
-    def _mark_welcome_shown(self) -> None:
+    async def _mark_welcome_shown(self) -> None:
         """Mark the welcome screen as shown in config."""
         app = cast("ShotgunApp", self.app)
-        config = app.config_manager.load()
+        config = await app.config_manager.load()
         config.shown_welcome_screen = True
-        app.config_manager.save(config)
+        await app.config_manager.save(config)

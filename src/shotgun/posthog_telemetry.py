@@ -60,7 +60,7 @@ def setup_posthog_observability() -> bool:
         # Set user context with anonymous shotgun instance ID from config
         try:
             config_manager = get_config_manager()
-            shotgun_instance_id = config_manager.get_shotgun_instance_id()
+            shotgun_instance_id = config_manager.get_shotgun_instance_id_sync()
 
             # Identify the user in PostHog
             posthog.identify(  # type: ignore[attr-defined]
@@ -109,7 +109,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
     try:
         # Get shotgun instance ID for tracking
         config_manager = get_config_manager()
-        shotgun_instance_id = config_manager.get_shotgun_instance_id()
+        shotgun_instance_id = config_manager.get_shotgun_instance_id_sync()
 
         # Add version and environment to properties
         if properties is None:

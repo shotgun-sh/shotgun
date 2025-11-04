@@ -53,7 +53,7 @@ def setup_sentry_observability() -> bool:
             from shotgun.agents.config import get_config_manager
 
             config_manager = get_config_manager()
-            shotgun_instance_id = config_manager.get_shotgun_instance_id()
+            shotgun_instance_id = config_manager.get_shotgun_instance_id_sync()
             sentry_sdk.set_user({"id": shotgun_instance_id})
             logger.debug("Sentry user context set with anonymous ID")
         except Exception as e:
