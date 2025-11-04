@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import aiofiles.os
+
 from shotgun.agents.conversation_history import ConversationHistory, ConversationState
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.agents.models import AgentType
@@ -95,7 +97,7 @@ class ConversationService:
             logger.exception(f"Failed to load conversation: {e}")
             return None
 
-    def check_for_corrupted_conversation(self) -> bool:
+    async def check_for_corrupted_conversation(self) -> bool:
         """Check if a conversation backup exists (indicating corruption).
 
         Returns:
@@ -104,7 +106,7 @@ class ConversationService:
         backup_path = self.conversation_manager.conversation_path.with_suffix(
             ".json.backup"
         )
-        return backup_path.exists()
+        return await aiofiles.os.path.exists(str(backup_path))
 
     async def restore_conversation(
         self,
@@ -127,7 +129,7 @@ class ConversationService:
 
         if conversation is None:
             # Check for corruption
-            if self.check_for_corrupted_conversation():
+            if await self.check_for_corrupted_conversation():
                 return (
                     False,
                     "⚠️ Previous session was corrupted and has been backed up. Starting fresh conversation.",
@@ -165,7 +167,7 @@ class ConversationService:
                 None,
             )
 
-    def clear_conversation(self) -> bool:
+    async def clear_conversation(self) -> bool:
         """Clear the saved conversation file.
 
         Returns:
@@ -173,8 +175,8 @@ class ConversationService:
         """
         try:
             conversation_path = self.conversation_manager.conversation_path
-            if conversation_path.exists():
-                conversation_path.unlink()
+            if await aiofiles.os.path.exists(str(conversation_path)):
+                await aiofiles.os.unlink(str(conversation_path))
                 logger.info("Conversation file cleared")
             return True
         except Exception as e:

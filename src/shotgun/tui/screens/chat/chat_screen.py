@@ -166,8 +166,9 @@ class ChatScreen(Screen[None]):
         self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
 
         # Load conversation history if --continue flag was provided
-        if self.continue_session and self.conversation_manager.exists():
-            self._load_conversation()
+        # Use call_later to handle async exists() check
+        if self.continue_session:
+            self.call_later(self._check_and_load_conversation)
 
         self.call_later(self.check_if_codebase_is_indexed)
         # Initial update of context indicator
@@ -456,7 +457,7 @@ class ChatScreen(Screen[None]):
             self.agent_manager.ui_message_history = []
 
             # Use conversation service to clear conversation
-            self.conversation_service.clear_conversation()
+            await self.conversation_service.clear_conversation()
 
             # Post message history updated event to refresh UI
             self.agent_manager.post_message(
@@ -1143,10 +1144,16 @@ class ChatScreen(Screen[None]):
     def _save_conversation(self) -> None:
         """Save the current conversation to persistent storage."""
         # Use conversation service for saving (run async in background)
+        # Use exclusive=True to prevent concurrent saves that can cause file contention
         self.run_worker(
             self.conversation_service.save_conversation(self.agent_manager),
-            exclusive=False,
+            exclusive=True,
         )
+
+    async def _check_and_load_conversation(self) -> None:
+        """Check if conversation exists and load it if it does."""
+        if await self.conversation_manager.exists():
+            self._load_conversation()
 
     def _load_conversation(self) -> None:
         """Load conversation from persistent storage."""

@@ -46,9 +46,12 @@ class ConversationManager:
 
             conversation.updated_at = datetime.now()
 
-            # Serialize to JSON using Pydantic's model_dump
-            data = conversation.model_dump(mode="json")
-            json_content = json.dumps(data, indent=2, ensure_ascii=False)
+            # Serialize to JSON in background thread to avoid blocking event loop
+            # This is crucial for large conversations (5k+ tokens)
+            data = await asyncio.to_thread(conversation.model_dump, mode="json")
+            json_content = await asyncio.to_thread(
+                json.dumps, data, indent=2, ensure_ascii=False
+            )
 
             async with aiofiles.open(
                 self.conversation_path, "w", encoding="utf-8"
@@ -76,9 +79,13 @@ class ConversationManager:
         try:
             async with aiofiles.open(self.conversation_path, encoding="utf-8") as f:
                 content = await f.read()
-                data = json.loads(content)
+                # Deserialize JSON in background thread to avoid blocking
+                data = await asyncio.to_thread(json.loads, content)
 
-            conversation = ConversationHistory.model_validate(data)
+            # Validate model in background thread for large conversations
+            conversation = await asyncio.to_thread(
+                ConversationHistory.model_validate, data
+            )
             logger.debug(
                 "Conversation loaded from %s with %d agent messages",
                 self.conversation_path,
@@ -127,10 +134,10 @@ class ConversationManager:
                     "Failed to clear conversation at %s: %s", self.conversation_path, e
                 )
 
-    def exists(self) -> bool:
+    async def exists(self) -> bool:
         """Check if a conversation history file exists.
 
         Returns:
             True if conversation file exists, False otherwise
         """
-        return self.conversation_path.exists()
+        return await aiofiles.os.path.exists(str(self.conversation_path))

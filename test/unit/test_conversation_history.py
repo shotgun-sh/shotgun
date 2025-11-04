@@ -147,7 +147,7 @@ async def test_conversation_manager_nonexistent_file(tmp_path):
     assert loaded is None
 
     # Check exists method
-    assert not manager.exists()
+    assert not await manager.exists()
 
 
 @pytest.mark.asyncio

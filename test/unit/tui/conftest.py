@@ -75,9 +75,9 @@ def mock_agent_manager(mock_agent_deps):
 def mock_conversation_manager():
     """Create a mock ConversationManager for testing."""
     manager = Mock(spec=ConversationManager)
-    manager.save = Mock()
-    manager.load = Mock(return_value=None)
-    manager.exists = Mock(return_value=False)
+    manager.save = AsyncMock()
+    manager.load = AsyncMock(return_value=None)
+    manager.exists = AsyncMock(return_value=False)
     return manager
 
 
@@ -124,11 +124,11 @@ def mock_codebase_sdk():
 def mock_conversation_service():
     """Create a mock ConversationService for testing."""
     service = Mock(spec=ConversationService)
-    service.save_conversation = Mock(return_value=True)
-    service.load_conversation = Mock(return_value=None)
-    service.restore_conversation = Mock(return_value=(True, None, None))
-    service.clear_conversation = Mock(return_value=True)
-    service.check_for_corrupted_conversation = Mock(return_value=False)
+    service.save_conversation = AsyncMock(return_value=True)
+    service.load_conversation = AsyncMock(return_value=None)
+    service.restore_conversation = AsyncMock(return_value=(True, None, None))
+    service.clear_conversation = AsyncMock(return_value=True)
+    service.check_for_corrupted_conversation = AsyncMock(return_value=False)
     return service
 
 
