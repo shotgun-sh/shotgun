@@ -5,6 +5,9 @@ import logging
 from pathlib import Path
 from typing import cast
 
+# DEBUG: Verify this file is being loaded
+logging.warning("🔍 chat_screen.py MODULE LOADED - new version with debug logging")
+
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
