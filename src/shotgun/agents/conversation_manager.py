@@ -69,7 +69,7 @@ class ConversationManager:
         Returns:
             ConversationHistory if file exists and is valid, None otherwise
         """
-        if not self.conversation_path.exists():
+        if not await aiofiles.os.path.exists(self.conversation_path):
             logger.debug("No conversation history found at %s", self.conversation_path)
             return None
 
@@ -115,7 +115,7 @@ class ConversationManager:
 
     async def clear(self) -> None:
         """Delete the conversation history file."""
-        if self.conversation_path.exists():
+        if await aiofiles.os.path.exists(self.conversation_path):
             try:
                 # Use asyncio.to_thread for unlink operation
                 await asyncio.to_thread(self.conversation_path.unlink)

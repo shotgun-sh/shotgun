@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 import aiofiles
+import aiofiles.os
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps, AgentType, FileOperationType
@@ -182,7 +183,7 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
     try:
         file_path = _validate_shotgun_path(filename)
 
-        if not file_path.exists():
+        if not await aiofiles.os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {filename}")
 
         async with aiofiles.open(file_path, encoding="utf-8") as f:
@@ -235,12 +236,12 @@ async def write_file(
         else:
             operation = (
                 FileOperationType.CREATED
-                if not file_path.exists()
+                if not await aiofiles.os.path.exists(file_path)
                 else FileOperationType.UPDATED
             )
 
         # Ensure parent directory exists
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(file_path.parent, exist_ok=True)
 
         # Write content
         if mode == "a":

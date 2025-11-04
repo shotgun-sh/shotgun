@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
+import aiofiles.os
 from pydantic import SecretStr
 
 from shotgun.logging_config import get_logger
@@ -61,7 +62,7 @@ class ConfigManager:
         if self._config is not None and not force_reload:
             return self._config
 
-        if not self.config_path.exists():
+        if not await aiofiles.os.path.exists(self.config_path):
             logger.info(
                 "Configuration file not found, creating new config at: %s",
                 self.config_path,
@@ -192,7 +193,7 @@ class ConfigManager:
                 )
 
         # Ensure directory exists
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(self.config_path.parent, exist_ok=True)
 
         try:
             # Convert SecretStr to plain text for JSON serialization

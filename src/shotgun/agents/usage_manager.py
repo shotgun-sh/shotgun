@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TypeAlias
 
 import aiofiles
+import aiofiles.os
 from genai_prices import calc_price
 from pydantic import BaseModel, Field
 from pydantic_ai import RunUsage
@@ -88,7 +89,7 @@ class SessionUsageManager:
         )
 
         try:
-            self._usage_path.parent.mkdir(parents=True, exist_ok=True)
+            await aiofiles.os.makedirs(self._usage_path.parent, exist_ok=True)
             json_content = json.dumps(state.model_dump(mode="json"), indent=2)
             async with aiofiles.open(self._usage_path, "w", encoding="utf-8") as f:
                 await f.write(json_content)
@@ -99,7 +100,7 @@ class SessionUsageManager:
             )
 
     async def restore_usage_state(self) -> None:
-        if not self._usage_path.exists():
+        if not await aiofiles.os.path.exists(self._usage_path):
             logger.debug("No usage state file found at %s", self._usage_path)
             return
 
