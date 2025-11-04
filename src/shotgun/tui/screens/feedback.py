@@ -125,8 +125,8 @@ class FeedbackScreen(Screen[Feedback | None]):
             self.set_focus(self.query_one("#feedback-description", TextArea))
 
     @on(Button.Pressed, "#submit")
-    def _on_submit_pressed(self) -> None:
-        self._submit_feedback()
+    async def _on_submit_pressed(self) -> None:
+        await self._submit_feedback()
 
     @on(Button.Pressed, "#cancel")
     def _on_cancel_pressed(self) -> None:
@@ -171,7 +171,7 @@ class FeedbackScreen(Screen[Feedback | None]):
         }
         return placeholders.get(kind, "Enter your feedback...")
 
-    def _submit_feedback(self) -> None:
+    async def _submit_feedback(self) -> None:
         text_area = self.query_one("#feedback-description", TextArea)
         description = text_area.text.strip()
 
@@ -182,7 +182,7 @@ class FeedbackScreen(Screen[Feedback | None]):
             return
 
         app = cast("ShotgunApp", self.app)
-        shotgun_instance_id = app.config_manager.get_shotgun_instance_id()
+        shotgun_instance_id = await app.config_manager.get_shotgun_instance_id()
 
         feedback = Feedback(
             kind=self.selected_kind,

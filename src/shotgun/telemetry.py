@@ -50,12 +50,14 @@ def setup_logfire_observability() -> bool:
 
         # Set user context using baggage for all logs and spans
         try:
+            import asyncio
+
             from opentelemetry import baggage, context
 
             from shotgun.agents.config import get_config_manager
 
             config_manager = get_config_manager()
-            shotgun_instance_id = config_manager.get_shotgun_instance_id()
+            shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
 
             # Set shotgun_instance_id as baggage in global context - this will be included in all logs/spans
             ctx = baggage.set_baggage("shotgun_instance_id", shotgun_instance_id)

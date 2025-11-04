@@ -1,5 +1,6 @@
 """Configuration management CLI commands."""
 
+import asyncio
 import json
 from typing import Annotated, Any
 
@@ -44,7 +45,7 @@ def init(
         console.print()
 
         # Initialize with defaults
-        config_manager.initialize()
+        asyncio.run(config_manager.initialize())
 
         # Ask for provider
         provider_choices = ["openai", "anthropic", "google"]
@@ -76,7 +77,7 @@ def init(
 
         if api_key:
             # update_provider will automatically set selected_model for first provider
-            config_manager.update_provider(provider, api_key=api_key)
+            asyncio.run(config_manager.update_provider(provider, api_key=api_key))
 
         console.print(
             f"\n✅ [bold green]Configuration saved to {config_manager.config_path}[/bold green]"
@@ -84,7 +85,7 @@ def init(
         console.print("🎯 You can now use Shotgun with your configured provider!")
 
     else:
-        config_manager.initialize()
+        asyncio.run(config_manager.initialize())
         console.print(f"✅ Configuration initialized at {config_manager.config_path}")
 
 
@@ -112,7 +113,7 @@ def set(
 
     try:
         if api_key:
-            config_manager.update_provider(provider, api_key=api_key)
+            asyncio.run(config_manager.update_provider(provider, api_key=api_key))
 
         console.print(f"✅ Configuration updated for {provider}")
 
@@ -133,8 +134,10 @@ def get(
     ] = False,
 ) -> None:
     """Display current configuration."""
+    import asyncio
+
     config_manager = get_config_manager()
-    config = config_manager.load()
+    config = asyncio.run(config_manager.load())
 
     if json_output:
         # Convert to dict and mask secrets

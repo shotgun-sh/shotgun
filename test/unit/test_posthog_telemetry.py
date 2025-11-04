@@ -1,7 +1,7 @@
 """Tests for PostHog telemetry module."""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from shotgun import posthog_telemetry
 from shotgun.posthog_telemetry import Feedback, FeedbackKind
@@ -55,8 +55,8 @@ def test_setup_posthog_with_build_constants():
                             "shotgun.posthog_telemetry.get_config_manager"
                         ) as mock_get_config:
                             mock_config = MagicMock()
-                            mock_config.get_shotgun_instance_id.return_value = (
-                                "test-shotgun-instance-id"
+                            mock_config.get_shotgun_instance_id = AsyncMock(
+                                return_value="test-shotgun-instance-id"
                             )
                             mock_get_config.return_value = mock_config
 
@@ -87,8 +87,8 @@ def test_setup_posthog_with_env_vars():
                             "shotgun.posthog_telemetry.get_config_manager"
                         ) as mock_get_config:
                             mock_config = MagicMock()
-                            mock_config.get_shotgun_instance_id.return_value = (
-                                "test-shotgun-instance-id"
+                            mock_config.get_shotgun_instance_id = AsyncMock(
+                                return_value="test-shotgun-instance-id"
                             )
                             mock_get_config.return_value = mock_config
 
@@ -121,8 +121,8 @@ def test_track_event_initialized():
     try:
         with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
             mock_config = MagicMock()
-            mock_config.get_shotgun_instance_id.return_value = (
-                "test-shotgun-instance-id"
+            mock_config.get_shotgun_instance_id = AsyncMock(
+                return_value="test-shotgun-instance-id"
             )
             mock_get_config.return_value = mock_config
 
@@ -151,8 +151,8 @@ def test_track_event_dev_version():
     try:
         with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
             mock_config = MagicMock()
-            mock_config.get_shotgun_instance_id.return_value = (
-                "test-shotgun-instance-id"
+            mock_config.get_shotgun_instance_id = AsyncMock(
+                return_value="test-shotgun-instance-id"
             )
             mock_get_config.return_value = mock_config
 
@@ -255,7 +255,7 @@ def test_submit_feedback_survey_bug_report(
     mock_config = MagicMock()
     mock_config.selected_model.value = "gpt-5"
     mock_config.config_version = "1.0.0"
-    mock_config_manager.load.return_value = mock_config
+    mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager
 
     mock_conversation_manager = MagicMock()
@@ -264,7 +264,7 @@ def test_submit_feedback_survey_bug_report(
         {"role": "user", "content": "Test message 1"},
         {"role": "assistant", "content": "Test response 1"},
     ]
-    mock_conversation_manager.load.return_value = mock_conversation
+    mock_conversation_manager.load = AsyncMock(return_value=mock_conversation)
     mock_conversation_manager_class.return_value = mock_conversation_manager
 
     # Set up a mock PostHog client
@@ -326,11 +326,11 @@ def test_submit_feedback_survey_feature_request(
     mock_config = MagicMock()
     mock_config.selected_model.value = "claude-opus-4-1"
     mock_config.config_version = "2.0.0"
-    mock_config_manager.load.return_value = mock_config
+    mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager
 
     mock_conversation_manager = MagicMock()
-    mock_conversation_manager.load.return_value = None
+    mock_conversation_manager.load = AsyncMock(return_value=None)
     mock_conversation_manager_class.return_value = mock_conversation_manager
 
     # Set up a mock PostHog client
@@ -380,7 +380,7 @@ def test_submit_feedback_survey_other_feedback(
     mock_config = MagicMock()
     mock_config.selected_model.value = "gemini-2.5-pro"
     mock_config.config_version = "1.5.0"
-    mock_config_manager.load.return_value = mock_config
+    mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager
 
     mock_conversation_manager = MagicMock()
@@ -389,7 +389,7 @@ def test_submit_feedback_survey_other_feedback(
     mock_conversation.get_agent_messages.return_value = [
         {"role": "user", "content": f"Message {i}"} for i in range(15)
     ]
-    mock_conversation_manager.load.return_value = mock_conversation
+    mock_conversation_manager.load = AsyncMock(return_value=mock_conversation)
     mock_conversation_manager_class.return_value = mock_conversation_manager
 
     # Set up a mock PostHog client

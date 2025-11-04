@@ -37,7 +37,8 @@ class TestCreateUsageLimits:
 class TestCreateBaseAgent:
     """Test suite for create_base_agent function."""
 
-    def test_handles_provider_model_error(self):
+    @pytest.mark.asyncio
+    async def test_handles_provider_model_error(self):
         """Test handling of provider model configuration errors."""
 
         def mock_system_prompt_fn(ctx):
@@ -53,7 +54,7 @@ class TestCreateBaseAgent:
             ),
         ):
             with pytest.raises(ValueError, match="Configured model is required"):
-                create_base_agent(mock_system_prompt_fn, agent_runtime_options)
+                await create_base_agent(mock_system_prompt_fn, agent_runtime_options)
 
 
 class TestPromptTemplateIntegration:

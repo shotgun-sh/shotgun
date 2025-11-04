@@ -1,5 +1,6 @@
 """Clear command for shotgun CLI."""
 
+import asyncio
 from pathlib import Path
 
 import typer
@@ -37,7 +38,7 @@ def clear() -> None:
 
         # Clear the conversation
         manager = ConversationManager(conversation_file)
-        manager.clear()
+        asyncio.run(manager.clear())
 
         console.print(
             "[green]✓[/green] Conversation cleared successfully", style="bold"

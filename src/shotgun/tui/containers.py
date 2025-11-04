@@ -5,10 +5,8 @@ from typing import TYPE_CHECKING
 from dependency_injector import containers, providers
 from pydantic_ai import RunContext
 
-from shotgun.agents.agent_manager import AgentManager
-from shotgun.agents.config import get_provider_model
 from shotgun.agents.conversation_manager import ConversationManager
-from shotgun.agents.models import AgentDeps, AgentType
+from shotgun.agents.models import AgentDeps
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
@@ -35,13 +33,19 @@ class TUIContainer(containers.DeclarativeContainer):
 
     This container manages the lifecycle and dependencies of all TUI components,
     ensuring consistent configuration and facilitating testing.
+
+    Note: model_config and agent_deps are created lazily via async factory methods
+    since get_provider_model() is now async.
     """
 
     # Configuration
     config = providers.Configuration()
 
     # Core dependencies
-    model_config = providers.Singleton(get_provider_model)
+    # TODO: Figure out a better solution for async dependency injection
+    # model_config is now loaded lazily via create_default_tui_deps()
+    # because get_provider_model() is async. This breaks the DI pattern
+    # and should be refactored to support async factories properly.
 
     storage_dir = providers.Singleton(lambda: get_shotgun_home() / "codebases")
 
@@ -51,15 +55,10 @@ class TUIContainer(containers.DeclarativeContainer):
 
     system_prompt_fn = providers.Object(_placeholder_system_prompt)
 
-    # AgentDeps singleton
-    agent_deps = providers.Singleton(
-        AgentDeps,
-        interactive_mode=True,
-        is_tui_context=True,
-        llm_model=model_config,
-        codebase_service=codebase_service,
-        system_prompt_fn=system_prompt_fn,
-    )
+    # TODO: Figure out a better solution for async dependency injection
+    # AgentDeps is now created via async create_default_tui_deps()
+    # instead of using DI container's Singleton provider because it requires
+    # async model_config initialization
 
     # Service singletons
     codebase_sdk = providers.Singleton(CodebaseSDK)
@@ -74,10 +73,9 @@ class TUIContainer(containers.DeclarativeContainer):
         ConversationService, conversation_manager=conversation_manager
     )
 
-    # Factory for AgentManager (needs agent_type parameter)
-    agent_manager_factory = providers.Factory(
-        AgentManager, deps=agent_deps, initial_type=providers.Object(AgentType.RESEARCH)
-    )
+    # TODO: Figure out a better solution for async dependency injection
+    # AgentManager factory removed - create via async initialization
+    # since it requires async agent creation
 
     # Factory for ProcessingStateManager (needs ChatScreen reference)
     processing_state_factory = providers.Factory(

@@ -100,12 +100,16 @@ async def test_filters_system_prompts_from_other_agents(
     mock_agent_deps,
 ):
     """Test that system prompts from other agent types are filtered out."""
-    # Mock the agent creation functions to return (agent, deps) tuples
-    mock_create_research.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_plan.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_tasks.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_specify.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_export.return_value = (MagicMock(), mock_agent_deps)
+
+    # Mock the agent creation functions to return coroutines that yield (agent, deps) tuples
+    async def async_create_agent(*args, **kwargs):
+        return (MagicMock(), mock_agent_deps)
+
+    mock_create_research.side_effect = async_create_agent
+    mock_create_plan.side_effect = async_create_agent
+    mock_create_tasks.side_effect = async_create_agent
+    mock_create_specify.side_effect = async_create_agent
+    mock_create_export.side_effect = async_create_agent
 
     # Mock the system message functions to just return the messages as-is
     mock_add_system_status.side_effect = lambda deps, msgs: msgs
@@ -150,6 +154,9 @@ async def test_filters_system_prompts_from_other_agents(
 
     # Switch to research agent
     manager._current_agent_type = AgentType.RESEARCH
+
+    # Ensure agents are initialized
+    await manager._ensure_agents_initialized()
 
     # Mock the agent run to capture the filtered message history
     captured_messages = None
@@ -224,12 +231,16 @@ async def test_preserves_non_agent_system_prompts(
     mock_agent_deps,
 ):
     """Test that SystemStatusPrompt and other parts are preserved."""
-    # Mock the agent creation functions to return (agent, deps) tuples
-    mock_create_research.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_plan.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_tasks.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_specify.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_export.return_value = (MagicMock(), mock_agent_deps)
+
+    # Mock the agent creation functions to return coroutines that yield (agent, deps) tuples
+    async def async_create_agent(*args, **kwargs):
+        return (MagicMock(), mock_agent_deps)
+
+    mock_create_research.side_effect = async_create_agent
+    mock_create_plan.side_effect = async_create_agent
+    mock_create_tasks.side_effect = async_create_agent
+    mock_create_specify.side_effect = async_create_agent
+    mock_create_export.side_effect = async_create_agent
 
     # Mock the system message functions
     mock_add_system_status.side_effect = lambda deps, msgs: msgs + [
@@ -259,6 +270,9 @@ async def test_preserves_non_agent_system_prompts(
 
     manager.message_history = messages
     manager._current_agent_type = AgentType.RESEARCH
+
+    # Ensure agents are initialized
+    await manager._ensure_agents_initialized()
 
     # Mock the agent run to capture the filtered message history
     captured_messages = None
@@ -333,12 +347,16 @@ async def test_filters_mixed_agent_prompts(
     mock_agent_deps,
 ):
     """Test filtering when multiple agent prompts are mixed in history."""
-    # Mock the agent creation functions to return (agent, deps) tuples
-    mock_create_research.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_plan.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_tasks.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_specify.return_value = (MagicMock(), mock_agent_deps)
-    mock_create_export.return_value = (MagicMock(), mock_agent_deps)
+
+    # Mock the agent creation functions to return coroutines that yield (agent, deps) tuples
+    async def async_create_agent(*args, **kwargs):
+        return (MagicMock(), mock_agent_deps)
+
+    mock_create_research.side_effect = async_create_agent
+    mock_create_plan.side_effect = async_create_agent
+    mock_create_tasks.side_effect = async_create_agent
+    mock_create_specify.side_effect = async_create_agent
+    mock_create_export.side_effect = async_create_agent
 
     # Mock the system message functions
     mock_add_system_status.side_effect = lambda deps, msgs: msgs
@@ -375,6 +393,9 @@ async def test_filters_mixed_agent_prompts(
 
     manager.message_history = messages
     manager._current_agent_type = AgentType.RESEARCH
+
+    # Ensure agents are initialized
+    await manager._ensure_agents_initialized()
 
     # Mock the agent run
     captured_messages = None

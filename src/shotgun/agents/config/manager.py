@@ -5,6 +5,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import aiofiles
+import aiofiles.os
 from pydantic import SecretStr
 
 from shotgun.logging_config import get_logger
@@ -48,7 +50,7 @@ class ConfigManager:
 
         self._config: ShotgunConfig | None = None
 
-    def load(self, force_reload: bool = True) -> ShotgunConfig:
+    async def load(self, force_reload: bool = True) -> ShotgunConfig:
         """Load configuration from file.
 
         Args:
@@ -60,18 +62,19 @@ class ConfigManager:
         if self._config is not None and not force_reload:
             return self._config
 
-        if not self.config_path.exists():
+        if not await aiofiles.os.path.exists(self.config_path):
             logger.info(
                 "Configuration file not found, creating new config at: %s",
                 self.config_path,
             )
             # Create new config with generated shotgun_instance_id
-            self._config = self.initialize()
+            self._config = await self.initialize()
             return self._config
 
         try:
-            with open(self.config_path, encoding="utf-8") as f:
-                data = json.load(f)
+            async with aiofiles.open(self.config_path, encoding="utf-8") as f:
+                content = await f.read()
+                data = json.loads(content)
 
             # Migration: Rename user_id to shotgun_instance_id (config v2 -> v3)
             if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
@@ -123,7 +126,7 @@ class ConfigManager:
 
                     if self._config.selected_model in MODEL_SPECS:
                         spec = MODEL_SPECS[self._config.selected_model]
-                        if not self.has_provider_key(spec.provider):
+                        if not await self.has_provider_key(spec.provider):
                             logger.info(
                                 "Selected model %s provider has no API key, finding available model",
                                 self._config.selected_model.value,
@@ -141,7 +144,7 @@ class ConfigManager:
                 # If no selected_model or it was invalid, find first available model
                 if not self._config.selected_model:
                     for provider in ProviderType:
-                        if self.has_provider_key(provider):
+                        if await self.has_provider_key(provider):
                             # Set to that provider's default model
                             from .models import MODEL_SPECS, ModelName
 
@@ -162,7 +165,7 @@ class ConfigManager:
                                 break
 
                 if should_save:
-                    self.save(self._config)
+                    await self.save(self._config)
 
             return self._config
 
@@ -171,10 +174,10 @@ class ConfigManager:
                 "Failed to load configuration from %s: %s", self.config_path, e
             )
             logger.info("Creating new configuration with generated shotgun_instance_id")
-            self._config = self.initialize()
+            self._config = await self.initialize()
             return self._config
 
-    def save(self, config: ShotgunConfig | None = None) -> None:
+    async def save(self, config: ShotgunConfig | None = None) -> None:
         """Save configuration to file.
 
         Args:
@@ -190,7 +193,7 @@ class ConfigManager:
                 )
 
         # Ensure directory exists
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(self.config_path.parent, exist_ok=True)
 
         try:
             # Convert SecretStr to plain text for JSON serialization
@@ -198,8 +201,9 @@ class ConfigManager:
             self._convert_secretstr_to_plain(data)
             self._convert_datetime_to_isoformat(data)
 
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            json_content = json.dumps(data, indent=2, ensure_ascii=False)
+            async with aiofiles.open(self.config_path, "w", encoding="utf-8") as f:
+                await f.write(json_content)
 
             logger.debug("Configuration saved to %s", self.config_path)
             self._config = config
@@ -208,14 +212,16 @@ class ConfigManager:
             logger.error("Failed to save configuration to %s: %s", self.config_path, e)
             raise
 
-    def update_provider(self, provider: ProviderType | str, **kwargs: Any) -> None:
+    async def update_provider(
+        self, provider: ProviderType | str, **kwargs: Any
+    ) -> None:
         """Update provider configuration.
 
         Args:
             provider: Provider to update
             **kwargs: Configuration fields to update (only api_key supported)
         """
-        config = self.load()
+        config = await self.load()
 
         # Get provider config and check if it's shotgun
         provider_config, is_shotgun = self._get_provider_config_and_type(
@@ -260,11 +266,11 @@ class ConfigManager:
             # This prevents the welcome screen from showing again after user has made their choice
             config.shown_welcome_screen = True
 
-        self.save(config)
+        await self.save(config)
 
-    def clear_provider_key(self, provider: ProviderType | str) -> None:
+    async def clear_provider_key(self, provider: ProviderType | str) -> None:
         """Remove the API key for the given provider (LLM provider or shotgun)."""
-        config = self.load()
+        config = await self.load()
 
         # Get provider config (shotgun or LLM provider)
         provider_config, is_shotgun = self._get_provider_config_and_type(
@@ -277,34 +283,34 @@ class ConfigManager:
         if is_shotgun and isinstance(provider_config, ShotgunAccountConfig):
             provider_config.supabase_jwt = None
 
-        self.save(config)
+        await self.save(config)
 
-    def update_selected_model(self, model_name: "ModelName") -> None:
+    async def update_selected_model(self, model_name: "ModelName") -> None:
         """Update the selected model.
 
         Args:
             model_name: Model to select
         """
-        config = self.load()
+        config = await self.load()
         config.selected_model = model_name
-        self.save(config)
+        await self.save(config)
 
-    def has_provider_key(self, provider: ProviderType | str) -> bool:
+    async def has_provider_key(self, provider: ProviderType | str) -> bool:
         """Check if the given provider has a non-empty API key configured.
 
         This checks only the configuration file.
         """
         # Use force_reload=False to avoid infinite loop when called from load()
-        config = self.load(force_reload=False)
+        config = await self.load(force_reload=False)
         provider_enum = self._ensure_provider_enum(provider)
         provider_config = self._get_provider_config(config, provider_enum)
 
         return self._provider_has_api_key(provider_config)
 
-    def has_any_provider_key(self) -> bool:
+    async def has_any_provider_key(self) -> bool:
         """Determine whether any provider has a configured API key."""
         # Use force_reload=False to avoid infinite loop when called from load()
-        config = self.load(force_reload=False)
+        config = await self.load(force_reload=False)
         # Check LLM provider keys (BYOK)
         has_llm_key = any(
             self._provider_has_api_key(self._get_provider_config(config, provider))
@@ -318,7 +324,7 @@ class ConfigManager:
         has_shotgun_key = self._provider_has_api_key(config.shotgun)
         return has_llm_key or has_shotgun_key
 
-    def initialize(self) -> ShotgunConfig:
+    async def initialize(self) -> ShotgunConfig:
         """Initialize configuration with defaults and save to file.
 
         Returns:
@@ -328,7 +334,7 @@ class ConfigManager:
         config = ShotgunConfig(
             shotgun_instance_id=str(uuid.uuid4()),
         )
-        self.save(config)
+        await self.save(config)
         logger.info(
             "Configuration initialized at %s with shotgun_instance_id: %s",
             self.config_path,
@@ -465,16 +471,16 @@ class ConfigManager:
         provider_enum = self._ensure_provider_enum(provider)
         return (self._get_provider_config(config, provider_enum), False)
 
-    def get_shotgun_instance_id(self) -> str:
+    async def get_shotgun_instance_id(self) -> str:
         """Get the shotgun instance ID from configuration.
 
         Returns:
             The unique shotgun instance ID string
         """
-        config = self.load()
+        config = await self.load()
         return config.shotgun_instance_id
 
-    def update_shotgun_account(
+    async def update_shotgun_account(
         self, api_key: str | None = None, supabase_jwt: str | None = None
     ) -> None:
         """Update Shotgun Account configuration.
@@ -483,7 +489,7 @@ class ConfigManager:
             api_key: LiteLLM proxy API key (optional)
             supabase_jwt: Supabase authentication JWT (optional)
         """
-        config = self.load()
+        config = await self.load()
 
         if api_key is not None:
             config.shotgun.api_key = SecretStr(api_key) if api_key else None
@@ -493,7 +499,7 @@ class ConfigManager:
                 SecretStr(supabase_jwt) if supabase_jwt else None
             )
 
-        self.save(config)
+        await self.save(config)
         logger.info("Updated Shotgun Account configuration")
 
 

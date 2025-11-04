@@ -50,6 +50,7 @@ dependencies = [
     "genai-prices>=0.0.27",
     "tenacity>=8.0.0",
     "dependency-injector>=4.41.0",
+    "aiofiles>=24.0.0",
 ]
 
 [project.urls]
@@ -145,6 +146,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "python-dotenv>=1.0.0",
     "types-pyyaml>=6.0.12.20250915",
+    "types-aiofiles>=24.0.0",
 ]
 
 [tool.pytest.ini_options]

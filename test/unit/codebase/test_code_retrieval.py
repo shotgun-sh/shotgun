@@ -1,6 +1,6 @@
 """Unit tests for code_retrieval module."""
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch, mock_open
 
 import pytest
 
@@ -99,7 +99,7 @@ def another_function():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(file_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(file_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.my_function"
@@ -152,7 +152,7 @@ class MyClass:
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(file_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(file_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.MyClass"
@@ -203,7 +203,7 @@ async def test_retrieve_code_by_qualified_name_method():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(file_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(file_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.MyClass.my_method"
@@ -295,9 +295,13 @@ async def test_retrieve_code_file_read_error():
         [{"p.repo_path": "/path/to/repo"}],
     ]
 
+    # Mock aiofiles.open to raise PermissionError
+    mock_file_error = AsyncMock()
+    mock_file_error.__aenter__ = AsyncMock(side_effect=PermissionError("Permission denied"))
+
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", side_effect=PermissionError("Permission denied")),
+        patch("aiofiles.open", return_value=mock_file_error),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.function"
@@ -334,7 +338,7 @@ async def test_retrieve_code_invalid_line_numbers():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(file_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(file_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.function"
@@ -396,7 +400,7 @@ def unicode_function():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(unicode_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(unicode_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.unicode_function"
@@ -430,7 +434,7 @@ async def test_retrieve_code_empty_file():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read("")),
+        patch("aiofiles.open", return_value=mock_aiofiles_open("")),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.function"
@@ -473,7 +477,7 @@ def other_function():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(file_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(file_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.target_function"
@@ -487,11 +491,18 @@ def other_function():
     assert len([line for line in lines if line]) == 3  # Three non-empty lines
 
 
-def mock_open_read(content):
-    """Helper to mock file reading with specific content."""
-    from unittest.mock import mock_open
+def mock_aiofiles_open(content):
+    """Helper to mock aiofiles.open() with specific content."""
+    mock_file = AsyncMock()
+    mock_file.read = AsyncMock(return_value=content)
+    mock_file.__aenter__ = AsyncMock(return_value=mock_file)
+    mock_file.__aexit__ = AsyncMock(return_value=None)
+    return mock_file
 
-    return mock_open(read_data=content)
+
+def mock_open_read(content):
+    """Helper to mock file reading with specific content - kept for compatibility."""
+    return mock_aiofiles_open(content)
 
 
 def test_code_snippet_serialization():
@@ -590,7 +601,7 @@ async def test_retrieve_code_multiple_results():
 
     with (
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.open", mock_open_read(file_content)),
+        patch("aiofiles.open", return_value=mock_aiofiles_open(file_content)),
     ):
         snippet = await retrieve_code_by_qualified_name(
             mock_manager, "test-graph", "test.module.function"

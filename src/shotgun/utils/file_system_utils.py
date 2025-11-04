@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import aiofiles
+
 from shotgun.settings import settings
 
 
@@ -35,3 +37,20 @@ def ensure_shotgun_directory_exists() -> Path:
     shotgun_dir.mkdir(exist_ok=True)
     # Note: Removed logger to avoid circular dependency with logging_config
     return shotgun_dir
+
+
+async def async_copy_file(src: Path, dst: Path) -> None:
+    """Asynchronously copy a file from src to dst.
+
+    Args:
+        src: Source file path
+        dst: Destination file path
+
+    Raises:
+        FileNotFoundError: If source file doesn't exist
+        OSError: If copy operation fails
+    """
+    async with aiofiles.open(src, "rb") as src_file:
+        content = await src_file.read()
+    async with aiofiles.open(dst, "wb") as dst_file:
+        await dst_file.write(content)

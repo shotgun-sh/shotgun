@@ -60,7 +60,7 @@ def tasks(
         )
 
         # Create the tasks agent with deps and provider
-        agent, deps = create_tasks_agent(agent_runtime_options, provider)
+        agent, deps = asyncio.run(create_tasks_agent(agent_runtime_options, provider))
 
         # Start task creation process
         logger.info("🎯 Starting task creation...")

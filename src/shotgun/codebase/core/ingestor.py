@@ -1,5 +1,6 @@
 """Kuzu graph ingestor for building code knowledge graphs."""
 
+import asyncio
 import hashlib
 import os
 import time
@@ -8,6 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+import aiofiles
 import kuzu
 from tree_sitter import Node, Parser, QueryCursor
 
@@ -619,7 +621,7 @@ class SimpleGraphBuilder:
             # Don't let progress callback errors crash the build
             logger.debug(f"Progress callback error: {e}")
 
-    def run(self) -> None:
+    async def run(self) -> None:
         """Run the three-pass graph building process."""
         logger.info(f"Building graph for project: {self.project_name}")
 
@@ -629,7 +631,7 @@ class SimpleGraphBuilder:
 
         # Pass 2: Definitions
         logger.info("Pass 2: Processing files and extracting definitions...")
-        self._process_files()
+        await self._process_files()
 
         # Pass 3: Relationships
         logger.info("Pass 3: Processing relationships (calls, imports)...")
@@ -771,7 +773,7 @@ class SimpleGraphBuilder:
             phase_complete=True,
         )
 
-    def _process_files(self) -> None:
+    async def _process_files(self) -> None:
         """Second pass: Process files and extract definitions."""
         # First pass: Count total files
         total_files = 0
@@ -807,7 +809,7 @@ class SimpleGraphBuilder:
                 lang_config = get_language_config(ext)
 
                 if lang_config and lang_config.name in self.parsers:
-                    self._process_single_file(filepath, lang_config.name)
+                    await self._process_single_file(filepath, lang_config.name)
                     file_count += 1
 
                     # Report progress after each file
@@ -832,7 +834,7 @@ class SimpleGraphBuilder:
             phase_complete=True,
         )
 
-    def _process_single_file(self, filepath: Path, language: str) -> None:
+    async def _process_single_file(self, filepath: Path, language: str) -> None:
         """Process a single file."""
         relative_path = filepath.relative_to(self.repo_path)
         relative_path_str = str(relative_path).replace(os.sep, "/")
@@ -873,8 +875,8 @@ class SimpleGraphBuilder:
 
         # Parse file
         try:
-            with open(filepath, "rb") as f:
-                content = f.read()
+            async with aiofiles.open(filepath, "rb") as f:
+                content = await f.read()
 
             parser = self.parsers[language]
             tree = parser.parse(content)
@@ -1636,7 +1638,7 @@ class CodebaseIngestor:
             )
             if self.project_name:
                 builder.project_name = self.project_name
-            builder.run()
+            asyncio.run(builder.run())
 
             logger.info(f"Graph successfully created at: {self.db_path}")
 

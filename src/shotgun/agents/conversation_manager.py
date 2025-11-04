@@ -1,11 +1,15 @@
 """Manager for handling conversation persistence operations."""
 
+import asyncio
 import json
-import shutil
 from pathlib import Path
+
+import aiofiles
+import aiofiles.os
 
 from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.file_system_utils import async_copy_file
 
 from .conversation_history import ConversationHistory
 
@@ -27,14 +31,14 @@ class ConversationManager:
         else:
             self.conversation_path = conversation_path
 
-    def save(self, conversation: ConversationHistory) -> None:
+    async def save(self, conversation: ConversationHistory) -> None:
         """Save conversation history to file.
 
         Args:
             conversation: ConversationHistory to save
         """
         # Ensure directory exists
-        self.conversation_path.parent.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(self.conversation_path.parent, exist_ok=True)
 
         try:
             # Update timestamp
@@ -44,9 +48,12 @@ class ConversationManager:
 
             # Serialize to JSON using Pydantic's model_dump
             data = conversation.model_dump(mode="json")
+            json_content = json.dumps(data, indent=2, ensure_ascii=False)
 
-            with open(self.conversation_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            async with aiofiles.open(
+                self.conversation_path, "w", encoding="utf-8"
+            ) as f:
+                await f.write(json_content)
 
             logger.debug("Conversation saved to %s", self.conversation_path)
 
@@ -56,19 +63,20 @@ class ConversationManager:
             )
             # Don't raise - we don't want to interrupt the user's session
 
-    def load(self) -> ConversationHistory | None:
+    async def load(self) -> ConversationHistory | None:
         """Load conversation history from file.
 
         Returns:
             ConversationHistory if file exists and is valid, None otherwise
         """
-        if not self.conversation_path.exists():
+        if not await aiofiles.os.path.exists(self.conversation_path):
             logger.debug("No conversation history found at %s", self.conversation_path)
             return None
 
         try:
-            with open(self.conversation_path, encoding="utf-8") as f:
-                data = json.load(f)
+            async with aiofiles.open(self.conversation_path, encoding="utf-8") as f:
+                content = await f.read()
+                data = json.loads(content)
 
             conversation = ConversationHistory.model_validate(data)
             logger.debug(
@@ -89,7 +97,7 @@ class ConversationManager:
             # Create a backup of the corrupted file for debugging
             backup_path = self.conversation_path.with_suffix(".json.backup")
             try:
-                shutil.copy2(self.conversation_path, backup_path)
+                await async_copy_file(self.conversation_path, backup_path)
                 logger.info("Backed up corrupted conversation to %s", backup_path)
             except Exception as backup_error:  # pragma: no cover
                 logger.warning("Failed to backup corrupted file: %s", backup_error)
@@ -105,11 +113,12 @@ class ConversationManager:
             )
             return None
 
-    def clear(self) -> None:
+    async def clear(self) -> None:
         """Delete the conversation history file."""
-        if self.conversation_path.exists():
+        if await aiofiles.os.path.exists(self.conversation_path):
             try:
-                self.conversation_path.unlink()
+                # Use asyncio.to_thread for unlink operation
+                await asyncio.to_thread(self.conversation_path.unlink)
                 logger.debug(
                     "Conversation history cleared at %s", self.conversation_path
                 )

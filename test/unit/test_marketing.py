@@ -174,7 +174,8 @@ def test_get_github_star_message():
     assert "⭐" in message
 
 
-def test_check_and_display_messages_shows_message(tmp_path):
+@pytest.mark.asyncio
+async def test_check_and_display_messages_shows_message(tmp_path):
     """Test that check_and_display_messages shows message and marks it as shown."""
     from shotgun.agents.config.manager import ConfigManager
 
@@ -197,7 +198,7 @@ def test_check_and_display_messages_shows_message(tmp_path):
         displayed_messages.append(message)
 
     # Call the method
-    MarketingManager.check_and_display_messages(
+    await MarketingManager.check_and_display_messages(
         config_manager, file_operations, display_callback
     )
 
@@ -206,11 +207,12 @@ def test_check_and_display_messages_shows_message(tmp_path):
     assert "GitHub" in displayed_messages[0]
 
     # Verify message was marked as shown in config
-    config = config_manager.load()
+    config = await config_manager.load()
     assert GITHUB_STAR_MESSAGE_ID in config.marketing.messages
 
 
-def test_check_and_display_messages_does_not_show_twice(tmp_path):
+@pytest.mark.asyncio
+async def test_check_and_display_messages_does_not_show_twice(tmp_path):
     """Test that message is not shown twice."""
     from shotgun.agents.config.manager import ConfigManager
 
@@ -233,10 +235,10 @@ def test_check_and_display_messages_does_not_show_twice(tmp_path):
         displayed_messages.append(message)
 
     # Call the method twice
-    MarketingManager.check_and_display_messages(
+    await MarketingManager.check_and_display_messages(
         config_manager, file_operations, display_callback
     )
-    MarketingManager.check_and_display_messages(
+    await MarketingManager.check_and_display_messages(
         config_manager, file_operations, display_callback
     )
 
@@ -244,7 +246,8 @@ def test_check_and_display_messages_does_not_show_twice(tmp_path):
     assert len(displayed_messages) == 1
 
 
-def test_check_and_display_messages_no_spec_files(tmp_path):
+@pytest.mark.asyncio
+async def test_check_and_display_messages_no_spec_files(tmp_path):
     """Test that message is not shown when no spec files are written."""
     from shotgun.agents.config.manager import ConfigManager
 
@@ -267,7 +270,7 @@ def test_check_and_display_messages_no_spec_files(tmp_path):
         displayed_messages.append(message)
 
     # Call the method
-    MarketingManager.check_and_display_messages(
+    await MarketingManager.check_and_display_messages(
         config_manager, file_operations, display_callback
     )
 

@@ -43,7 +43,7 @@ async def openai_web_search_tool(query: str) -> str:
 
         # Get API key from centralized configuration
         try:
-            model_config = get_provider_model(ProviderType.OPENAI)
+            model_config = await get_provider_model(ProviderType.OPENAI)
             api_key = model_config.api_key
         except ValueError as e:
             error_msg = f"OpenAI API key not configured: {str(e)}"

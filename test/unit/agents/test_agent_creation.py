@@ -33,13 +33,19 @@ def mock_agent_deps():
 
 
 @patch("shotgun.agents.plan.create_base_agent")
-def test_create_plan_agent(mock_create_base, mock_agent_runtime_options):
+@pytest.mark.asyncio
+async def test_create_plan_agent(mock_create_base, mock_agent_runtime_options):
     """Test create_plan_agent function."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
 
-    agent, deps = create_plan_agent(mock_agent_runtime_options)
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
+
+    agent, deps = await create_plan_agent(mock_agent_runtime_options)
 
     assert agent == mock_agent
     assert deps == mock_deps
@@ -60,13 +66,23 @@ def test_create_plan_agent(mock_create_base, mock_agent_runtime_options):
 
 
 @patch("shotgun.agents.plan.create_base_agent")
-def test_create_plan_agent_with_provider(mock_create_base, mock_agent_runtime_options):
+@pytest.mark.asyncio
+async def test_create_plan_agent_with_provider(
+    mock_create_base, mock_agent_runtime_options
+):
     """Test create_plan_agent function with custom provider."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
 
-    agent, deps = create_plan_agent(mock_agent_runtime_options, provider="anthropic")
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
+
+    agent, deps = await create_plan_agent(
+        mock_agent_runtime_options, provider="anthropic"
+    )
 
     # Verify provider was passed through
     call_kwargs = mock_create_base.call_args[1]
@@ -74,13 +90,19 @@ def test_create_plan_agent_with_provider(mock_create_base, mock_agent_runtime_op
 
 
 @patch("shotgun.agents.tasks.create_base_agent")
-def test_create_tasks_agent(mock_create_base, mock_agent_runtime_options):
+@pytest.mark.asyncio
+async def test_create_tasks_agent(mock_create_base, mock_agent_runtime_options):
     """Test create_tasks_agent function."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
 
-    agent, deps = create_tasks_agent(mock_agent_runtime_options)
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
+
+    agent, deps = await create_tasks_agent(mock_agent_runtime_options)
 
     assert agent == mock_agent
     assert deps == mock_deps
@@ -99,13 +121,23 @@ def test_create_tasks_agent(mock_create_base, mock_agent_runtime_options):
 
 
 @patch("shotgun.agents.tasks.create_base_agent")
-def test_create_tasks_agent_with_provider(mock_create_base, mock_agent_runtime_options):
+@pytest.mark.asyncio
+async def test_create_tasks_agent_with_provider(
+    mock_create_base, mock_agent_runtime_options
+):
     """Test create_tasks_agent function with custom provider."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
 
-    agent, deps = create_tasks_agent(mock_agent_runtime_options, provider="openai")
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
+
+    agent, deps = await create_tasks_agent(
+        mock_agent_runtime_options, provider="openai"
+    )
 
     # Verify provider was passed through
     call_kwargs = mock_create_base.call_args[1]
@@ -113,13 +145,19 @@ def test_create_tasks_agent_with_provider(mock_create_base, mock_agent_runtime_o
 
 
 @patch("shotgun.agents.specify.create_base_agent")
-def test_create_specify_agent(mock_create_base, mock_agent_runtime_options):
+@pytest.mark.asyncio
+async def test_create_specify_agent(mock_create_base, mock_agent_runtime_options):
     """Test create_specify_agent function."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
 
-    agent, deps = create_specify_agent(mock_agent_runtime_options)
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
+
+    agent, deps = await create_specify_agent(mock_agent_runtime_options)
 
     assert agent == mock_agent
     assert deps == mock_deps
@@ -140,15 +178,23 @@ def test_create_specify_agent(mock_create_base, mock_agent_runtime_options):
 
 
 @patch("shotgun.agents.specify.create_base_agent")
-def test_create_specify_agent_with_provider(
+@pytest.mark.asyncio
+async def test_create_specify_agent_with_provider(
     mock_create_base, mock_agent_runtime_options
 ):
     """Test create_specify_agent function with custom provider."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
 
-    agent, deps = create_specify_agent(mock_agent_runtime_options, provider="gemini")
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
+
+    agent, deps = await create_specify_agent(
+        mock_agent_runtime_options, provider="gemini"
+    )
 
     # Verify provider was passed through
     call_kwargs = mock_create_base.call_args[1]
@@ -157,19 +203,25 @@ def test_create_specify_agent_with_provider(
 
 @patch("shotgun.agents.research.get_available_web_search_tools")
 @patch("shotgun.agents.research.create_base_agent")
-def test_create_research_agent(
+@pytest.mark.asyncio
+async def test_create_research_agent(
     mock_create_base, mock_get_tools, mock_agent_runtime_options
 ):
     """Test create_research_agent function."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
+
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
 
     # Mock web search tools
     mock_tools = [MagicMock(), MagicMock()]
     mock_get_tools.return_value = mock_tools
 
-    agent, deps = create_research_agent(mock_agent_runtime_options)
+    agent, deps = await create_research_agent(mock_agent_runtime_options)
 
     assert agent == mock_agent
     assert deps == mock_deps
@@ -194,18 +246,24 @@ def test_create_research_agent(
 
 @patch("shotgun.agents.research.get_available_web_search_tools")
 @patch("shotgun.agents.research.create_base_agent")
-def test_create_research_agent_no_web_tools(
+@pytest.mark.asyncio
+async def test_create_research_agent_no_web_tools(
     mock_create_base, mock_get_tools, mock_agent_runtime_options
 ):
     """Test create_research_agent function when no web search tools are available."""
     mock_agent = MagicMock(spec=Agent)
     mock_deps = MagicMock(spec=AgentDeps)
-    mock_create_base.return_value = (mock_agent, mock_deps)
+
+    # create_base_agent is now async, so mock it as an async function
+    async def async_create_base(*args, **kwargs):
+        return (mock_agent, mock_deps)
+
+    mock_create_base.side_effect = async_create_base
 
     # Mock no web search tools available
     mock_get_tools.return_value = []
 
-    agent, deps = create_research_agent(mock_agent_runtime_options)
+    agent, deps = await create_research_agent(mock_agent_runtime_options)
 
     # Should still create agent successfully
     assert agent == mock_agent

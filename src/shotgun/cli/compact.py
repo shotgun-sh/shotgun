@@ -79,7 +79,7 @@ async def compact_conversation() -> dict[str, Any]:
 
     # Load conversation
     manager = ConversationManager(conversation_file)
-    conversation = manager.load()
+    conversation = await manager.load()
 
     if not conversation:
         raise ValueError("Conversation file is empty or corrupted")
@@ -91,7 +91,7 @@ async def compact_conversation() -> dict[str, Any]:
         raise ValueError("No agent messages found in conversation")
 
     # Get model config
-    model_config = get_provider_model()
+    model_config = await get_provider_model()
 
     # Calculate before metrics
     original_message_count = len(agent_messages)
@@ -133,7 +133,7 @@ async def compact_conversation() -> dict[str, Any]:
 
     # Save compacted conversation
     conversation.set_agent_messages(compacted_messages)
-    manager.save(conversation)
+    await manager.save(conversation)
 
     logger.info(
         f"Compacted conversation: {original_message_count} → {compacted_message_count} messages "

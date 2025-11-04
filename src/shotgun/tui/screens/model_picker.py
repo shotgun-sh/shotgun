@@ -98,7 +98,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             yield Button("Select \\[ENTER]", variant="primary", id="select")
             yield Button("Done \\[ESC]", id="done")
 
-    def _rebuild_model_list(self) -> None:
+    async def _rebuild_model_list(self) -> None:
         """Rebuild the model list from current config.
 
         This method is called both on first show and when screen is resumed
@@ -108,7 +108,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         # Load current config with force_reload to get latest API keys
         config_manager = self.config_manager
-        config = config_manager.load(force_reload=True)
+        config = await config_manager.load(force_reload=True)
 
         # Log provider key status
         logger.debug(
@@ -133,7 +133,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         logger.debug("Removed %d existing model items from list", old_count)
 
         # Add new items (labels already have correct text including current indicator)
-        new_items = self._build_model_items(config)
+        new_items = await self._build_model_items(config)
         for item in new_items:
             list_view.append(item)
         logger.debug("Added %d available model items to list", len(new_items))
@@ -153,7 +153,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     def on_show(self) -> None:
         """Rebuild model list when screen is first shown."""
         logger.debug("ModelPickerScreen.on_show() called")
-        self._rebuild_model_list()
+        self.run_worker(self._rebuild_model_list(), exclusive=False)
 
     def on_screenresume(self) -> None:
         """Rebuild model list when screen is resumed (subsequent visits).
@@ -162,7 +162,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         ensuring the model list reflects any config changes made while away.
         """
         logger.debug("ModelPickerScreen.on_screenresume() called")
-        self._rebuild_model_list()
+        self.run_worker(self._rebuild_model_list(), exclusive=False)
 
     def action_done(self) -> None:
         self.dismiss()
@@ -193,14 +193,14 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         app = cast("ShotgunApp", self.app)
         return app.config_manager
 
-    def refresh_model_labels(self) -> None:
+    async def refresh_model_labels(self) -> None:
         """Update the list view entries to reflect current selection.
 
         Note: This method only updates labels for currently displayed models.
         To rebuild the entire list after provider changes, on_show() should be used.
         """
         # Load config once with force_reload
-        config = self.config_manager.load(force_reload=True)
+        config = await self.config_manager.load(force_reload=True)
         current_model = config.selected_model or get_default_model_for_provider(config)
 
         # Update labels for available models only
@@ -215,9 +215,11 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 self._model_label(model_name, is_current=model_name == current_model)
             )
 
-    def _build_model_items(self, config: ShotgunConfig | None = None) -> list[ListItem]:
+    async def _build_model_items(
+        self, config: ShotgunConfig | None = None
+    ) -> list[ListItem]:
         if config is None:
-            config = self.config_manager.load(force_reload=True)
+            config = await self.config_manager.load(force_reload=True)
 
         items: list[ListItem] = []
         current_model = self.selected_model
@@ -246,9 +248,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 return model_name
         return None
 
-    def _is_model_available(
-        self, model_name: ModelName, config: ShotgunConfig | None = None
-    ) -> bool:
+    def _is_model_available(self, model_name: ModelName, config: ShotgunConfig) -> bool:
         """Check if a model is available based on provider key configuration.
 
         A model is available if:
@@ -257,14 +257,11 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         Args:
             model_name: The model to check availability for
-            config: Optional pre-loaded config to avoid multiple reloads
+            config: Pre-loaded config (must be provided)
 
         Returns:
             True if the model can be used, False otherwise
         """
-        if config is None:
-            config = self.config_manager.load(force_reload=True)
-
         # If Shotgun Account is configured, all models are available
         if self.config_manager._provider_has_api_key(config.shotgun):
             logger.debug("Model %s available (Shotgun Account configured)", model_name)
@@ -325,17 +322,21 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
     def _select_model(self) -> None:
         """Save the selected model."""
+        self.run_worker(self._do_select_model(), exclusive=True)
+
+    async def _do_select_model(self) -> None:
+        """Async implementation of model selection."""
         try:
             # Get old model before updating
-            config = self.config_manager.load()
+            config = await self.config_manager.load()
             old_model = config.selected_model
 
             # Update the selected model in config
-            self.config_manager.update_selected_model(self.selected_model)
-            self.refresh_model_labels()
+            await self.config_manager.update_selected_model(self.selected_model)
+            await self.refresh_model_labels()
 
             # Get the full model config with provider information
-            model_config = get_provider_model(self.selected_model)
+            model_config = await get_provider_model(self.selected_model)
 
             # Dismiss the screen and return the model config update to the caller
             self.dismiss(

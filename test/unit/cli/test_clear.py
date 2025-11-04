@@ -1,7 +1,8 @@
 """Unit tests for the clear CLI command."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from typer.testing import CliRunner
 
@@ -14,6 +15,8 @@ runner = CliRunner()
 
 def test_clear_conversation_success(tmp_path):
     """Test successfully clearing conversation."""
+    import asyncio
+
     # Create a conversation file
     conversation_file = tmp_path / ".shotgun-sh" / "conversation.json"
     conversation_file.parent.mkdir(parents=True)
@@ -27,7 +30,7 @@ def test_clear_conversation_success(tmp_path):
     history.set_agent_messages(messages)
 
     manager = ConversationManager(conversation_file)
-    manager.save(history)
+    asyncio.run(manager.save(history))
 
     # Verify file exists
     assert conversation_file.exists()
@@ -61,13 +64,15 @@ def test_clear_conversation_no_file(tmp_path):
 
 def test_clear_conversation_file_error(tmp_path):
     """Test error handling when file deletion fails."""
+    import asyncio
+
     conversation_file = tmp_path / ".shotgun-sh" / "conversation.json"
     conversation_file.parent.mkdir(parents=True)
 
     # Create the file
     history = ConversationHistory()
     manager = ConversationManager(conversation_file)
-    manager.save(history)
+    asyncio.run(manager.save(history))
 
     # Mock ConversationManager.clear() to raise an error
     with (
@@ -75,6 +80,7 @@ def test_clear_conversation_file_error(tmp_path):
         patch.object(
             ConversationManager,
             "clear",
+            new_callable=AsyncMock,
             side_effect=PermissionError("Access denied"),
         ),
     ):
@@ -87,6 +93,8 @@ def test_clear_conversation_file_error(tmp_path):
 
 def test_clear_preserves_other_files(tmp_path):
     """Test that clear only removes conversation.json and not other files."""
+    import asyncio
+
     shotgun_dir = tmp_path / ".shotgun-sh"
     shotgun_dir.mkdir(parents=True)
 
@@ -100,7 +108,7 @@ def test_clear_preserves_other_files(tmp_path):
     # Create conversation
     history = ConversationHistory()
     manager = ConversationManager(conversation_file)
-    manager.save(history)
+    asyncio.run(manager.save(history))
 
     # Create other files
     config_file.write_text('{"key": "value"}')

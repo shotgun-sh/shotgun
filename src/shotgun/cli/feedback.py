@@ -28,9 +28,11 @@ def send_feedback(
     ],
 ) -> None:
     """Initialize Shotgun configuration."""
+    import asyncio
+
     config_manager = get_config_manager()
-    config_manager.load()
-    shotgun_instance_id = config_manager.get_shotgun_instance_id()
+    asyncio.run(config_manager.load())
+    shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
 
     if not description:
         console.print(

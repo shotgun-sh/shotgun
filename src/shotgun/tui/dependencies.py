@@ -8,7 +8,7 @@ from shotgun.tui.filtered_codebase_service import FilteredCodebaseService
 from shotgun.utils import get_shotgun_home
 
 
-def create_default_tui_deps() -> AgentDeps:
+async def create_default_tui_deps() -> AgentDeps:
     """Create default AgentDeps for TUI components.
 
     This creates a standard AgentDeps configuration suitable for interactive
@@ -21,7 +21,7 @@ def create_default_tui_deps() -> AgentDeps:
     Returns:
         Configured AgentDeps instance ready for TUI use.
     """
-    model_config = get_provider_model()
+    model_config = await get_provider_model()
     storage_dir = get_shotgun_home() / "codebases"
     codebase_service = FilteredCodebaseService(storage_dir)
 

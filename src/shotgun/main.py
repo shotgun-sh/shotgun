@@ -56,8 +56,10 @@ logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
 # Initialize configuration
 try:
+    import asyncio
+
     config_manager = get_config_manager()
-    config_manager.load()  # Ensure config is loaded at startup
+    asyncio.run(config_manager.load())  # Ensure config is loaded at startup
 except Exception as e:
     logger.debug("Configuration initialization warning: %s", e)
 

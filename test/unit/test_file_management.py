@@ -185,6 +185,8 @@ class TestReadFile:
     @pytest.mark.asyncio
     async def test_permission_error_handling(self):
         """Test handling of permission errors."""
+        from unittest.mock import AsyncMock
+
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
                 "shotgun.agents.tools.file_management.get_shotgun_base_path"
@@ -197,10 +199,13 @@ class TestReadFile:
                 test_file = shotgun_dir / "protected.md"
                 test_file.write_text("secret", encoding="utf-8")
 
-                # Mock read_text to raise PermissionError
-                with patch.object(
-                    Path, "read_text", side_effect=PermissionError("Permission denied")
-                ):
+                # Mock aiofiles.open to raise PermissionError
+                mock_file = AsyncMock()
+                mock_file.__aenter__ = AsyncMock(
+                    side_effect=PermissionError("Permission denied")
+                )
+
+                with patch("aiofiles.open", return_value=mock_file):
                     # Create mock context
                     mock_ctx = MagicMock()
                     mock_ctx.deps = MagicMock()
@@ -335,6 +340,8 @@ class TestWriteFile:
     @pytest.mark.asyncio
     async def test_write_permission_error(self):
         """Test handling of write permission errors."""
+        from unittest.mock import AsyncMock
+
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch(
                 "shotgun.agents.tools.file_management.get_shotgun_base_path"
@@ -343,13 +350,17 @@ class TestWriteFile:
                 shotgun_dir.mkdir()
                 mock_base.return_value = shotgun_dir
 
-                # Mock write_text to raise PermissionError
-                with patch.object(
-                    Path, "write_text", side_effect=PermissionError("Permission denied")
-                ):
+                # Mock aiofiles.open to raise PermissionError
+                mock_file = AsyncMock()
+                mock_file.__aenter__ = AsyncMock(
+                    side_effect=PermissionError("Permission denied")
+                )
+
+                with patch("aiofiles.open", return_value=mock_file):
                     # Create mock context
                     mock_ctx = MagicMock()
                     mock_ctx.deps.file_tracker = MagicMock()
+                    mock_ctx.deps.agent_mode = None
 
                     result = await write_file(mock_ctx, "protected.md", "content")
 

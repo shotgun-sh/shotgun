@@ -21,19 +21,20 @@ def usage_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def test_usage_breakdown_aggregates_by_model(usage_home: Path) -> None:
+@pytest.mark.asyncio
+async def test_usage_breakdown_aggregates_by_model(usage_home: Path) -> None:
     manager = SessionUsageManager()
-    manager.add_usage(
+    await manager.add_usage(
         RunUsage(input_tokens=10, output_tokens=5, cache_read_tokens=2),
         model_name="gpt-4o-mini",
         provider=ProviderType.OPENAI,
     )
-    manager.add_usage(
+    await manager.add_usage(
         RunUsage(input_tokens=2, output_tokens=1, cache_read_tokens=1),
         model_name="gpt-4o-mini",
         provider=ProviderType.OPENAI,
     )
-    manager.add_usage(
+    await manager.add_usage(
         RunUsage(input_tokens=7, output_tokens=3, cache_read_tokens=0),
         model_name="claude-3.5-sonnet",
         provider=ProviderType.ANTHROPIC,
@@ -53,9 +54,10 @@ def test_usage_breakdown_aggregates_by_model(usage_home: Path) -> None:
     assert (usage_home / "usage.json").exists()
 
 
-def test_build_usage_hint_renders_markdown_sections(usage_home: Path) -> None:
+@pytest.mark.asyncio
+async def test_build_usage_hint_renders_markdown_sections(usage_home: Path) -> None:
     manager = SessionUsageManager()
-    manager.add_usage(
+    await manager.add_usage(
         RunUsage(input_tokens=4, output_tokens=6, cache_read_tokens=1),
         model_name="claude-3.5-sonnet",
         provider=ProviderType.ANTHROPIC,
@@ -85,9 +87,10 @@ def test_format_usage_hint_handles_empty_breakdown() -> None:
     assert "Input: 1" in hint
 
 
-def test_persist_and_restore_usage_state(usage_home: Path) -> None:
+@pytest.mark.asyncio
+async def test_persist_and_restore_usage_state(usage_home: Path) -> None:
     first_manager = SessionUsageManager()
-    first_manager.add_usage(
+    await first_manager.add_usage(
         RunUsage(input_tokens=8, output_tokens=2, cache_read_tokens=0),
         model_name="gpt-4.1-mini",
         provider=ProviderType.OPENAI,
@@ -96,6 +99,7 @@ def test_persist_and_restore_usage_state(usage_home: Path) -> None:
     assert persisted_path.exists()
 
     restored_manager = SessionUsageManager()
+    await restored_manager.restore_usage_state()
     report = restored_manager.get_usage_report()
 
     assert "gpt-4.1-mini" in report

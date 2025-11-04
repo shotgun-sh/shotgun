@@ -3,6 +3,8 @@
 import random
 from pathlib import Path
 
+import aiofiles
+
 from shotgun.agents.models import AgentType
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
@@ -30,7 +32,7 @@ class ModeProgressChecker:
         """
         self.base_path = base_path or get_shotgun_base_path()
 
-    def has_mode_content(self, mode: AgentType) -> bool:
+    async def has_mode_content(self, mode: AgentType) -> bool:
         """Check if a mode has meaningful content.
 
         Args:
@@ -52,7 +54,8 @@ class ModeProgressChecker:
                 for item in export_path.glob("*"):
                     if item.is_file() and not item.name.startswith("."):
                         try:
-                            content = item.read_text(encoding="utf-8")
+                            async with aiofiles.open(item, encoding="utf-8") as f:
+                                content = await f.read()
                             if len(content.strip()) > self.MIN_CONTENT_SIZE:
                                 return True
                         except (OSError, UnicodeDecodeError):
@@ -65,13 +68,16 @@ class ModeProgressChecker:
             return False
 
         try:
-            content = file_path.read_text(encoding="utf-8")
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
+                content = await f.read()
             # Check if file has meaningful content
             return len(content.strip()) > self.MIN_CONTENT_SIZE
         except (OSError, UnicodeDecodeError):
             return False
 
-    def get_next_suggested_mode(self, current_mode: AgentType) -> AgentType | None:
+    async def get_next_suggested_mode(
+        self, current_mode: AgentType
+    ) -> AgentType | None:
         """Get the next suggested mode based on current progress.
 
         Args:
@@ -94,7 +100,7 @@ class ModeProgressChecker:
             return None
 
         # Check if current mode has content
-        if not self.has_mode_content(current_mode):
+        if not await self.has_mode_content(current_mode):
             # Current mode is empty, no suggestion for next mode
             return None
 
@@ -222,8 +228,9 @@ class PlaceholderHints:
         if current_mode not in self.HINTS:
             return f"Enter your {current_mode.value} mode prompt (SHIFT+TAB to switch modes)"
 
-        # Determine if mode has content
-        has_content = self.progress_checker.has_mode_content(current_mode)
+        # For placeholder text, we default to "no content" state (initial hints)
+        # This avoids async file system checks in the UI rendering path
+        has_content = False
 
         # Get hint variations for this mode and state
         hints_list = self.HINTS[current_mode][has_content]

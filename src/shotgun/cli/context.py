@@ -79,7 +79,7 @@ async def analyze_context() -> ContextAnalysisOutput:
 
     # Load conversation
     manager = ConversationManager(conversation_file)
-    conversation = manager.load()
+    conversation = await manager.load()
 
     if not conversation:
         raise ValueError("Conversation file is empty or corrupted")
@@ -91,7 +91,7 @@ async def analyze_context() -> ContextAnalysisOutput:
         raise ValueError("No agent messages found in conversation")
 
     # Get model config (use default provider settings)
-    model_config = get_provider_model()
+    model_config = await get_provider_model()
 
     # Debug: Log the model being used
     logger.debug(f"Using model: {model_config.name.value}")

@@ -135,7 +135,7 @@ class ShotgunAuthScreen(Screen[bool]):
         """Start the authentication flow."""
         try:
             # Get shotgun instance ID from config
-            shotgun_instance_id = self.config_manager.get_shotgun_instance_id()
+            shotgun_instance_id = await self.config_manager.get_shotgun_instance_id()
             logger.info("Starting auth flow with instance ID: %s", shotgun_instance_id)
 
             # Update status
@@ -215,7 +215,7 @@ class ShotgunAuthScreen(Screen[bool]):
                     logger.info("Authentication completed successfully")
 
                     if status_response.litellm_key and status_response.supabase_key:
-                        self.config_manager.update_shotgun_account(
+                        await self.config_manager.update_shotgun_account(
                             api_key=status_response.litellm_key,
                             supabase_jwt=status_response.supabase_key,
                         )

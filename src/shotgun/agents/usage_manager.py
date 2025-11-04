@@ -6,6 +6,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import TypeAlias
 
+import aiofiles
+import aiofiles.os
 from genai_prices import calc_price
 from pydantic import BaseModel, Field
 from pydantic_ai import RunUsage
@@ -48,9 +50,10 @@ class SessionUsageManager:
         self._model_providers: dict[ModelName, ProviderType] = {}
         self._usage_log: list[UsageLogEntry] = []
         self._usage_path: Path = get_shotgun_home() / "usage.json"
-        self.restore_usage_state()
+        # Note: restore_usage_state needs to be called asynchronously after init
+        # Caller should use: manager = SessionUsageManager(); await manager.restore_usage_state()
 
-    def add_usage(
+    async def add_usage(
         self, usage: RunUsage, *, model_name: ModelName, provider: ProviderType
     ) -> None:
         self.usage[model_name] += usage
@@ -58,7 +61,7 @@ class SessionUsageManager:
         self._usage_log.append(
             UsageLogEntry(model_name=model_name, usage=usage, provider=provider)
         )
-        self.persist_usage_state()
+        await self.persist_usage_state()
 
     def get_usage_report(self) -> dict[ModelName, RunUsage]:
         return self.usage.copy()
@@ -78,7 +81,7 @@ class SessionUsageManager:
     def build_usage_hint(self) -> str | None:
         return format_usage_hint(self.get_usage_breakdown())
 
-    def persist_usage_state(self) -> None:
+    async def persist_usage_state(self) -> None:
         state = UsageState(
             usage=dict(self.usage.items()),
             model_providers=self._model_providers.copy(),
@@ -86,23 +89,25 @@ class SessionUsageManager:
         )
 
         try:
-            self._usage_path.parent.mkdir(parents=True, exist_ok=True)
-            with self._usage_path.open("w", encoding="utf-8") as f:
-                json.dump(state.model_dump(mode="json"), f, indent=2)
+            await aiofiles.os.makedirs(self._usage_path.parent, exist_ok=True)
+            json_content = json.dumps(state.model_dump(mode="json"), indent=2)
+            async with aiofiles.open(self._usage_path, "w", encoding="utf-8") as f:
+                await f.write(json_content)
             logger.debug("Usage state persisted to %s", self._usage_path)
         except Exception as exc:
             logger.error(
                 "Failed to persist usage state to %s: %s", self._usage_path, exc
             )
 
-    def restore_usage_state(self) -> None:
-        if not self._usage_path.exists():
+    async def restore_usage_state(self) -> None:
+        if not await aiofiles.os.path.exists(self._usage_path):
             logger.debug("No usage state file found at %s", self._usage_path)
             return
 
         try:
-            with self._usage_path.open(encoding="utf-8") as f:
-                data = json.load(f)
+            async with aiofiles.open(self._usage_path, encoding="utf-8") as f:
+                content = await f.read()
+                data = json.loads(content)
 
             state = UsageState.model_validate(data)
         except Exception as exc:

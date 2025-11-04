@@ -73,7 +73,7 @@ async def async_research(
     agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
 
     # Create the research agent with deps and provider
-    agent, deps = create_research_agent(agent_runtime_options, provider)
+    agent, deps = await create_research_agent(agent_runtime_options, provider)
 
     # Start research process
     logger.info("🔬 Starting research...")

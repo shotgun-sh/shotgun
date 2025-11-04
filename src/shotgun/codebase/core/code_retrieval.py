@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import aiofiles
 from pydantic import BaseModel
 
 from shotgun.logging_config import get_logger
@@ -141,8 +142,9 @@ async def retrieve_code_by_qualified_name(
 
         # Read the file and extract the snippet
         try:
-            with full_path.open("r", encoding="utf-8") as f:
-                all_lines = f.readlines()
+            async with aiofiles.open(full_path, encoding="utf-8") as f:
+                content = await f.read()
+                all_lines = content.splitlines(keepends=True)
 
             # Extract the relevant lines (1-indexed to 0-indexed)
             snippet_lines = all_lines[start_line - 1 : end_line]

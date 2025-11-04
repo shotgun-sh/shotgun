@@ -51,7 +51,7 @@ def specify(
         )
 
         # Create the specify agent with deps and provider
-        agent, deps = create_specify_agent(agent_runtime_options, provider)
+        agent, deps = asyncio.run(create_specify_agent(agent_runtime_options, provider))
 
         # Start specification process
         logger.info("📋 Starting specification generation...")
