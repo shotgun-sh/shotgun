@@ -692,11 +692,11 @@ class AgentManager(Widget):
                     )
                 )
 
-            # Post UI update with hint messages and file operations
+            # Post UI update with hint messages (file operations will be posted after compaction)
             logger.debug(
-                "Posting UI update for Q&A mode with hint messages and file operations"
+                "Posting UI update for Q&A mode with hint messages"
             )
-            self._post_messages_updated(file_operations)
+            self._post_messages_updated([])
         else:
             # No clarifying questions - show the response or a default success message
             if agent_response.response and agent_response.response.strip():
@@ -731,10 +731,11 @@ class AgentManager(Widget):
                     )
 
             # Post UI update immediately so user sees the response without delay
+            # (file operations will be posted after compaction to avoid duplicates)
             logger.debug(
-                "Posting immediate UI update with hint message and file operations"
+                "Posting immediate UI update with hint message"
             )
-            self._post_messages_updated(file_operations)
+            self._post_messages_updated([])
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
