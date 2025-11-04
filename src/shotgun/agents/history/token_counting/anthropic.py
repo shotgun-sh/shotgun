@@ -72,6 +72,10 @@ class AnthropicTokenCounter(TokenCounter):
         Raises:
             RuntimeError: If API call fails
         """
+        # Handle empty text to avoid unnecessary API calls
+        if not text or not text.strip():
+            return 0
+
         try:
             # Anthropic API expects messages format and model parameter
             # Use await with async client
@@ -107,5 +111,9 @@ class AnthropicTokenCounter(TokenCounter):
         Raises:
             RuntimeError: If token counting fails
         """
+        # Handle empty message list early
+        if not messages:
+            return 0
+
         total_text = extract_text_from_messages(messages)
         return await self.count_tokens(total_text)

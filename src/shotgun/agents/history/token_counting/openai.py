@@ -57,6 +57,10 @@ class OpenAITokenCounter(TokenCounter):
         Raises:
             RuntimeError: If token counting fails
         """
+        # Handle empty text to avoid unnecessary encoding
+        if not text or not text.strip():
+            return 0
+
         try:
             return len(self.encoding.encode(text))
         except Exception as e:
@@ -76,5 +80,9 @@ class OpenAITokenCounter(TokenCounter):
         Raises:
             RuntimeError: If token counting fails
         """
+        # Handle empty message list early
+        if not messages:
+            return 0
+
         total_text = extract_text_from_messages(messages)
         return await self.count_tokens(total_text)

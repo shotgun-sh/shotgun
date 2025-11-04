@@ -88,6 +88,10 @@ class SentencePieceTokenCounter(TokenCounter):
         Raises:
             RuntimeError: If token counting fails
         """
+        # Handle empty text to avoid unnecessary tokenization
+        if not text or not text.strip():
+            return 0
+
         await self._ensure_tokenizer()
 
         if self.sp is None:
@@ -115,5 +119,9 @@ class SentencePieceTokenCounter(TokenCounter):
         Raises:
             RuntimeError: If token counting fails
         """
+        # Handle empty message list early
+        if not messages:
+            return 0
+
         total_text = extract_text_from_messages(messages)
         return await self.count_tokens(total_text)
