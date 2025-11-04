@@ -355,8 +355,8 @@ jobs:
             CHANGELOG=$(git log --oneline ${PREVIOUS_TAG}..HEAD)
           fi
 
-          # Escape for JSON and limit length
-          CHANGELOG=$(echo "$CHANGELOG" | head -20 | sed 's/"/\\"/g' | sed 's/`/\\`/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          # Limit length and store raw (we'll escape in the next step)
+          CHANGELOG=$(echo "$CHANGELOG" | head -20)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -367,7 +367,11 @@ jobs:
         run: |
           VERSION="${{ needs.build-and-package.outputs.version }}"
           IS_DEV="${{ needs.build-and-package.outputs.is_dev }}"
-          CHANGELOG="${{ steps.changelog.outputs.changelog }}"
+          CHANGELOG_RAW="${{ steps.changelog.outputs.changelog }}"
+
+          # Properly escape changelog for JSON using printf and jq
+          # This ensures all special characters are properly escaped
+          CHANGELOG_ESCAPED=$(printf '%s' "$CHANGELOG_RAW" | jq -Rs . | sed 's/^"//;s/"$//')
 
           # Create JSON payload for Slack
           if [[ "$IS_DEV" == "true" ]]; then
@@ -411,7 +415,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*Recent Changes:*\n\`\`\`\n${CHANGELOG}\n\`\`\`"
+                  "text": "*Recent Changes:*\n\`\`\`\n${CHANGELOG_ESCAPED}\n\`\`\`"
                 }
               },
               {
@@ -468,7 +472,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "*Recent Changes:*\n\`\`\`\n${CHANGELOG}\n\`\`\`"
+                  "text": "*Recent Changes:*\n\`\`\`\n${CHANGELOG_ESCAPED}\n\`\`\`"
                 }
               },
               {
