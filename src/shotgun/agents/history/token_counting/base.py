@@ -56,12 +56,23 @@ def extract_text_from_messages(messages: list[ModelMessage]) -> str:
         if hasattr(message, "parts"):
             for part in message.parts:
                 if hasattr(part, "content") and isinstance(part.content, str):
-                    text_parts.append(part.content)
+                    # Only add non-empty content
+                    if part.content.strip():
+                        text_parts.append(part.content)
                 else:
                     # Handle non-text parts (tool calls, etc.)
-                    text_parts.append(str(part))
+                    part_str = str(part)
+                    if part_str.strip():
+                        text_parts.append(part_str)
         else:
             # Handle messages without parts
-            text_parts.append(str(message))
+            msg_str = str(message)
+            if msg_str.strip():
+                text_parts.append(msg_str)
+
+    # If no valid text parts found, return a minimal placeholder
+    # This ensures we never send completely empty content to APIs
+    if not text_parts:
+        return "."
 
     return "\n".join(text_parts)
