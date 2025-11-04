@@ -835,6 +835,9 @@ class AgentManager(Widget):
         else:
             partial_parts = []
 
+        # Track last posted response to avoid posting duplicates
+        last_posted_response: ModelResponse | None = None
+
         async for event in stream:
             try:
                 if isinstance(event, PartStartEvent):
@@ -853,7 +856,7 @@ class AgentManager(Widget):
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
-                        self._post_partial_message(False)
+                        last_posted_response = self._post_partial_message(False, last_posted_response)
 
                 elif isinstance(event, PartDeltaEvent):
                     index = event.index
@@ -879,7 +882,7 @@ class AgentManager(Widget):
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
-                        self._post_partial_message(False)
+                        last_posted_response = self._post_partial_message(False, last_posted_response)
 
                 elif isinstance(event, FunctionToolCallEvent):
                     # Track tool call event
@@ -958,7 +961,7 @@ class AgentManager(Widget):
                     partial_message = self._build_partial_response(partial_parts)
                     if partial_message is not None:
                         state.current_response = partial_message
-                        self._post_partial_message(False)
+                        last_posted_response = self._post_partial_message(False, last_posted_response)
                 elif isinstance(event, FunctionToolResultEvent):
                     # Track tool completion event
 
@@ -988,7 +991,7 @@ class AgentManager(Widget):
                     ):
                         state.messages.append(request_message)
                         ## this is what the user responded with
-                        self._post_partial_message(is_last=False)
+                        last_posted_response = self._post_partial_message(is_last=False, last_posted_response=last_posted_response)
 
                 elif isinstance(event, FinalResultEvent):
                     pass
@@ -1005,7 +1008,7 @@ class AgentManager(Widget):
             if final_message not in state.messages:
                 state.messages.append(final_message)
             state.current_response = None
-            self._post_partial_message(True)
+            last_posted_response = self._post_partial_message(True, last_posted_response)
         state.current_response = None
 
         # Notify UI that streaming has completed
@@ -1023,10 +1026,20 @@ class AgentManager(Widget):
             return None
         return ModelResponse(parts=list(completed_parts))
 
-    def _post_partial_message(self, is_last: bool) -> None:
-        """Post a partial message to the UI."""
+    def _post_partial_message(
+        self, is_last: bool, last_posted_response: ModelResponse | None = None
+    ) -> ModelResponse | None:
+        """Post a partial message to the UI.
+
+        Args:
+            is_last: Whether this is the last partial message
+            last_posted_response: The last response that was posted (to avoid duplicates)
+
+        Returns:
+            The current_response that was posted, or None if nothing was posted
+        """
         if self._stream_state is None:
-            return
+            return None
 
         # Deduplicate state.messages before sending to UI
         # This prevents duplicate tool results from appearing during streaming
@@ -1037,15 +1050,27 @@ class AgentManager(Widget):
             ):
                 deduplicated_messages.append(msg)
 
+        current = self._stream_state.current_response
+
+        # Skip posting if the current response hasn't changed since last post
+        # This prevents duplicate tool calls from being shown multiple times
+        if (
+            not is_last
+            and current is not None
+            and last_posted_response is not None
+            and current.parts == last_posted_response.parts
+        ):
+            return last_posted_response  # No change, return the same response
+
         self.post_message(
             PartialResponseMessage(
-                self._stream_state.current_response
-                if self._stream_state.current_response not in deduplicated_messages
-                else None,
+                current if current not in deduplicated_messages else None,
                 deduplicated_messages,
                 is_last,
             )
         )
+
+        return current
 
     def _post_messages_updated(
         self, file_operations: list[FileOperation] | None = None
