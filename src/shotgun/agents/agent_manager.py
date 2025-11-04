@@ -169,6 +169,14 @@ class CompactionCompletedMessage(Message):
     """Event posted when conversation compaction completes."""
 
 
+class AgentStreamingStarted(Message):
+    """Event posted when agent starts streaming responses."""
+
+
+class AgentStreamingCompleted(Message):
+    """Event posted when agent finishes streaming responses."""
+
+
 @dataclass(frozen=True)
 class ModelConfigUpdated:
     """Data returned when AI model configuration changes.
@@ -806,6 +814,9 @@ class AgentManager(Widget):
     ) -> None:
         """Process streamed events and forward partial updates to the UI."""
 
+        # Notify UI that streaming has started
+        self.post_message(AgentStreamingStarted())
+
         state = self._stream_state
         if state is None:
             state = self._stream_state = _PartialStreamState()
@@ -983,6 +994,9 @@ class AgentManager(Widget):
             state.current_response = None
             self._post_partial_message(True)
         state.current_response = None
+
+        # Notify UI that streaming has completed
+        self.post_message(AgentStreamingCompleted())
 
     def _build_partial_response(
         self, parts: list[ModelResponsePart | ToolCallPartDelta]

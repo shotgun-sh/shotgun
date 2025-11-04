@@ -245,3 +245,18 @@ class WidgetCoordinator:
                 spinner.text = text
         except Exception as e:
             logger.exception(f"Failed to update spinner text: {e}")
+
+    def set_context_streaming(self, streaming: bool) -> None:
+        """Enable or disable context indicator streaming animation.
+
+        Args:
+            streaming: Whether to show streaming animation.
+        """
+        if not self.screen.is_mounted:
+            return
+
+        try:
+            context_indicator = self.screen.query_one(ContextIndicator)
+            context_indicator.set_streaming(streaming)
+        except Exception as e:
+            logger.exception(f"Failed to set context streaming: {e}")

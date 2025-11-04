@@ -502,6 +502,34 @@ class ChatScreen(Screen[None]):
                 f"[CONTEXT] Failed to update context indicator: {e}", exc_info=True
             )
 
+    @work(exclusive=False)
+    async def update_context_indicator_with_messages(
+        self, messages: list[ModelMessage]
+    ) -> None:
+        """Update the context indicator with specific message set (for streaming updates).
+
+        Args:
+            messages: The messages to analyze (typically includes partial streaming response)
+        """
+        try:
+            from shotgun.agents.context_analyzer.analyzer import ContextAnalyzer
+
+            analyzer = ContextAnalyzer(self.deps.llm_model)
+            # Analyze the provided messages against UI history
+            # (UI history is used for hint messages which aren't in agent history)
+            analysis = await analyzer.analyze_conversation(
+                messages, self.agent_manager.ui_message_history
+            )
+
+            if analysis:
+                model_name = self.deps.llm_model.name
+                self.widget_coordinator.update_context_indicator(analysis, model_name)
+        except Exception as e:
+            logger.error(
+                f"Failed to update context indicator with streaming messages: {e}",
+                exc_info=True,
+            )
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Container(id="window"):
@@ -560,6 +588,10 @@ class ChatScreen(Screen[None]):
         self.widget_coordinator.set_partial_response(
             self.partial_message, new_message_list
         )
+
+        # Update context indicator with current streaming messages
+        # This analyzes event.messages which includes the partial response
+        self.update_context_indicator_with_messages(event.messages)
 
     def _clear_partial_response(self) -> None:
         # Use widget coordinator to clear partial response
@@ -1048,6 +1080,9 @@ class ChatScreen(Screen[None]):
         self.processing_state.start_processing("Processing...")
         self.processing_state.bind_worker(get_current_worker())
 
+        # Start context indicator animation immediately
+        self.widget_coordinator.set_context_streaming(True)
+
         prompt = message
 
         try:
@@ -1083,6 +1118,8 @@ class ChatScreen(Screen[None]):
             self.mount_hint(hint)
         finally:
             self.processing_state.stop_processing()
+            # Stop context indicator animation
+            self.widget_coordinator.set_context_streaming(False)
 
         # Save conversation after each interaction
         self._save_conversation()
