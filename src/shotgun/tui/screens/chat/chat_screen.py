@@ -557,7 +557,9 @@ class ChatScreen(Screen[None]):
         )
 
         # Use widget coordinator to set partial response
-        self.widget_coordinator.set_partial_response(self.partial_message, new_message_list)
+        self.widget_coordinator.set_partial_response(
+            self.partial_message, new_message_list
+        )
 
     def _clear_partial_response(self) -> None:
         # Use widget coordinator to clear partial response
@@ -1095,8 +1097,10 @@ class ChatScreen(Screen[None]):
     def _load_conversation(self) -> None:
         """Load conversation from persistent storage."""
         # Use conversation service for restoration
-        success, error_msg, restored_type = self.conversation_service.restore_conversation(
-            self.agent_manager, self.deps.usage_manager
+        success, error_msg, restored_type = (
+            self.conversation_service.restore_conversation(
+                self.agent_manager, self.deps.usage_manager
+            )
         )
 
         if not success and error_msg:
