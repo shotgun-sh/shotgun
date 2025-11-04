@@ -49,7 +49,9 @@ class ConversationManager:
             data = conversation.model_dump(mode="json")
             json_content = json.dumps(data, indent=2, ensure_ascii=False)
 
-            async with aiofiles.open(self.conversation_path, "w", encoding="utf-8") as f:
+            async with aiofiles.open(
+                self.conversation_path, "w", encoding="utf-8"
+            ) as f:
                 await f.write(json_content)
 
             logger.debug("Conversation saved to %s", self.conversation_path)

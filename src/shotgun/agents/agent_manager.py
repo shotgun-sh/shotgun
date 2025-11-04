@@ -230,7 +230,7 @@ class AgentManager(Widget):
         self.deps = deps
 
         # Create AgentRuntimeOptions from deps for agent creation
-        agent_runtime_options = AgentRuntimeOptions(
+        self._agent_runtime_options = AgentRuntimeOptions(
             interactive_mode=self.deps.interactive_mode,
             working_directory=self.deps.working_directory,
             is_tui_context=self.deps.is_tui_context,
@@ -239,22 +239,18 @@ class AgentManager(Widget):
             tasks=self.deps.tasks,
         )
 
-        # Initialize all agents and store their specific deps
-        self.research_agent, self.research_deps = create_research_agent(
-            agent_runtime_options=agent_runtime_options
-        )
-        self.plan_agent, self.plan_deps = create_plan_agent(
-            agent_runtime_options=agent_runtime_options
-        )
-        self.tasks_agent, self.tasks_deps = create_tasks_agent(
-            agent_runtime_options=agent_runtime_options
-        )
-        self.specify_agent, self.specify_deps = create_specify_agent(
-            agent_runtime_options=agent_runtime_options
-        )
-        self.export_agent, self.export_deps = create_export_agent(
-            agent_runtime_options=agent_runtime_options
-        )
+        # Lazy initialization - agents created on first access
+        self._research_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._research_deps: AgentDeps | None = None
+        self._plan_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._plan_deps: AgentDeps | None = None
+        self._tasks_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._tasks_deps: AgentDeps | None = None
+        self._specify_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._specify_deps: AgentDeps | None = None
+        self._export_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._export_deps: AgentDeps | None = None
+        self._agents_initialized = False
 
         # Track current active agent
         self._current_agent_type: AgentType = initial_type
@@ -268,6 +264,119 @@ class AgentManager(Widget):
         # Q&A mode state for structured output questions
         self._qa_questions: list[str] | None = None
         self._qa_mode_active: bool = False
+
+    async def _ensure_agents_initialized(self) -> None:
+        """Ensure all agents are initialized (lazy initialization)."""
+        if self._agents_initialized:
+            return
+
+        # Initialize all agents asynchronously
+        self._research_agent, self._research_deps = await create_research_agent(
+            agent_runtime_options=self._agent_runtime_options
+        )
+        self._plan_agent, self._plan_deps = await create_plan_agent(
+            agent_runtime_options=self._agent_runtime_options
+        )
+        self._tasks_agent, self._tasks_deps = await create_tasks_agent(
+            agent_runtime_options=self._agent_runtime_options
+        )
+        self._specify_agent, self._specify_deps = await create_specify_agent(
+            agent_runtime_options=self._agent_runtime_options
+        )
+        self._export_agent, self._export_deps = await create_export_agent(
+            agent_runtime_options=self._agent_runtime_options
+        )
+        self._agents_initialized = True
+
+    @property
+    def research_agent(self) -> Agent[AgentDeps, AgentResponse]:
+        """Get research agent (must call _ensure_agents_initialized first)."""
+        if self._research_agent is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._research_agent
+
+    @property
+    def research_deps(self) -> AgentDeps:
+        """Get research deps (must call _ensure_agents_initialized first)."""
+        if self._research_deps is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._research_deps
+
+    @property
+    def plan_agent(self) -> Agent[AgentDeps, AgentResponse]:
+        """Get plan agent (must call _ensure_agents_initialized first)."""
+        if self._plan_agent is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._plan_agent
+
+    @property
+    def plan_deps(self) -> AgentDeps:
+        """Get plan deps (must call _ensure_agents_initialized first)."""
+        if self._plan_deps is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._plan_deps
+
+    @property
+    def tasks_agent(self) -> Agent[AgentDeps, AgentResponse]:
+        """Get tasks agent (must call _ensure_agents_initialized first)."""
+        if self._tasks_agent is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._tasks_agent
+
+    @property
+    def tasks_deps(self) -> AgentDeps:
+        """Get tasks deps (must call _ensure_agents_initialized first)."""
+        if self._tasks_deps is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._tasks_deps
+
+    @property
+    def specify_agent(self) -> Agent[AgentDeps, AgentResponse]:
+        """Get specify agent (must call _ensure_agents_initialized first)."""
+        if self._specify_agent is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._specify_agent
+
+    @property
+    def specify_deps(self) -> AgentDeps:
+        """Get specify deps (must call _ensure_agents_initialized first)."""
+        if self._specify_deps is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._specify_deps
+
+    @property
+    def export_agent(self) -> Agent[AgentDeps, AgentResponse]:
+        """Get export agent (must call _ensure_agents_initialized first)."""
+        if self._export_agent is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._export_agent
+
+    @property
+    def export_deps(self) -> AgentDeps:
+        """Get export deps (must call _ensure_agents_initialized first)."""
+        if self._export_deps is None:
+            raise RuntimeError(
+                "Agents not initialized. Call _ensure_agents_initialized() first."
+            )
+        return self._export_deps
 
     @property
     def current_agent(self) -> Agent[AgentDeps, AgentResponse]:
@@ -420,6 +529,9 @@ class AgentManager(Widget):
         Returns:
             The agent run result.
         """
+        # Ensure agents are initialized before running
+        await self._ensure_agents_initialized()
+
         logger.info(f"Running agent {self._current_agent_type.value}")
         # Use merged deps (shared state + agent-specific system prompt) if not provided
         if deps is None:
@@ -785,7 +897,7 @@ class AgentManager(Widget):
 
         usage = result.usage()
         if hasattr(deps, "llm_model") and deps.llm_model is not None:
-            deps.usage_manager.add_usage(
+            await deps.usage_manager.add_usage(
                 usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
             )
         else:

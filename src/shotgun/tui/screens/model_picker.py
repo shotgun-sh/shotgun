@@ -248,9 +248,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 return model_name
         return None
 
-    def _is_model_available(
-        self, model_name: ModelName, config: ShotgunConfig
-    ) -> bool:
+    def _is_model_available(self, model_name: ModelName, config: ShotgunConfig) -> bool:
         """Check if a model is available based on provider key configuration.
 
         A model is available if:
@@ -338,7 +336,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             await self.refresh_model_labels()
 
             # Get the full model config with provider information
-            model_config = get_provider_model(self.selected_model)
+            model_config = await get_provider_model(self.selected_model)
 
             # Dismiss the screen and return the model config update to the caller
             self.dismiss(

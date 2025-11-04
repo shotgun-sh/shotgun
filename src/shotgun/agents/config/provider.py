@@ -170,7 +170,7 @@ def get_or_create_model(
     return _model_cache[cache_key]
 
 
-def get_provider_model(
+async def get_provider_model(
     provider_or_model: ProviderType | ModelName | None = None,
 ) -> ModelConfig:
     """Get a fully configured ModelConfig with API key and Model instance.
@@ -187,12 +187,9 @@ def get_provider_model(
     Raises:
         ValueError: If provider is not configured properly or model not found
     """
-    import asyncio
-
     config_manager = get_config_manager()
     # Use cached config for read-only access (performance)
-    # Run async load() in synchronous context
-    config = asyncio.run(config_manager.load(force_reload=False))
+    config = await config_manager.load(force_reload=False)
 
     # Priority 1: Check if Shotgun key exists - if so, use it for ANY model
     shotgun_api_key = _get_api_key(config.shotgun.api_key)

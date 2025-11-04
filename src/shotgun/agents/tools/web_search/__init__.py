@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 WebSearchTool = Callable[[str], Awaitable[str]]
 
 
-def get_available_web_search_tools() -> list[WebSearchTool]:
+async def get_available_web_search_tools() -> list[WebSearchTool]:
     """Get list of available web search tools based on configured API keys.
 
     Works with both Shotgun Account (via LiteLLM proxy) and BYOK (individual provider keys).
@@ -41,29 +41,27 @@ def get_available_web_search_tools() -> list[WebSearchTool]:
     """
     tools: list[WebSearchTool] = []
 
-    import asyncio
-
     # Check if using Shotgun Account
     config_manager = get_config_manager()
-    config = asyncio.run(config_manager.load())
+    config = await config_manager.load()
     has_shotgun_key = config.shotgun.api_key is not None
 
     if has_shotgun_key:
         logger.debug("🔑 Shotgun Account - only Gemini web search available")
 
         # Gemini: Only search tool available for Shotgun Account
-        if is_provider_available(ProviderType.GOOGLE):
+        if await is_provider_available(ProviderType.GOOGLE):
             logger.debug("✅ Gemini web search tool available")
             tools.append(gemini_web_search_tool)
 
         # Anthropic: Not available for Shotgun Account (Gemini-only for Shotgun)
-        if is_provider_available(ProviderType.ANTHROPIC):
+        if await is_provider_available(ProviderType.ANTHROPIC):
             logger.debug(
                 "⚠️  Anthropic web search requires BYOK (Shotgun Account uses Gemini only)"
             )
 
         # OpenAI: Not available for Shotgun Account (Responses API incompatible with proxy)
-        if is_provider_available(ProviderType.OPENAI):
+        if await is_provider_available(ProviderType.OPENAI):
             logger.debug(
                 "⚠️  OpenAI web search requires BYOK (Responses API not supported via proxy)"
             )
@@ -71,15 +69,15 @@ def get_available_web_search_tools() -> list[WebSearchTool]:
         # BYOK mode: Load all available tools based on individual provider keys
         logger.debug("🔑 BYOK mode - checking all provider web search tools")
 
-        if is_provider_available(ProviderType.OPENAI):
+        if await is_provider_available(ProviderType.OPENAI):
             logger.debug("✅ OpenAI web search tool available")
             tools.append(openai_web_search_tool)
 
-        if is_provider_available(ProviderType.ANTHROPIC):
+        if await is_provider_available(ProviderType.ANTHROPIC):
             logger.debug("✅ Anthropic web search tool available")
             tools.append(anthropic_web_search_tool)
 
-        if is_provider_available(ProviderType.GOOGLE):
+        if await is_provider_available(ProviderType.GOOGLE):
             logger.debug("✅ Gemini web search tool available")
             tools.append(gemini_web_search_tool)
 

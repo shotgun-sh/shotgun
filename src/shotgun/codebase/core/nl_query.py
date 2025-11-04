@@ -34,7 +34,7 @@ async def llm_cypher_prompt(
     Returns:
         CypherGenerationResponse with cypher_query, can_generate flag, and reason if not
     """
-    model_config = get_provider_model()
+    model_config = await get_provider_model()
 
     # Create an agent with structured output for Cypher generation
     cypher_agent = Agent(

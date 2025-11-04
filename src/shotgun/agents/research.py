@@ -26,7 +26,7 @@ from .tools import get_available_web_search_tools
 logger = get_logger(__name__)
 
 
-def create_research_agent(
+async def create_research_agent(
     agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
 ) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
     """Create a research agent with web search and artifact management capabilities.
@@ -41,7 +41,7 @@ def create_research_agent(
     logger.debug("Initializing research agent")
 
     # Get available web search tools based on configured API keys
-    web_search_tools = get_available_web_search_tools()
+    web_search_tools = await get_available_web_search_tools()
     if web_search_tools:
         logger.info(
             "Research agent configured with %d web search tool(s)",
@@ -53,7 +53,7 @@ def create_research_agent(
     # Use partial to create system prompt function for research agent
     system_prompt_fn = partial(build_agent_system_prompt, "research")
 
-    agent, deps = create_base_agent(
+    agent, deps = await create_base_agent(
         system_prompt_fn,
         agent_runtime_options,
         load_codebase_understanding_tools=True,

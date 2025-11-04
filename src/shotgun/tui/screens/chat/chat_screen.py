@@ -387,11 +387,11 @@ class ChatScreen(Screen[None]):
             # Save to conversation file
             conversation_file = get_shotgun_home() / "conversation.json"
             manager = ConversationManager(conversation_file)
-            conversation = manager.load()
+            conversation = await manager.load()
 
             if conversation:
                 conversation.set_agent_messages(compacted_messages)
-                manager.save(conversation)
+                await manager.save(conversation)
 
             # Post compaction completed event
             self.agent_manager.post_message(CompactionCompletedMessage())
@@ -638,7 +638,9 @@ class ChatScreen(Screen[None]):
         self.qa_answers = []
 
     @on(MessageHistoryUpdated)
-    def handle_message_history_updated(self, event: MessageHistoryUpdated) -> None:
+    async def handle_message_history_updated(
+        self, event: MessageHistoryUpdated
+    ) -> None:
         """Handle message history updates from the agent manager."""
         self._clear_partial_response()
         self.messages = event.messages
@@ -684,7 +686,7 @@ class ChatScreen(Screen[None]):
                     from shotgun.tui.app import ShotgunApp
 
                     app = cast(ShotgunApp, self.app)
-                    MarketingManager.check_and_display_messages(
+                    await MarketingManager.check_and_display_messages(
                         app.config_manager, event.file_operations, self.mount_hint
                     )
 
@@ -1148,9 +1150,14 @@ class ChatScreen(Screen[None]):
 
     def _load_conversation(self) -> None:
         """Load conversation from persistent storage."""
+
         # Use conversation service for restoration (run async)
         async def _do_load() -> None:
-            success, error_msg, restored_type = await self.conversation_service.restore_conversation(
+            (
+                success,
+                error_msg,
+                restored_type,
+            ) = await self.conversation_service.restore_conversation(
                 self.agent_manager, self.deps.usage_manager
             )
 

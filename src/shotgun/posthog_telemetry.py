@@ -180,8 +180,8 @@ def submit_feedback_survey(feedback: Feedback) -> None:
     conversation = None
     try:
         conversation = asyncio.run(conversation_manager.load())
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to load conversation history: {e}")
     last_10_messages = []
     if conversation is not None:
         last_10_messages = conversation.get_agent_messages()[:10]

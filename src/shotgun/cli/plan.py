@@ -55,7 +55,7 @@ def plan(
         )
 
         # Create the plan agent with deps and provider
-        agent, deps = create_plan_agent(agent_runtime_options, provider)
+        agent, deps = asyncio.run(create_plan_agent(agent_runtime_options, provider))
 
         # Start planning process
         logger.info("🎯 Starting planning...")

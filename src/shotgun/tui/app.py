@@ -5,6 +5,7 @@ from textual.app import App, SystemCommand
 from textual.binding import Binding
 from textual.screen import Screen
 
+from shotgun.agents.agent_manager import AgentManager
 from shotgun.agents.config import ConfigManager, get_config_manager
 from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
@@ -127,8 +128,13 @@ class ShotgunApp(App[None]):
             # Get the default agent mode (RESEARCH)
             agent_mode = AgentType.RESEARCH
 
-            # Create AgentManager with the correct mode
-            agent_manager = self.container.agent_manager_factory(initial_type=agent_mode)
+            # Create AgentDeps asynchronously (get_provider_model is now async)
+            from shotgun.tui.dependencies import create_default_tui_deps
+
+            agent_deps = await create_default_tui_deps()
+
+            # Create AgentManager with async initialization
+            agent_manager = AgentManager(deps=agent_deps, initial_type=agent_mode)
 
             # Create ProcessingStateManager - we'll pass the screen after creation
             # For now, create with None and the ChatScreen will set itself
@@ -136,7 +142,9 @@ class ShotgunApp(App[None]):
                 agent_manager=agent_manager,
                 conversation_manager=self.container.conversation_manager(),
                 conversation_service=self.container.conversation_service(),
-                widget_coordinator=self.container.widget_coordinator_factory(screen=None),
+                widget_coordinator=self.container.widget_coordinator_factory(
+                    screen=None
+                ),
                 processing_state=self.container.processing_state_factory(
                     screen=None,  # Will be set after ChatScreen is created
                     telemetry_context={"agent_mode": agent_mode.value},
@@ -144,7 +152,7 @@ class ShotgunApp(App[None]):
                 command_handler=self.container.command_handler(),
                 placeholder_hints=self.container.placeholder_hints(),
                 codebase_sdk=self.container.codebase_sdk(),
-                deps=self.container.agent_deps(),
+                deps=agent_deps,
                 continue_session=self.continue_session,
                 force_reindex=self.force_reindex,
             )

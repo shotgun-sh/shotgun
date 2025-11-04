@@ -63,7 +63,7 @@ def export(
         )
 
         # Create the export agent with deps and provider
-        agent, deps = create_export_agent(agent_runtime_options, provider)
+        agent, deps = asyncio.run(create_export_agent(agent_runtime_options, provider))
 
         # Start export process
         logger.info("🎯 Starting export...")

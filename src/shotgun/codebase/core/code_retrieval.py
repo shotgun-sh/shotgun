@@ -142,7 +142,7 @@ async def retrieve_code_by_qualified_name(
 
         # Read the file and extract the snippet
         try:
-            async with aiofiles.open(full_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(full_path, encoding="utf-8") as f:
                 content = await f.read()
                 all_lines = content.splitlines(keepends=True)
 

@@ -46,7 +46,7 @@ async def anthropic_web_search_tool(query: str) -> str:
 
     # Get model configuration (supports both Shotgun and BYOK)
     try:
-        model_config = get_provider_model(ProviderType.ANTHROPIC)
+        model_config = await get_provider_model(ProviderType.ANTHROPIC)
     except ValueError as e:
         error_msg = f"Anthropic API key not configured: {str(e)}"
         logger.error("❌ %s", error_msg)
@@ -141,7 +141,7 @@ async def main() -> None:
     # Check if API key is available
     try:
         if callable(get_provider_model):
-            model_config = get_provider_model(ProviderType.ANTHROPIC)
+            model_config = await get_provider_model(ProviderType.ANTHROPIC)
             if not model_config.api_key:
                 raise ValueError("No API key configured")
     except (ValueError, Exception):

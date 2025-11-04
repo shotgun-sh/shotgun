@@ -75,7 +75,9 @@ class ModeProgressChecker:
         except (OSError, UnicodeDecodeError):
             return False
 
-    async def get_next_suggested_mode(self, current_mode: AgentType) -> AgentType | None:
+    async def get_next_suggested_mode(
+        self, current_mode: AgentType
+    ) -> AgentType | None:
         """Get the next suggested mode based on current progress.
 
         Args:
@@ -212,7 +214,7 @@ class PlaceholderHints:
         self._cached_hints: dict[tuple[AgentType, bool], str] = {}
         self._hint_indices: dict[tuple[AgentType, bool], int] = {}
 
-    async def get_hint(self, current_mode: AgentType, force_refresh: bool = False) -> str:
+    def get_hint(self, current_mode: AgentType, force_refresh: bool = False) -> str:
         """Get a dynamic hint based on current mode and progress.
 
         Args:
@@ -226,8 +228,9 @@ class PlaceholderHints:
         if current_mode not in self.HINTS:
             return f"Enter your {current_mode.value} mode prompt (SHIFT+TAB to switch modes)"
 
-        # Determine if mode has content
-        has_content = await self.progress_checker.has_mode_content(current_mode)
+        # For placeholder text, we default to "no content" state (initial hints)
+        # This avoids async file system checks in the UI rendering path
+        has_content = False
 
         # Get hint variations for this mode and state
         hints_list = self.HINTS[current_mode][has_content]
@@ -247,7 +250,7 @@ class PlaceholderHints:
 
         return self._cached_hints[cache_key]
 
-    async def get_placeholder_for_mode(self, current_mode: AgentType) -> str:
+    def get_placeholder_for_mode(self, current_mode: AgentType) -> str:
         """Get placeholder text for a given mode.
 
         This is an alias for get_hint() to maintain compatibility.
@@ -258,4 +261,4 @@ class PlaceholderHints:
         Returns:
             A contextual hint string for the placeholder.
         """
-        return await self.get_hint(current_mode)
+        return self.get_hint(current_mode)

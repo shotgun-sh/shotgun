@@ -23,7 +23,7 @@ from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 logger = get_logger(__name__)
 
 
-def create_export_agent(
+async def create_export_agent(
     agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
 ) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
     """Create an export agent with file management capabilities.
@@ -39,7 +39,7 @@ def create_export_agent(
     # Use partial to create system prompt function for export agent
     system_prompt_fn = partial(build_agent_system_prompt, "export")
 
-    agent, deps = create_base_agent(
+    agent, deps = await create_base_agent(
         system_prompt_fn,
         agent_runtime_options,
         provider=provider,

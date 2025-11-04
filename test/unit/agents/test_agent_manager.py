@@ -106,12 +106,13 @@ def mock_agents():
     return research_agent, plan_agent, tasks_agent
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
-def test_agent_manager_init(
+async def test_agent_manager_init(
     mock_create_export,
     mock_create_specify,
     mock_create_tasks,
@@ -123,7 +124,7 @@ def test_agent_manager_init(
     """Test AgentManager initialization."""
     research_agent, plan_agent, tasks_agent = mock_agents
 
-    # Mock the create_*_agent functions
+    # Mock the create_*_agent functions (create_research_agent is now async)
     mock_create_research.return_value = (research_agent, mock_agent_deps)
     mock_create_plan.return_value = (plan_agent, mock_agent_deps)
     mock_create_tasks.return_value = (tasks_agent, mock_agent_deps)
@@ -134,6 +135,9 @@ def test_agent_manager_init(
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Initialize agents (lazy initialization)
+    await manager._ensure_agents_initialized()
 
     assert manager.deps == mock_agent_deps
     assert manager._current_agent_type == AgentType.RESEARCH
@@ -156,12 +160,13 @@ def test_agent_manager_init_no_deps(
         AgentManager(deps=None)
 
 
+@pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
 @patch("shotgun.agents.agent_manager.create_tasks_agent")
 @patch("shotgun.agents.agent_manager.create_specify_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
-def test_agent_manager_current_agent(
+async def test_agent_manager_current_agent(
     mock_create_export,
     mock_create_specify,
     mock_create_tasks,
@@ -180,6 +185,10 @@ def test_agent_manager_current_agent(
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+
+    # Initialize agents (lazy initialization)
+    await manager._ensure_agents_initialized()
+
     assert manager.current_agent == research_agent
 
     manager._current_agent_type = AgentType.PLAN

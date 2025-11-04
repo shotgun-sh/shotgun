@@ -769,7 +769,7 @@ class CodebaseGraphManager:
 
                     lang_config = get_language_config(full_path.suffix)
                     if lang_config and lang_config.name in parsers:
-                        builder._process_single_file(full_path, lang_config.name)
+                        await builder._process_single_file(full_path, lang_config.name)
                         stats["nodes_modified"] += 1  # Approximate
 
             # Process additions
@@ -784,7 +784,7 @@ class CodebaseGraphManager:
 
                     lang_config = get_language_config(full_path.suffix)
                     if lang_config and lang_config.name in parsers:
-                        builder._process_single_file(full_path, lang_config.name)
+                        await builder._process_single_file(full_path, lang_config.name)
                         stats["nodes_added"] += 1  # Approximate
 
             # Flush all pending operations
@@ -1751,7 +1751,7 @@ class CodebaseGraphManager:
             )
 
             # Build the graph
-            builder.run()
+            asyncio.run(builder.run())
 
         # Run build in thread pool
         await anyio.to_thread.run_sync(_build_graph)

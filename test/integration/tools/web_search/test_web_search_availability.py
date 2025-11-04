@@ -2,6 +2,8 @@
 
 import os
 
+import pytest
+
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.tools.web_search import (
     get_available_web_search_tools,
@@ -9,9 +11,10 @@ from shotgun.agents.tools.web_search import (
 )
 
 
-def test_get_available_web_search_tools():
+@pytest.mark.asyncio
+async def test_get_available_web_search_tools():
     """Test that get_available_web_search_tools returns correct tools."""
-    tools = get_available_web_search_tools()
+    tools = await get_available_web_search_tools()
 
     # Should return a list
     assert isinstance(tools, list)
@@ -48,7 +51,8 @@ def test_provider_availability_detection():
     assert google_available == bool(os.getenv("GEMINI_API_KEY"))
 
 
-def test_no_tools_available_when_no_api_keys():
+@pytest.mark.asyncio
+async def test_no_tools_available_when_no_api_keys():
     """Test that no tools are available when no API keys are set."""
     # Save original API keys
     original_keys = {
@@ -64,7 +68,7 @@ def test_no_tools_available_when_no_api_keys():
         assert not is_provider_available(ProviderType.GOOGLE)
 
         # Should return empty list
-        tools = get_available_web_search_tools()
+        tools = await get_available_web_search_tools()
         assert tools == []
 
     finally:
@@ -74,7 +78,8 @@ def test_no_tools_available_when_no_api_keys():
                 os.environ[key] = value
 
 
-def test_selective_tool_availability():
+@pytest.mark.asyncio
+async def test_selective_tool_availability():
     """Test that only tools with API keys are available."""
     # Save original API keys
     original_keys = {
@@ -91,7 +96,7 @@ def test_selective_tool_availability():
         assert not is_provider_available(ProviderType.ANTHROPIC)
         assert not is_provider_available(ProviderType.GOOGLE)
 
-        tools = get_available_web_search_tools()
+        tools = await get_available_web_search_tools()
         assert len(tools) == 1
         assert "openai" in tools[0].__name__
 
@@ -99,14 +104,14 @@ def test_selective_tool_availability():
         os.environ["ANTHROPIC_API_KEY"] = "test_key"
 
         assert is_provider_available(ProviderType.ANTHROPIC)
-        tools = get_available_web_search_tools()
+        tools = await get_available_web_search_tools()
         assert len(tools) == 2
 
         # Add Gemini key
         os.environ["GEMINI_API_KEY"] = "test_key"
 
         assert is_provider_available(ProviderType.GOOGLE)
-        tools = get_available_web_search_tools()
+        tools = await get_available_web_search_tools()
         assert len(tools) == 3
 
     finally:

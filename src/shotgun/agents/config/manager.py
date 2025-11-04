@@ -125,7 +125,7 @@ class ConfigManager:
 
                     if self._config.selected_model in MODEL_SPECS:
                         spec = MODEL_SPECS[self._config.selected_model]
-                        if not self.has_provider_key(spec.provider):
+                        if not await self.has_provider_key(spec.provider):
                             logger.info(
                                 "Selected model %s provider has no API key, finding available model",
                                 self._config.selected_model.value,
@@ -143,7 +143,7 @@ class ConfigManager:
                 # If no selected_model or it was invalid, find first available model
                 if not self._config.selected_model:
                     for provider in ProviderType:
-                        if self.has_provider_key(provider):
+                        if await self.has_provider_key(provider):
                             # Set to that provider's default model
                             from .models import MODEL_SPECS, ModelName
 
@@ -175,7 +175,6 @@ class ConfigManager:
             logger.info("Creating new configuration with generated shotgun_instance_id")
             self._config = await self.initialize()
             return self._config
-
 
     async def save(self, config: ShotgunConfig | None = None) -> None:
         """Save configuration to file.
@@ -212,7 +211,9 @@ class ConfigManager:
             logger.error("Failed to save configuration to %s: %s", self.config_path, e)
             raise
 
-    async def update_provider(self, provider: ProviderType | str, **kwargs: Any) -> None:
+    async def update_provider(
+        self, provider: ProviderType | str, **kwargs: Any
+    ) -> None:
         """Update provider configuration.
 
         Args:
@@ -477,7 +478,6 @@ class ConfigManager:
         """
         config = await self.load()
         return config.shotgun_instance_id
-
 
     async def update_shotgun_account(
         self, api_key: str | None = None, supabase_jwt: str | None = None

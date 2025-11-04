@@ -241,7 +241,8 @@ def test_save_config_failure(mock_logger):
 
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
     """Test get_provider_model for OpenAI with API key in config."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -257,7 +258,7 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
         manager._config = config
         mock_get_config_manager.return_value = manager
 
-        model = get_provider_model(ProviderType.OPENAI)
+        model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
         assert model.name == "gpt-5"
@@ -266,7 +267,8 @@ def test_get_provider_model_openai_with_config_key(mock_get_config_manager):
 
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_openai_no_key(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_no_key(mock_get_config_manager):
     """Test get_provider_model for OpenAI with no API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -274,12 +276,13 @@ def test_get_provider_model_openai_no_key(mock_get_config_manager):
         mock_get_config_manager.return_value = manager
 
         with pytest.raises(ValueError, match="OpenAI API key not configured"):
-            get_provider_model(ProviderType.OPENAI)
+            await get_provider_model(ProviderType.OPENAI)
 
 
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
     """Test get_provider_model for Anthropic with API key in config."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -295,7 +298,7 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
         manager._config = config
         mock_get_config_manager.return_value = manager
 
-        model = get_provider_model(ProviderType.ANTHROPIC)
+        model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
         assert model.name == "claude-haiku-4-5"
@@ -304,7 +307,8 @@ def test_get_provider_model_anthropic_with_config_key(mock_get_config_manager):
 
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_anthropic_no_key(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_anthropic_no_key(mock_get_config_manager):
     """Test get_provider_model for Anthropic with no API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -312,12 +316,13 @@ def test_get_provider_model_anthropic_no_key(mock_get_config_manager):
         mock_get_config_manager.return_value = manager
 
         with pytest.raises(ValueError, match="Anthropic API key not configured"):
-            get_provider_model(ProviderType.ANTHROPIC)
+            await get_provider_model(ProviderType.ANTHROPIC)
 
 
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_google_with_config_key(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_google_with_config_key(mock_get_config_manager):
     """Test get_provider_model for Google with API key in config."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -333,7 +338,7 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
         manager._config = config
         mock_get_config_manager.return_value = manager
 
-        model = get_provider_model(ProviderType.GOOGLE)
+        model = await get_provider_model(ProviderType.GOOGLE)
 
         assert isinstance(model, ModelConfig)
         assert model.name == "gemini-2.5-pro"
@@ -342,7 +347,8 @@ def test_get_provider_model_google_with_config_key(mock_get_config_manager):
 
 @patch.dict(os.environ, {}, clear=True)
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_google_no_key(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_google_no_key(mock_get_config_manager):
     """Test get_provider_model for Google with no API key."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -350,11 +356,12 @@ def test_get_provider_model_google_no_key(mock_get_config_manager):
         mock_get_config_manager.return_value = manager
 
         with pytest.raises(ValueError, match="Gemini API key not configured"):
-            get_provider_model(ProviderType.GOOGLE)
+            await get_provider_model(ProviderType.GOOGLE)
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_string_provider(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_string_provider(mock_get_config_manager):
     """Test get_provider_model with string provider argument."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -370,14 +377,15 @@ def test_get_provider_model_string_provider(mock_get_config_manager):
         manager._config = config
         mock_get_config_manager.return_value = manager
 
-        model = get_provider_model("openai")
+        model = await get_provider_model("openai")
 
         assert isinstance(model, ModelConfig)
         assert model.name == "gpt-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
     """Test get_provider_model with None provider finds first available."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -393,14 +401,15 @@ def test_get_provider_model_none_finds_first_available(mock_get_config_manager):
         manager._config = config
         mock_get_config_manager.return_value = manager
 
-        model = get_provider_model(None)
+        model = await get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
         assert model.name == "claude-haiku-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
-def test_get_provider_model_unsupported_provider(mock_get_config_manager):
+@pytest.mark.asyncio
+async def test_get_provider_model_unsupported_provider(mock_get_config_manager):
     """Test get_provider_model with unsupported provider."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "config.json"
@@ -408,7 +417,7 @@ def test_get_provider_model_unsupported_provider(mock_get_config_manager):
         mock_get_config_manager.return_value = manager
 
         with pytest.raises(ValueError, match="is not a valid ProviderType"):
-            get_provider_model("unsupported")
+            await get_provider_model("unsupported")
 
 
 def test_update_provider_openai():

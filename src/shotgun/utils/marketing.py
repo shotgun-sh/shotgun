@@ -76,7 +76,7 @@ class MarketingManager:
         return "⭐ Enjoying Shotgun? Star us on GitHub: https://github.com/shotgun-sh/shotgun"
 
     @staticmethod
-    def check_and_display_messages(
+    async def check_and_display_messages(
         config_manager: "ConfigManager",
         file_operations: list[FileOperation],
         display_callback: Callable[[str], None],
@@ -93,9 +93,7 @@ class MarketingManager:
             file_operations: List of file operations from the current agent run
             display_callback: Callback function to display messages to the user
         """
-        import asyncio
-
-        config = asyncio.run(config_manager.load())
+        config = await config_manager.load()
 
         # Check GitHub star message
         if MarketingManager.should_show_github_star_message(
@@ -109,4 +107,4 @@ class MarketingManager:
             MarketingManager.mark_message_shown(
                 config.marketing, GITHUB_STAR_MESSAGE_ID
             )
-            config_manager.save(config)
+            await config_manager.save(config)

@@ -95,7 +95,7 @@ async def add_system_status_message(
     return message_history
 
 
-def create_base_agent(
+async def create_base_agent(
     system_prompt_fn: Callable[[RunContext[AgentDeps]], str],
     agent_runtime_options: AgentRuntimeOptions,
     load_codebase_understanding_tools: bool = True,
@@ -120,7 +120,7 @@ def create_base_agent(
 
     # Get configured model or fall back to first available provider
     try:
-        model_config = get_provider_model(provider)
+        model_config = await get_provider_model(provider)
         provider_name = model_config.provider
         logger.debug(
             "🤖 Creating agent with configured %s model: %s",
@@ -311,7 +311,9 @@ async def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
     for prior_file in config.prior_files:
         file_path = base_path / prior_file
         # Only show # and ## headings from prior files, max 500 chars each
-        prior_toc = await _extract_file_toc_content(file_path, max_depth=2, max_chars=500)
+        prior_toc = await _extract_file_toc_content(
+            file_path, max_depth=2, max_chars=500
+        )
         if prior_toc:
             # Add section with XML tags
             toc_sections.append(
@@ -323,7 +325,9 @@ async def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
     # Extract TOC from own file (full detail)
     if config.own_file:
         own_path = base_path / config.own_file
-        own_toc = await _extract_file_toc_content(own_path, max_depth=None, max_chars=2000)
+        own_toc = await _extract_file_toc_content(
+            own_path, max_depth=None, max_chars=2000
+        )
         if own_toc:
             # Put own file TOC at the beginning with XML tags
             toc_sections.insert(
