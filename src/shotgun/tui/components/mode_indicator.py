@@ -1,14 +1,10 @@
 """Widget to display the current agent mode."""
 
-from typing import TYPE_CHECKING
-
 from textual.widget import Widget
 
 from shotgun.agents.models import AgentType
+from shotgun.tui.protocols import QAStateProvider
 from shotgun.tui.utils.mode_progress import PlaceholderHints
-
-if TYPE_CHECKING:
-    from shotgun.tui.screens.chat import ChatScreen
 
 
 class ModeIndicator(Widget):
@@ -34,16 +30,11 @@ class ModeIndicator(Widget):
     def render(self) -> str:
         """Render the mode indicator."""
         # Check if in Q&A mode first
-        try:
-            chat_screen = self.screen
-            if isinstance(chat_screen, ChatScreen) and chat_screen.qa_mode:
-                return (
-                    "[bold $text-accent]Q&A mode[/]"
-                    "[$foreground-muted] (Answer the clarifying questions or ESC to cancel)[/]"
-                )
-        except Exception:  # noqa: S110
-            # If we can't access chat screen, continue with normal display
-            pass
+        if isinstance(self.screen, QAStateProvider) and self.screen.qa_mode:
+            return (
+                "[bold $text-accent]Q&A mode[/]"
+                "[$foreground-muted] (Answer the clarifying questions or ESC to cancel)[/]"
+            )
 
         mode_display = {
             AgentType.RESEARCH: "Research",

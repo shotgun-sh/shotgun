@@ -1,11 +1,8 @@
 """Widget to display the status bar with contextual help text."""
 
-from typing import TYPE_CHECKING
-
 from textual.widget import Widget
 
-if TYPE_CHECKING:
-    from shotgun.tui.screens.chat import ChatScreen
+from shotgun.tui.protocols import QAStateProvider
 
 
 class StatusBar(Widget):
@@ -30,16 +27,11 @@ class StatusBar(Widget):
     def render(self) -> str:
         """Render the status bar with contextual help text."""
         # Check if in Q&A mode first (highest priority)
-        try:
-            chat_screen = self.screen
-            if isinstance(chat_screen, ChatScreen) and chat_screen.qa_mode:
-                return (
-                    "[$foreground-muted][bold $text]esc[/] to exit Q&A mode • "
-                    "[bold $text]enter[/] to send answer • [bold $text]ctrl+j[/] for newline[/]"
-                )
-        except Exception:  # noqa: S110
-            # If we can't access chat screen, continue with normal display
-            pass
+        if isinstance(self.screen, QAStateProvider) and self.screen.qa_mode:
+            return (
+                "[$foreground-muted][bold $text]esc[/] to exit Q&A mode • "
+                "[bold $text]enter[/] to send answer • [bold $text]ctrl+j[/] for newline[/]"
+            )
 
         if self.working:
             return (
