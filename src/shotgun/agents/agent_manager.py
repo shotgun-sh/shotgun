@@ -978,10 +978,17 @@ class AgentManager(Widget):
                         },
                     )
 
+                    # Create the tool result message
                     request_message = ModelRequest(parts=[event.result])
-                    state.messages.append(request_message)
-                    ## this is what the user responded with
-                    self._post_partial_message(is_last=False)
+
+                    # Only append if this exact message isn't already in state.messages
+                    # This prevents duplicate tool results from being added during streaming
+                    if not self._is_message_duplicate(
+                        request_message, cast(list[ModelMessage | HintMessage], state.messages)
+                    ):
+                        state.messages.append(request_message)
+                        ## this is what the user responded with
+                        self._post_partial_message(is_last=False)
 
                 elif isinstance(event, FinalResultEvent):
                     pass
