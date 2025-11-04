@@ -1123,24 +1123,14 @@ class AgentManager(Widget):
             )
 
         # For ModelRequest/ModelResponse, compare parts
-        if not hasattr(msg, "parts"):
-            return False
-
-        msg_parts = getattr(msg, "parts", None)
-        if msg_parts is None:
-            return False
-
-        for existing in existing_messages:
-            if not isinstance(existing, type(msg)):
-                continue
-
-            existing_parts = getattr(existing, "parts", None)
-            if existing_parts is None:
-                continue
-
-            # Compare parts lists - if all parts are identical, it's a duplicate
-            if msg_parts == existing_parts:
-                return True
+        if isinstance(msg, (ModelRequest, ModelResponse)):
+            for existing in existing_messages:
+                # Check if existing is the same type and compare parts
+                if isinstance(existing, type(msg)) and isinstance(
+                    existing, (ModelRequest, ModelResponse)
+                ):
+                    if msg.parts == existing.parts:
+                        return True
 
         return False
 
