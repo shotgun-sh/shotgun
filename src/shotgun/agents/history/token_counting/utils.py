@@ -44,9 +44,6 @@ def get_token_counter(model_config: ModelConfig) -> TokenCounter:
 
     # Return cached instance if available
     if cache_key in _token_counter_cache:
-        logger.debug(
-            f"Reusing cached token counter for {model_config.provider.value}:{model_config.name}"
-        )
         return _token_counter_cache[cache_key]
 
     # Create new instance and cache it
