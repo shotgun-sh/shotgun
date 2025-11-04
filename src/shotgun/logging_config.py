@@ -3,10 +3,14 @@
 import logging
 import logging.handlers
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from shotgun.settings import settings
 from shotgun.utils.env_utils import is_truthy
+
+# Generate a single timestamp for this run to be used across all loggers
+_RUN_TIMESTAMP = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def get_log_directory() -> Path:
@@ -67,7 +71,7 @@ def setup_logger(
 
     # Check if we already have a file handler
     has_file_handler = any(
-        isinstance(h, logging.handlers.TimedRotatingFileHandler)
+        isinstance(h, logging.FileHandler)
         for h in logger.handlers
     )
 
@@ -120,21 +124,16 @@ def setup_logger(
 
     if file_logging_enabled:
         try:
-            # Create file handler with rotation
+            # Create file handler with ISO8601 timestamp for each run
             log_dir = get_log_directory()
-            log_file = log_dir / "shotgun.log"
+            log_file = log_dir / f"shotgun-{_RUN_TIMESTAMP}.log"
 
-            # Use TimedRotatingFileHandler - rotates daily and keeps 7 days of logs
-            file_handler = logging.handlers.TimedRotatingFileHandler(
+            # Use regular FileHandler - each run gets its own isolated log file
+            file_handler = logging.FileHandler(
                 filename=log_file,
-                when="midnight",  # Rotate at midnight
-                interval=1,  # Every 1 day
-                backupCount=7,  # Keep 7 days of logs
                 encoding="utf-8",
             )
 
-            # Also set max file size (10MB) using RotatingFileHandler as fallback
-            # Note: We'll use TimedRotatingFileHandler which handles both time and size
             file_handler.setLevel(getattr(logging, log_level))
 
             # Use standard formatter for file (no colors)
@@ -190,7 +189,7 @@ def get_logger(name: str) -> logging.Logger:
 
     # Check if we have a file handler already
     has_file_handler = any(
-        isinstance(h, logging.handlers.TimedRotatingFileHandler)
+        isinstance(h, logging.FileHandler)
         for h in logger.handlers
     )
 
