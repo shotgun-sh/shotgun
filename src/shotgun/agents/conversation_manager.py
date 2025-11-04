@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import aiofiles
+import aiofiles.os
 
 from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
@@ -36,8 +37,8 @@ class ConversationManager:
         Args:
             conversation: ConversationHistory to save
         """
-        # Ensure directory exists (synchronous, but fast)
-        self.conversation_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure directory exists
+        await aiofiles.os.makedirs(self.conversation_path.parent, exist_ok=True)
 
         try:
             # Update timestamp
