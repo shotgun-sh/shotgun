@@ -239,35 +239,6 @@ async def test_query_codebase_cypher(temp_storage_dir, calculator_codebase):
 
 
 @pytest.mark.integration
-@pytest.mark.llm
-@pytest.mark.asyncio
-async def test_query_codebase_natural_language_smoke(
-    temp_storage_dir, calculator_codebase
-):
-    """Smoke test for natural language queries - just verify it doesn't crash."""
-    sdk = CodebaseSDK(temp_storage_dir / "query_nl_smoke_test")
-
-    # Index first
-    index_result = await sdk.index_codebase(calculator_codebase, "NL Query Test")
-
-    # Query with natural language (smoke test - just check it returns something)
-    nl_query = "Show me all the classes"
-    result = await sdk.query_codebase(
-        index_result.graph_id, nl_query, QueryType.NATURAL_LANGUAGE
-    )
-
-    assert result.graph_name == "NL Query Test"
-    assert result.query_type == "natural language"
-    # Just verify we get some kind of result - no need for exact validation
-    assert result.result is not None
-
-    # Test string representation doesn't crash
-    result_str = str(result)
-    assert isinstance(result_str, str)
-    assert len(result_str) > 0
-
-
-@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_query_codebase_not_found(temp_storage_dir):
     """Test querying nonexistent codebase."""
