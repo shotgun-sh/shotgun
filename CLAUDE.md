@@ -142,6 +142,74 @@ uv run pytest test/integration/ -v
 9. Don't write tests that assert the logger, thats not useful.
 - Always use a Pydantic Model instead of a dict or dataclass when possible.
 
+## Architectural Patterns
+
+### Circular Dependency Resolution
+
+**IMPORTANT**: When encountering circular import issues, use **Protocol-Based Dependency Inversion** instead of workarounds like attribute checking, duck typing with `getattr()`, or `TYPE_CHECKING` blocks with try-except.
+
+#### Example: TUI Protocols
+
+See `src/shotgun/tui/protocols.py` as the canonical example of this pattern.
+
+**Problem**: Components (like `ModeIndicator`, `StatusBar`) need to check screen state (like `qa_mode`, `working`) but importing the concrete screen class (`ChatScreen`) creates circular imports.
+
+**Solution**: Define runtime-checkable protocols that specify the interface:
+
+```python
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class QAStateProvider(Protocol):
+    """Protocol for screens that provide Q&A mode state."""
+
+    @property
+    def qa_mode(self) -> bool:
+        """Whether Q&A mode is currently active."""
+        ...
+
+@runtime_checkable
+class ProcessingStateProvider(Protocol):
+    """Protocol for screens that provide processing state."""
+
+    @property
+    def working(self) -> bool:
+        """Whether an agent is currently working."""
+        ...
+```
+
+**Usage in components**:
+
+```python
+from shotgun.tui.protocols import QAStateProvider
+
+class ModeIndicator(Widget):
+    def render(self) -> str:
+        # Check if screen satisfies the protocol
+        if isinstance(self.screen, QAStateProvider) and self.screen.qa_mode:
+            return "[bold]Q&A mode[/]"
+        # ... rest of implementation
+```
+
+**Benefits**:
+- ✅ Zero circular imports
+- ✅ Type-safe with mypy
+- ✅ Follows SOLID principles (Dependency Inversion Principle)
+- ✅ Self-documenting interfaces
+- ✅ Concrete classes automatically satisfy protocols (structural typing)
+
+**When to use**:
+1. Component needs to check state/behavior of parent/screen
+2. Importing concrete class creates circular dependency
+3. Multiple classes may provide the same interface
+4. You want type safety without tight coupling
+
+**DO NOT use these workarounds**:
+- ❌ `getattr(obj, 'attribute', default)` - loses type safety
+- ❌ `hasattr(obj, 'attribute')` - no type checking
+- ❌ `TYPE_CHECKING` with try-except `isinstance()` - fails at runtime
+- ❌ Moving imports inside functions - hard to maintain
+
 ## Conversation History Navigation
 
 ### Overview
