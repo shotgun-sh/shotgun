@@ -1018,13 +1018,21 @@ class AgentManager(Widget):
         """Post a partial message to the UI."""
         if self._stream_state is None:
             return
+
+        # Deduplicate state.messages before sending to UI
+        # This prevents duplicate tool results from appearing during streaming
+        deduplicated_messages = []
+        for msg in self._stream_state.messages:
+            if not self._is_message_duplicate(msg, deduplicated_messages):
+                deduplicated_messages.append(msg)
+
         self.post_message(
             PartialResponseMessage(
                 self._stream_state.current_response
                 if self._stream_state.current_response
-                not in self._stream_state.messages
+                not in deduplicated_messages
                 else None,
-                self._stream_state.messages,
+                deduplicated_messages,
                 is_last,
             )
         )
