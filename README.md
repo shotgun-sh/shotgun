@@ -428,6 +428,8 @@ Locked into specific IDE or coding agent.
 - **➕ Adding Features** - Know exactly where your feature fits. Prevent duplicate functionality
 - **📦 Migration** - Map the old, plan the new, track the delta. Break migration into safe stages
 
+**📚 Want to see a detailed example?** Check out our [Case Study](docs/CASE_STUDY.md) showing Shotgun in action on a real-world project.
+
 ---
 
 # FAQ
