@@ -39,12 +39,12 @@ class GitHubIssueScreen(ModalScreen[None]):
 
         #issue-buttons {
             height: auto;
-            padding: 1 0 0 0;
+            padding: 2 0 0 0;
             align: center middle;
         }
 
         #issue-buttons Button {
-            margin: 0 1;
+            margin: 1 1;
             min-width: 20;
         }
     """
