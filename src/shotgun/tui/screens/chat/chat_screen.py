@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -1192,10 +1193,10 @@ class ChatScreen(Screen[None]):
         config = await config_manager.load()
 
         # Only show onboarding if it hasn't been shown before
-        if not config.shown_onboarding_popup:
+        if config.shown_onboarding_popup is None:
             # Show the onboarding modal
             await self.app.push_screen_wait(OnboardingModal())
 
-            # Mark as shown in config
-            config.shown_onboarding_popup = True
+            # Mark as shown in config with current timestamp
+            config.shown_onboarding_popup = datetime.now(timezone.utc)
             await config_manager.save(config)
