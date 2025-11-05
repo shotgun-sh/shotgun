@@ -265,9 +265,9 @@ Start at specification. Build first, discover problems later.
 </tr>
 
 <tr>
-<td><strong>Multi-Agent Coordination</strong></td>
+<td><strong>Dedicated Agents Per Mode</strong></td>
 <td>
-15+ specialized agents work in parallel (research, security, architecture) with coordinated outputs.
+Each mode (research, spec, plan, tasks, export) uses a <strong>separate specialized agent</strong> with prompts tailored specifically for that phase. 100% user-controllable via mode switching.
 </td>
 <td>
 Single-agent or one-size-fits-all prompts.
