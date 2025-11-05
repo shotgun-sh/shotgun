@@ -3,6 +3,7 @@
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Protocol
 
+from anthropic import APIStatusError
 from pydantic_ai import ModelSettings
 from pydantic_ai.messages import (
     ModelMessage,
@@ -35,12 +36,6 @@ from .token_estimation import (
     estimate_post_summary_tokens,
     estimate_tokens_from_messages,
 )
-
-# Optional import for Anthropic API error handling
-try:
-    from anthropic import APIStatusError
-except ImportError:
-    APIStatusError = None  # type: ignore[assignment, misc]
 
 if TYPE_CHECKING:
     pass
@@ -130,11 +125,10 @@ async def _safe_token_estimation(
             ) from e
 
         # Check for Anthropic's 32 MB request size limit (APIStatusError with status 413)
-        if APIStatusError is not None and isinstance(e, APIStatusError):
-            if e.status_code == 413:
-                raise ContextSizeLimitExceeded(
-                    model_name=model_name, max_tokens=max_tokens
-                ) from e
+        if isinstance(e, APIStatusError) and e.status_code == 413:
+            raise ContextSizeLimitExceeded(
+                model_name=model_name, max_tokens=max_tokens
+            ) from e
 
         # Re-raise other exceptions (network errors, auth failures, etc.)
         raise
