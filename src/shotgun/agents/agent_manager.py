@@ -469,6 +469,44 @@ class AgentManager(Widget):
                 f"Invalid agent type: {agent_type}. Must be one of: {', '.join(e.value for e in AgentType)}"
             ) from None
 
+    async def _validate_context_before_run(
+        self, message_history: list[ModelMessage], deps: AgentDeps
+    ) -> None:
+        """Validate that conversation fits in model's context window before running.
+
+        This is a safety check to prevent API errors when context exceeds model limits.
+
+        Args:
+            message_history: The message history that will be sent to the model
+            deps: Agent dependencies containing model configuration
+
+        Raises:
+            ValueError: If conversation exceeds model's context window limit
+        """
+        if not deps.llm_model or not message_history:
+            return
+
+        try:
+            from shotgun.agents.history.validation import validate_context_for_model
+
+            validation = await validate_context_for_model(
+                message_history, deps.llm_model
+            )
+
+            if not validation.is_valid:
+                model_name = deps.llm_model.name
+                raise ValueError(
+                    f"Conversation too large for {model_name} "
+                    f"({validation.current_tokens_k}K > {validation.max_tokens_k}K tokens). "
+                    f"Run /compact or switch to larger model."
+                )
+        except ValueError:
+            # Re-raise ValueError (our context overflow error)
+            raise
+        except Exception as e:
+            # Log but don't block if validation itself fails
+            logger.warning(f"Failed to validate context before run: {e}")
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
@@ -611,6 +649,9 @@ class AgentManager(Widget):
         if not has_system_prompt:
             message_history = await add_system_prompt_message(deps, message_history)
 
+        # Validate context window before running agent (safety check)
+        await self._validate_context_before_run(message_history, deps)
+
         # Run the agent with streaming support (from origin/main)
         self._stream_state = _PartialStreamState()
 
@@ -652,8 +693,35 @@ class AgentManager(Widget):
                 **kwargs,
             )
         except ValueError as e:
-            # Handle truncated/incomplete JSON in tool calls specifically
             error_str = str(e)
+
+            # Handle context window overflow errors
+            if "Conversation too large" in error_str or "too large for" in error_str:
+                logger.error(
+                    "Context window overflow detected",
+                    extra={
+                        "agent_mode": self._current_agent_type.value,
+                        "model_name": model_name,
+                        "error": error_str,
+                    },
+                )
+                logfire.error(
+                    "Context window overflow",
+                    agent_mode=self._current_agent_type.value,
+                    model_name=model_name,
+                    error=error_str,
+                )
+                # Add helpful hint message for the user
+                self.ui_message_history.append(
+                    HintMessage(
+                        message=f"⚠️ {error_str}"
+                    )
+                )
+                self._post_messages_updated()
+                # Re-raise to maintain error visibility
+                raise
+
+            # Handle truncated/incomplete JSON in tool calls specifically
             if "EOF while parsing" in error_str or (
                 "JSON" in error_str and "parsing" in error_str
             ):
@@ -682,6 +750,42 @@ class AgentManager(Widget):
             # Re-raise to maintain error visibility
             raise
         except Exception as e:
+            error_str = str(e)
+
+            # Detect API-level context overflow errors from different providers
+            is_context_overflow = any([
+                "prompt is too long" in error_str.lower(),  # Anthropic
+                "context_length_exceeded" in error_str.lower(),  # OpenAI
+                "context window" in error_str.lower(),
+                "maximum context" in error_str.lower(),
+                "token limit" in error_str.lower(),
+            ])
+
+            if is_context_overflow:
+                logger.error(
+                    "API context window overflow detected",
+                    extra={
+                        "agent_mode": self._current_agent_type.value,
+                        "model_name": model_name,
+                        "error_type": type(e).__name__,
+                        "error": error_str,
+                    },
+                )
+                logfire.error(
+                    "API context window overflow",
+                    agent_mode=self._current_agent_type.value,
+                    model_name=model_name,
+                    error_type=type(e).__name__,
+                )
+                # Add helpful hint message for the user
+                self.ui_message_history.append(
+                    HintMessage(
+                        message=f"⚠️ Conversation context exceeds {model_name}'s limit. "
+                        f"Run /compact or switch to larger model via Ctrl+P → Select AI Model."
+                    )
+                )
+                self._post_messages_updated()
+
             # Log the error with full stack trace to shotgun.log and Logfire
             logger.exception(
                 "Agent execution failed",

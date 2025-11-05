@@ -18,6 +18,7 @@ from shotgun.agents.config.provider import (
     get_default_model_for_provider,
     get_provider_model,
 )
+from shotgun.agents.history.constants import TOKEN_LIMIT_RATIO
 from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -39,7 +40,21 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     """Select AI model to use.
 
     Returns ModelConfigUpdated when a model is selected, None if cancelled.
+
+    Args:
+        current_conversation_tokens: Optional current token count to show warnings
+            for models with insufficient context windows.
     """
+
+    def __init__(self, current_conversation_tokens: int | None = None):
+        """Initialize model picker with optional context validation.
+
+        Args:
+            current_conversation_tokens: Current conversation token count for
+                showing warnings about models with insufficient context.
+        """
+        super().__init__()
+        self.current_conversation_tokens = current_conversation_tokens
 
     CSS = """
         ModelPicker {
@@ -62,6 +77,12 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             padding: 1 0;
             text-style: bold;
             color: $text-accent;
+        }
+
+        #model-picker-warning {
+            padding: 1 0;
+            color: $warning;
+            text-style: italic;
         }
 
         #model-list {
@@ -93,10 +114,33 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 "Select the AI model you want to use for your tasks.",
                 id="model-picker-summary",
             )
+            # Show warning if conversation might exceed some models' context
+            if self._should_show_context_warning():
+                yield Static(
+                    "⚠️ Some models have insufficient context for current conversation.\n"
+                    "Compact conversation first: Ctrl+P → Compact Conversation",
+                    id="model-picker-warning",
+                    classes="warning-message",
+                )
         yield ListView(id="model-list")
         with Horizontal(id="model-actions"):
             yield Button("Select \\[ENTER]", variant="primary", id="select")
             yield Button("Done \\[ESC]", id="done")
+
+    def _should_show_context_warning(self) -> bool:
+        """Check if any available models would have context issues."""
+        if self.current_conversation_tokens is None:
+            return False
+
+        # Check if current conversation exceeds any available model's limit
+        for model_name in AVAILABLE_MODELS:
+            if model_name in MODEL_SPECS:
+                spec = MODEL_SPECS[model_name]
+                max_allowed = int(spec.max_input_tokens * TOKEN_LIMIT_RATIO)
+                if self.current_conversation_tokens > max_allowed:
+                    return True
+
+        return False
 
     async def _rebuild_model_list(self) -> None:
         """Rebuild the model list from current config.
@@ -307,6 +351,12 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         if is_current:
             label += " · Current"
+
+        # Check if current conversation exceeds this model's context limit
+        if self.current_conversation_tokens is not None:
+            max_allowed = int(spec.max_input_tokens * TOKEN_LIMIT_RATIO)
+            if self.current_conversation_tokens > max_allowed:
+                label += " · ⚠️ Context too large"
 
         return label
 

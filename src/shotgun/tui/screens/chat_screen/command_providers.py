@@ -3,13 +3,17 @@ from typing import TYPE_CHECKING, cast
 
 from textual.command import DiscoveryHit, Hit, Provider
 
+from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
 from shotgun.agents.models import AgentType
 from shotgun.codebase.models import CodebaseGraph
+from shotgun.logging_config import get_logger
 from shotgun.tui.screens.model_picker import ModelPickerScreen
 from shotgun.tui.screens.provider_config import ProviderConfigScreen
 
 if TYPE_CHECKING:
     from shotgun.tui.screens.chat import ChatScreen
+
+logger = get_logger(__name__)
 
 
 class AgentModeProvider(Provider):
@@ -176,9 +180,34 @@ class ProviderSetupProvider(Provider):
         self.chat_screen.app.push_screen(ProviderConfigScreen())
 
     def open_model_picker(self) -> None:
-        """Show the model picker screen."""
+        """Show the model picker screen with context validation."""
+        # Run async token calculation in background
+        self.chat_screen.run_worker(
+            self._open_model_picker_async(), exclusive=False, exit_on_error=False
+        )
+
+    async def _open_model_picker_async(self) -> None:
+        """Async implementation to calculate tokens and open model picker."""
+        current_tokens = None
+        try:
+            # Get current conversation messages
+            messages = self.chat_screen.agent_manager.message_history
+            model_config = self.chat_screen.deps.llm_model
+
+            if messages and model_config:
+                # Calculate current conversation token count
+                current_tokens = await estimate_tokens_from_messages(
+                    messages, model_config
+                )
+                logger.debug("Current conversation tokens: %d", current_tokens)
+        except Exception as e:
+            # Log but don't block model picker if token counting fails
+            logger.warning("Failed to calculate conversation tokens: %s", e)
+
+        # Open model picker with optional token count
         self.chat_screen.app.push_screen(
-            ModelPickerScreen(), callback=self.chat_screen.handle_model_selected
+            ModelPickerScreen(current_conversation_tokens=current_tokens),
+            callback=self.chat_screen.handle_model_selected,
         )
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
@@ -321,9 +350,34 @@ class UnifiedCommandProvider(Provider):
         self.chat_screen.app.push_screen(ProviderConfigScreen())
 
     def open_model_picker(self) -> None:
-        """Show the model picker screen."""
+        """Show the model picker screen with context validation."""
+        # Run async token calculation in background
+        self.chat_screen.run_worker(
+            self._open_model_picker_async(), exclusive=False, exit_on_error=False
+        )
+
+    async def _open_model_picker_async(self) -> None:
+        """Async implementation to calculate tokens and open model picker."""
+        current_tokens = None
+        try:
+            # Get current conversation messages
+            messages = self.chat_screen.agent_manager.message_history
+            model_config = self.chat_screen.deps.llm_model
+
+            if messages and model_config:
+                # Calculate current conversation token count
+                current_tokens = await estimate_tokens_from_messages(
+                    messages, model_config
+                )
+                logger.debug("Current conversation tokens: %d", current_tokens)
+        except Exception as e:
+            # Log but don't block model picker if token counting fails
+            logger.warning("Failed to calculate conversation tokens: %s", e)
+
+        # Open model picker with optional token count
         self.chat_screen.app.push_screen(
-            ModelPickerScreen(), callback=self.chat_screen.handle_model_selected
+            ModelPickerScreen(current_conversation_tokens=current_tokens),
+            callback=self.chat_screen.handle_model_selected,
         )
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:

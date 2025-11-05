@@ -775,11 +775,40 @@ class ChatScreen(Screen[None]):
                 )
             )
 
+            # Validate context window after model switch
+            await self._validate_context_after_model_switch(result.model_config, model_display)
+
         except Exception as e:
             logger.error(f"Failed to handle model selection: {e}")
             self.agent_manager.add_hint_message(
                 HintMessage(message=f"⚠ Failed to update model configuration: {e}")
             )
+
+    async def _validate_context_after_model_switch(self, model_config, model_display: str) -> None:
+        """Validate conversation context fits in new model and show warning if needed."""
+        try:
+            from shotgun.agents.history.validation import validate_context_for_model
+
+            messages = self.agent_manager.message_history
+            if not messages:
+                return
+
+            validation = await validate_context_for_model(messages, model_config)
+
+            if not validation.is_valid:
+                # Context exceeds new model's limit - show warning hint
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message=(
+                            f"⚠️ Conversation context ({validation.current_tokens_k}K tokens) "
+                            f"exceeds {model_display}'s limit ({validation.max_tokens_k}K tokens). "
+                            f"Please compact via Ctrl+P → Compact Conversation before sending next message."
+                        )
+                    )
+                )
+        except Exception as e:
+            # Log but don't block model switch if validation fails
+            logger.warning(f"Failed to validate context after model switch: {e}")
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:
