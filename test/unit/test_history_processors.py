@@ -1165,3 +1165,107 @@ class TestMaxTokensCalculation:
 
             # Must end with ModelRequest
             assert isinstance(result[-1], ModelRequest)
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_when_token_estimation_fails(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that ContextSizeLimitExceeded is raised when token estimation fails."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Test message")]),
+            ModelResponse(parts=[TextPart(content="Test response")]),
+        ]
+
+        # Mock estimate_tokens_from_messages to raise an exception
+        with patch(
+            "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+            side_effect=RuntimeError("Token counting API failed"),
+        ):
+            with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                await token_limit_compactor(mock_run_context, messages)
+
+            # Verify exception has correct attributes
+            assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+            assert exc_info.value.max_tokens == 4096
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_when_tokens_exceed_limit(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that ContextSizeLimitExceeded is raised when tokens exceed model limit."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Test message")]),
+            ModelResponse(parts=[TextPart(content="Test response")]),
+        ]
+
+        # Mock estimate_tokens_from_messages to return more than max_input_tokens (4096)
+        with patch(
+            "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+            return_value=5000,  # More than 4096 limit
+        ):
+            with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                await token_limit_compactor(mock_run_context, messages)
+
+            # Verify exception has correct attributes
+            assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+            assert exc_info.value.max_tokens == 4096
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_with_summary_when_post_summary_fails(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that ContextSizeLimitExceeded is raised when post-summary token estimation fails."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        # Create messages with a summary
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Original message")]),
+            ModelResponse(
+                parts=[TextPart(content=f"{SUMMARY_MARKER}Existing summary{SUMMARY_MARKER}")]
+            ),
+            ModelRequest(parts=[UserPromptPart(content="New message")]),
+        ]
+
+        # Mock estimate_post_summary_tokens to fail
+        with patch(
+            "shotgun.agents.history.history_processors.estimate_post_summary_tokens",
+            side_effect=RuntimeError("Token counting failed"),
+        ):
+            with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                await token_limit_compactor(mock_run_context, messages)
+
+            # Verify exception has correct attributes
+            assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+            assert exc_info.value.max_tokens == 4096
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_with_summary_when_tokens_exceed_limit(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that ContextSizeLimitExceeded is raised when post-summary tokens exceed limit."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        # Create messages with a summary
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Original message")]),
+            ModelResponse(
+                parts=[TextPart(content=f"{SUMMARY_MARKER}Existing summary{SUMMARY_MARKER}")]
+            ),
+            ModelRequest(parts=[UserPromptPart(content="New message")]),
+        ]
+
+        # Mock estimate_post_summary_tokens to return more than limit
+        with patch(
+            "shotgun.agents.history.history_processors.estimate_post_summary_tokens",
+            return_value=5000,  # More than 4096 limit
+        ):
+            with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                await token_limit_compactor(mock_run_context, messages)
+
+            # Verify exception has correct attributes
+            assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+            assert exc_info.value.max_tokens == 4096

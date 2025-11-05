@@ -47,6 +47,7 @@ from shotgun.codebase.core.manager import (
     CodebaseGraphManager,
 )
 from shotgun.codebase.models import IndexProgress, ProgressPhase
+from shotgun.exceptions import ContextSizeLimitExceeded
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
@@ -1127,6 +1128,27 @@ class ChatScreen(Screen[None]):
         except asyncio.CancelledError:
             # Handle cancellation gracefully - DO NOT re-raise
             self.mount_hint("⚠️ Operation cancelled by user")
+        except ContextSizeLimitExceeded as e:
+            # User-friendly error with actionable options
+            hint = (
+                f"⚠️ **Context too large for {e.model_name}**\n\n"
+                f"Your conversation history exceeds this model's limit ({e.max_tokens:,} tokens).\n\n"
+                f"**Choose an action:**\n\n"
+                f"1. Switch to a larger model (`Ctrl+P` → Change Model)\n"
+                f"2. Switch to a larger model, compact (`/compact`), then switch back to {e.model_name}\n"
+                f"3. Clear conversation (`/clear`)\n"
+            )
+
+            self.mount_hint(hint)
+
+            # Log for debugging (won't send to Sentry due to ErrorNotPickedUpBySentry)
+            logger.info(
+                "Context size limit exceeded",
+                extra={
+                    "max_tokens": e.max_tokens,
+                    "model_name": e.model_name,
+                },
+            )
         except Exception as e:
             # Log with full stack trace to shotgun.log
             logger.exception(

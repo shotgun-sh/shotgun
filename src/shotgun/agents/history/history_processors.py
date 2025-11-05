@@ -157,9 +157,42 @@ async def token_limit_compactor(
 
     if last_summary_index is not None:
         # Check if post-summary conversation exceeds threshold for incremental compaction
-        post_summary_tokens = await estimate_post_summary_tokens(
-            messages, last_summary_index, deps.llm_model
-        )
+        try:
+            post_summary_tokens = await estimate_post_summary_tokens(
+                messages, last_summary_index, deps.llm_model
+            )
+        except Exception as e:
+            # Token counting failed - likely context too large
+            from shotgun.exceptions import ContextSizeLimitExceeded
+
+            logger.warning(
+                f"Token counting failed for {deps.llm_model.name}",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "model": deps.llm_model.name,
+                },
+            )
+            raise ContextSizeLimitExceeded(
+                model_name=deps.llm_model.name, max_tokens=model_max_tokens
+            ) from e
+
+        # Check if context exceeds model's hard limit
+        if post_summary_tokens > model_max_tokens:
+            from shotgun.exceptions import ContextSizeLimitExceeded
+
+            logger.warning(
+                "Context exceeds model limit",
+                extra={
+                    "current_tokens": post_summary_tokens,
+                    "max_tokens": model_max_tokens,
+                    "model": deps.llm_model.name,
+                },
+            )
+            raise ContextSizeLimitExceeded(
+                model_name=deps.llm_model.name, max_tokens=model_max_tokens
+            )
+
         post_summary_percentage = (
             (post_summary_tokens / max_tokens) * 100 if max_tokens > 0 else 0
         )
@@ -366,7 +399,40 @@ async def token_limit_compactor(
 
     else:
         # Check if total conversation exceeds threshold for full compaction
-        total_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
+        try:
+            total_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
+        except Exception as e:
+            # Token counting failed - likely context too large
+            from shotgun.exceptions import ContextSizeLimitExceeded
+
+            logger.warning(
+                f"Token counting failed for {deps.llm_model.name}",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "model": deps.llm_model.name,
+                },
+            )
+            raise ContextSizeLimitExceeded(
+                model_name=deps.llm_model.name, max_tokens=model_max_tokens
+            ) from e
+
+        # Check if context exceeds model's hard limit
+        if total_tokens > model_max_tokens:
+            from shotgun.exceptions import ContextSizeLimitExceeded
+
+            logger.warning(
+                "Context exceeds model limit",
+                extra={
+                    "current_tokens": total_tokens,
+                    "max_tokens": model_max_tokens,
+                    "model": deps.llm_model.name,
+                },
+            )
+            raise ContextSizeLimitExceeded(
+                model_name=deps.llm_model.name, max_tokens=model_max_tokens
+            )
+
         total_percentage = (total_tokens / max_tokens) * 100 if max_tokens > 0 else 0
 
         logger.debug(
