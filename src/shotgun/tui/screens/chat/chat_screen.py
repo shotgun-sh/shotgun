@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -31,6 +32,7 @@ from shotgun.agents.agent_manager import (
     ModelConfigUpdated,
     PartialResponseMessage,
 )
+from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.agents.history.compaction import apply_persistent_compaction
@@ -70,6 +72,7 @@ from shotgun.tui.screens.chat_screen.command_providers import (
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
+from shotgun.tui.screens.onboarding import OnboardingModal
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
@@ -173,6 +176,9 @@ class ChatScreen(Screen[None]):
         self.call_later(self.check_if_codebase_is_indexed)
         # Initial update of context indicator
         self.update_context_indicator()
+
+        # Show onboarding popup if not shown before
+        self.call_later(self._check_and_show_onboarding)
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
@@ -305,6 +311,10 @@ class ChatScreen(Screen[None]):
             self.mount_hint(context_hint)
         else:
             self.notify("No context analysis available", severity="error")
+
+    def action_view_onboarding(self) -> None:
+        """Show the onboarding modal."""
+        self.app.push_screen(OnboardingModal())
 
     @work
     async def action_compact_conversation(self) -> None:
@@ -1175,3 +1185,18 @@ class ChatScreen(Screen[None]):
                 self.mode = restored_type
 
         self.run_worker(_do_load(), exclusive=False)
+
+    @work
+    async def _check_and_show_onboarding(self) -> None:
+        """Check if onboarding should be shown and display modal if needed."""
+        config_manager = get_config_manager()
+        config = await config_manager.load()
+
+        # Only show onboarding if it hasn't been shown before
+        if config.shown_onboarding_popup is None:
+            # Show the onboarding modal
+            await self.app.push_screen_wait(OnboardingModal())
+
+            # Mark as shown in config with current timestamp
+            config.shown_onboarding_popup = datetime.now(timezone.utc)
+            await config_manager.save(config)

@@ -1,6 +1,6 @@
 """Unit tests for code_retrieval module."""
 
-from unittest.mock import AsyncMock, Mock, patch, mock_open
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -297,7 +297,9 @@ async def test_retrieve_code_file_read_error():
 
     # Mock aiofiles.open to raise PermissionError
     mock_file_error = AsyncMock()
-    mock_file_error.__aenter__ = AsyncMock(side_effect=PermissionError("Permission denied"))
+    mock_file_error.__aenter__ = AsyncMock(
+        side_effect=PermissionError("Permission denied")
+    )
 
     with (
         patch("pathlib.Path.exists", return_value=True),
