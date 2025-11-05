@@ -162,13 +162,12 @@ Shotgun guides you through **5 specialized modes**, each designed for a specific
 
 **Writes to:** `.shotgun/research.md`
 
-**Example usage:**
-```bash
-shotgun research "how do we handle authentication in this codebase?"
-shotgun research "best practices for implementing real-time collaboration"
-```
-
 **When to use:** Start here when exploring new features, investigating problems, or onboarding to understand the codebase.
+
+**Example prompts:**
+- "How do we handle authentication in this codebase?"
+- "Research best practices for implementing real-time collaboration"
+- "What patterns do we use for database access?"
 
 ---
 
@@ -184,13 +183,12 @@ shotgun research "best practices for implementing real-time collaboration"
 
 **Writes to:** `.shotgun/specification.md`
 
-**Example usage:**
-```bash
-shotgun spec "Add OAuth2 authentication with refresh token support"
-shotgun spec "User profile management system with avatar uploads"
-```
-
 **When to use:** After research, when you need a clear specification before implementation planning.
+
+**Example prompts:**
+- "Add OAuth2 authentication with refresh token support"
+- "User profile management system with avatar uploads"
+- "Specify a notification system with email and SMS"
 
 ---
 
@@ -206,13 +204,12 @@ shotgun spec "User profile management system with avatar uploads"
 
 **Writes to:** `.shotgun/plan.md`
 
-**Example usage:**
-```bash
-shotgun plan "Build user dashboard with analytics widgets"
-shotgun plan "Migrate authentication system to OAuth2"
-```
-
 **When to use:** After specification, when you need a structured approach to implementation.
+
+**Example prompts:**
+- "Build user dashboard with analytics widgets"
+- "Migrate authentication system to OAuth2"
+- "Create an implementation plan for the payment system"
 
 ---
 
@@ -228,13 +225,12 @@ shotgun plan "Migrate authentication system to OAuth2"
 
 **Writes to:** `.shotgun/tasks.md`
 
-**Example usage:**
-```bash
-shotgun tasks "Create the tasks for implementing the OAuth2 system"
-shotgun tasks "Break down the user dashboard plan into tasks"
-```
-
 **When to use:** After planning, when you're ready to start implementation and need clear action items.
+
+**Example prompts:**
+- "Create the tasks for implementing the OAuth2 system"
+- "Break down the user dashboard plan into tasks"
+- "What are the specific steps to implement this feature?"
 
 ---
 
@@ -250,43 +246,42 @@ shotgun tasks "Break down the user dashboard plan into tasks"
 
 **Writes to:** `.shotgun/AGENTS.md`, `.shotgun/PRD.md`, and other custom files in `.shotgun/`
 
-**Example usage:**
-```bash
-shotgun export
-shotgun export "Create a PRD for the authentication feature"
-```
-
 **When to use:** When you're ready to hand off to your AI coding agent or need to generate documentation.
+
+**Example prompts:**
+- "Export everything to AGENTS.md"
+- "Create a PRD for the authentication feature"
+- "Generate documentation for the new payment system"
 
 ---
 
-## Working with Modes
+## Using the Interactive TUI
 
-### Interactive TUI (Default)
-
-Simply run `shotgun` to launch the interactive Terminal User Interface:
+Launch Shotgun to start the interactive Terminal User Interface:
 
 ```bash
 shotgun
 ```
 
-**In the TUI:**
-- 🔄 **Switch modes:** Press `Shift+Tab` or `Ctrl+P` for command palette
-- 💬 **Chat naturally:** The AI understands which mode you're in
-- 📊 **Visual indicators:** Current mode shown at bottom of screen
-- ⚡ **Hot keys:** `Ctrl+C` to cancel, `Escape` for Q&A mode, `Ctrl+U` for usage
+**TUI Features:**
+- 🔄 **Switch modes:** Press `Shift+Tab` to cycle through modes, or `Ctrl+P` to open command palette
+- 💬 **Natural conversation:** Chat naturally with the AI - it understands context and your current mode
+- 📊 **Visual indicators:** Current mode, status, and progress shown at bottom of screen
+- ⚡ **Keyboard shortcuts:**
+  - `Ctrl+P` - Open command palette
+  - `Shift+Tab` - Switch between modes
+  - `Ctrl+C` - Cancel current operation
+  - `Escape` - Toggle Q&A mode (quick questions)
+  - `Ctrl+U` - View usage statistics
+  - `Ctrl+K` - Clear conversation history
 
-### CLI Commands (Direct Mode)
+**Getting Started:**
+1. Run `shotgun` in your project directory
+2. Start with Research mode to explore your codebase
+3. Progress through the modes as needed
+4. Export your specifications when ready
 
-Run specific modes directly from command line:
-
-```bash
-shotgun research "your question"
-shotgun spec "your feature"
-shotgun plan "your project"
-shotgun tasks "your plan"
-shotgun export
-```
+> **Note:** CLI commands are available but the TUI is the recommended way to use Shotgun. See [docs/CLI.md](docs/CLI.md) for CLI usage.
 
 ## Tips for Better Results
 
