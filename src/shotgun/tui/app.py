@@ -19,7 +19,7 @@ from shotgun.utils.update_checker import (
 
 from .screens.chat import ChatScreen
 from .screens.directory_setup import DirectorySetupScreen
-from .screens.feedback import FeedbackScreen
+from .screens.github_issue import GitHubIssueScreen
 from .screens.model_picker import ModelPickerScreen
 from .screens.pipx_migration import PipxMigrationScreen
 from .screens.provider_config import ProviderConfigScreen
@@ -35,7 +35,7 @@ class ShotgunApp(App[None]):
         "provider_config": ProviderConfigScreen,
         "model_picker": ModelPickerScreen,
         "directory_setup": DirectorySetupScreen,
-        "feedback": FeedbackScreen,
+        "github_issue": GitHubIssueScreen,
     }
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit the app"),
@@ -181,20 +181,15 @@ class ShotgunApp(App[None]):
     def get_system_commands(self, screen: Screen[Any]) -> Iterable[SystemCommand]:
         return [
             SystemCommand(
-                "Feedback", "Send us feedback or report a bug", self.action_feedback
+                "New Issue",
+                "Report a bug or request a feature on GitHub",
+                self.action_new_issue,
             )
-        ]  # we don't want any system commands
+        ]
 
-    def action_feedback(self) -> None:
-        """Open feedback screen and submit feedback."""
-        from shotgun.posthog_telemetry import Feedback, submit_feedback_survey
-
-        def handle_feedback(feedback: Feedback | None) -> None:
-            if feedback is not None:
-                submit_feedback_survey(feedback)
-                self.notify("Feedback sent. Thank you!")
-
-        self.push_screen(FeedbackScreen(), callback=handle_feedback)
+    def action_new_issue(self) -> None:
+        """Open GitHub issue screen to guide users to create an issue."""
+        self.push_screen(GitHubIssueScreen())
 
 
 def run(
