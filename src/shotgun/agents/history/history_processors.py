@@ -162,9 +162,7 @@ async def token_limit_compactor(
                 messages, last_summary_index, deps.llm_model
             )
         except Exception as e:
-            # Token counting failed - likely context too large
-            from shotgun.exceptions import ContextSizeLimitExceeded
-
+            # Log the error with full context
             logger.warning(
                 f"Token counting failed for {deps.llm_model.name}",
                 extra={
@@ -173,25 +171,18 @@ async def token_limit_compactor(
                     "model": deps.llm_model.name,
                 },
             )
-            raise ContextSizeLimitExceeded(
-                model_name=deps.llm_model.name, max_tokens=model_max_tokens
-            ) from e
 
-        # Check if context exceeds model's hard limit
-        if post_summary_tokens > model_max_tokens:
-            from shotgun.exceptions import ContextSizeLimitExceeded
+            # TODO: Research exact error types from each provider (Anthropic, OpenAI, Google)
+            # For now, only wrap RuntimeError which is what our token counters raise
+            # Let other errors (network, auth, etc.) bubble up normally
+            if isinstance(e, RuntimeError):
+                from shotgun.exceptions import ContextSizeLimitExceeded
+                raise ContextSizeLimitExceeded(
+                    model_name=deps.llm_model.name, max_tokens=model_max_tokens
+                ) from e
 
-            logger.warning(
-                "Context exceeds model limit",
-                extra={
-                    "current_tokens": post_summary_tokens,
-                    "max_tokens": model_max_tokens,
-                    "model": deps.llm_model.name,
-                },
-            )
-            raise ContextSizeLimitExceeded(
-                model_name=deps.llm_model.name, max_tokens=model_max_tokens
-            )
+            # Re-raise other exceptions (network errors, auth failures, etc.)
+            raise
 
         post_summary_percentage = (
             (post_summary_tokens / max_tokens) * 100 if max_tokens > 0 else 0
@@ -402,9 +393,7 @@ async def token_limit_compactor(
         try:
             total_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
         except Exception as e:
-            # Token counting failed - likely context too large
-            from shotgun.exceptions import ContextSizeLimitExceeded
-
+            # Log the error with full context
             logger.warning(
                 f"Token counting failed for {deps.llm_model.name}",
                 extra={
@@ -413,25 +402,18 @@ async def token_limit_compactor(
                     "model": deps.llm_model.name,
                 },
             )
-            raise ContextSizeLimitExceeded(
-                model_name=deps.llm_model.name, max_tokens=model_max_tokens
-            ) from e
 
-        # Check if context exceeds model's hard limit
-        if total_tokens > model_max_tokens:
-            from shotgun.exceptions import ContextSizeLimitExceeded
+            # TODO: Research exact error types from each provider (Anthropic, OpenAI, Google)
+            # For now, only wrap RuntimeError which is what our token counters raise
+            # Let other errors (network, auth, etc.) bubble up normally
+            if isinstance(e, RuntimeError):
+                from shotgun.exceptions import ContextSizeLimitExceeded
+                raise ContextSizeLimitExceeded(
+                    model_name=deps.llm_model.name, max_tokens=model_max_tokens
+                ) from e
 
-            logger.warning(
-                "Context exceeds model limit",
-                extra={
-                    "current_tokens": total_tokens,
-                    "max_tokens": model_max_tokens,
-                    "model": deps.llm_model.name,
-                },
-            )
-            raise ContextSizeLimitExceeded(
-                model_name=deps.llm_model.name, max_tokens=model_max_tokens
-            )
+            # Re-raise other exceptions (network errors, auth failures, etc.)
+            raise
 
         total_percentage = (total_tokens / max_tokens) * 100 if max_tokens > 0 else 0
 
