@@ -17,6 +17,7 @@ from pydantic_ai.messages import (
 from shotgun.agents.config.models import ModelConfig
 from shotgun.agents.history.token_counting.utils import count_tokens_from_messages
 from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
+from shotgun.agents.history.usage_tokens import extract_usage_tokens
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -60,14 +61,10 @@ class ContextAnalyzer:
         Returns:
             TokenAllocation with token counts by message/tool type
         """
-        # Step 1: Find the last response's usage data (ground truth for input tokens)
-        last_input_tokens = 0
-        total_output_tokens = 0
-
-        for msg in reversed(message_history):
-            if isinstance(msg, ModelResponse) and msg.usage:
-                last_input_tokens = msg.usage.input_tokens + msg.usage.cache_read_tokens
-                break
+        # Step 1: Extract tokens from usage data (ground truth from API)
+        usage = extract_usage_tokens(message_history)
+        last_input_tokens = usage.input_tokens
+        total_output_tokens = usage.output_tokens
 
         if last_input_tokens == 0:
             # Fallback to token estimation (no logging to reduce verbosity)
@@ -75,12 +72,7 @@ class ContextAnalyzer:
                 message_history, self.model_config
             )
 
-        # Step 2: Calculate total output tokens (sum across all responses)
-        for msg in message_history:
-            if isinstance(msg, ModelResponse) and msg.usage:
-                total_output_tokens += msg.usage.output_tokens
-
-        # Step 3: Calculate content size proportions for each part type across ALL requests
+        # Step 2: Calculate content size proportions for each part type across ALL requests
         # Initialize size accumulators
         user_size = 0
         system_prompts_size = 0
@@ -135,7 +127,7 @@ class ContextAnalyzer:
                         elif category == ToolCategory.UNKNOWN:
                             unknown_input_size += size
 
-        # Step 4: Calculate output proportions by tool category
+        # Step 3: Calculate output proportions by tool category
         codebase_understanding_size = 0
         artifact_management_size = 0
         web_research_size = 0
@@ -162,7 +154,7 @@ class ContextAnalyzer:
                     elif isinstance(part, TextPart):
                         agent_response_size += len(part.content)
 
-        # Step 5: Allocate input tokens proportionally
+        # Step 4: Allocate input tokens proportionally
         # Initialize TokenAllocation fields
         user_tokens = 0
         agent_response_tokens = 0
@@ -205,7 +197,7 @@ class ContextAnalyzer:
                 last_input_tokens * (unknown_input_size / total_input_size)
             )
 
-        # Step 6: Allocate output tokens proportionally
+        # Step 5: Allocate output tokens proportionally
         total_output_size = (
             codebase_understanding_size
             + artifact_management_size

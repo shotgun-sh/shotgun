@@ -6,6 +6,7 @@ from shotgun.agents.config.models import ModelConfig
 
 from .constants import TOKEN_LIMIT_RATIO
 from .token_estimation import estimate_tokens_from_messages
+from .usage_tokens import extract_usage_tokens
 
 
 class ContextValidationResult:
@@ -47,6 +48,10 @@ async def validate_context_for_model(
     This checks if the current conversation size exceeds the target model's
     maximum input token limit (using 80% threshold via TOKEN_LIMIT_RATIO).
 
+    Uses actual usage data from ModelResponse.usage when available for accuracy,
+    falling back to token estimation when usage data is missing (e.g., first
+    message or after history compaction).
+
     Args:
         messages: Current conversation messages to validate
         model_config: Target model configuration to validate against
@@ -58,8 +63,15 @@ async def validate_context_for_model(
         ValueError: If provider is not supported for token counting
         RuntimeError: If token counting fails
     """
-    # Calculate current conversation size
-    current_tokens = await estimate_tokens_from_messages(messages, model_config)
+    # Try to use actual usage data first (more accurate)
+    usage = extract_usage_tokens(messages)
+
+    if usage.has_usage_data:
+        # Use ground truth from API
+        current_tokens = usage.total_tokens
+    else:
+        # Fallback to estimation when no usage data available
+        current_tokens = await estimate_tokens_from_messages(messages, model_config)
 
     # Calculate max allowed tokens (80% of model's input limit)
     model_max_tokens = model_config.max_input_tokens
