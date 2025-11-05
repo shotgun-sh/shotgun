@@ -666,32 +666,42 @@ class ChatScreen(Screen[None]):
         self.update_context_indicator()
 
         # If there are file operations, add a message showing the modified files
+        # Skip if hint was already added by agent_manager (e.g., in QA mode)
         if event.file_operations:
-            chat_history = self.query_one(ChatHistory)
-            if chat_history.vertical_tail:
-                tracker = FileOperationTracker(operations=event.file_operations)
-                display_path = tracker.get_display_path()
+            # Check if file operation hint already exists in recent messages
+            file_hint_exists = any(
+                isinstance(msg, HintMessage)
+                and (
+                    msg.message.startswith("📝 Modified:")
+                    or msg.message.startswith("📁 Modified")
+                )
+                for msg in event.messages[-5:]  # Check last 5 messages
+            )
 
-                if display_path:
-                    # Create a simple markdown message with the file path
-                    # The terminal emulator will make this clickable automatically
-                    path_obj = Path(display_path)
+            if not file_hint_exists:
+                chat_history = self.query_one(ChatHistory)
+                if chat_history.vertical_tail:
+                    tracker = FileOperationTracker(operations=event.file_operations)
+                    display_path = tracker.get_display_path()
 
-                    if len(event.file_operations) == 1:
-                        message = f"📝 Modified: `{display_path}`"
-                    else:
-                        num_files = len({op.file_path for op in event.file_operations})
-                        if path_obj.is_dir():
-                            message = (
-                                f"📁 Modified {num_files} files in: `{display_path}`"
-                            )
+                    if display_path:
+                        # Create a simple markdown message with the file path
+                        # The terminal emulator will make this clickable automatically
+                        path_obj = Path(display_path)
+
+                        if len(event.file_operations) == 1:
+                            message = f"📝 Modified: `{display_path}`"
                         else:
-                            # Common path is a file, show parent directory
-                            message = (
-                                f"📁 Modified {num_files} files in: `{path_obj.parent}`"
+                            num_files = len(
+                                {op.file_path for op in event.file_operations}
                             )
+                            if path_obj.is_dir():
+                                message = f"📁 Modified {num_files} files in: `{display_path}`"
+                            else:
+                                # Common path is a file, show parent directory
+                                message = f"📁 Modified {num_files} files in: `{path_obj.parent}`"
 
-                    self.mount_hint(message)
+                        self.mount_hint(message)
 
                     # Check and display any marketing messages
                     from shotgun.tui.app import ShotgunApp

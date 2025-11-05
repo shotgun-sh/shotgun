@@ -58,7 +58,12 @@ from shotgun.agents.context_analyzer import (
     ContextCompositionTelemetry,
     ContextFormatter,
 )
-from shotgun.agents.models import AgentResponse, AgentType, FileOperation
+from shotgun.agents.models import (
+    AgentResponse,
+    AgentType,
+    FileOperation,
+    FileOperationTracker,
+)
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
@@ -769,6 +774,12 @@ class AgentManager(Widget):
                     HintMessage(message=agent_response.response)
                 )
 
+            # Add file operation hints before questions (so they appear first in UI)
+            if file_operations:
+                file_hint = self._create_file_operation_hint(file_operations)
+                if file_hint:
+                    self.ui_message_history.append(HintMessage(message=file_hint))
+
             if len(agent_response.clarifying_questions) == 1:
                 # Single question - treat as non-blocking suggestion, DON'T enter Q&A mode
                 self.ui_message_history.append(
@@ -1133,6 +1144,38 @@ class AgentManager(Widget):
                 is_last,
             )
         )
+
+    def _create_file_operation_hint(
+        self, file_operations: list[FileOperation]
+    ) -> str | None:
+        """Create a hint message for file operations.
+
+        Args:
+            file_operations: List of file operations to create a hint for
+
+        Returns:
+            Hint message string or None if no operations
+        """
+        if not file_operations:
+            return None
+
+        tracker = FileOperationTracker(operations=file_operations)
+        display_path = tracker.get_display_path()
+
+        if not display_path:
+            return None
+
+        path_obj = Path(display_path)
+
+        if len(file_operations) == 1:
+            return f"📝 Modified: `{display_path}`"
+        else:
+            num_files = len({op.file_path for op in file_operations})
+            if path_obj.is_dir():
+                return f"📁 Modified {num_files} files in: `{display_path}`"
+            else:
+                # Common path is a file, show parent directory
+                return f"📁 Modified {num_files} files in: `{path_obj.parent}`"
 
     def _post_messages_updated(
         self, file_operations: list[FileOperation] | None = None
