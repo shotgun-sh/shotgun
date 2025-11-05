@@ -162,11 +162,11 @@ class OnboardingModal(ModalScreen[None]):
                     # Resource sections (only shown on page 1)
                     with Container(id="resource-sections"):
                         yield Markdown(
-                            "### 🎥 Video Tutorial\nWatch our onboarding video to see Shotgun in action",
+                            "### 🎥 Video Demo\nWatch our demo video to see Shotgun in action",
                             id="video-section",
                         )
                         yield Button(
-                            "▶️  Watch on YouTube",
+                            "▶️  Watch Demo Video",
                             id="youtube-button",
                             variant="success",
                         )
@@ -418,8 +418,10 @@ Intelligently compress the conversation history while preserving important conte
 
     @on(Button.Pressed, "#youtube-button")
     def handle_youtube(self) -> None:
-        """Open YouTube video in browser."""
-        webbrowser.open("https://www.youtube.com/watch?v=3e7kxhANXWA")
+        """Open demo section in README."""
+        webbrowser.open(
+            "https://github.com/shotgun-sh/shotgun?tab=readme-ov-file#-demo"
+        )
 
     @on(Button.Pressed, "#usage-button")
     def handle_usage_guide(self) -> None:
