@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Support
+    url: https://github.com/shotgun-sh/shotgun/discussions
+    about: Ask questions and discuss Shotgun with the community
+  - name: General Discussion
+    url: https://github.com/shotgun-sh/shotgun/discussions/categories/general
+    about: General discussion about Shotgun and its features
