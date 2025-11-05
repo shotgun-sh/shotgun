@@ -12,21 +12,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Auto-assign issue to scottfrasso
+      - name: Auto-assign issue
         uses: actions/github-script@v8
+        env:
+          ASSIGNEE: ${{ secrets.AUTO_ASSIGN_TO_USER }}
         with:
           script: |
-            await github.rest.issues.addAssignees({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              assignees: ['scottfrasso']
-            });
-            console.log('✅ Issue assigned to scottfrasso');
+            const assignee = process.env.ASSIGNEE;
+            if (assignee) {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                assignees: [assignee]
+              });
+              console.log(`✅ Issue assigned to ${assignee}`);
+            } else {
+              console.log('⚠️ AUTO_ASSIGN_TO_USER secret not set, skipping assignment');
+            }
 
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SHOTGUN_ALPHA_WEBHOOK }}
+          ASSIGNEE: ${{ secrets.AUTO_ASSIGN_TO_USER }}
         run: |
           # Get issue information
           ISSUE_NUMBER="${{ github.event.issue.number }}"
@@ -44,6 +52,20 @@ jobs:
           # Escape for JSON using jq
           ISSUE_TITLE_ESCAPED=$(printf '%s' "$ISSUE_TITLE" | jq -Rs . | sed 's/^"//;s/"$//')
           ISSUE_BODY_ESCAPED=$(printf '%s' "$ISSUE_BODY_TRUNCATED" | jq -Rs . | sed 's/^"//;s/"$//')
+          ASSIGNEE_ESCAPED=$(printf '%s' "$ASSIGNEE" | jq -Rs . | sed 's/^"//;s/"$//')
+
+          # Build assigned field only if ASSIGNEE is set
+          if [[ -n "$ASSIGNEE" ]]; then
+            ASSIGNED_FIELD="{
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*Assigned to:*\n@${ASSIGNEE_ESCAPED}\"
+                  }"
+          else
+            ASSIGNED_FIELD="{
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*Assigned to:*\nNone\"
+                  }"
+          fi
 
           # Create Slack payload
           cat <<EOF > /tmp/slack_payload.json
@@ -71,10 +93,7 @@ jobs:
                     "type": "mrkdwn",
                     "text": "*Reported by:*\n@${ISSUE_AUTHOR}"
                   },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Assigned to:*\n@scottfrasso"
-                  }
+                  ${ASSIGNED_FIELD}
                 ]
               },
               {

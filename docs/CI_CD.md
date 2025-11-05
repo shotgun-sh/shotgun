@@ -97,7 +97,7 @@ Runs daily to verify installation methods work:
 ### `.github/workflows/issue-notifications.yml`
 
 Runs when new issues are created:
-- Auto-assigns issues to scottfrasso
+- Auto-assigns issues to configured user (via `AUTO_ASSIGN_TO_USER` secret)
 - Sends Slack notification with issue details
 
 ## Local CI Testing
@@ -223,6 +223,7 @@ The following secrets must be configured in GitHub repository settings:
 - `SHOTGUN_POSTHOG_API_KEY` - PostHog analytics (embedded at build time)
 - `SHOTGUN_POSTHOG_PROJECT_ID` - PostHog project ID (embedded at build time)
 - `SHOTGUN_ALPHA_WEBHOOK` - Slack webhook URL for notifications (deployments, issues, test failures)
+- `AUTO_ASSIGN_TO_USER` - GitHub username to auto-assign new issues to (optional)
 
 ### Build-Time Secrets
 
