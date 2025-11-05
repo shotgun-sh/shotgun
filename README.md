@@ -275,9 +275,32 @@ Shotgun guides you through **5 specialized modes**, each designed for a specific
 
 Launch Shotgun to start the interactive Terminal User Interface:
 
+<table>
+<tr>
+<th>If Installed</th>
+<th>If Not Installed (Try First)</th>
+</tr>
+<tr>
+<td>
+
 ```bash
 shotgun
 ```
+
+After running `uv tool install shotgun-sh`
+
+</td>
+<td>
+
+```bash
+uvx shotgun-sh@latest
+```
+
+No installation needed, runs immediately
+
+</td>
+</tr>
+</table>
 
 **TUI Features:**
 - 🔄 **Switch modes:** Press `Shift+Tab` to cycle through modes, or `Ctrl+P` to open command palette
@@ -291,7 +314,7 @@ shotgun
   - `Ctrl+U` - View usage statistics
 
 **Getting Started:**
-1. Run `shotgun` in your project directory
+1. Launch Shotgun in your project directory (see table above)
 2. Start with Research mode to explore your codebase
 3. Progress through the modes as needed
 4. Export your specifications when ready
