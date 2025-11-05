@@ -118,7 +118,7 @@ class TestTokenLimitCompactor:
         large_content = " ".join(
             [
                 f"Test message {i} with diverse content to exceed token limits using real counting methods."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content in safe range (80%-100%)
         messages = [
@@ -190,13 +190,13 @@ class TestTokenLimitCompactor:
         """Test context extraction from different message types during summarization."""
         # Create content that exceeds token threshold (80%) but stays under hard limit (100%)
         # For max_input_tokens=4096: threshold=3276, target ~3500 tokens
-        # Each sentence ~20 tokens, so 145 sentences * 20 ≈ 2900 tokens
+        # Each sentence ~14 words ≈ 16 tokens, so 250 sentences * 16 ≈ 4000 tokens
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to exceed thresholds."
-                for i in range(150)
+                for i in range(250)
             ]
-        )  # Diverse content in safe range (80%-100%)
+        )  # Diverse content exceeding 80% threshold
         messages = [
             ModelRequest(
                 parts=[
@@ -512,7 +512,7 @@ class TestTokenLimitCompactorEdgeCases:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content in safe range
         messages = [
@@ -548,7 +548,7 @@ class TestTokenLimitCompactorEdgeCases:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -604,7 +604,7 @@ class TestTokenLimitCompactorEdgeCases:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -704,7 +704,7 @@ class TestIncrementalCompaction:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -757,7 +757,7 @@ class TestIncrementalCompaction:
         large_new_content = " ".join(
             [
                 f"New message {i} after summary with lots of varied content and diverse tokens."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Sufficient content
         messages = [
@@ -821,7 +821,7 @@ class TestIncrementalCompaction:
         large_content = " ".join(
             [
                 f"Incremental test sentence {i} with varied content and tokens."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -922,7 +922,7 @@ class TestIncrementalCompaction:
         large_content = " ".join(
             [
                 f"Template test sentence {i} with different content and varied tokens."
-                for i in range(180)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -1104,7 +1104,7 @@ class TestMaxTokensCalculation:
         large_new_content = " ".join(
             [
                 f"Context maintenance test {i} with varied sentences and different token patterns."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content
 
