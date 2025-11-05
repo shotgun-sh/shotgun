@@ -205,6 +205,10 @@ class ShotgunConfig(BaseModel):
         default=False,
         description="Whether the welcome screen has been shown to the user",
     )
+    shown_onboarding_popup: bool = Field(
+        default=False,
+        description="Whether the onboarding popup has been shown to the user",
+    )
     marketing: MarketingConfig = Field(
         default_factory=MarketingConfig,
         description="Marketing messages configuration and tracking",

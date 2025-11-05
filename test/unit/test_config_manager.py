@@ -454,7 +454,9 @@ async def test_update_provider_anthropic_string():
         config_path = Path(temp_dir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        await manager.update_provider("anthropic", **{API_KEY_FIELD: "new-anthropic-key"})
+        await manager.update_provider(
+            "anthropic", **{API_KEY_FIELD: "new-anthropic-key"}
+        )
 
         # Verify config was updated and saved
         assert config_path.exists()
@@ -504,7 +506,9 @@ async def test_update_provider_unsupported_fields():
         manager = ConfigManager(config_path=config_path)
 
         with pytest.raises(ValueError, match="Unsupported configuration fields"):
-            await manager.update_provider(ProviderType.OPENAI, api_key="key", model="gpt-4")
+            await manager.update_provider(
+                ProviderType.OPENAI, api_key="key", model="gpt-4"
+            )
 
 
 @pytest.mark.asyncio
@@ -974,7 +978,9 @@ async def test_clear_provider_key_updates_selected_model():
 
         # Set up multiple providers
         await manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
-        await manager.update_provider(ProviderType.ANTHROPIC, api_key="test-anthropic-key")
+        await manager.update_provider(
+            ProviderType.ANTHROPIC, api_key="test-anthropic-key"
+        )
 
         # Manually set selected_model to Anthropic model
         await manager.update_selected_model(ModelName.CLAUDE_HAIKU_4_5)
@@ -1019,7 +1025,9 @@ async def test_clear_all_provider_keys_sets_selected_model_to_none():
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.config.manager.logger")
-async def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(mock_logger):
+async def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(
+    mock_logger,
+):
     """Test that load() sets shown_welcome_screen=False for existing BYOK users."""
     import uuid
 
@@ -1059,7 +1067,9 @@ async def test_load_migration_sets_shown_welcome_screen_for_existing_byok_users(
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.config.manager.logger")
-async def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(mock_logger):
+async def test_load_migration_does_not_set_shown_welcome_screen_for_new_users(
+    mock_logger,
+):
     """Test that load() does not set shown_welcome_screen for new users without BYOK keys."""
     import uuid
 
