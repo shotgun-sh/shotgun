@@ -146,6 +146,20 @@ _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
 
 ---
 
+# 🎥 Demo
+
+Watch this quick demo to see Shotgun in action:
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=3e7kxhANXWA">
+    <img src="https://img.youtube.com/vi/3e7kxhANXWA/maxresdefault.jpg" alt="Watch the Shotgun demo" width="720" height="405">
+  </a>
+</p>
+
+_Click the image above to watch the full demo on YouTube_
+
+---
+
 # 🎯 Usage
 
 Shotgun guides you through **5 specialized modes**, each designed for a specific phase of the development workflow. Each mode uses a dedicated AI agent with prompts tailored for that phase, and writes to its own file in `.shotgun/`.
