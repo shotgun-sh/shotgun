@@ -178,21 +178,15 @@ done < features.txt
 
 ## Environment Variables
 
-Configure Shotgun behavior via environment variables:
+Optional environment variables for advanced configuration:
 
 ```bash
-# API Keys
-export ANTHROPIC_API_KEY="your-key"
-export OPENAI_API_KEY="your-key"
-export GOOGLE_API_KEY="your-key"
-
-# Configuration
+# Configuration paths (optional)
 export SHOTGUN_CONFIG_PATH="~/.shotgun-sh/config.json"
 export SHOTGUN_DATA_DIR="~/.shotgun-sh"
-
-# Model Selection
-export SHOTGUN_DEFAULT_MODEL="claude-sonnet-4"
 ```
+
+**Note:** API keys are managed through the `shotgun config` command, not environment variables.
 
 ## Why Use the TUI Instead?
 
