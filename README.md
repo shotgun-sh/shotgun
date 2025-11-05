@@ -49,12 +49,6 @@ It includes research on existing patterns, implementation plans that respect you
 
 # 📦 Installation
 
-> [!WARNING]
-> **Upgrading from alpha?** Uninstall the old version first:
-> ```bash
-> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
-> ```
-
 ### 1. Install uv
 
 Shotgun runs via `uvx` or `uv tool install`. First, install `uv` for your platform:
@@ -141,6 +135,14 @@ When you launch Shotgun, it will guide you through:
 | **3. First Research** | Start generating codebase-aware specs |
 
 _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
+
+---
+
+> [!WARNING]
+> **Upgrading from alpha?** Uninstall the old version first:
+> ```bash
+> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
+> ```
 
 ---
 
@@ -442,14 +444,6 @@ Shotgun is open-source and we welcome contributions. Whether you're fixing bugs,
 
 ---
 
-## Uninstall
-
-```bash
-uv tool uninstall shotgun-sh
-```
-
----
-
 <div align="center">
 
 ## 🚀 Ready to Stop AI Agents from Derailing?
@@ -483,3 +477,11 @@ uvx shotgun-sh@latest
 ---
 
 **License:** MIT | **Python:** 3.11+ | **Homepage:** [shotgun.sh](https://shotgun.sh/)
+
+---
+
+## Uninstall
+
+```bash
+uv tool uninstall shotgun-sh
+```
