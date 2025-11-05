@@ -1,5 +1,7 @@
 """Sentry observability setup for Shotgun."""
 
+from typing import Any
+
 from shotgun import __version__
 from shotgun.logging_config import get_early_logger
 from shotgun.settings import settings
@@ -38,7 +40,7 @@ def setup_sentry_observability() -> bool:
         else:
             environment = "production"
 
-        def before_send(event, hint):
+        def before_send(event: Any, hint: dict[str, Any]) -> Any:
             """Filter out user-actionable errors from Sentry.
 
             User-actionable errors (like context size limits) are expected conditions

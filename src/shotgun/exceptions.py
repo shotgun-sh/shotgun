@@ -1,7 +1,7 @@
 """General exceptions for Shotgun application."""
 
 
-class ErrorNotPickedUpBySentry(Exception):
+class ErrorNotPickedUpBySentry(Exception):  # noqa: N818
     """Base for user-actionable errors that shouldn't be sent to Sentry.
 
     These errors represent expected user conditions requiring action
