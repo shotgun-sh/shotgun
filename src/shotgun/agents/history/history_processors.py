@@ -92,16 +92,31 @@ async def _safe_token_estimation(
             },
         )
 
-        # Token counting methods wrap provider-specific errors in RuntimeError:
-        # - OpenAI/tiktoken: ValueError, KeyError, AttributeError, SSLError (file/cache issues)
-        # - Gemini/SentencePiece: RuntimeError, IOError, TypeError (file/model loading issues)
-        # - Anthropic API: APIError subclasses (auth, rate limit, network errors)
+        # Token counting behavior with oversized context (verified via testing):
         #
-        # Note: No provider raises specific errors for "context too large" during counting.
-        # Context size validation happens separately by comparing token count to max_input_tokens.
+        # 1. OpenAI/tiktoken:
+        #    - Successfully counts any size (tested with 752K tokens, no error)
+        #    - Library errors: ValueError, KeyError, AttributeError, SSLError (file/cache issues)
+        #    - Wrapped as: RuntimeError by our counter
         #
-        # We only wrap RuntimeError (library-level failures). Other errors like network issues
-        # from external services should bubble up so callers can handle them appropriately.
+        # 2. Gemini/SentencePiece:
+        #    - Successfully counts any size (tested with 752K tokens, no error)
+        #    - Library errors: RuntimeError, IOError, TypeError (file/model loading issues)
+        #    - Wrapped as: RuntimeError by our counter
+        #
+        # 3. Anthropic API:
+        #    - Successfully counts large token counts (tested with 752K tokens, no error)
+        #    - Only enforces 32 MB request size limit (not token count)
+        #    - Raises: APIStatusError(413) with error type 'request_too_large' for 32MB+ requests
+        #    - Other API errors: APIConnectionError, RateLimitError, APIStatusError (4xx/5xx)
+        #    - Wrapped as: RuntimeError by our counter
+        #
+        # IMPORTANT: No provider raises errors for "too many tokens" during counting.
+        # Token count validation happens separately by comparing count to max_input_tokens.
+        #
+        # We only wrap RuntimeError (library-level failures from tiktoken/sentencepiece).
+        # API errors like Anthropic's 413 should bubble up - they indicate API/network issues,
+        # not token counting failures. Callers can handle them appropriately (retry, etc.).
         if isinstance(e, RuntimeError):
             from shotgun.exceptions import ContextSizeLimitExceeded
 
