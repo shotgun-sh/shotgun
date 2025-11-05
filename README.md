@@ -3,6 +3,7 @@
 
 ### Spec-Driven Development
 
+
 **Write codebase-aware specs for AI coding agents (Codex, Cursor, Claude Code) so they don't derail.**
 <p align="center">
   <a href="https://github.com/shotgun-sh/shotgun">
@@ -22,7 +23,8 @@
   </a>
 </p>
 
-[Website](https://shotgun.sh) • [X.com](https://x.com/ShotgunCLI) • [YouTube](https://www.youtube.com/@shotgunCLI)
+[![Website](https://img.shields.io/badge/-shotgun.sh-5865F2?style=social&logo=safari&logoColor=5865F2)](https://shotgun.sh)      [![Follow @ShotgunCLI](https://img.shields.io/badge/Follow%20@ShotgunCLI-1DA1F2?style=social&logo=x&logoColor=000000)](https://x.com/ShotgunCLI)    [![YouTube](https://img.shields.io/badge/-@shotgunCLI-FF0000?style=social&logo=youtube&logoColor=red)](https://www.youtube.com/@shotgunCLI)
+
 </div>
 
 ---
@@ -31,14 +33,12 @@
 <tr>
 <td>
   
-**Shotgun is a CLI tool** that generates codebase-aware specs for AI coding agents like Cursor, Claude Code, and Lovable. **It reads your entire repository**, researches how new features should fit your architecture, and produces technical specifications that keep AI agents on track—so they build what you actually want instead of derailing halfway through.
+**Shotgun is a CLI tool** that generates codebase-aware specs for AI coding agents like Cursor, Claude Code, and Lovable. **It reads your entire repository**, researches how new features should fit your architecture, and produces technical specifications that keep AI agents on track—so they build what you actually want instead of derailing halfway through. **Bring your own key (BYOK) or use a Shotgun subscription — $10 for $10 in usage.**
 
 It includes research on existing patterns, implementation plans that respect your architecture, and task breakdowns ready to export as **AGENTS.md** files. Each spec is complete enough that your AI agent can work longer and further without losing context or creating conflicts.
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=3e7kxhANXWA">
-    <img src="https://img.youtube.com/vi/3e7kxhANXWA/maxresdefault.jpg" alt="Watch the Shotgun demo" width="720" height="450">
-  </a>
+  <img src="https://github.com/user-attachments/assets/9c7ca014-1ed3-4935-b310-9147b275fdc7" alt="Shotgun Demo" />
 </p>
 
 </td>
@@ -48,12 +48,6 @@ It includes research on existing patterns, implementation plans that respect you
 ---
 
 # 📦 Installation
-
-> [!WARNING]
-> **Upgrading from alpha?** Uninstall the old version first:
-> ```bash
-> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
-> ```
 
 ### 1. Install uv
 
@@ -141,6 +135,14 @@ When you launch Shotgun, it will guide you through:
 | **3. First Research** | Start generating codebase-aware specs |
 
 _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
+
+--- 
+
+> [!WARNING]
+> **Upgrading from alpha?** Uninstall the old version first:
+> ```bash
+> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
+> ```
 
 ---
 
@@ -296,11 +298,15 @@ Locked into specific IDE or coding agent.
 
 </table>
 
-### Why It Matters
+### Case Study - Real Example:
 
-**The Problem:** AI coding agents are fast at generating code but have no idea what you already built or why past decisions were made.
+We had to implement payments. Cursor, Claude Code, and Copilot all suggested building a custom payment proxy — 3-4 weeks of development. 
 
-**The Solution:** Shotgun gives AI agents the full picture—your codebase context, architectural patterns, and research findings—so they build what you actually need instead of creating conflicts.
+⭐ Shotgun's research found [LiteLLM Proxy](https://docs.litellm.ai/docs/simple_proxy) instead—**30 minutes to discover, 5 days to deploy, first customer in 14 hours.**
+
+****80% less dev time. Near-zero technical debt.****
+
+### **[📖 Read the full case study](docs/CASE_STUDY.md)**
 
 ---
 
