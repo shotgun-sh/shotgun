@@ -700,3 +700,102 @@ async def test_restore_conversation_state_filters_system_prompt(
 
     # Hint messages should not appear in the agent message history
     assert all(not isinstance(msg, HintMessage) for msg in manager.message_history)
+
+
+@pytest.mark.asyncio
+@patch("shotgun.agents.agent_manager.add_system_status_message")
+@patch("shotgun.agents.agent_manager.create_export_agent")
+@patch("shotgun.agents.agent_manager.create_research_agent")
+@patch("shotgun.agents.agent_manager.create_plan_agent")
+@patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
+async def test_qa_mode_hint_ordering_with_file_operations(
+    mock_create_specify,
+    mock_create_tasks,
+    mock_create_plan,
+    mock_create_research,
+    mock_create_export,
+    mock_add_system_status,
+    mock_agent_deps,
+    mock_agents,
+):
+    """Test that file operation hints appear before QA questions."""
+    from shotgun.agents.models import FileOperation, FileOperationType
+
+    research_agent, plan_agent, tasks_agent = mock_agents
+
+    # Add file operations to the shared deps' file_tracker
+    mock_agent_deps.file_tracker.operations = [
+        FileOperation(
+            file_path="/test/file.py",
+            operation=FileOperationType.UPDATED,
+        )
+    ]
+
+    # Create separate deps for each agent
+    research_deps = MagicMock(spec=AgentDeps)
+    research_deps.system_prompt_fn = MagicMock(return_value="Research system prompt")
+
+    mock_create_research.return_value = (research_agent, research_deps)
+    mock_create_plan.return_value = (plan_agent, research_deps)
+    mock_create_tasks.return_value = (tasks_agent, research_deps)
+    mock_create_specify.return_value = (tasks_agent, research_deps)
+    mock_create_export.return_value = (tasks_agent, research_deps)
+
+    # Mock the agent run method with clarifying questions
+    mock_result = MagicMock(spec=AgentRunResult)
+    mock_result.output = AgentResponse(
+        response="Initial response",
+        clarifying_questions=["Question 1?", "Question 2?"],
+    )
+    mock_result.new_messages.return_value = [MagicMock()]
+    mock_result.all_messages.return_value = [MagicMock(), MagicMock()]
+    mock_result.usage.return_value = MagicMock()
+    research_agent.run = AsyncMock(return_value=mock_result)
+
+    # Mock add_system_status_message
+    async def mock_add_status(deps, history):
+        return history if history else []
+
+    mock_add_system_status.side_effect = mock_add_status
+
+    manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+    manager.post_message = MagicMock()
+
+    # Run the agent
+    await manager.run("test prompt")
+
+    # Verify UI message history order
+    # Expected order:
+    # 1. Initial response hint
+    # 2. File operation hint (should come before questions)
+    # 3. Questions intro
+    # 4. Q1
+    ui_messages = manager.ui_message_history
+    assert len(ui_messages) >= 4
+
+    # Find the file operation hint
+    file_hint_idx = None
+    for i, msg in enumerate(ui_messages):
+        if isinstance(msg, HintMessage) and (
+            msg.message.startswith("📝 Modified:")
+            or msg.message.startswith("📁 Modified")
+        ):
+            file_hint_idx = i
+            break
+
+    assert file_hint_idx is not None, "File operation hint should be present"
+
+    # Find the first QA question
+    q1_idx = None
+    for i, msg in enumerate(ui_messages):
+        if isinstance(msg, HintMessage) and msg.message.startswith("**Q1:**"):
+            q1_idx = i
+            break
+
+    assert q1_idx is not None, "Q1 should be present"
+
+    # Verify file hint comes before Q1
+    assert file_hint_idx < q1_idx, (
+        "File operation hint should appear before first question"
+    )
