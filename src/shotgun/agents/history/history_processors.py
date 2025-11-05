@@ -114,15 +114,29 @@ async def _safe_token_estimation(
         # IMPORTANT: No provider raises errors for "too many tokens" during counting.
         # Token count validation happens separately by comparing count to max_input_tokens.
         #
-        # We only wrap RuntimeError (library-level failures from tiktoken/sentencepiece).
-        # API errors like Anthropic's 413 should bubble up - they indicate API/network issues,
-        # not token counting failures. Callers can handle them appropriately (retry, etc.).
+        # We wrap RuntimeError (library-level failures from tiktoken/sentencepiece).
+        # We also wrap Anthropic's 413 error (request exceeds 32 MB) as it indicates
+        # context is effectively too large and needs user action to reduce it.
         if isinstance(e, RuntimeError):
             from shotgun.exceptions import ContextSizeLimitExceeded
 
             raise ContextSizeLimitExceeded(
                 model_name=model_name, max_tokens=max_tokens
             ) from e
+
+        # Check for Anthropic's 32 MB request size limit (APIStatusError with status 413)
+        try:
+            from anthropic import APIStatusError
+
+            if isinstance(e, APIStatusError) and e.status_code == 413:
+                from shotgun.exceptions import ContextSizeLimitExceeded
+
+                raise ContextSizeLimitExceeded(
+                    model_name=model_name, max_tokens=max_tokens
+                ) from e
+        except ImportError:
+            # Anthropic SDK not installed, skip this check
+            pass
 
         # Re-raise other exceptions (network errors, auth failures, etc.)
         raise

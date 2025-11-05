@@ -1219,3 +1219,42 @@ class TestMaxTokensCalculation:
             assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
             assert exc_info.value.max_tokens == 4096
 
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_on_anthropic_413_error(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that Anthropic's 413 error is wrapped in ContextSizeLimitExceeded."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Test message")]),
+            ModelResponse(parts=[TextPart(content="Test response")]),
+        ]
+
+        # Create a mock Anthropic APIStatusError with 413 status
+        try:
+            from anthropic import APIStatusError
+
+            # Mock the error with status_code attribute
+            mock_error = APIStatusError(
+                message="Request exceeds the maximum size",
+                response=MagicMock(status_code=413),
+                body={"error": {"type": "request_too_large"}},
+            )
+            mock_error.status_code = 413
+
+            # Mock estimate_tokens_from_messages to raise the 413 error
+            with patch(
+                "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_error,
+            ):
+                with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                    await token_limit_compactor(mock_run_context, messages)
+
+                # Verify exception has correct attributes
+                assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+                assert exc_info.value.max_tokens == 4096
+
+        except ImportError:
+            pytest.skip("Anthropic SDK not installed")
+
