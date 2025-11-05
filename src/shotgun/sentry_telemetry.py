@@ -1,5 +1,7 @@
 """Sentry observability setup for Shotgun."""
 
+from typing import Any
+
 from shotgun import __version__
 from shotgun.logging_config import get_early_logger
 from shotgun.settings import settings
@@ -32,11 +34,26 @@ def setup_sentry_observability() -> bool:
         logger.debug("Using Sentry DSN from settings, proceeding with setup")
 
         # Determine environment based on version
-        # Dev versions contain "dev", "rc", "alpha", or "beta"
+        # Dev versions contain "dev", "rc", "alpha", "beta"
         if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
             environment = "development"
         else:
             environment = "production"
+
+        def before_send(event: Any, hint: dict[str, Any]) -> Any:
+            """Filter out user-actionable errors from Sentry.
+
+            User-actionable errors (like context size limits) are expected conditions
+            that users need to resolve, not bugs that need tracking.
+            """
+            if "exc_info" in hint:
+                exc_type, exc_value, tb = hint["exc_info"]
+                from shotgun.exceptions import ErrorNotPickedUpBySentry
+
+                if isinstance(exc_value, ErrorNotPickedUpBySentry):
+                    # Don't send to Sentry - this is user-actionable, not a bug
+                    return None
+            return event
 
         # Initialize Sentry
         sentry_sdk.init(
@@ -46,6 +63,7 @@ def setup_sentry_observability() -> bool:
             send_default_pii=False,  # Privacy-first: never send PII
             traces_sample_rate=0.1 if environment == "production" else 1.0,
             profiles_sample_rate=0.1 if environment == "production" else 1.0,
+            before_send=before_send,
         )
 
         # Set user context with anonymous shotgun instance ID from config

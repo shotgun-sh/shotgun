@@ -1,7 +1,9 @@
 """History processors for managing conversation history in Shotgun agents."""
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Protocol
 
+from anthropic import APIStatusError
 from pydantic_ai import ModelSettings
 from pydantic_ai.messages import (
     ModelMessage,
@@ -14,6 +16,7 @@ from pydantic_ai.messages import (
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
+from shotgun.exceptions import ContextSizeLimitExceeded
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 from shotgun.prompts import PromptLoader
@@ -49,6 +52,86 @@ logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()
+
+
+async def _safe_token_estimation(
+    estimation_func: Callable[..., Awaitable[int]],
+    model_name: str,
+    max_tokens: int,
+    *args: Any,
+    **kwargs: Any,
+) -> int:
+    """Safely estimate tokens with proper error handling.
+
+    Wraps token estimation functions to handle failures gracefully.
+    Only RuntimeError (from token counters) is wrapped in ContextSizeLimitExceeded.
+    Other errors (network, auth) are allowed to bubble up.
+
+    Args:
+        estimation_func: Async function that estimates tokens
+        model_name: Name of the model for error messages
+        max_tokens: Maximum tokens for the model
+        *args: Arguments to pass to estimation_func
+        **kwargs: Keyword arguments to pass to estimation_func
+
+    Returns:
+        Token count from estimation_func
+
+    Raises:
+        ContextSizeLimitExceeded: If token counting fails with RuntimeError
+        Exception: Any other exceptions from estimation_func
+    """
+    try:
+        return await estimation_func(*args, **kwargs)
+    except Exception as e:
+        # Log the error with full context
+        logger.warning(
+            f"Token counting failed for {model_name}",
+            extra={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "model": model_name,
+            },
+        )
+
+        # Token counting behavior with oversized context (verified via testing):
+        #
+        # 1. OpenAI/tiktoken:
+        #    - Successfully counts any size (tested with 752K tokens, no error)
+        #    - Library errors: ValueError, KeyError, AttributeError, SSLError (file/cache issues)
+        #    - Wrapped as: RuntimeError by our counter
+        #
+        # 2. Gemini/SentencePiece:
+        #    - Successfully counts any size (tested with 752K tokens, no error)
+        #    - Library errors: RuntimeError, IOError, TypeError (file/model loading issues)
+        #    - Wrapped as: RuntimeError by our counter
+        #
+        # 3. Anthropic API:
+        #    - Successfully counts large token counts (tested with 752K tokens, no error)
+        #    - Only enforces 32 MB request size limit (not token count)
+        #    - Raises: APIStatusError(413) with error type 'request_too_large' for 32MB+ requests
+        #    - Other API errors: APIConnectionError, RateLimitError, APIStatusError (4xx/5xx)
+        #    - Wrapped as: RuntimeError by our counter
+        #
+        # IMPORTANT: No provider raises errors for "too many tokens" during counting.
+        # Token count validation happens separately by comparing count to max_input_tokens.
+        #
+        # We wrap RuntimeError (library-level failures from tiktoken/sentencepiece).
+        # We also wrap Anthropic's 413 error (request exceeds 32 MB) as it indicates
+        # context is effectively too large and needs user action to reduce it.
+        if isinstance(e, RuntimeError):
+            raise ContextSizeLimitExceeded(
+                model_name=model_name, max_tokens=max_tokens
+            ) from e
+
+        # Check for Anthropic's 32 MB request size limit (APIStatusError with status 413)
+        if isinstance(e, APIStatusError) and e.status_code == 413:
+            raise ContextSizeLimitExceeded(
+                model_name=model_name, max_tokens=max_tokens
+            ) from e
+
+        # Re-raise other exceptions (network errors, auth failures, etc.)
+        raise
 
 
 def is_summary_part(part: Any) -> bool:
@@ -157,9 +240,15 @@ async def token_limit_compactor(
 
     if last_summary_index is not None:
         # Check if post-summary conversation exceeds threshold for incremental compaction
-        post_summary_tokens = await estimate_post_summary_tokens(
-            messages, last_summary_index, deps.llm_model
+        post_summary_tokens = await _safe_token_estimation(
+            estimate_post_summary_tokens,
+            deps.llm_model.name,
+            model_max_tokens,
+            messages,
+            last_summary_index,
+            deps.llm_model,
         )
+
         post_summary_percentage = (
             (post_summary_tokens / max_tokens) * 100 if max_tokens > 0 else 0
         )
@@ -366,7 +455,14 @@ async def token_limit_compactor(
 
     else:
         # Check if total conversation exceeds threshold for full compaction
-        total_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
+        total_tokens = await _safe_token_estimation(
+            estimate_tokens_from_messages,
+            deps.llm_model.name,
+            model_max_tokens,
+            messages,
+            deps.llm_model,
+        )
+
         total_percentage = (total_tokens / max_tokens) * 100 if max_tokens > 0 else 0
 
         logger.debug(

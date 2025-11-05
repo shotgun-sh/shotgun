@@ -112,14 +112,15 @@ class TestTokenLimitCompactor:
     @pytest.mark.asyncio
     async def test_over_token_limit_triggers_summarization(self, mock_run_context):
         """Test that messages over token limit trigger summarization."""
-        # Create large messages that will exceed token limit when counted directly
-        # Create varied content that will exceed token threshold with real counting
+        # Create large messages that will exceed token threshold (80%) but stay under hard limit (100%)
+        # For max_input_tokens=4096: threshold=3276, target ~3500 tokens
+        # Each message ~24 tokens, so 145 messages * 24 ≈ 3480 tokens
         large_content = " ".join(
             [
                 f"Test message {i} with diverse content to exceed token limits using real counting methods."
                 for i in range(250)
             ]
-        )  # Diverse content
+        )  # Diverse content in safe range (80%-100%)
         messages = [
             ModelRequest(
                 parts=[
@@ -187,15 +188,15 @@ class TestTokenLimitCompactor:
     @pytest.mark.asyncio
     async def test_extracts_context_from_various_message_types(self, mock_run_context):
         """Test context extraction from different message types during summarization."""
-        # Create content that will actually exceed token threshold with real counting
-        # Use varied text instead of repetitive content to ensure real tokens > threshold
-        # Create diverse content that will exceed token threshold with real counting
+        # Create content that exceeds token threshold (80%) but stays under hard limit (100%)
+        # For max_input_tokens=4096: threshold=3276, target ~3500 tokens
+        # Each sentence ~14 words ≈ 16 tokens, so 250 sentences * 16 ≈ 4000 tokens
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to exceed thresholds."
                 for i in range(250)
             ]
-        )  # Diverse content to trigger compaction
+        )  # Diverse content exceeding 80% threshold
         messages = [
             ModelRequest(
                 parts=[
@@ -507,13 +508,13 @@ class TestTokenLimitCompactorEdgeCases:
     @pytest.mark.asyncio
     async def test_handles_messages_without_system_prompt(self, mock_run_context):
         """Test compaction when there's no system prompt."""
-        # Create diverse content that will exceed token threshold with real counting
+        # Create content that exceeds threshold (80%) but stays under hard limit (100%)
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(200)
+                for i in range(250)
             ]
-        )  # Diverse content
+        )  # Diverse content in safe range
         messages = [
             ModelRequest(parts=[UserPromptPart(content="User message")]),
             ModelResponse(parts=[TextPart(content=large_content)]),
@@ -547,7 +548,7 @@ class TestTokenLimitCompactorEdgeCases:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(200)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -603,7 +604,7 @@ class TestTokenLimitCompactorEdgeCases:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(200)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -703,7 +704,7 @@ class TestIncrementalCompaction:
         large_content = " ".join(
             [
                 f"This is sentence number {i} with different content and varied tokens to ensure real tokenization exceeds the threshold."
-                for i in range(200)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -756,7 +757,7 @@ class TestIncrementalCompaction:
         large_new_content = " ".join(
             [
                 f"New message {i} after summary with lots of varied content and diverse tokens."
-                for i in range(400)
+                for i in range(250)
             ]
         )  # Sufficient content
         messages = [
@@ -820,7 +821,7 @@ class TestIncrementalCompaction:
         large_content = " ".join(
             [
                 f"Incremental test sentence {i} with varied content and tokens."
-                for i in range(150)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -921,7 +922,7 @@ class TestIncrementalCompaction:
         large_content = " ".join(
             [
                 f"Template test sentence {i} with different content and varied tokens."
-                for i in range(180)
+                for i in range(250)
             ]
         )  # Diverse content
         messages = [
@@ -1103,7 +1104,7 @@ class TestMaxTokensCalculation:
         large_new_content = " ".join(
             [
                 f"Context maintenance test {i} with varied sentences and different token patterns."
-                for i in range(300)
+                for i in range(250)
             ]
         )  # Diverse content
 
@@ -1165,3 +1166,95 @@ class TestMaxTokensCalculation:
 
             # Must end with ModelRequest
             assert isinstance(result[-1], ModelRequest)
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_when_token_estimation_fails(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that ContextSizeLimitExceeded is raised when token estimation fails."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Test message")]),
+            ModelResponse(parts=[TextPart(content="Test response")]),
+        ]
+
+        # Mock estimate_tokens_from_messages to raise an exception
+        with patch(
+            "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+            side_effect=RuntimeError("Token counting API failed"),
+        ):
+            with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                await token_limit_compactor(mock_run_context, messages)
+
+            # Verify exception has correct attributes
+            assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+            assert exc_info.value.max_tokens == 4096
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_with_summary_when_post_summary_fails(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that ContextSizeLimitExceeded is raised when post-summary token estimation fails."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        # Create messages with a summary
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Original message")]),
+            ModelResponse(
+                parts=[TextPart(content=f"{SUMMARY_MARKER}Existing summary{SUMMARY_MARKER}")]
+            ),
+            ModelRequest(parts=[UserPromptPart(content="New message")]),
+        ]
+
+        # Mock estimate_post_summary_tokens to fail
+        with patch(
+            "shotgun.agents.history.history_processors.estimate_post_summary_tokens",
+            side_effect=RuntimeError("Token counting failed"),
+        ):
+            with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                await token_limit_compactor(mock_run_context, messages)
+
+            # Verify exception has correct attributes
+            assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+            assert exc_info.value.max_tokens == 4096
+
+    @pytest.mark.asyncio
+    async def test_raises_context_size_limit_exceeded_on_anthropic_413_error(
+        self, mock_run_context: MagicMock
+    ) -> None:
+        """Test that Anthropic's 413 error is wrapped in ContextSizeLimitExceeded."""
+        from shotgun.exceptions import ContextSizeLimitExceeded
+
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="Test message")]),
+            ModelResponse(parts=[TextPart(content="Test response")]),
+        ]
+
+        # Create a mock Anthropic APIStatusError with 413 status
+        try:
+            from anthropic import APIStatusError
+
+            # Mock the error with status_code attribute
+            mock_error = APIStatusError(
+                message="Request exceeds the maximum size",
+                response=MagicMock(status_code=413),
+                body={"error": {"type": "request_too_large"}},
+            )
+            mock_error.status_code = 413
+
+            # Mock estimate_tokens_from_messages to raise the 413 error
+            with patch(
+                "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_error,
+            ):
+                with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+                    await token_limit_compactor(mock_run_context, messages)
+
+                # Verify exception has correct attributes
+                assert exc_info.value.model_name == mock_run_context.deps.llm_model.name
+                assert exc_info.value.max_tokens == 4096
+
+        except ImportError:
+            pytest.skip("Anthropic SDK not installed")
+
