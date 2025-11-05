@@ -271,7 +271,7 @@ shotgun
   - `Ctrl+P` - Open command palette
   - `Shift+Tab` - Switch between modes
   - `Ctrl+C` - Cancel current operation
-  - `Escape` - Toggle Q&A mode (quick questions)
+  - `Escape` - Exit Q&A mode or cancel current agent processing
   - `Ctrl+U` - View usage statistics
   - `Ctrl+K` - Clear conversation history
 
