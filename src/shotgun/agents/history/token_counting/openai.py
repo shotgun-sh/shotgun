@@ -63,7 +63,9 @@ class OpenAITokenCounter(TokenCounter):
 
         try:
             return len(self.encoding.encode(text))
-        except Exception as e:
+        except BaseException as e:
+            # Must catch BaseException to handle PanicException from tiktoken's Rust layer
+            # which can occur with extremely long texts. Regular Exception won't catch it.
             raise RuntimeError(
                 f"Failed to count tokens for OpenAI model {self.model_name}"
             ) from e

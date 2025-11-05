@@ -92,9 +92,16 @@ async def _safe_token_estimation(
             },
         )
 
-        # TODO: Research exact error types from each provider (Anthropic, OpenAI, Google)
-        # For now, only wrap RuntimeError which is what our token counters raise
-        # Let other errors (network, auth, etc.) bubble up normally
+        # Token counting methods wrap provider-specific errors in RuntimeError:
+        # - OpenAI/tiktoken: ValueError, KeyError, AttributeError, SSLError (file/cache issues)
+        # - Gemini/SentencePiece: RuntimeError, IOError, TypeError (file/model loading issues)
+        # - Anthropic API: APIError subclasses (auth, rate limit, network errors)
+        #
+        # Note: No provider raises specific errors for "context too large" during counting.
+        # Context size validation happens separately by comparing token count to max_input_tokens.
+        #
+        # We only wrap RuntimeError (library-level failures). Other errors like network issues
+        # from external services should bubble up so callers can handle them appropriately.
         if isinstance(e, RuntimeError):
             from shotgun.exceptions import ContextSizeLimitExceeded
 
