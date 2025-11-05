@@ -1,0 +1,109 @@
+name: Issue Notifications
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  handle-new-issue:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Auto-assign issue to scottfrasso
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              assignees: ['scottfrasso']
+            });
+            console.log('✅ Issue assigned to scottfrasso');
+
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SHOTGUN_ALPHA_WEBHOOK }}
+        run: |
+          # Get issue information
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_AUTHOR="${{ github.event.issue.user.login }}"
+          ISSUE_URL="${{ github.event.issue.html_url }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+
+          # Truncate body if too long (Slack has message limits)
+          ISSUE_BODY_TRUNCATED=$(echo "$ISSUE_BODY" | head -c 500)
+          if [[ ${#ISSUE_BODY} -gt 500 ]]; then
+            ISSUE_BODY_TRUNCATED="${ISSUE_BODY_TRUNCATED}..."
+          fi
+
+          # Escape for JSON using jq
+          ISSUE_TITLE_ESCAPED=$(printf '%s' "$ISSUE_TITLE" | jq -Rs . | sed 's/^"//;s/"$//')
+          ISSUE_BODY_ESCAPED=$(printf '%s' "$ISSUE_BODY_TRUNCATED" | jq -Rs . | sed 's/^"//;s/"$//')
+
+          # Create Slack payload
+          cat <<EOF > /tmp/slack_payload.json
+          {
+            "blocks": [
+              {
+                "type": "header",
+                "text": {
+                  "type": "plain_text",
+                  "text": "🎯 New Issue Created",
+                  "emoji": true
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Issue:* <${ISSUE_URL}|#${ISSUE_NUMBER}: ${ISSUE_TITLE_ESCAPED}>"
+                }
+              },
+              {
+                "type": "section",
+                "fields": [
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Reported by:*\n@${ISSUE_AUTHOR}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Assigned to:*\n@scottfrasso"
+                  }
+                ]
+              },
+              {
+                "type": "divider"
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Description:*\n${ISSUE_BODY_ESCAPED}"
+                }
+              },
+              {
+                "type": "divider"
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "<${ISSUE_URL}|View Issue on GitHub>"
+                }
+              }
+            ]
+          }
+          EOF
+
+          # Send to Slack
+          curl -X POST -H 'Content-type: application/json' \
+            --data @/tmp/slack_payload.json \
+            "$SLACK_WEBHOOK_URL"
+
+          echo "✅ Slack notification sent for issue #${ISSUE_NUMBER}"

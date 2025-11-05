@@ -94,6 +94,12 @@ Runs daily to verify installation methods work:
 - Tests `uv tool install shotgun-sh`
 - Ensures package is installable from PyPI
 
+### `.github/workflows/issue-notifications.yml`
+
+Runs when new issues are created:
+- Auto-assigns issues to scottfrasso
+- Sends Slack notification with issue details
+
 ## Local CI Testing
 
 ### Run All Checks Locally
@@ -216,6 +222,7 @@ The following secrets must be configured in GitHub repository settings:
 - `SHOTGUN_LOGFIRE_TOKEN` - Logfire logging (embedded at build time)
 - `SHOTGUN_POSTHOG_API_KEY` - PostHog analytics (embedded at build time)
 - `SHOTGUN_POSTHOG_PROJECT_ID` - PostHog project ID (embedded at build time)
+- `SHOTGUN_ALPHA_WEBHOOK` - Slack webhook URL for notifications (deployments, issues, test failures)
 
 ### Build-Time Secrets
 
