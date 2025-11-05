@@ -273,7 +273,6 @@ shotgun
   - `Ctrl+C` - Cancel current operation
   - `Escape` - Exit Q&A mode or cancel current agent processing
   - `Ctrl+U` - View usage statistics
-  - `Ctrl+K` - Clear conversation history
 
 **Getting Started:**
 1. Run `shotgun` in your project directory
