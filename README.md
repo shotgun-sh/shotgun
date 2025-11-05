@@ -136,16 +136,6 @@ When you launch Shotgun, it will guide you through:
 
 _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
 
---- 
-
-> [!WARNING]
-> **Upgrading from alpha?** Uninstall the old version first:
-> ```bash
-> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
-> ```
-
----
-
 > [!WARNING]
 > **Upgrading from alpha?** Uninstall the old version first:
 > ```bash
@@ -155,8 +145,6 @@ _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
 ---
 
 # 🎥 Demo
-
-Watch this quick demo to see Shotgun in action:
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=3e7kxhANXWA">
@@ -170,190 +158,70 @@ _Click the image above to watch the full demo on YouTube_
 
 # 🎯 Usage
 
-Shotgun guides you through **5 specialized modes**, each designed for a specific phase of the development workflow. Each mode uses a dedicated AI agent with prompts tailored for that phase, and writes to its own file in `.shotgun/`.
+Shotgun's Terminal UI guides you through **5 specialized modes** — from research to export. Each mode has a dedicated AI agent optimized for that phase.
 
-## The 5 Modes Explained
+### Launch Shotgun in your project directory:
 
-### 🔬 1. Research Mode
+| Already Installed | First Time / Try It Out |
+|-------------------|------------------------|
+| `shotgun` | `uvx shotgun-sh@latest` |
 
-**Purpose:** Research topics with web search and synthesize findings. Perfect for gathering information and exploring new concepts before writing any specs.
+_The TUI opens automatically. **Press `Shift+Tab` to switch modes** or `Ctrl+P` for the command palette._
 
-**What it does:**
-- Searches your codebase to understand existing patterns and architecture
-- Performs web research to find best practices and external solutions
-- Synthesizes findings into actionable insights
-- Identifies constraints and opportunities
-
-**Writes to:** `.shotgun/research.md`
-
-**When to use:** Start here when exploring new features, investigating problems, or onboarding to understand the codebase.
-
-**Example prompts:**
-- "How do we handle authentication in this codebase?"
-- "Research best practices for implementing real-time collaboration"
-- "What patterns do we use for database access?"
-
----
-
-### 📝 2. Specify Mode
-
-**Purpose:** Create detailed specifications and requirements documents. Great for planning features and documenting requirements based on your research.
-
-**What it does:**
-- Creates technical specifications aware of your existing architecture
-- Documents functional and non-functional requirements
-- Defines acceptance criteria and success metrics
-- References discovered patterns from research
-
-**Writes to:** `.shotgun/specification.md`
-
-**When to use:** After research, when you need a clear specification before implementation planning.
-
-**Example prompts:**
-- "Add OAuth2 authentication with refresh token support"
-- "User profile management system with avatar uploads"
-- "Specify a notification system with email and SMS"
-
----
-
-### 📋 3. Plan Mode
-
-**Purpose:** Create actionable implementation plans with milestones. Ideal for breaking down large projects into manageable steps.
-
-**What it does:**
-- Generates implementation plans respecting your codebase structure
-- Breaks work into logical phases with clear milestones
-- Identifies dependencies and sequencing requirements
-- Considers risks and mitigation strategies
-
-**Writes to:** `.shotgun/plan.md`
-
-**When to use:** After specification, when you need a structured approach to implementation.
-
-**Example prompts:**
-- "Build user dashboard with analytics widgets"
-- "Migrate authentication system to OAuth2"
-- "Create an implementation plan for the payment system"
-
----
-
-### ✅ 4. Tasks Mode
-
-**Purpose:** Generate specific, actionable tasks from research and plans. Best for getting concrete next steps and action items.
-
-**What it does:**
-- Breaks down plans into dependency-aware actionable tasks
-- Provides clear sequencing and priorities
-- Includes implementation details and file references
-- Tracks what needs to be done and in what order
-
-**Writes to:** `.shotgun/tasks.md`
-
-**When to use:** After planning, when you're ready to start implementation and need clear action items.
-
-**Example prompts:**
-- "Create the tasks for implementing the OAuth2 system"
-- "Break down the user dashboard plan into tasks"
-- "What are the specific steps to implement this feature?"
-
----
-
-### 📤 5. Export Mode
-
-**Purpose:** Export artifacts and findings to various formats. Creates documentation like `AGENTS.md` (AI agent instructions), `PRD.md` (Product Requirements), and other deliverables.
-
-**What it does:**
-- Exports research, specs, plans, and tasks to AI agent formats
-- Generates `AGENTS.md` files for Cursor, Claude Code, Windsurf, Lovable
-- Creates PRDs, technical documentation, and other artifacts
-- Formats content for your chosen AI coding tool
-
-**Writes to:** `.shotgun/AGENTS.md`, `.shotgun/PRD.md`, and other custom files in `.shotgun/`
-
-**When to use:** When you're ready to hand off to your AI coding agent or need to generate documentation.
-
-**Example prompts:**
-- "Export everything to AGENTS.md"
-- "Create a PRD for the authentication feature"
-- "Generate documentation for the new payment system"
-
----
-
-## Using the Interactive TUI
-
-Launch Shotgun to start the interactive Terminal User Interface:
+### The 5-Phase Workflow
 
 <table>
 <tr>
-<th>If Installed</th>
-<th>If Not Installed (Try First)</th>
-</tr>
-<tr>
-<td>
-
-```bash
-shotgun
-```
-
-After running `uv tool install shotgun-sh`
-
-</td>
-<td>
-
-```bash
-uvx shotgun-sh@latest
-```
-
-No installation needed, runs immediately
-
-</td>
+<td align="center"><b>🔬 Research</b><br/>Explore & understand</td>
+<td align="center">→</td>
+<td align="center"><b>📝 Specify</b><br/>Define requirements</td>
+<td align="center">→</td>
+<td align="center"><b>📋 Plan</b><br/>Create roadmap</td>
+<td align="center">→</td>
+<td align="center"><b>✅ Tasks</b><br/>Break into steps</td>
+<td align="center">→</td>
+<td align="center"><b>📤 Export</b><br/>Format for AI</td>
 </tr>
 </table>
 
-**TUI Features:**
-- 🔄 **Switch modes:** Press `Shift+Tab` to cycle through modes, or `Ctrl+P` to open command palette
-- 💬 **Natural conversation:** Chat naturally with the AI - it understands context and your current mode
-- 📊 **Visual indicators:** Current mode, status, and progress shown at bottom of screen
-- ⚡ **Keyboard shortcuts:**
-  - `Ctrl+P` - Open command palette
-  - `Shift+Tab` - Switch between modes
-  - `Ctrl+C` - Cancel current operation
-  - `Escape` - Exit Q&A mode or cancel current agent processing
-  - `Ctrl+U` - View usage statistics
+_Each phase builds on the previous one, creating a complete specification ready for AI coding agents._
 
-**Getting Started:**
-1. Launch Shotgun in your project directory (see table above)
-2. Start with Research mode to explore your codebase
-3. Progress through the modes as needed
-4. Export your specifications when ready
+### Mode Reference
 
-> **Note:** CLI commands are available but the TUI is the recommended way to use Shotgun. See [docs/CLI.md](docs/CLI.md) for CLI usage.
+| Mode | What It Does | Example Prompt | Output |
+|:-----|:-------------|:---------------|:-------|
+| **🔬&nbsp;Research** | Searches codebase + web, identifies patterns | `How do we handle authentication in this codebase?` | `research.md` |
+| **📝&nbsp;Specify** | Creates technical specs aware of architecture | `Add OAuth2 authentication with refresh token support` | `specification.md` |
+| **📋&nbsp;Plan** | Generates implementation roadmap | `Create an implementation plan for the payment system` | `plan.md` |
+| **✅&nbsp;Tasks** | Breaks plans into actionable items | `Break down the user dashboard plan into tasks` | `tasks.md` |
+| **📤&nbsp;Export** | Formats for AI coding agents | `Export everything to AGENTS.md` | `AGENTS.md` |
 
-## Tips for Better Results
+_**Mode switching:** `Shift+Tab` cycles through modes_
 
-### 1. Ask for Research First
-Before jumping into a task, let Shotgun research the codebase:
+_**Visual status:** See current mode and progress at bottom_
 
-> "Can you research how authentication works in this codebase?"
+### ⌨️ Keyboard Shortcuts
 
-### 2. Request Clarifying Questions
-Let Shotgun ask you questions to better understand your needs:
+| Shortcut | Action |
+|----------|--------|
+| `Shift+Tab` | Switch modes |
+| `Ctrl+P` | Open command palette |
+| `Ctrl+C` | Cancel operation |
+| `Escape` | Exit Q&A / stop agent |
+| `Ctrl+U` | View usage stats |
 
-> "I want to add user profiles. Please ask me clarifying questions before starting."
+### Tips for Better Results
 
-### 3. Use the Right Mode
-- Use **Research** for exploration and understanding
-- Use **Specify** for requirements and specifications
-- Use **Plan** for implementation strategy
-- Use **Tasks** for actionable next steps
-- Use **Export** to generate AI agent instructions
+| Do This | Not This |
+|---------|----------|
+| ✅ `Research how we handle auth` | ❌ Jump straight to building |
+| ✅ `Shotgun please ask me questions first` | ❌ Assume Shotgun knows your needs |
+| ✅ `I'm working on payments, need refunds` | ❌ `Add refunds` (no context) |
+| ✅ Follow Research → Specify → Plan → Tasks | ❌ Skip phases |
 
-### 4. Provide Context
-Give relevant context about what you're trying to accomplish:
+**Result:** Your AI coding agent gets complete context—what exists, why, and what to build.
 
-> "I'm working on the payment flow. I need to add support for refunds."
-
-**Result:** Your AI coding agent now has complete context—what exists, why decisions were made, and exactly what to build.
+ **Note:** CLI available in [docs/CLI.md](docs/CLI.md), but TUI is recommended.
 
 ---
 
