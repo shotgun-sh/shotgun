@@ -15,6 +15,7 @@ from pydantic_ai.messages import (
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
+from shotgun.exceptions import ContextSizeLimitExceeded
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 from shotgun.prompts import PromptLoader
@@ -34,6 +35,12 @@ from .token_estimation import (
     estimate_post_summary_tokens,
     estimate_tokens_from_messages,
 )
+
+# Optional import for Anthropic API error handling
+try:
+    from anthropic import APIStatusError
+except ImportError:
+    APIStatusError = None  # type: ignore[assignment, misc]
 
 if TYPE_CHECKING:
     pass
@@ -118,25 +125,16 @@ async def _safe_token_estimation(
         # We also wrap Anthropic's 413 error (request exceeds 32 MB) as it indicates
         # context is effectively too large and needs user action to reduce it.
         if isinstance(e, RuntimeError):
-            from shotgun.exceptions import ContextSizeLimitExceeded
-
             raise ContextSizeLimitExceeded(
                 model_name=model_name, max_tokens=max_tokens
             ) from e
 
         # Check for Anthropic's 32 MB request size limit (APIStatusError with status 413)
-        try:
-            from anthropic import APIStatusError
-
-            if isinstance(e, APIStatusError) and e.status_code == 413:
-                from shotgun.exceptions import ContextSizeLimitExceeded
-
+        if APIStatusError is not None and isinstance(e, APIStatusError):
+            if e.status_code == 413:
                 raise ContextSizeLimitExceeded(
                     model_name=model_name, max_tokens=max_tokens
                 ) from e
-        except ImportError:
-            # Anthropic SDK not installed, skip this check
-            pass
 
         # Re-raise other exceptions (network errors, auth failures, etc.)
         raise
