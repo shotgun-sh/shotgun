@@ -391,6 +391,16 @@ uvx shotgun-sh@latest
   <img src="https://img.shields.io/badge/⭐%20Star%20on%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Star Shotgun Repo" />
 </a>
 
+### Star History
+
+<a href="https://www.star-history.com/#shotgun-sh/shotgun&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=shotgun-sh/shotgun&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=shotgun-sh/shotgun&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=shotgun-sh/shotgun&type=date&legend=bottom-right" />
+ </picture>
+</a>
+
 </div>
 
 ---
