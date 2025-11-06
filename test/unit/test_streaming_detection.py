@@ -113,7 +113,7 @@ async def test_get_provider_model_gpt5_byok_not_tested():
 
             # Mock the streaming test to return True
             with patch(
-                "shotgun.agents.config.provider.check_streaming_capability_sync"
+                "shotgun.agents.config.provider.check_streaming_capability"
             ) as mock_test:
                 mock_test.return_value = True
 
@@ -154,7 +154,7 @@ async def test_get_provider_model_gpt5_mini_byok_not_tested():
 
             # Mock the streaming test to return False
             with patch(
-                "shotgun.agents.config.provider.check_streaming_capability_sync"
+                "shotgun.agents.config.provider.check_streaming_capability"
             ) as mock_test:
                 mock_test.return_value = False
 
@@ -197,7 +197,7 @@ async def test_get_provider_model_gpt5_byok_already_tested():
 
             # Mock the streaming test - should NOT be called
             with patch(
-                "shotgun.agents.config.provider.check_streaming_capability_sync"
+                "shotgun.agents.config.provider.check_streaming_capability"
             ) as mock_test:
                 # Get the model config
                 model_config = await get_provider_model(ModelName.GPT_5)

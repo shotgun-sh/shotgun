@@ -25,7 +25,7 @@ from .models import (
     ProviderType,
     ShotgunConfig,
 )
-from .streaming_test import check_streaming_capability_sync
+from .streaming_test import check_streaming_capability
 
 logger = get_logger(__name__)
 
@@ -279,7 +279,7 @@ async def get_provider_model(
             if streaming_capability is None:
                 # Not tested yet - run streaming test
                 logger.info(f"Testing streaming capability for {model_name.value}...")
-                streaming_capability = check_streaming_capability_sync(api_key, model_name.value)
+                streaming_capability = await check_streaming_capability(api_key, model_name.value)
 
                 # Save result to config
                 setattr(config.openai, streaming_field, streaming_capability)
