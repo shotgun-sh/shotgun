@@ -33,6 +33,132 @@ logger = get_logger(__name__)
 # Type alias for provider configuration objects
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
+# Current config version
+CURRENT_CONFIG_VERSION = 5
+
+
+def _migrate_v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 2 to version 3.
+
+    Changes:
+    - Rename 'user_id' field to 'shotgun_instance_id'
+
+    Args:
+        data: Config data dict at version 2
+
+    Returns:
+        Modified config data dict at version 3
+    """
+    if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
+        data[SHOTGUN_INSTANCE_ID_FIELD] = data.pop("user_id")
+        data["config_version"] = 3
+        logger.info("Migrated config v2->v3: renamed user_id to shotgun_instance_id")
+
+    return data
+
+
+def _migrate_v3_to_v4(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 3 to version 4.
+
+    Changes:
+    - Add 'marketing' field with empty messages dict
+    - Set 'shown_welcome_screen' to False for existing BYOK users
+
+    Args:
+        data: Config data dict at version 3
+
+    Returns:
+        Modified config data dict at version 4
+    """
+    # Add marketing config
+    if "marketing" not in data:
+        data["marketing"] = {"messages": {}}
+        logger.info("Migrated config v3->v4: added marketing configuration")
+
+    # Set shown_welcome_screen for existing BYOK users
+    # If shown_welcome_screen doesn't exist AND any BYOK provider has a key,
+    # set it to False so they see the welcome screen once
+    if "shown_welcome_screen" not in data:
+        has_byok_key = False
+        for section in ["openai", "anthropic", "google"]:
+            if (
+                section in data
+                and isinstance(data[section], dict)
+                and data[section].get("api_key")
+            ):
+                has_byok_key = True
+                break
+
+        if has_byok_key:
+            data["shown_welcome_screen"] = False
+            logger.info(
+                "Existing BYOK user detected: set shown_welcome_screen=False to show welcome screen"
+            )
+
+    data["config_version"] = 4
+    return data
+
+
+def _migrate_v4_to_v5(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 4 to version 5.
+
+    Changes:
+    - Add 'supports_streaming' field to OpenAI config (initially None for auto-detection)
+
+    Args:
+        data: Config data dict at version 4
+
+    Returns:
+        Modified config data dict at version 5
+    """
+    if "openai" in data and isinstance(data["openai"], dict):
+        if "supports_streaming" not in data["openai"]:
+            data["openai"]["supports_streaming"] = None
+            logger.info(
+                "Migrated config v4->v5: added streaming capability detection for OpenAI"
+            )
+
+    data["config_version"] = 5
+    return data
+
+
+def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
+    """Apply all necessary migrations to bring config to current version.
+
+    Migrations are applied sequentially from the config's current version
+    to CURRENT_CONFIG_VERSION.
+
+    Args:
+        data: Config data dict at any version
+
+    Returns:
+        Config data dict at CURRENT_CONFIG_VERSION
+    """
+    # Get current version (default to 2 for very old configs)
+    current_version = data.get("config_version", 2)
+
+    # Define migrations in order
+    migrations = {
+        2: _migrate_v2_to_v3,
+        3: _migrate_v3_to_v4,
+        4: _migrate_v4_to_v5,
+    }
+
+    # Apply migrations sequentially
+    while current_version < CURRENT_CONFIG_VERSION:
+        if current_version in migrations:
+            logger.info(f"Applying migration from v{current_version} to v{current_version + 1}")
+            data = migrations[current_version](data)
+            current_version = data.get("config_version", current_version + 1)
+        else:
+            logger.warning(
+                f"No migration defined for v{current_version}, skipping to v{current_version + 1}"
+            )
+            current_version += 1
+            data["config_version"] = current_version
+
+    return data
+
 
 class ConfigManager:
     """Manager for Shotgun configuration."""
@@ -76,47 +202,8 @@ class ConfigManager:
                 content = await f.read()
                 data = json.loads(content)
 
-            # Migration: Rename user_id to shotgun_instance_id (config v2 -> v3)
-            if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
-                data[SHOTGUN_INSTANCE_ID_FIELD] = data.pop("user_id")
-                data["config_version"] = 3
-                logger.info(
-                    "Migrated config v2->v3: renamed user_id to shotgun_instance_id"
-                )
-
-            # Migration: Set shown_welcome_screen for existing BYOK users
-            # If shown_welcome_screen doesn't exist AND any BYOK provider has a key,
-            # set it to False so they see the welcome screen once
-            if "shown_welcome_screen" not in data:
-                has_byok_key = False
-                for section in ["openai", "anthropic", "google"]:
-                    if (
-                        section in data
-                        and isinstance(data[section], dict)
-                        and data[section].get("api_key")
-                    ):
-                        has_byok_key = True
-                        break
-
-                if has_byok_key:
-                    data["shown_welcome_screen"] = False
-                    logger.info(
-                        "Existing BYOK user detected: set shown_welcome_screen=False to show welcome screen"
-                    )
-
-            # Migration: Add marketing config for v3 -> v4
-            if "marketing" not in data:
-                data["marketing"] = {"messages": {}}
-                data["config_version"] = 4
-                logger.info("Migrated config v3->v4: added marketing configuration")
-
-            # Migration: Add streaming capability field for v4 -> v5
-            if data.get("config_version", 4) == 4:
-                if "openai" in data and isinstance(data["openai"], dict):
-                    if "supports_streaming" not in data["openai"]:
-                        data["openai"]["supports_streaming"] = None
-                data["config_version"] = 5
-                logger.info("Migrated config v4->v5: added streaming capability detection")
+            # Apply all necessary migrations to bring config to current version
+            data = _apply_migrations(data)
 
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
