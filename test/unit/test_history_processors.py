@@ -1202,7 +1202,11 @@ class TestMaxTokensCalculation:
         messages = [
             ModelRequest(parts=[UserPromptPart(content="Original message")]),
             ModelResponse(
-                parts=[TextPart(content=f"{SUMMARY_MARKER}Existing summary{SUMMARY_MARKER}")]
+                parts=[
+                    TextPart(
+                        content=f"{SUMMARY_MARKER}Existing summary{SUMMARY_MARKER}"
+                    )
+                ]
             ),
             ModelRequest(parts=[UserPromptPart(content="New message")]),
         ]
@@ -1257,4 +1261,3 @@ class TestMaxTokensCalculation:
 
         except ImportError:
             pytest.skip("Anthropic SDK not installed")
-
