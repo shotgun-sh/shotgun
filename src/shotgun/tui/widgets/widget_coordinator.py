@@ -166,8 +166,9 @@ class WidgetCoordinator:
 
         try:
             chat_history = self.screen.query_one(ChatHistory)
-            if message:
-                chat_history.partial_response = message
+            # Set the reactive attribute to trigger the PartialResponseWidget update
+            chat_history.partial_response = message
+            # Also update the full message list
             chat_history.update_messages(messages)
         except Exception as e:
             logger.exception(f"Failed to set partial response: {e}")
