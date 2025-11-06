@@ -13,6 +13,9 @@ permissions:
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    env:
+      # Skip build validation during tests (telemetry keys not needed for testing)
+      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     steps:
       - uses: actions/checkout@v5

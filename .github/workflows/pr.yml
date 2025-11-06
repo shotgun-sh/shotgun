@@ -48,18 +48,21 @@ jobs:
 
   basic-pr-check:
     runs-on: ubuntu-latest
-    
+    env:
+      # Skip build validation during tests (telemetry keys not needed for testing)
+      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
+
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: ''
-          
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
-        
+
       - name: Install dependencies
         run: uv sync --all-extras
         
@@ -112,6 +115,9 @@ jobs:
 
   test-cli-basics:
     runs-on: ubuntu-latest
+    env:
+      # Skip build validation during tests (telemetry keys not needed for testing)
+      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     steps:
       - uses: actions/checkout@v5
@@ -189,6 +195,8 @@ jobs:
     if: needs.check-permissions.outputs.is-maintainer == 'true'
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Skip build validation during tests (telemetry keys not needed for testing)
+      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     strategy:
       matrix:
