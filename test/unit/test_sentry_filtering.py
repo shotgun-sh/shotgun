@@ -387,7 +387,9 @@ def test_before_send_removes_cwd_from_runtime_context(mock_settings):
 
         # Verify CWD was removed
         assert "cwd" not in result["contexts"]["runtime"]
-        assert result["contexts"]["runtime"]["name"] == "python"  # Other fields preserved
+        assert (
+            result["contexts"]["runtime"]["name"] == "python"
+        )  # Other fields preserved
 
 
 def test_before_send_scrubs_sys_argv(mock_settings):

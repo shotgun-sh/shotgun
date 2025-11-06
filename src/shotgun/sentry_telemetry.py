@@ -73,6 +73,14 @@ def _scrub_sensitive_paths(event: dict[str, Any]) -> None:
     Args:
         event: The Sentry event dictionary to scrub
     """
+    extra = event.get("extra", {})
+    if "sys.argv" in extra:
+        argv = extra["sys.argv"]
+        if isinstance(argv, list):
+            extra["sys.argv"] = [
+                _scrub_path(arg) if isinstance(arg, str) else arg for arg in argv
+            ]
+
     # Scrub server name if present
     if "server_name" in event:
         event["server_name"] = ""
@@ -88,7 +96,10 @@ def _scrub_sensitive_paths(event: dict[str, Any]) -> None:
             if "sys.argv" in contexts["runtime"]:
                 argv = contexts["runtime"]["sys.argv"]
                 if isinstance(argv, list):
-                    contexts["runtime"]["sys.argv"] = [_scrub_path(arg) if isinstance(arg, str) else arg for arg in argv]
+                    contexts["runtime"]["sys.argv"] = [
+                        _scrub_path(arg) if isinstance(arg, str) else arg
+                        for arg in argv
+                    ]
 
     # Scrub exception stack traces
     if "exception" in event and "values" in event["exception"]:
@@ -162,7 +173,9 @@ def setup_sentry_observability() -> bool:
                 log_record.pathname = _scrub_path(log_record.pathname)
 
                 # Scrub traceback text if it exists
-                if hasattr(log_record, "exc_text") and isinstance(log_record.exc_text, str):
+                if hasattr(log_record, "exc_text") and isinstance(
+                    log_record.exc_text, str
+                ):
                     # Replace home directory in traceback text
                     home = Path.home()
                     log_record.exc_text = log_record.exc_text.replace(str(home), "~")
