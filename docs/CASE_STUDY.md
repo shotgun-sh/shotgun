@@ -20,7 +20,7 @@ Cursor, Claude Code, Copilot - they suggest code immediately. You describe a pro
 
 **They never ask: does this already exist?**
 
-This case study: usage tracking and budget enforcement for our AI agent platform's LLM calls. Traditional approach: 3–4 weeks to build a custom LLM proxy. Every AI coding agent we tried said the same: build it custom.
+This case study: building a payment system for our AI agent platform. We needed usage tracking and budget enforcement for LLM calls as part of that system. Traditional approach: 3–4 weeks to build a custom LLM proxy. Every AI coding agent we tried said the same: build it custom.
 
 Shotgun researched first. Found LiteLLM Proxy in 30 minutes. An existing solution we didn't know existed. Implementation: 5 days instead of 3–4 weeks. First paying customer: 14 hours after deployment.
 
@@ -178,7 +178,7 @@ Most teams skip step one (codebase context), step two (external research) and st
 
 ## Conclusion
 
-LLM usage tracking and billing project. Every AI coding agent said: build custom LLM proxy, 3–4 weeks.
+Payment system project for our AI agent platform. Every AI coding agent said: build custom LLM proxy for usage tracking and budgets, 3–4 weeks.
 
 Shotgun researched first with full codebase context. Found LiteLLM Proxy in 30 minutes. Combined with Stripe and glue code for payments. 5 days to deployment. First customer 14 hours later.
 
