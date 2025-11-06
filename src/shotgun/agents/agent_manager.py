@@ -615,19 +615,27 @@ class AgentManager(Widget):
         self._stream_state = _PartialStreamState()
 
         model_name = ""
+        supports_streaming = True  # Default to streaming enabled
+
         if hasattr(deps, "llm_model") and deps.llm_model is not None:
             model_name = deps.llm_model.name
+            supports_streaming = deps.llm_model.supports_streaming
 
-        # Check if it's a Shotgun account
-        is_shotgun_account = (
-            hasattr(deps, "llm_model")
-            and deps.llm_model is not None
-            and deps.llm_model.key_provider == KeyProvider.SHOTGUN
-        )
-
-        # Only disable streaming for GPT-5 if NOT a Shotgun account
-        # Shotgun accounts support streaming for GPT-5
-        is_gpt5_byok = "gpt-5" in model_name.lower() and not is_shotgun_account
+            # Add hint message if streaming is disabled for BYOK GPT-5 models
+            if not supports_streaming and deps.llm_model.key_provider == KeyProvider.BYOK:
+                self.ui_message_history.append(
+                    HintMessage(
+                        message=(
+                            "⚠️ **Streaming not available for GPT-5**\n\n"
+                            "Your OpenAI organization doesn't have streaming enabled for this model.\n\n"
+                            "**Options:**\n"
+                            "- Get a [Shotgun Account](https://shotgun.sh) - streaming works out of the box\n"
+                            "- Complete [Biometric Verification](https://platform.openai.com/settings/organization/billing/payment-methods) with OpenAI\n\n"
+                            "Continuing without streaming (responses will appear all at once)."
+                        )
+                    )
+                )
+                self._post_messages_updated()
 
         # Track message send event
         event_name = f"message_send_{self._current_agent_type.value}"
@@ -646,9 +654,7 @@ class AgentManager(Widget):
                 deps=deps,
                 usage_limits=usage_limits,
                 message_history=message_history,
-                event_stream_handler=self._handle_event_stream
-                if not is_gpt5_byok
-                else None,
+                event_stream_handler=self._handle_event_stream if supports_streaming else None,
                 **kwargs,
             )
         except ValueError as e:

@@ -237,6 +237,14 @@ class ConfigManager:
                 SecretStr(api_key_value) if api_key_value is not None else None
             )
 
+            # Reset streaming capabilities when OpenAI API key is changed
+            if not is_shotgun and provider_enum == ProviderType.OPENAI:
+                from .models import OpenAIConfig
+
+                if isinstance(provider_config, OpenAIConfig):
+                    provider_config.gpt5_supports_streaming = None
+                    provider_config.gpt5_mini_supports_streaming = None
+
         # Reject other fields
         unsupported_fields = set(kwargs.keys()) - {API_KEY_FIELD}
         if unsupported_fields:
@@ -282,6 +290,16 @@ class ConfigManager:
         # For Shotgun Account, also clear the JWT
         if is_shotgun and isinstance(provider_config, ShotgunAccountConfig):
             provider_config.supabase_jwt = None
+
+        # Reset streaming capabilities when OpenAI API key is cleared
+        if not is_shotgun:
+            provider_enum = self._ensure_provider_enum(provider)
+            if provider_enum == ProviderType.OPENAI:
+                from .models import OpenAIConfig
+
+                if isinstance(provider_config, OpenAIConfig):
+                    provider_config.gpt5_supports_streaming = None
+                    provider_config.gpt5_mini_supports_streaming = None
 
         await self.save(config)
 

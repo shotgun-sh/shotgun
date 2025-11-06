@@ -56,6 +56,10 @@ class ModelConfig(BaseModel):
     max_input_tokens: int
     max_output_tokens: int
     api_key: str
+    supports_streaming: bool = Field(
+        default=True,
+        description="Whether this model configuration supports streaming. False only for BYOK GPT-5 models without streaming enabled.",
+    )
     _model_instance: Model | None = PrivateAttr(default=None)
 
     class Config:
@@ -148,6 +152,14 @@ class OpenAIConfig(BaseModel):
     """Configuration for OpenAI provider."""
 
     api_key: SecretStr | None = None
+    gpt5_supports_streaming: bool | None = Field(
+        default=None,
+        description="Whether GPT-5 supports streaming for this API key. None = not tested yet",
+    )
+    gpt5_mini_supports_streaming: bool | None = Field(
+        default=None,
+        description="Whether GPT-5-Mini supports streaming for this API key. None = not tested yet",
+    )
 
 
 class AnthropicConfig(BaseModel):
