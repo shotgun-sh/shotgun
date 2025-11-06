@@ -1,6 +1,6 @@
 # Developer Case Study: Cursor and Claude Code Suggested Building a Proxy. Shotgun CLI Found LiteLLM Instead.
 
-*Cursor, Claude Code, and Copilot all suggested building a custom proxy for our payment system - 3–4 weeks of work. Shotgun's codebase-aware research found LiteLLM Proxy instead. Implementation took 5 days. First paying customer arrived 14 hours after deployment. 80% less development time vs building a custom proxy. Near-zero technical debt.*
+*Cursor, Claude Code, and Copilot all suggested building a custom LLM proxy to track usage and enforce budgets - 3–4 weeks of work. Shotgun's codebase-aware research found LiteLLM Proxy instead, which we integrated with Stripe and some glue code for payments. Implementation took 5 days. First paying customer arrived 14 hours after deployment. 80% less development time vs building a custom proxy. Near-zero technical debt.*
 
 **Shotgun is a Spec Driven Development CLI Tool for Developers and AI Agents.** It does the prep work your AI coding agent needs but can't do itself: reads your entire codebase, researches how features should fit, writes specs with full context, then hands that to your AI agent. Works for greenfield projects and existing codebases.
 
@@ -20,7 +20,7 @@ Cursor, Claude Code, Copilot - they suggest code immediately. You describe a pro
 
 **They never ask: does this already exist?**
 
-This case study: payment system for our AI agent platform. Traditional approach: 3–4 weeks to build a custom proxy. Every AI coding agent we tried said the same: build it custom.
+This case study: usage tracking and budget enforcement for our AI agent platform's LLM calls. Traditional approach: 3–4 weeks to build a custom LLM proxy. Every AI coding agent we tried said the same: build it custom.
 
 Shotgun researched first. Found LiteLLM Proxy in 30 minutes. An existing solution we didn't know existed. Implementation: 5 days instead of 3–4 weeks. First paying customer: 14 hours after deployment.
 
@@ -175,9 +175,9 @@ Most teams skip step one (codebase context), step two (external research) and st
 
 ## Conclusion
 
-Payment system project. Every AI coding agent said: build custom proxy, 3–4 weeks.
+LLM usage tracking and billing project. Every AI coding agent said: build custom LLM proxy, 3–4 weeks.
 
-Shotgun researched first with full codebase context. Found LiteLLM Proxy in 30 minutes. 5 days to deployment. First customer 14 hours later.
+Shotgun researched first with full codebase context. Found LiteLLM Proxy in 30 minutes. Combined with Stripe and glue code for payments. 5 days to deployment. First customer 14 hours later.
 
 > "This would have never been possible without Shotgun. The solution it discovered was so well-tailored to our problem that we were able to get paying customers in days."
 
