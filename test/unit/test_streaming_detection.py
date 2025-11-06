@@ -17,10 +17,7 @@ from shotgun.agents.config.models import (
     ShotgunConfig,
 )
 from shotgun.agents.config.provider import get_provider_model
-from shotgun.agents.config.streaming_test import (
-    check_streaming_capability,
-    check_streaming_capability_sync,
-)
+from shotgun.agents.config.streaming_test import check_streaming_capability
 
 
 @pytest.mark.asyncio
@@ -79,18 +76,6 @@ async def test_check_streaming_capability_timeout():
 
         result = await check_streaming_capability("test-key", "gpt-5")
         assert result is False
-
-
-def test_check_streaming_capability_sync():
-    """Test synchronous wrapper for streaming capability detection."""
-    with patch(
-        "shotgun.agents.config.streaming_test.check_streaming_capability"
-    ) as mock_async:
-        mock_async.return_value = True
-
-        result = check_streaming_capability_sync("test-key", "gpt-5")
-        # The sync wrapper should call the async function
-        mock_async.assert_called_once_with("test-key", "gpt-5")
 
 
 @pytest.mark.asyncio

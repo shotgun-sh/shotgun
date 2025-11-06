@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from typing import Any
 
 import httpx
 
@@ -67,27 +66,3 @@ async def check_streaming_capability(api_key: str, model_name: str) -> bool:
     # If we got here without reading any chunks, streaming didn't work
     logger.warning(f"Streaming test failed for {model_name}: no data received")
     return False
-
-
-def check_streaming_capability_sync(api_key: str, model_name: str) -> bool:
-    """Synchronous wrapper for checking streaming capability.
-
-    Args:
-        api_key: The OpenAI API key to test
-        model_name: The model name (e.g., "gpt-5", "gpt-5-mini")
-
-    Returns:
-        True if streaming is supported, False otherwise
-    """
-    try:
-        # Try to get the current event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # If we're already in an async context, create a new task
-            return asyncio.create_task(check_streaming_capability(api_key, model_name))
-        else:
-            # Otherwise, run in the existing loop
-            return loop.run_until_complete(check_streaming_capability(api_key, model_name))
-    except RuntimeError:
-        # No event loop exists, create a new one
-        return asyncio.run(check_streaming_capability(api_key, model_name))

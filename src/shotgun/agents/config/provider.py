@@ -271,7 +271,7 @@ async def get_provider_model(
 
             if streaming_capability is None:
                 # Not tested yet - run streaming test (test once for all GPT-5 models)
-                logger.info(f"Testing streaming capability for OpenAI GPT-5 family...")
+                logger.info("Testing streaming capability for OpenAI GPT-5 family...")
                 streaming_capability = await check_streaming_capability(api_key, model_name.value)
 
                 # Save result to config (applies to all OpenAI models)
