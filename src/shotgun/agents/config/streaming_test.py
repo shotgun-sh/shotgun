@@ -1,6 +1,5 @@
 """Utility for testing streaming capability of OpenAI models."""
 
-import asyncio
 import logging
 
 import httpx
