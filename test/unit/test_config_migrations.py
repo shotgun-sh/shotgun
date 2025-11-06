@@ -309,3 +309,235 @@ def test_apply_migrations_handles_missing_version():
     assert result["config_version"] == CURRENT_CONFIG_VERSION
     assert "user_id" not in result
     assert result["shotgun_instance_id"] == "test-user-id-12345"
+
+
+# Tests with populated configs (non-empty values)
+
+
+def test_migrate_v2_to_v3_with_all_providers_configured():
+    """Test v2->v3 migration preserves all provider API keys."""
+    config = V2_CONFIG.copy()
+    config["openai"]["api_key"] = "sk-proj-abc123xyz"
+    config["anthropic"]["api_key"] = "sk-ant-api03-xyz789"
+    config["google"]["api_key"] = "AIzaSyABC123XYZ789"
+    config["selected_model"] = "gpt-5"
+
+    result = _migrate_v2_to_v3(config)
+
+    assert result["config_version"] == 3
+    assert result["shotgun_instance_id"] == "test-user-id-12345"
+    assert result["openai"]["api_key"] == "sk-proj-abc123xyz"
+    assert result["anthropic"]["api_key"] == "sk-ant-api03-xyz789"
+    assert result["google"]["api_key"] == "AIzaSyABC123XYZ789"
+    assert result["selected_model"] == "gpt-5"
+
+
+def test_migrate_v2_to_v3_with_shotgun_account():
+    """Test v2->v3 migration preserves Shotgun Account key."""
+    config = V2_CONFIG.copy()
+    config["shotgun"]["api_key"] = "sg_test_key_12345"
+
+    result = _migrate_v2_to_v3(config)
+
+    assert result["config_version"] == 3
+    assert result["shotgun"]["api_key"] == "sg_test_key_12345"
+    assert result["shotgun_instance_id"] == "test-user-id-12345"
+
+
+def test_migrate_v3_to_v4_preserves_multiple_providers():
+    """Test v3->v4 migration with multiple providers configured."""
+    config = V3_CONFIG.copy()
+    config["openai"]["api_key"] = "sk-proj-openai"
+    config["anthropic"]["api_key"] = "sk-ant-anthropic"
+    config["google"]["api_key"] = "AIza-google"
+    config["shotgun"]["api_key"] = "sg_account_key"
+    config["selected_model"] = "claude-sonnet-4-5"
+
+    result = _migrate_v3_to_v4(config)
+
+    assert result["config_version"] == 4
+    assert result["marketing"] == {"messages": {}}
+    assert result["shown_welcome_screen"] is False  # Has BYOK key
+    # Verify all providers preserved
+    assert result["openai"]["api_key"] == "sk-proj-openai"
+    assert result["anthropic"]["api_key"] == "sk-ant-anthropic"
+    assert result["google"]["api_key"] == "AIza-google"
+    assert result["shotgun"]["api_key"] == "sg_account_key"
+    assert result["selected_model"] == "claude-sonnet-4-5"
+
+
+def test_migrate_v3_to_v4_with_only_shotgun_account():
+    """Test v3->v4 migration for Shotgun Account only user (no BYOK)."""
+    config = V3_CONFIG.copy()
+    config["openai"]["api_key"] = None
+    config["anthropic"]["api_key"] = None
+    config["google"]["api_key"] = None
+    config["shotgun"]["api_key"] = "sg_only_account_key"
+    config["selected_model"] = "gpt-5"
+
+    result = _migrate_v3_to_v4(config)
+
+    assert result["config_version"] == 4
+    assert "shown_welcome_screen" not in result  # No BYOK keys
+    assert result["shotgun"]["api_key"] == "sg_only_account_key"
+    assert result["selected_model"] == "gpt-5"
+
+
+def test_migrate_v4_to_v5_preserves_all_fields():
+    """Test v4->v5 migration preserves all existing fields."""
+    config = V4_CONFIG.copy()
+    config["openai"]["api_key"] = "sk-proj-test"
+    config["anthropic"]["api_key"] = "sk-ant-test"
+    config["google"]["api_key"] = "AIza-test"
+    config["shotgun"]["api_key"] = "sg_test"
+    config["selected_model"] = "claude-opus-4-1"
+    config["shown_welcome_screen"] = True
+    config["marketing"]["messages"] = {
+        "github_star_v1": {
+            "shown_at": "2025-11-01T12:00:00Z"
+        }
+    }
+
+    result = _migrate_v4_to_v5(config)
+
+    assert result["config_version"] == 5
+    assert result["openai"]["supports_streaming"] is None
+    # Verify everything else preserved
+    assert result["openai"]["api_key"] == "sk-proj-test"
+    assert result["anthropic"]["api_key"] == "sk-ant-test"
+    assert result["google"]["api_key"] == "AIza-test"
+    assert result["shotgun"]["api_key"] == "sg_test"
+    assert result["selected_model"] == "claude-opus-4-1"
+    assert result["shown_welcome_screen"] is True
+    assert result["marketing"]["messages"]["github_star_v1"]["shown_at"] == "2025-11-01T12:00:00Z"
+
+
+def test_migrate_v4_to_v5_with_multiple_marketing_messages():
+    """Test v4->v5 migration preserves multiple marketing message records."""
+    config = V4_CONFIG.copy()
+    config["marketing"]["messages"] = {
+        "github_star_v1": {"shown_at": "2025-11-01T10:00:00Z"},
+        "feedback_prompt_v1": {"shown_at": "2025-11-02T15:30:00Z"},
+        "survey_v2": {"shown_at": "2025-11-03T09:45:00Z"},
+    }
+
+    result = _migrate_v4_to_v5(config)
+
+    assert result["config_version"] == 5
+    assert len(result["marketing"]["messages"]) == 3
+    assert result["marketing"]["messages"]["github_star_v1"]["shown_at"] == "2025-11-01T10:00:00Z"
+    assert result["marketing"]["messages"]["feedback_prompt_v1"]["shown_at"] == "2025-11-02T15:30:00Z"
+    assert result["marketing"]["messages"]["survey_v2"]["shown_at"] == "2025-11-03T09:45:00Z"
+
+
+@pytest.mark.asyncio
+async def test_config_manager_loads_v3_with_supabase_jwt():
+    """Test ConfigManager preserves Supabase JWT during v3->current migration."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+
+        # Create v3 config with Supabase JWT
+        v3_with_jwt = V3_CONFIG.copy()
+        v3_with_jwt["shotgun"]["api_key"] = "sg_api_key_test"
+        v3_with_jwt["shotgun"]["supabase_jwt"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
+        v3_with_jwt["openai"]["api_key"] = "sk-proj-test"
+
+        with open(config_path, "w") as f:
+            json.dump(v3_with_jwt, f)
+
+        manager = ConfigManager(config_path=config_path)
+        config = await manager.load()
+
+        assert config.config_version == CURRENT_CONFIG_VERSION
+        assert config.shotgun.api_key.get_secret_value() == "sg_api_key_test"
+        assert config.shotgun.supabase_jwt.get_secret_value() == "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
+        assert config.openai.api_key.get_secret_value() == "sk-proj-test"
+
+
+@pytest.mark.asyncio
+async def test_config_manager_loads_v4_with_marketing_data():
+    """Test ConfigManager preserves marketing message data during v4->v5 migration."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+
+        # Create v4 config with marketing messages
+        v4_with_marketing = V4_CONFIG.copy()
+        v4_with_marketing["openai"]["api_key"] = "sk-proj-xyz"
+        v4_with_marketing["marketing"]["messages"] = {
+            "github_star_v1": {"shown_at": "2025-11-01T12:00:00Z"}
+        }
+        v4_with_marketing["shown_welcome_screen"] = True
+
+        with open(config_path, "w") as f:
+            json.dump(v4_with_marketing, f)
+
+        manager = ConfigManager(config_path=config_path)
+        config = await manager.load()
+
+        assert config.config_version == CURRENT_CONFIG_VERSION
+        assert config.openai.api_key.get_secret_value() == "sk-proj-xyz"
+        assert config.shown_welcome_screen is True
+        assert "github_star_v1" in config.marketing.messages
+        assert config.marketing.messages["github_star_v1"].shown_at.isoformat() == "2025-11-01T12:00:00+00:00"
+
+
+def test_apply_migrations_v2_to_current_with_full_config():
+    """Test complete migration path v2->v5 with fully populated config."""
+    config = V2_CONFIG.copy()
+    config["openai"]["api_key"] = "sk-proj-full-test"
+    config["anthropic"]["api_key"] = "sk-ant-full-test"
+    config["google"]["api_key"] = "AIza-full-test"
+    config["shotgun"]["api_key"] = "sg_full_test"
+    config["selected_model"] = "gemini-2.5-pro"
+
+    result = _apply_migrations(config)
+
+    # Should have all v5 fields
+    assert result["config_version"] == CURRENT_CONFIG_VERSION
+    assert result["shotgun_instance_id"] == "test-user-id-12345"  # v2->v3
+    assert "user_id" not in result  # v2->v3
+    assert result["marketing"] == {"messages": {}}  # v3->v4
+    assert result["shown_welcome_screen"] is False  # v3->v4 (has BYOK)
+    assert result["openai"]["supports_streaming"] is None  # v4->v5
+
+    # All user data preserved
+    assert result["openai"]["api_key"] == "sk-proj-full-test"
+    assert result["anthropic"]["api_key"] == "sk-ant-full-test"
+    assert result["google"]["api_key"] == "AIza-full-test"
+    assert result["shotgun"]["api_key"] == "sg_full_test"
+    assert result["selected_model"] == "gemini-2.5-pro"
+
+
+def test_apply_migrations_v3_to_current_with_partial_config():
+    """Test v3->v5 migration with only some providers configured."""
+    config = V3_CONFIG.copy()
+    config["openai"]["api_key"] = None
+    config["anthropic"]["api_key"] = "sk-ant-only"
+    config["google"]["api_key"] = None
+    config["shotgun"]["api_key"] = None
+    config["selected_model"] = "claude-haiku-4-5"
+
+    result = _apply_migrations(config)
+
+    assert result["config_version"] == CURRENT_CONFIG_VERSION
+    assert result["shotgun_instance_id"] == "test-user-id-12345"
+    assert result["anthropic"]["api_key"] == "sk-ant-only"
+    assert result["selected_model"] == "claude-haiku-4-5"
+    assert result["shown_welcome_screen"] is False  # Has BYOK key
+    assert result["marketing"]["messages"] == {}
+
+
+def test_migration_preserves_instance_id_consistency():
+    """Test that shotgun_instance_id remains consistent across all migrations."""
+    original_instance_id = "consistent-id-abc-123-xyz"
+
+    # Start with v2
+    v2_config = V2_CONFIG.copy()
+    v2_config["user_id"] = original_instance_id
+
+    # Migrate to current
+    result = _apply_migrations(v2_config)
+
+    # Instance ID should be preserved through the rename
+    assert result["shotgun_instance_id"] == original_instance_id
+    assert "user_id" not in result
