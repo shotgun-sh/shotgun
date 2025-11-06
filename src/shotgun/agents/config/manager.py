@@ -242,8 +242,7 @@ class ConfigManager:
                 from .models import OpenAIConfig
 
                 if isinstance(provider_config, OpenAIConfig):
-                    provider_config.gpt5_supports_streaming = None
-                    provider_config.gpt5_mini_supports_streaming = None
+                    provider_config.supports_streaming = None
 
         # Reject other fields
         unsupported_fields = set(kwargs.keys()) - {API_KEY_FIELD}
@@ -298,8 +297,7 @@ class ConfigManager:
                 from .models import OpenAIConfig
 
                 if isinstance(provider_config, OpenAIConfig):
-                    provider_config.gpt5_supports_streaming = None
-                    provider_config.gpt5_mini_supports_streaming = None
+                    provider_config.supports_streaming = None
 
         await self.save(config)
 

@@ -131,7 +131,7 @@ async def test_get_provider_model_gpt5_byok_not_tested():
 
                 # Verify config was updated
                 updated_config = await manager.load(force_reload=True)
-                assert updated_config.openai.gpt5_supports_streaming is True
+                assert updated_config.openai.supports_streaming is True
 
 
 @pytest.mark.asyncio
@@ -172,7 +172,7 @@ async def test_get_provider_model_gpt5_mini_byok_not_tested():
 
                 # Verify config was updated
                 updated_config = await manager.load(force_reload=True)
-                assert updated_config.openai.gpt5_mini_supports_streaming is False
+                assert updated_config.openai.supports_streaming is False
 
 
 @pytest.mark.asyncio
@@ -184,7 +184,7 @@ async def test_get_provider_model_gpt5_byok_already_tested():
         # Create config with streaming capability already tested
         config = ShotgunConfig(
             openai=OpenAIConfig(
-                api_key=SecretStr("test-key"), gpt5_supports_streaming=False
+                api_key=SecretStr("test-key"), supports_streaming=False
             ),
             shotgun_instance_id="test-instance",
         )
@@ -244,12 +244,11 @@ async def test_update_provider_resets_streaming_capabilities():
         config_path = Path(tmpdir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # Create config with streaming capabilities already set
+        # Create config with streaming capability already set
         config = ShotgunConfig(
             openai=OpenAIConfig(
                 api_key=SecretStr("old-key"),
-                gpt5_supports_streaming=True,
-                gpt5_mini_supports_streaming=False,
+                supports_streaming=True,
             ),
             shotgun_instance_id="test-instance",
         )
@@ -258,10 +257,9 @@ async def test_update_provider_resets_streaming_capabilities():
         # Update the API key
         await manager.update_provider(ProviderType.OPENAI, api_key="new-key")
 
-        # Verify streaming capabilities were reset
+        # Verify streaming capability was reset
         updated_config = await manager.load(force_reload=True)
-        assert updated_config.openai.gpt5_supports_streaming is None
-        assert updated_config.openai.gpt5_mini_supports_streaming is None
+        assert updated_config.openai.supports_streaming is None
 
 
 @pytest.mark.asyncio
@@ -271,12 +269,11 @@ async def test_clear_provider_key_resets_streaming_capabilities():
         config_path = Path(tmpdir) / "config.json"
         manager = ConfigManager(config_path=config_path)
 
-        # Create config with streaming capabilities already set
+        # Create config with streaming capability already set
         config = ShotgunConfig(
             openai=OpenAIConfig(
                 api_key=SecretStr("test-key"),
-                gpt5_supports_streaming=True,
-                gpt5_mini_supports_streaming=False,
+                supports_streaming=True,
             ),
             shotgun_instance_id="test-instance",
         )
@@ -285,8 +282,7 @@ async def test_clear_provider_key_resets_streaming_capabilities():
         # Clear the API key
         await manager.clear_provider_key(ProviderType.OPENAI)
 
-        # Verify streaming capabilities were reset
+        # Verify streaming capability was reset
         updated_config = await manager.load(force_reload=True)
         assert updated_config.openai.api_key is None
-        assert updated_config.openai.gpt5_supports_streaming is None
-        assert updated_config.openai.gpt5_mini_supports_streaming is None
+        assert updated_config.openai.supports_streaming is None

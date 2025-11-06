@@ -266,26 +266,19 @@ async def get_provider_model(
         # Check and test streaming capability for GPT-5 family models
         supports_streaming = True  # Default to True for all models
         if model_name in (ModelName.GPT_5, ModelName.GPT_5_MINI):
-            # Determine which config field to check/update
-            streaming_field = (
-                "gpt5_supports_streaming"
-                if model_name == ModelName.GPT_5
-                else "gpt5_mini_supports_streaming"
-            )
-
             # Check if streaming capability has been tested
-            streaming_capability = getattr(config.openai, streaming_field)
+            streaming_capability = config.openai.supports_streaming
 
             if streaming_capability is None:
-                # Not tested yet - run streaming test
-                logger.info(f"Testing streaming capability for {model_name.value}...")
+                # Not tested yet - run streaming test (test once for all GPT-5 models)
+                logger.info(f"Testing streaming capability for OpenAI GPT-5 family...")
                 streaming_capability = await check_streaming_capability(api_key, model_name.value)
 
-                # Save result to config
-                setattr(config.openai, streaming_field, streaming_capability)
+                # Save result to config (applies to all OpenAI models)
+                config.openai.supports_streaming = streaming_capability
                 await config_manager.save(config)
                 logger.info(
-                    f"Streaming test result for {model_name.value}: "
+                    f"Streaming test result: "
                     f"{'enabled' if streaming_capability else 'disabled'}"
                 )
 

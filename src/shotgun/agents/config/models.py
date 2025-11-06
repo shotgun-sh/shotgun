@@ -152,13 +152,9 @@ class OpenAIConfig(BaseModel):
     """Configuration for OpenAI provider."""
 
     api_key: SecretStr | None = None
-    gpt5_supports_streaming: bool | None = Field(
+    supports_streaming: bool | None = Field(
         default=None,
-        description="Whether GPT-5 supports streaming for this API key. None = not tested yet",
-    )
-    gpt5_mini_supports_streaming: bool | None = Field(
-        default=None,
-        description="Whether GPT-5-Mini supports streaming for this API key. None = not tested yet",
+        description="Whether streaming is supported for this API key. None = not tested yet",
     )
 
 

@@ -24,11 +24,12 @@ async def check_streaming_capability(api_key: str, model_name: str) -> bool:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+    # GPT-5 family uses max_completion_tokens instead of max_tokens
     payload = {
         "model": model_name,
         "messages": [{"role": "user", "content": "test"}],
         "stream": True,
-        "max_tokens": 10,
+        "max_completion_tokens": 10,
     }
 
     try:
