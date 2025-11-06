@@ -12,7 +12,8 @@ LABEL org.opencontainers.image.title="Shotgun" \
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_SYSTEM_PYTHON=1
+    UV_SYSTEM_PYTHON=1 \
+    SHOTGUN_BUILD_SKIP_VALIDATION=true
 
 # Install uv for dependency management
 RUN pip install --no-cache-dir uv
