@@ -110,6 +110,14 @@ class ConfigManager:
                 data["config_version"] = 4
                 logger.info("Migrated config v3->v4: added marketing configuration")
 
+            # Migration: Add streaming capability field for v4 -> v5
+            if data.get("config_version", 4) == 4:
+                if "openai" in data and isinstance(data["openai"], dict):
+                    if "supports_streaming" not in data["openai"]:
+                        data["openai"]["supports_streaming"] = None
+                data["config_version"] = 5
+                logger.info("Migrated config v4->v5: added streaming capability detection")
+
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
 
@@ -239,8 +247,6 @@ class ConfigManager:
 
             # Reset streaming capabilities when OpenAI API key is changed
             if not is_shotgun and provider_enum == ProviderType.OPENAI:
-                from .models import OpenAIConfig
-
                 if isinstance(provider_config, OpenAIConfig):
                     provider_config.supports_streaming = None
 
@@ -294,8 +300,6 @@ class ConfigManager:
         if not is_shotgun:
             provider_enum = self._ensure_provider_enum(provider)
             if provider_enum == ProviderType.OPENAI:
-                from .models import OpenAIConfig
-
                 if isinstance(provider_config, OpenAIConfig):
                     provider_config.supports_streaming = None
 
