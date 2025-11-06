@@ -2,7 +2,7 @@
 name = "shotgun-sh"
 version = "0.1.0.dev3"
 description = "AI-powered research, planning, and task management CLI tool"
-readme = "docs/README_PYPI.md"
+readme = "README.md"
 license = { text = "MIT" }
 authors = [
     { name = "Proofs.io", email = "hello@proofs.io" }
@@ -10,7 +10,7 @@ authors = [
 requires-python = ">=3.11"
 keywords = ["cli", "ai", "agent", "research", "planning", "task-management", "productivity", "llm", "pydantic-ai"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -82,7 +82,6 @@ packages = ["src/shotgun"]
 include = [
     "/src",
     "/README.md",
-    "/docs/README_PYPI.md",
     "/LICENSE",
     "/pyproject.toml"
 ]
