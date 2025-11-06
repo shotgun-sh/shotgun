@@ -333,6 +333,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            SHOTGUN_SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+            SHOTGUN_POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
+            SHOTGUN_POSTHOG_PROJECT_ID=${{ secrets.POSTHOG_PROJECT_ID }}
+            SHOTGUN_LOGFIRE_ENABLED=${{ needs.build-and-package.outputs.is_dev == 'true' && 'true' || '' }}
+            SHOTGUN_LOGFIRE_TOKEN=${{ needs.build-and-package.outputs.is_dev == 'true' && secrets.LOGFIRE_TOKEN || '' }}
 
   notify-slack:
     runs-on: ubuntu-latest
