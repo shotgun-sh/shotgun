@@ -47,7 +47,6 @@ class ChatHistory(Widget):
         super().__init__()
         self.items: Sequence[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
-        self.partial_response = None
         self._rendered_count = 0  # Track how many messages have been mounted
 
     def compose(self) -> ComposeResult:
@@ -63,7 +62,7 @@ class ChatHistory(Widget):
                     yield HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
                     yield AgentResponseWidget(item)
-            yield PartialResponseWidget(self.partial_response).data_bind(
+            yield PartialResponseWidget(None).data_bind(
                 item=ChatHistory.partial_response
             )
 

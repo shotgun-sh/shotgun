@@ -104,7 +104,6 @@ class ChatScreen(Screen[None]):
     history: PromptHistory = PromptHistory()
     messages = reactive(list[ModelMessage | HintMessage]())
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
-    partial_message: reactive[ModelMessage | None] = reactive(None)
 
     # Q&A mode state (for structured output clarifying questions)
     qa_mode = reactive(False)
@@ -579,8 +578,6 @@ class ChatScreen(Screen[None]):
 
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
-        self.partial_message = event.message
-
         # Filter event.messages to exclude ModelRequest with only ToolReturnPart
         # These are intermediate tool results that would render as empty (UserQuestionWidget
         # filters out ToolReturnPart in format_prompt_parts), causing user messages to disappear
@@ -604,9 +601,7 @@ class ChatScreen(Screen[None]):
         )
 
         # Use widget coordinator to set partial response
-        self.widget_coordinator.set_partial_response(
-            self.partial_message, new_message_list
-        )
+        self.widget_coordinator.set_partial_response(event.message, new_message_list)
 
         # Skip context updates for file write operations (they don't add to input context)
         has_file_write = any(
