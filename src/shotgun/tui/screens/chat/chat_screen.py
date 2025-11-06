@@ -12,6 +12,7 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     TextPart,
+    ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
 )
@@ -116,7 +117,7 @@ class ChatScreen(Screen[None]):
 
     # Throttle context indicator updates (in seconds)
     _last_context_update: float = 0.0
-    _context_update_throttle: float = 0.25  # 250ms
+    _context_update_throttle: float = 5.0  # 5 seconds
 
     def __init__(
         self,
@@ -607,8 +608,22 @@ class ChatScreen(Screen[None]):
             self.partial_message, new_message_list
         )
 
+        # Skip context updates for file write operations (they don't add to input context)
+        has_file_write = any(
+            isinstance(msg, ModelResponse)
+            and any(
+                isinstance(part, ToolCallPart)
+                and part.tool_name in ("write_file", "append_file")
+                for part in msg.parts
+            )
+            for msg in event.messages
+        )
+
+        if has_file_write:
+            return  # Skip context update for file writes
+
         # Throttle context indicator updates to improve performance during streaming
-        # Only update at most once per 250ms to avoid excessive token calculations
+        # Only update at most once per 5 seconds to avoid excessive token calculations
         current_time = time.time()
         if current_time - self._last_context_update >= self._context_update_throttle:
             self._last_context_update = current_time
