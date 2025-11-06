@@ -61,7 +61,6 @@ cover/
 
 # Documentation
 docs/
-!docs/README_PYPI.md
 !docs/README_DOCKER.md
 *.md
 !README.md

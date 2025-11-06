@@ -246,6 +246,25 @@ jobs:
       - name: Run trufflehog scan (pass 2 - uv.lock only, exclude SentryToken)
         run: trufflehog git file://. --fail --no-update --include-paths=.github/trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
 
+  docker-build-test:
+    name: Docker build test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: shotgun:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   notify-slack-on-secret-found:
     runs-on: ubuntu-latest
     needs: [secret-scanning]
@@ -367,7 +386,7 @@ jobs:
 
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, test-cli-basics, check-permissions, test-cli-commands, secret-scanning]
+    needs: [validate-pr-title, basic-pr-check, test-cli-basics, check-permissions, test-cli-commands, secret-scanning, docker-build-test]
     if: always()
 
     steps:
@@ -379,13 +398,15 @@ jobs:
           echo "check-permissions: ${{ needs.check-permissions.result }}"
           echo "test-cli-commands: ${{ needs.test-cli-commands.result }}"
           echo "secret-scanning: ${{ needs.secret-scanning.result }}"
+          echo "docker-build-test: ${{ needs.docker-build-test.result }}"
 
           # Required jobs that must always succeed
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
                 "${{ needs.basic-pr-check.result }}" != "success" || \
                 "${{ needs.test-cli-basics.result }}" != "success" || \
                 "${{ needs.check-permissions.result }}" != "success" || \
-                "${{ needs.secret-scanning.result }}" != "success" ]]; then
+                "${{ needs.secret-scanning.result }}" != "success" || \
+                "${{ needs.docker-build-test.result }}" != "success" ]]; then
             echo "❌ One or more required checks failed or were cancelled"
             exit 1
           fi
