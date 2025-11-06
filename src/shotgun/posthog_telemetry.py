@@ -18,6 +18,9 @@ logger = get_early_logger(__name__)
 # Global PostHog client instance
 _posthog_client = None
 
+# Cache the shotgun instance ID to avoid async calls during event tracking
+_shotgun_instance_id: str | None = None
+
 
 def setup_posthog_observability() -> bool:
     """Set up PostHog analytics for usage tracking.
@@ -25,7 +28,7 @@ def setup_posthog_observability() -> bool:
     Returns:
         True if PostHog was successfully set up, False otherwise
     """
-    global _posthog_client
+    global _posthog_client, _shotgun_instance_id
 
     try:
         # Check if PostHog is already initialized
@@ -57,31 +60,20 @@ def setup_posthog_observability() -> bool:
         # Store the client for later use
         _posthog_client = posthog
 
-        # Set user context with anonymous shotgun instance ID from config
+        # Cache the shotgun instance ID for later use (avoids async issues)
         try:
             import asyncio
 
             config_manager = get_config_manager()
-            shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
-
-            # Identify the user in PostHog
-            posthog.identify(  # type: ignore[attr-defined]
-                distinct_id=shotgun_instance_id,
-                properties={
-                    "version": __version__,
-                    "environment": environment,
-                },
-            )
-
-            # Set default properties for all events
-            posthog.disabled = False
-            posthog.personal_api_key = None  # Not needed for event tracking
+            _shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
 
             logger.debug(
-                "PostHog user identified with anonymous ID: %s", shotgun_instance_id
+                "PostHog initialized with shotgun instance ID: %s",
+                _shotgun_instance_id,
             )
         except Exception as e:
-            logger.warning("Failed to set user context: %s", e)
+            logger.warning("Failed to load shotgun instance ID: %s", e)
+            # Continue anyway - we'll try to get it during event tracking
 
         logger.debug(
             "PostHog analytics configured successfully (environment: %s, version: %s)",
@@ -102,18 +94,19 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         event_name: Name of the event to track
         properties: Optional properties to include with the event
     """
-    global _posthog_client
+    global _posthog_client, _shotgun_instance_id
 
     if _posthog_client is None:
         logger.debug("PostHog not initialized, skipping event: %s", event_name)
         return
 
     try:
-        import asyncio
-
-        # Get shotgun instance ID for tracking
-        config_manager = get_config_manager()
-        shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
+        # Use cached instance ID (loaded during setup)
+        if _shotgun_instance_id is None:
+            logger.warning(
+                "Shotgun instance ID not available, skipping event: %s", event_name
+            )
+            return
 
         # Add version and environment to properties
         if properties is None:
@@ -128,7 +121,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
 
         # Track the event using PostHog's capture method
         _posthog_client.capture(
-            distinct_id=shotgun_instance_id, event=event_name, properties=properties
+            distinct_id=_shotgun_instance_id, event=event_name, properties=properties
         )
         logger.debug("Tracked PostHog event: %s", event_name)
     except Exception as e:
