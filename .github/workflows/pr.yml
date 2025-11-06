@@ -272,6 +272,8 @@ jobs:
           tags: shotgun:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            SHOTGUN_BUILD_SKIP_VALIDATION=true
 
   notify-slack-on-secret-found:
     runs-on: ubuntu-latest

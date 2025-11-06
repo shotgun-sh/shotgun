@@ -1,6 +1,15 @@
 # Use Python 3.13 slim as base image
 FROM python:3.13-slim
 
+# Build arguments for telemetry configuration
+# These are used during the build process to embed analytics keys
+ARG SHOTGUN_SENTRY_DSN=""
+ARG SHOTGUN_POSTHOG_API_KEY=""
+ARG SHOTGUN_POSTHOG_PROJECT_ID=""
+ARG SHOTGUN_LOGFIRE_ENABLED=""
+ARG SHOTGUN_LOGFIRE_TOKEN=""
+ARG SHOTGUN_BUILD_SKIP_VALIDATION=""
+
 # OCI annotations for package metadata
 LABEL org.opencontainers.image.title="Shotgun" \
       org.opencontainers.image.description="AI-powered CLI tool for research, planning, and task management. Always use :latest for production - see README for details." \
@@ -12,8 +21,7 @@ LABEL org.opencontainers.image.title="Shotgun" \
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_SYSTEM_PYTHON=1 \
-    SHOTGUN_BUILD_SKIP_VALIDATION=true
+    UV_SYSTEM_PYTHON=1
 
 # Install uv for dependency management
 RUN pip install --no-cache-dir uv
@@ -31,7 +39,14 @@ COPY --chown=shotgun:shotgun README.md LICENSE ./
 COPY --chown=shotgun:shotgun docs/README_DOCKER.md ./docs/
 
 # Install dependencies
-RUN uv sync --frozen --no-dev
+# Pass build args as environment variables for the build hook
+RUN SHOTGUN_SENTRY_DSN="${SHOTGUN_SENTRY_DSN}" \
+    SHOTGUN_POSTHOG_API_KEY="${SHOTGUN_POSTHOG_API_KEY}" \
+    SHOTGUN_POSTHOG_PROJECT_ID="${SHOTGUN_POSTHOG_PROJECT_ID}" \
+    SHOTGUN_LOGFIRE_ENABLED="${SHOTGUN_LOGFIRE_ENABLED}" \
+    SHOTGUN_LOGFIRE_TOKEN="${SHOTGUN_LOGFIRE_TOKEN}" \
+    SHOTGUN_BUILD_SKIP_VALIDATION="${SHOTGUN_BUILD_SKIP_VALIDATION}" \
+    uv sync --frozen --no-dev
 
 # Create directories for workspace and config
 RUN mkdir -p /workspace /home/shotgun/.shotgun-sh && \
