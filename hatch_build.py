@@ -20,11 +20,18 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
             for marker in ["dev", "rc", "alpha", "beta", "a", "b"]
         )
 
+        # Check if validation should be skipped (for test/development environments)
+        skip_validation = os.environ.get("SHOTGUN_BUILD_SKIP_VALIDATION", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
         # Get Sentry configuration from environment (SHOTGUN_ prefix for production builds)
         sentry_dsn = os.environ.get("SHOTGUN_SENTRY_DSN", "")
 
-        # Validate that Sentry DSN is present for all builds
-        if not sentry_dsn:
+        # Validate that Sentry DSN is present for all builds (unless skipped)
+        if not skip_validation and not sentry_dsn:
             raise ValueError(
                 "❌ SHOTGUN_SENTRY_DSN is required for builds but not found in environment. "
                 "Ensure the GitHub secret SENTRY_DSN is set and passed to the build."
@@ -34,18 +41,19 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
         posthog_api_key = os.environ.get("SHOTGUN_POSTHOG_API_KEY", "")
         posthog_project_id = os.environ.get("SHOTGUN_POSTHOG_PROJECT_ID", "")
 
-        # Validate that PostHog keys are present for all builds
+        # Validate that PostHog keys are present for all builds (unless skipped)
         # This ensures we never deploy without analytics configured
-        if not posthog_api_key:
-            raise ValueError(
-                "❌ SHOTGUN_POSTHOG_API_KEY is required for builds but not found in environment. "
-                "Ensure the GitHub secret POSTHOG_API_KEY is set and passed to the build."
-            )
-        if not posthog_project_id:
-            raise ValueError(
-                "❌ SHOTGUN_POSTHOG_PROJECT_ID is required for builds but not found in environment. "
-                "Ensure the GitHub secret POSTHOG_PROJECT_ID is set and passed to the build."
-            )
+        if not skip_validation:
+            if not posthog_api_key:
+                raise ValueError(
+                    "❌ SHOTGUN_POSTHOG_API_KEY is required for builds but not found in environment. "
+                    "Ensure the GitHub secret POSTHOG_API_KEY is set and passed to the build."
+                )
+            if not posthog_project_id:
+                raise ValueError(
+                    "❌ SHOTGUN_POSTHOG_PROJECT_ID is required for builds but not found in environment. "
+                    "Ensure the GitHub secret POSTHOG_PROJECT_ID is set and passed to the build."
+                )
 
         # Get Logfire configuration (SHOTGUN_ prefix, only for dev builds)
         logfire_enabled = ""
