@@ -1,6 +1,6 @@
 # Developer Case Study: Cursor and Claude Code Suggested Building a Proxy. Shotgun CLI Found LiteLLM Instead.
 
-*Cursor, Claude Code, and Copilot all suggested building a custom proxy for our payment system - 3–4 weeks of work. Shotgun's codebase-aware research found LiteLLM Proxy instead. Implementation took 5 days. First paying customer arrived 14 hours after deployment. 80% less development time vs building a custom proxy. Near-zero technical debt.*
+*Cursor, Claude Code, and Copilot all suggested building a custom LLM proxy to track usage and enforce budgets - 3–4 weeks of work. Shotgun's codebase-aware research found LiteLLM Proxy instead, which we integrated with Stripe and some glue code for payments. Implementation took 5 days. First paying customer arrived 14 hours after deployment. 80% less development time vs building a custom proxy. Near-zero technical debt.*
 
 **Shotgun is a Spec Driven Development CLI Tool for Developers and AI Agents.** It does the prep work your AI coding agent needs but can't do itself: reads your entire codebase, researches how features should fit, writes specs with full context, then hands that to your AI agent. Works for greenfield projects and existing codebases.
 
@@ -20,7 +20,7 @@ Cursor, Claude Code, Copilot - they suggest code immediately. You describe a pro
 
 **They never ask: does this already exist?**
 
-This case study: payment system for our AI agent platform. Traditional approach: 3–4 weeks to build a custom proxy. Every AI coding agent we tried said the same: build it custom.
+This case study: building a payment system for our AI agent platform. We needed usage tracking and budget enforcement for LLM calls as part of that system. Traditional approach: 3–4 weeks to build a custom LLM proxy. Every AI coding agent we tried said the same: build it custom.
 
 Shotgun researched first. Found LiteLLM Proxy in 30 minutes. An existing solution we didn't know existed. Implementation: 5 days instead of 3–4 weeks. First paying customer: 14 hours after deployment.
 
@@ -38,9 +38,10 @@ Shotgun researched first. Found LiteLLM Proxy in 30 minutes. An existing solutio
 We were building an AI agents platform. Users run LLM API calls through our system. We needed to charge them for usage without exposing our API keys.
 
 ### Requirements:
+- Real-time usage tracking for LLM calls
 - Usage-based billing for LLM calls
 - API key protection (users never see our keys)
-- Budget limits at team and user level
+- Budget limits at global, team, and user levels
 - Works with our existing Pydantic AI setup
 
 ### Traditional build approach:
@@ -92,7 +93,8 @@ Most of that was Shotgun reading documentation for solutions we'd never heard of
 
 It sits between your application and LLM providers. Handles everything we were about to build:
 
-- **Budget enforcement** at team and user level. Set limits, requests stop when hit. Built-in.
+- **Usage tracking** for all LLM calls. Real-time spending metrics per request. Built-in.
+- **Budget enforcement** at global, team, and user levels. Set limits, requests stop when hit. Built-in.
 - **API key protection** through virtual keys. Users never see your actual OpenAI/Anthropic keys.
 - **Pydantic AI compatible.** Change the endpoint URL. Everything else stays the same.
 - **Infrastructure cost:** ~$100/month self-hosted. No development needed.
@@ -103,8 +105,9 @@ It sits between your application and LLM providers. Handles everything we were a
 | What We Almost Built | What We Actually Did |
 |---------------------|---------------------|
 | Custom proxy: 3–4 weeks | LiteLLM config: 2 hours |
+| Usage tracking system | built-in |
 | Event management system | built-in |
-| Budget logic | built-in |
+| Budget logic (global/team/user) | built-in |
 | Security review of custom code | battle-tested open source |
 
 **We were about to double our codebase to build what already existed.**
@@ -175,9 +178,9 @@ Most teams skip step one (codebase context), step two (external research) and st
 
 ## Conclusion
 
-Payment system project. Every AI coding agent said: build custom proxy, 3–4 weeks.
+Payment system project for our AI agent platform. Every AI coding agent said: build custom LLM proxy for usage tracking and budgets, 3–4 weeks.
 
-Shotgun researched first with full codebase context. Found LiteLLM Proxy in 30 minutes. 5 days to deployment. First customer 14 hours later.
+Shotgun researched first with full codebase context. Found LiteLLM Proxy in 30 minutes. Combined with Stripe and glue code for payments. 5 days to deployment. First customer 14 hours later.
 
 > "This would have never been possible without Shotgun. The solution it discovered was so well-tailored to our problem that we were able to get paying customers in days."
 
