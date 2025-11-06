@@ -38,9 +38,10 @@ Shotgun researched first. Found LiteLLM Proxy in 30 minutes. An existing solutio
 We were building an AI agents platform. Users run LLM API calls through our system. We needed to charge them for usage without exposing our API keys.
 
 ### Requirements:
+- Real-time usage tracking for LLM calls
 - Usage-based billing for LLM calls
 - API key protection (users never see our keys)
-- Budget limits at team and user level
+- Budget limits at global, team, and user levels
 - Works with our existing Pydantic AI setup
 
 ### Traditional build approach:
@@ -92,7 +93,8 @@ Most of that was Shotgun reading documentation for solutions we'd never heard of
 
 It sits between your application and LLM providers. Handles everything we were about to build:
 
-- **Budget enforcement** at team and user level. Set limits, requests stop when hit. Built-in.
+- **Usage tracking** for all LLM calls. Real-time spending metrics per request. Built-in.
+- **Budget enforcement** at global, team, and user levels. Set limits, requests stop when hit. Built-in.
 - **API key protection** through virtual keys. Users never see your actual OpenAI/Anthropic keys.
 - **Pydantic AI compatible.** Change the endpoint URL. Everything else stays the same.
 - **Infrastructure cost:** ~$100/month self-hosted. No development needed.
@@ -103,8 +105,9 @@ It sits between your application and LLM providers. Handles everything we were a
 | What We Almost Built | What We Actually Did |
 |---------------------|---------------------|
 | Custom proxy: 3–4 weeks | LiteLLM config: 2 hours |
+| Usage tracking system | built-in |
 | Event management system | built-in |
-| Budget logic | built-in |
+| Budget logic (global/team/user) | built-in |
 | Security review of custom code | battle-tested open source |
 
 **We were about to double our codebase to build what already existed.**
