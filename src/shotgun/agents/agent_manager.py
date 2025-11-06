@@ -622,7 +622,10 @@ class AgentManager(Widget):
             supports_streaming = deps.llm_model.supports_streaming
 
             # Add hint message if streaming is disabled for BYOK GPT-5 models
-            if not supports_streaming and deps.llm_model.key_provider == KeyProvider.BYOK:
+            if (
+                not supports_streaming
+                and deps.llm_model.key_provider == KeyProvider.BYOK
+            ):
                 self.ui_message_history.append(
                     HintMessage(
                         message=(
@@ -654,7 +657,9 @@ class AgentManager(Widget):
                 deps=deps,
                 usage_limits=usage_limits,
                 message_history=message_history,
-                event_stream_handler=self._handle_event_stream if supports_streaming else None,
+                event_stream_handler=self._handle_event_stream
+                if supports_streaming
+                else None,
                 **kwargs,
             )
         except ValueError as e:

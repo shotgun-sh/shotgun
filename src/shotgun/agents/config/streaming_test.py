@@ -32,7 +32,9 @@ async def check_streaming_capability(api_key: str, model_name: str) -> bool:
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            async with client.stream("POST", url, json=payload, headers=headers) as response:
+            async with client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as response:
                 # Check if we get a successful response
                 if response.status_code != 200:
                     logger.warning(
@@ -59,7 +61,9 @@ async def check_streaming_capability(api_key: str, model_name: str) -> bool:
         logger.warning(f"Streaming test failed for {model_name}: {e}")
         return False
     except Exception as e:
-        logger.warning(f"Streaming test failed for {model_name} with unexpected error: {e}")
+        logger.warning(
+            f"Streaming test failed for {model_name} with unexpected error: {e}"
+        )
         return False
 
     # If we got here without reading any chunks, streaming didn't work

@@ -147,7 +147,9 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     # Apply migrations sequentially
     while current_version < CURRENT_CONFIG_VERSION:
         if current_version in migrations:
-            logger.info(f"Applying migration from v{current_version} to v{current_version + 1}")
+            logger.info(
+                f"Applying migration from v{current_version} to v{current_version + 1}"
+            )
             data = migrations[current_version](data)
             current_version = data.get("config_version", current_version + 1)
         else:
