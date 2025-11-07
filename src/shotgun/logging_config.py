@@ -30,11 +30,21 @@ def get_log_directory() -> Path:
 def cleanup_old_log_files(log_dir: Path, max_files: int) -> None:
     """Remove old log files, keeping only the most recent ones.
 
+    Also removes the legacy shotgun.log file if it exists.
+
     Args:
         log_dir: Directory containing log files
         max_files: Maximum number of log files to keep
     """
     try:
+        # Remove legacy non-timestamped log file if it exists
+        legacy_log = log_dir / "shotgun.log"
+        if legacy_log.exists():
+            try:
+                legacy_log.unlink()
+            except OSError:
+                pass  # noqa: S110
+
         # Find all shotgun log files
         log_files = sorted(
             log_dir.glob("shotgun-*.log"),

@@ -165,3 +165,29 @@ def test_cleanup_old_log_files_with_identical_mtimes(tmp_path: Path) -> None:
     # Verify exactly 2 files remain
     remaining_files = list(tmp_path.glob("shotgun-*.log"))
     assert len(remaining_files) == 2
+
+
+def test_cleanup_removes_legacy_log_file(tmp_path: Path) -> None:
+    """Test that cleanup removes the legacy shotgun.log file."""
+    # Create legacy log file
+    legacy_log = tmp_path / "shotgun.log"
+    legacy_log.touch()
+
+    # Create some timestamped log files
+    for i in range(3):
+        log_file = tmp_path / f"shotgun-2024010{i}T120000Z.log"
+        log_file.touch()
+        time.sleep(0.01)
+
+    # Verify legacy file exists before cleanup
+    assert legacy_log.exists()
+
+    # Run cleanup
+    cleanup_old_log_files(tmp_path, max_files=10)
+
+    # Verify legacy file was removed
+    assert not legacy_log.exists()
+
+    # Verify timestamped files still exist (under the limit)
+    remaining_files = list(tmp_path.glob("shotgun-*.log"))
+    assert len(remaining_files) == 3
