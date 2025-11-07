@@ -633,7 +633,10 @@ class AgentManager(Widget):
                             "Your OpenAI organization doesn't have streaming enabled for this model.\n\n"
                             "**Options:**\n"
                             "- Get a [Shotgun Account](https://shotgun.sh) - streaming works out of the box\n"
-                            "- Complete [Biometric Verification](https://platform.openai.com/settings/organization/billing/payment-methods) with OpenAI\n\n"
+                            "- Complete [Biometric Verification](https://platform.openai.com/settings/organization/general) with OpenAI, then:\n"
+                            "  1. Press `Ctrl+P` → Open Provider Setup\n"
+                            "  2. Select OpenAI → Clear key\n"
+                            "  3. Re-add your OpenAI API key\n\n"
                             "Continuing without streaming (responses will appear all at once)."
                         )
                     )
