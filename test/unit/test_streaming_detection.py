@@ -41,13 +41,13 @@ async def test_check_streaming_capability_success():
         mock_client.return_value.__aenter__.return_value = mock_client_instance
         mock_client.return_value.__aexit__.return_value = None
 
-        result = await check_streaming_capability("test-key", "gpt-5")
+        result = await check_streaming_capability("test-key", "gpt-5", max_attempts=1)
         assert result is True
 
 
 @pytest.mark.asyncio
 async def test_check_streaming_capability_failure_http_error():
-    """Test streaming capability detection with HTTP error."""
+    """Test streaming capability detection with HTTP error (403 = definitive failure)."""
     mock_response = MagicMock()
     mock_response.status_code = 403
 
@@ -61,21 +61,61 @@ async def test_check_streaming_capability_failure_http_error():
         mock_client.return_value.__aenter__.return_value = mock_client_instance
         mock_client.return_value.__aexit__.return_value = None
 
-        result = await check_streaming_capability("test-key", "gpt-5")
+        # 403 is a definitive error - should fail immediately without retries
+        result = await check_streaming_capability("test-key", "gpt-5", max_attempts=3)
         assert result is False
 
 
 @pytest.mark.asyncio
 async def test_check_streaming_capability_timeout():
-    """Test streaming capability detection with timeout."""
+    """Test streaming capability detection with timeout (retries then fails)."""
     with patch("httpx.AsyncClient") as mock_client:
         mock_client_instance = MagicMock()
         mock_client_instance.stream.side_effect = httpx.TimeoutException("Timeout")
         mock_client.return_value.__aenter__.return_value = mock_client_instance
         mock_client.return_value.__aexit__.return_value = None
 
-        result = await check_streaming_capability("test-key", "gpt-5")
+        # Should retry 3 times and then fail
+        result = await check_streaming_capability("test-key", "gpt-5", max_attempts=3)
         assert result is False
+
+
+@pytest.mark.asyncio
+async def test_check_streaming_capability_retry_success():
+    """Test streaming capability succeeds after initial failures."""
+
+    async def mock_aiter_bytes():
+        yield b"data: test"
+
+    # First attempt fails with 500, second attempt succeeds
+    mock_response_fail = MagicMock()
+    mock_response_fail.status_code = 500
+
+    mock_response_success = MagicMock()
+    mock_response_success.status_code = 200
+    mock_response_success.aiter_bytes = mock_aiter_bytes
+
+    with patch("httpx.AsyncClient") as mock_client:
+        mock_stream_context_fail = AsyncMock()
+        mock_stream_context_fail.__aenter__.return_value = mock_response_fail
+        mock_stream_context_fail.__aexit__.return_value = None
+
+        mock_stream_context_success = AsyncMock()
+        mock_stream_context_success.__aenter__.return_value = mock_response_success
+        mock_stream_context_success.__aexit__.return_value = None
+
+        mock_client_instance = MagicMock()
+        # First call returns 500, second call returns 200
+        mock_client_instance.stream.side_effect = [
+            mock_stream_context_fail,
+            mock_stream_context_success,
+        ]
+        mock_client.return_value.__aenter__.return_value = mock_client_instance
+        mock_client.return_value.__aexit__.return_value = None
+
+        # Should succeed on second attempt
+        result = await check_streaming_capability("test-key", "gpt-5", max_attempts=3)
+        assert result is True
 
 
 @pytest.mark.asyncio
