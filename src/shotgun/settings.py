@@ -108,6 +108,11 @@ class LoggingSettings(BaseSettings):
         default=True,
         description="Enable file logging output",
     )
+    max_log_files: int = Field(
+        default=10,
+        description="Maximum number of log files to keep (older files are deleted)",
+        ge=1,
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="SHOTGUN_",
