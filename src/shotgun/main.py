@@ -21,7 +21,7 @@ import typer
 from dotenv import load_dotenv
 
 from shotgun import __version__
-from shotgun.agents.config import get_config_manager
+from shotgun.agents.config import ConfigMigrationError, get_config_manager
 from shotgun.cli import (
     clear,
     codebase,
@@ -58,8 +58,17 @@ logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 try:
     import asyncio
 
+    from rich.console import Console
+
     config_manager = get_config_manager()
     asyncio.run(config_manager.load())  # Ensure config is loaded at startup
+except ConfigMigrationError as e:
+    # Show user-friendly migration error and exit
+    console = Console(stderr=True)
+    console.print("\n[bold red]Configuration Migration Failed[/bold red]\n", style="red")
+    console.print(str(e))
+    console.print()
+    raise typer.Exit(1) from e
 except Exception as e:
     logger.debug("Configuration initialization warning: %s", e)
 

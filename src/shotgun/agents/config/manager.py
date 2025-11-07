@@ -1,7 +1,9 @@
 """Configuration manager for Shotgun CLI."""
 
 import json
+import shutil
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,11 +32,49 @@ from .models import (
 
 logger = get_logger(__name__)
 
+
+class ConfigMigrationError(Exception):
+    """Exception raised when config migration fails."""
+
+    def __init__(self, message: str, backup_path: Path | None = None):
+        """Initialize with error message and optional backup path.
+
+        Args:
+            message: Error message describing what went wrong
+            backup_path: Path to backup file if one was created
+        """
+        self.backup_path = backup_path
+        super().__init__(message)
+
 # Type alias for provider configuration objects
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
 CURRENT_CONFIG_VERSION = 5
+
+
+def _create_backup(config_path: Path) -> Path:
+    """Create a timestamped backup of the config file before migration.
+
+    Args:
+        config_path: Path to the config file to backup
+
+    Returns:
+        Path to the backup file
+
+    Raises:
+        IOError: If backup creation fails
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = config_path.parent / f"config.backup.{timestamp}.json"
+
+    try:
+        shutil.copy2(config_path, backup_path)
+        logger.info(f"Created config backup at {backup_path}")
+        return backup_path
+    except Exception as e:
+        logger.error(f"Failed to create config backup: {e}")
+        raise OSError(f"Failed to create config backup: {e}") from e
 
 
 def _migrate_v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
@@ -199,13 +239,49 @@ class ConfigManager:
             self._config = await self.initialize()
             return self._config
 
+        backup_path: Path | None = None
         try:
             async with aiofiles.open(self.config_path, encoding="utf-8") as f:
                 content = await f.read()
                 data = json.loads(content)
 
+            # Get current version to determine if migration is needed
+            current_version = data.get("config_version", 2)
+
+            # Create backup before migration if config needs upgrading
+            if current_version < CURRENT_CONFIG_VERSION:
+                logger.info(
+                    f"Config needs migration from v{current_version} to v{CURRENT_CONFIG_VERSION}"
+                )
+                try:
+                    backup_path = _create_backup(self.config_path)
+                except OSError as backup_error:
+                    logger.warning(
+                        f"Could not create backup before migration: {backup_error}"
+                    )
+                    # Continue without backup - better than failing completely
+
             # Apply all necessary migrations to bring config to current version
-            data = _apply_migrations(data)
+            try:
+                data = _apply_migrations(data)
+            except Exception as migration_error:
+                error_msg = (
+                    f"Failed to migrate configuration from v{current_version} to v{CURRENT_CONFIG_VERSION}. "
+                    f"Error: {migration_error}"
+                )
+                if backup_path:
+                    error_msg += f"\n\nYour original config has been backed up to:\n{backup_path}"
+                    error_msg += (
+                        "\n\nTo start fresh, delete or rename your config file:\n"
+                        f"  rm {self.config_path}\n"
+                        f"  shotgun config init\n\n"
+                        "To restore your backup:\n"
+                        f"  cp {backup_path} {self.config_path}"
+                    )
+                else:
+                    error_msg += "\n\nTo start fresh, run: shotgun config init"
+
+                raise ConfigMigrationError(error_msg, backup_path) from migration_error
 
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
@@ -266,13 +342,44 @@ class ConfigManager:
 
             return self._config
 
-        except Exception as e:
-            logger.error(
-                "Failed to load configuration from %s: %s", self.config_path, e
+        except ConfigMigrationError:
+            # Re-raise migration errors with full context
+            raise
+        except json.JSONDecodeError as json_error:
+            error_msg = (
+                f"Configuration file is corrupted (invalid JSON): {self.config_path}\n"
+                f"Error: {json_error}\n\n"
             )
-            logger.info("Creating new configuration with generated shotgun_instance_id")
-            self._config = await self.initialize()
-            return self._config
+            if backup_path:
+                error_msg += f"A backup was created at: {backup_path}\n"
+
+            error_msg += (
+                "To start fresh, delete or rename your config file:\n"
+                f"  rm {self.config_path}\n"
+                f"  shotgun config init"
+            )
+            raise ConfigMigrationError(error_msg, backup_path) from json_error
+        except Exception as e:
+            error_msg = (
+                f"Failed to load configuration from {self.config_path}\n"
+                f"Error: {e}\n\n"
+            )
+            if backup_path:
+                error_msg += f"A backup was created at: {backup_path}\n"
+                error_msg += (
+                    "\nTo start fresh, delete or rename your config file:\n"
+                    f"  rm {self.config_path}\n"
+                    f"  shotgun config init\n\n"
+                    "To restore your backup:\n"
+                    f"  cp {backup_path} {self.config_path}"
+                )
+            else:
+                error_msg += (
+                    "To start fresh, delete or rename your config file:\n"
+                    f"  rm {self.config_path}\n"
+                    f"  shotgun config init"
+                )
+            raise ConfigMigrationError(error_msg, backup_path) from e
 
     async def save(self, config: ShotgunConfig | None = None) -> None:
         """Save configuration to file.
