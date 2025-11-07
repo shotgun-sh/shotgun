@@ -27,6 +27,44 @@ def get_log_directory() -> Path:
     return log_dir
 
 
+def cleanup_old_log_files(log_dir: Path, max_files: int) -> None:
+    """Remove old log files, keeping only the most recent ones.
+
+    Also removes the legacy shotgun.log file if it exists.
+
+    Args:
+        log_dir: Directory containing log files
+        max_files: Maximum number of log files to keep
+    """
+    try:
+        # Remove legacy non-timestamped log file if it exists
+        legacy_log = log_dir / "shotgun.log"
+        if legacy_log.exists():
+            try:
+                legacy_log.unlink()
+            except OSError:
+                pass  # noqa: S110
+
+        # Find all shotgun log files
+        log_files = sorted(
+            log_dir.glob("shotgun-*.log"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,  # Newest first
+        )
+
+        # Remove files beyond the limit
+        files_to_delete = log_files[max_files:]
+        for log_file in files_to_delete:
+            try:
+                log_file.unlink()
+            except OSError:
+                # Ignore errors when deleting individual files
+                pass  # noqa: S110
+    except Exception:  # noqa: S110
+        # Silently fail - log cleanup shouldn't break the application
+        pass
+
+
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with colors for different log levels."""
 
@@ -123,6 +161,10 @@ def setup_logger(
         try:
             # Create file handler with ISO8601 timestamp for each run
             log_dir = get_log_directory()
+
+            # Clean up old log files before creating a new one
+            cleanup_old_log_files(log_dir, settings.logging.max_log_files)
+
             log_file = log_dir / f"shotgun-{_RUN_TIMESTAMP}.log"
 
             # Use regular FileHandler - each run gets its own isolated log file
