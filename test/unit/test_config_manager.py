@@ -130,9 +130,7 @@ async def test_load_config_valid_file(mock_logger):
 
 @pytest.mark.asyncio
 async def test_load_config_invalid_json():
-    """Test loading config from invalid JSON file raises ConfigMigrationError."""
-    from shotgun.agents.config.manager import ConfigMigrationError
-
+    """Test loading config from invalid JSON file auto-recovers with fresh config."""
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False
     ) as temp_file:
@@ -142,13 +140,15 @@ async def test_load_config_invalid_json():
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
 
-            # Should raise ConfigMigrationError with helpful message
-            with pytest.raises(ConfigMigrationError) as exc_info:
-                await manager.load()
+            # Should auto-recover by creating fresh config
+            config = await manager.load()
 
-            error_msg = str(exc_info.value)
-            assert "corrupted" in error_msg.lower() or "invalid JSON" in error_msg
-            assert "shotgun config init" in error_msg
+            # Verify fresh config was created with migration failure flag
+            assert isinstance(config, ShotgunConfig)
+            assert config.migration_failed is True
+            assert config.migration_backup_path is not None
+            assert hasattr(config, "shotgun_instance_id")
+            assert config.shotgun_instance_id is not None
         finally:
             os.unlink(temp_file.name)
 
