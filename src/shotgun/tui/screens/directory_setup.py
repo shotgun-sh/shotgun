@@ -8,7 +8,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Static
+from textual.widgets import Button, Label, Static
 
 from shotgun.utils.file_system_utils import ensure_shotgun_directory_exists
 
@@ -56,6 +56,14 @@ class DirectorySetupScreen(Screen[None]):
         #directory-actions > * {
             margin-right: 2;
         }
+
+        #directory-status {
+            height: auto;
+            padding: 0 1;
+            min-height: 1;
+            color: $error;
+            text-align: center;
+        }
     """
 
     BINDINGS = [
@@ -69,6 +77,7 @@ class DirectorySetupScreen(Screen[None]):
             yield Static("Shotgun keeps workspace data in a .shotgun directory.\n")
             yield Static("Initialize it in the current directory?\n")
             yield Static(f"[$foreground-muted]({Path.cwd().resolve()})[/]")
+        yield Label("", id="directory-status")
         with Horizontal(id="directory-actions"):
             yield Button(
                 "Initialize and proceed \\[ENTER]", variant="primary", id="initialize"
@@ -93,17 +102,17 @@ class DirectorySetupScreen(Screen[None]):
         self._exit_application()
 
     def _initialize_directory(self) -> None:
+        status_label = self.query_one("#directory-status", Label)
         try:
             path = ensure_shotgun_directory_exists()
         except Exception as exc:  # pragma: no cover - defensive; textual path
-            self.notify(f"Failed to initialize directory: {exc}", severity="error")
+            status_label.update(f"❌ Failed to initialize directory: {exc}")
             return
 
         # Double-check a directory now exists; guard against unexpected filesystem state.
         if not path.is_dir():
-            self.notify(
-                "Unable to initialize .shotgun directory due to filesystem conflict.",
-                severity="error",
+            status_label.update(
+                "❌ Unable to initialize .shotgun directory due to filesystem conflict."
             )
             return
 

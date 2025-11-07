@@ -6,7 +6,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Markdown, Static
+from textual.widgets import Button, Label, Markdown, Static
 
 
 class GitHubIssueScreen(ModalScreen[None]):
@@ -47,6 +47,13 @@ class GitHubIssueScreen(ModalScreen[None]):
             margin: 1 1;
             min-width: 20;
         }
+
+        #issue-status {
+            height: auto;
+            padding: 1;
+            min-height: 1;
+            text-align: center;
+        }
     """
 
     BINDINGS = [
@@ -85,6 +92,7 @@ We review all issues and will respond as soon as possible!
                     id="issue-markdown",
                 )
             with Vertical(id="issue-buttons"):
+                yield Label("", id="issue-status")
                 yield Button(
                     "🐙 Open GitHub Issues", id="github-button", variant="primary"
                 )
@@ -94,7 +102,8 @@ We review all issues and will respond as soon as possible!
     def handle_github(self) -> None:
         """Open GitHub issues page in browser."""
         webbrowser.open("https://github.com/shotgun-sh/shotgun/issues")
-        self.notify("Opening GitHub Issues in your browser...")
+        status_label = self.query_one("#issue-status", Label)
+        status_label.update("✓ Opening GitHub Issues in your browser...")
 
     @on(Button.Pressed, "#close-button")
     def handle_close(self) -> None:

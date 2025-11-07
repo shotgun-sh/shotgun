@@ -182,12 +182,10 @@ class ShotgunAuthScreen(Screen[bool]):
             self.query_one("#status", Label).update(
                 f"❌ Error: Failed to create authentication token\n{e}"
             )
-            self.notify("Failed to start authentication", severity="error")
 
         except Exception as e:
             logger.error("Unexpected error during auth flow: %s", e)
             self.query_one("#status", Label).update(f"❌ Unexpected error: {e}")
-            self.notify("Authentication failed", severity="error")
 
     async def _poll_token_status(self) -> None:
         """Poll token status until completed or expired."""
@@ -224,17 +222,12 @@ class ShotgunAuthScreen(Screen[bool]):
                             "✅ Authentication successful! Saving credentials..."
                         )
                         await asyncio.sleep(1)
-                        self.notify(
-                            "Shotgun Account configured successfully!",
-                            severity="information",
-                        )
                         self.dismiss(True)
                     else:
                         logger.error("Completed but missing keys")
                         self.query_one("#status", Label).update(
                             "❌ Error: Authentication completed but keys are missing"
                         )
-                        self.notify("Authentication failed", severity="error")
                         await asyncio.sleep(3)
                         self.dismiss(False)
                     return
@@ -250,7 +243,6 @@ class ShotgunAuthScreen(Screen[bool]):
                         "❌ Authentication token expired (30 minutes)\n"
                         "Please try again."
                     )
-                    self.notify("Authentication token expired", severity="error")
                     await asyncio.sleep(3)
                     self.dismiss(False)
                     return
@@ -269,7 +261,6 @@ class ShotgunAuthScreen(Screen[bool]):
                     self.query_one("#status", Label).update(
                         "❌ Authentication token expired"
                     )
-                    self.notify("Authentication token expired", severity="error")
                     await asyncio.sleep(3)
                     self.dismiss(False)
                     return
@@ -290,6 +281,5 @@ class ShotgunAuthScreen(Screen[bool]):
         self.query_one("#status", Label).update(
             "❌ Authentication timeout (30 minutes)\nPlease try again."
         )
-        self.notify("Authentication timeout", severity="error")
         await asyncio.sleep(3)
         self.dismiss(False)

@@ -5,6 +5,7 @@ from textual.command import DiscoveryHit, Hit, Provider
 
 from shotgun.agents.models import AgentType
 from shotgun.codebase.models import CodebaseGraph
+from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.model_picker import ModelPickerScreen
 from shotgun.tui.screens.provider_config import ProviderConfigScreen
 
@@ -271,8 +272,8 @@ class DeleteCodebasePaletteProvider(Provider):
         try:
             result = await self.chat_screen.codebase_sdk.list_codebases()
         except Exception as exc:  # pragma: no cover - defensive UI path
-            self.chat_screen.notify(
-                f"Unable to load codebases: {exc}", severity="error"
+            self.chat_screen.agent_manager.add_hint_message(
+                HintMessage(message=f"❌ Unable to load codebases: {exc}")
             )
             return []
         return result.graphs
