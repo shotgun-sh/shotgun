@@ -156,6 +156,14 @@ class ApiSettings(BaseSettings):
         default="https://litellm-219702594231.us-east4.run.app",
         description="Shotgun's LiteLLM proxy base URL (AI model requests)",
     )
+    openai_base_url: str | None = Field(
+        default=None,
+        description="Custom OpenAI API base URL (BYOK only)",
+    )
+    anthropic_base_url: str | None = Field(
+        default=None,
+        description="Custom Anthropic API base URL (BYOK only)",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="SHOTGUN_",

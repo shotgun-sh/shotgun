@@ -6,6 +6,7 @@ from pydantic_ai.messages import ModelMessage
 from shotgun.agents.config.models import KeyProvider
 from shotgun.llm_proxy import create_anthropic_proxy_provider
 from shotgun.logging_config import get_logger
+from shotgun.settings import settings
 
 from .base import TokenCounter, extract_text_from_messages
 
@@ -45,7 +46,8 @@ class AnthropicTokenCounter(TokenCounter):
                 )
             else:
                 # Direct Anthropic API for BYOK - use async client
-                self.client = anthropic.AsyncAnthropic(api_key=api_key)
+                base_url = settings.api.anthropic_base_url
+                self.client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url)
                 logger.debug(
                     f"Initialized async Anthropic token counter for {model_name} via direct API"
                 )

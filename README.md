@@ -326,6 +326,10 @@ A: Planned. We'll publish compatibility notes and local provider integrations.
 
 A: Currently OpenAI, Anthropic (Claude), and Google Gemini. Local LLM support is on the roadmap.
 
+**Q: Can I use custom API base URLs (proxies/alternative endpoints)?**
+
+A: Yes, for BYOK (Bring Your Own Key) configurations. Set `SHOTGUN_OPENAI_BASE_URL` or `SHOTGUN_ANTHROPIC_BASE_URL` environment variables to point to your custom endpoint. This is useful for proxies, local testing, or alternative API gateways.
+
 **Q: Can I use Shotgun offline?**
 
 A: You need an internet connection for LLM API calls, but your codebase stays local.

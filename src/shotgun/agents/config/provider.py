@@ -15,6 +15,7 @@ from shotgun.llm_proxy import (
     create_litellm_provider,
 )
 from shotgun.logging_config import get_logger
+from shotgun.settings import settings
 
 from .manager import get_config_manager
 from .models import (
@@ -30,7 +31,9 @@ from .streaming_test import check_streaming_capability
 logger = get_logger(__name__)
 
 # Global cache for Model instances (singleton pattern)
-_model_cache: dict[tuple[ProviderType, KeyProvider, ModelName, str], Model] = {}
+_model_cache: dict[
+    tuple[ProviderType, KeyProvider, ModelName, str, str | None, str | None], Model
+] = {}
 
 
 def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
@@ -81,7 +84,13 @@ def get_or_create_model(
     Raises:
         ValueError: If provider is not supported
     """
-    cache_key = (provider, key_provider, model_name, api_key)
+    # Get custom base URLs for BYOK providers
+    openai_base_url = settings.api.openai_base_url if key_provider == KeyProvider.BYOK else None
+    anthropic_base_url = (
+        settings.api.anthropic_base_url if key_provider == KeyProvider.BYOK else None
+    )
+
+    cache_key = (provider, key_provider, model_name, api_key, openai_base_url, anthropic_base_url)
 
     if cache_key not in _model_cache:
         logger.debug(
@@ -138,14 +147,18 @@ def get_or_create_model(
         elif key_provider == KeyProvider.BYOK:
             # Use native provider implementations with user's API keys
             if provider == ProviderType.OPENAI:
-                openai_provider = OpenAIProvider(api_key=api_key)
+                openai_provider = OpenAIProvider(
+                    api_key=api_key, base_url=openai_base_url
+                )
                 _model_cache[cache_key] = OpenAIChatModel(
                     model_name,
                     provider=openai_provider,
                     settings=ModelSettings(max_tokens=max_tokens),
                 )
             elif provider == ProviderType.ANTHROPIC:
-                anthropic_provider = AnthropicProvider(api_key=api_key)
+                anthropic_provider = AnthropicProvider(
+                    api_key=api_key, base_url=anthropic_base_url
+                )
                 _model_cache[cache_key] = AnthropicModel(
                     model_name,
                     provider=anthropic_provider,

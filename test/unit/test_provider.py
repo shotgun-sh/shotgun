@@ -338,3 +338,203 @@ async def test_get_provider_model_api_key_environment_isolation(
         # Verify environment variables are NOT set (we no longer set them)
         assert os.environ.get("OPENAI_API_KEY") is None
         assert os.environ.get("ANTHROPIC_API_KEY") is None
+
+
+@patch("shotgun.agents.config.provider.settings")
+@patch("shotgun.agents.config.provider.get_config_manager")
+@patch("shotgun.agents.config.provider.OpenAIProvider")
+@pytest.mark.asyncio
+async def test_custom_openai_base_url_byok(
+    mock_openai_provider, mock_get_config_manager, mock_settings
+):
+    """Test that custom OpenAI base URL is used for BYOK providers."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Set cached config with OpenAI API key (BYOK)
+        import uuid
+
+        config = ShotgunConfig(
+            shotgun_instance_id=str(uuid.uuid4()),
+            openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
+        )
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        # Mock settings with custom base URL
+        mock_settings.api.openai_base_url = "https://custom-openai.com/v1"
+        mock_settings.api.anthropic_base_url = None
+
+        from shotgun.agents.config.provider import get_or_create_model
+        from shotgun.agents.config.models import KeyProvider, ModelName
+
+        # Clear cache to force new model creation
+        from shotgun.agents.config import provider
+
+        provider._model_cache.clear()
+
+        # Create model instance
+        get_or_create_model(
+            ProviderType.OPENAI,
+            KeyProvider.BYOK,
+            ModelName.GPT_5,
+            "test-openai-key",
+        )
+
+        # Verify OpenAIProvider was called with custom base_url
+        mock_openai_provider.assert_called_once()
+        call_kwargs = mock_openai_provider.call_args.kwargs
+        assert call_kwargs["api_key"] == "test-openai-key"
+        assert call_kwargs["base_url"] == "https://custom-openai.com/v1"
+
+
+@patch("shotgun.agents.config.provider.settings")
+@patch("shotgun.agents.config.provider.get_config_manager")
+@patch("shotgun.agents.config.provider.AnthropicProvider")
+@pytest.mark.asyncio
+async def test_custom_anthropic_base_url_byok(
+    mock_anthropic_provider, mock_get_config_manager, mock_settings
+):
+    """Test that custom Anthropic base URL is used for BYOK providers."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Set cached config with Anthropic API key (BYOK)
+        import uuid
+
+        config = ShotgunConfig(
+            shotgun_instance_id=str(uuid.uuid4()),
+            anthropic=AnthropicConfig(api_key=SecretStr("test-anthropic-key")),
+        )
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        # Mock settings with custom base URL
+        mock_settings.api.openai_base_url = None
+        mock_settings.api.anthropic_base_url = "https://custom-anthropic.com"
+
+        from shotgun.agents.config.provider import get_or_create_model
+        from shotgun.agents.config.models import KeyProvider, ModelName
+
+        # Clear cache to force new model creation
+        from shotgun.agents.config import provider
+
+        provider._model_cache.clear()
+
+        # Create model instance
+        get_or_create_model(
+            ProviderType.ANTHROPIC,
+            KeyProvider.BYOK,
+            ModelName.CLAUDE_HAIKU_4_5,
+            "test-anthropic-key",
+        )
+
+        # Verify AnthropicProvider was called with custom base_url
+        mock_anthropic_provider.assert_called_once()
+        call_kwargs = mock_anthropic_provider.call_args.kwargs
+        assert call_kwargs["api_key"] == "test-anthropic-key"
+        assert call_kwargs["base_url"] == "https://custom-anthropic.com"
+
+
+@patch.dict(os.environ, {}, clear=True)
+@patch("shotgun.agents.config.provider.get_config_manager")
+@patch("shotgun.agents.config.provider.OpenAIProvider")
+@pytest.mark.asyncio
+async def test_no_custom_base_url_when_none_set(
+    mock_openai_provider, mock_get_config_manager
+):
+    """Test that base_url is None when no custom base URL is set."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Set cached config with OpenAI API key (BYOK)
+        import uuid
+
+        config = ShotgunConfig(
+            shotgun_instance_id=str(uuid.uuid4()),
+            openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
+        )
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        # Import after env var is set so settings picks it up
+        from shotgun.agents.config.provider import get_or_create_model
+        from shotgun.agents.config.models import KeyProvider, ModelName
+
+        # Clear cache to force new model creation
+        from shotgun.agents.config import provider
+
+        provider._model_cache.clear()
+
+        # Create model instance
+        get_or_create_model(
+            ProviderType.OPENAI,
+            KeyProvider.BYOK,
+            ModelName.GPT_5,
+            "test-openai-key",
+        )
+
+        # Verify OpenAIProvider was called with base_url=None
+        mock_openai_provider.assert_called_once()
+        call_kwargs = mock_openai_provider.call_args.kwargs
+        assert call_kwargs["api_key"] == "test-openai-key"
+        assert call_kwargs["base_url"] is None
+
+
+@patch.dict(
+    os.environ,
+    {"SHOTGUN_OPENAI_BASE_URL": "https://custom-proxy.com"},
+    clear=False,
+)
+@patch("shotgun.agents.config.provider.get_config_manager")
+@pytest.mark.asyncio
+async def test_custom_base_url_cache_invalidation(mock_get_config_manager):
+    """Test that cache key includes base_url for proper invalidation."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        # Set cached config with OpenAI API key (BYOK)
+        import uuid
+
+        config = ShotgunConfig(
+            shotgun_instance_id=str(uuid.uuid4()),
+            openai=OpenAIConfig(api_key=SecretStr("test-openai-key")),
+        )
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        # Import after env var is set so settings picks it up
+        from shotgun.agents.config.provider import get_or_create_model
+        from shotgun.agents.config.models import KeyProvider, ModelName
+
+        # Clear cache to start fresh
+        from shotgun.agents.config import provider
+
+        provider._model_cache.clear()
+
+        # Create model instance with custom base URL
+        model1 = get_or_create_model(
+            ProviderType.OPENAI,
+            KeyProvider.BYOK,
+            ModelName.GPT_5,
+            "test-openai-key",
+        )
+
+        # Verify cache has one entry
+        assert len(provider._model_cache) == 1
+
+        # Get the same model again - should use cache
+        model2 = get_or_create_model(
+            ProviderType.OPENAI,
+            KeyProvider.BYOK,
+            ModelName.GPT_5,
+            "test-openai-key",
+        )
+
+        # Should be the same instance (cached)
+        assert model1 is model2
+        assert len(provider._model_cache) == 1
