@@ -121,7 +121,10 @@ class WelcomeScreen(Screen[None]):
             config = app.config_manager._config
             if config.migration_failed:
                 with Vertical(id="migration-warning"):
-                    yield Static("⚠️  Configuration Migration Failed", id="migration-warning-title")
+                    yield Static(
+                        "⚠️  Configuration Migration Failed",
+                        id="migration-warning-title",
+                    )
                     backup_msg = "Your previous configuration couldn't be migrated automatically."
                     if config.migration_backup_path:
                         backup_msg += f"\n\nYour old configuration (including API keys) has been backed up to:\n{config.migration_backup_path}"

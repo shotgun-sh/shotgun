@@ -46,6 +46,7 @@ class ConfigMigrationError(Exception):
         self.backup_path = backup_path
         super().__init__(message)
 
+
 # Type alias for provider configuration objects
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
