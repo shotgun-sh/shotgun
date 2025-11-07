@@ -949,9 +949,7 @@ class ChatScreen(Screen[None]):
                 HintMessage(message=f"✓ Deleted codebase: {graph_id}")
             )
         except CodebaseNotFoundError as exc:
-            self.agent_manager.add_hint_message(
-                HintMessage(message=f"❌ {exc}")
-            )
+            self.agent_manager.add_hint_message(HintMessage(message=f"❌ {exc}"))
         except Exception as exc:  # pragma: no cover - defensive UI path
             self.agent_manager.add_hint_message(
                 HintMessage(message=f"❌ Failed to delete codebase: {exc}")
@@ -1103,16 +1101,12 @@ class ChatScreen(Screen[None]):
             except CodebaseAlreadyIndexedError as exc:
                 progress_timer.stop()
                 logger.warning(f"Codebase already indexed: {exc}")
-                self.agent_manager.add_hint_message(
-                    HintMessage(message=f"⚠️ {exc}")
-                )
+                self.agent_manager.add_hint_message(HintMessage(message=f"⚠️ {exc}"))
                 return
             except InvalidPathError as exc:
                 progress_timer.stop()
                 logger.error(f"Invalid path error: {exc}")
-                self.agent_manager.add_hint_message(
-                    HintMessage(message=f"❌ {exc}")
-                )
+                self.agent_manager.add_hint_message(HintMessage(message=f"❌ {exc}"))
                 return
 
             except Exception as exc:  # pragma: no cover - defensive UI path
