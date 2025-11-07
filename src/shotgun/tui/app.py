@@ -6,7 +6,10 @@ from textual.binding import Binding
 from textual.screen import Screen
 
 from shotgun.agents.agent_manager import AgentManager
-from shotgun.agents.config import ConfigManager, get_config_manager
+from shotgun.agents.config import (
+    ConfigManager,
+    get_config_manager,
+)
 from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
 from shotgun.tui.containers import TUIContainer
@@ -99,7 +102,10 @@ class ShotgunApp(App[None]):
         # Run async config loading in worker
         async def _check_config() -> None:
             # Show welcome screen if no providers are configured OR if user hasn't seen it yet
+            # Note: If config migration fails, ConfigManager will auto-create fresh config
+            # and set migration_failed flag, which WelcomeScreen will display
             config = await self.config_manager.load()
+
             has_any_key = await self.config_manager.has_any_provider_key()
             if not has_any_key or not config.shown_welcome_screen:
                 if isinstance(self.screen, WelcomeScreen):

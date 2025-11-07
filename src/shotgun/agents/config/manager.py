@@ -1,7 +1,9 @@
 """Configuration manager for Shotgun CLI."""
 
 import json
+import shutil
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,8 +32,195 @@ from .models import (
 
 logger = get_logger(__name__)
 
+
+class ConfigMigrationError(Exception):
+    """Exception raised when config migration fails."""
+
+    def __init__(self, message: str, backup_path: Path | None = None):
+        """Initialize with error message and optional backup path.
+
+        Args:
+            message: Error message describing what went wrong
+            backup_path: Path to backup file if one was created
+        """
+        self.backup_path = backup_path
+        super().__init__(message)
+
+
 # Type alias for provider configuration objects
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
+
+# Current config version
+CURRENT_CONFIG_VERSION = 5
+
+# Backup directory name
+BACKUP_DIR_NAME = "backup"
+
+
+def get_backup_dir(config_path: Path) -> Path:
+    """Get the backup directory path for a given config file.
+
+    Args:
+        config_path: Path to the config file
+
+    Returns:
+        Path to the backup directory (e.g., ~/.shotgun-sh/backup/)
+    """
+    return config_path.parent / BACKUP_DIR_NAME
+
+
+def _create_backup(config_path: Path) -> Path:
+    """Create a timestamped backup of the config file before migration.
+
+    Backups are saved to ~/.shotgun-sh/backup/ directory.
+
+    Args:
+        config_path: Path to the config file to backup
+
+    Returns:
+        Path to the backup file in the backup directory
+
+    Raises:
+        OSError: If backup creation fails
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = get_backup_dir(config_path)
+    backup_path = backup_dir / f"config.backup.{timestamp}.json"
+
+    try:
+        # Create backup directory if it doesn't exist
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(config_path, backup_path)
+        logger.info(f"Created config backup at {backup_path}")
+        return backup_path
+    except Exception as e:
+        logger.error(f"Failed to create config backup: {e}")
+        raise OSError(f"Failed to create config backup: {e}") from e
+
+
+def _migrate_v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 2 to version 3.
+
+    Changes:
+    - Rename 'user_id' field to 'shotgun_instance_id'
+
+    Args:
+        data: Config data dict at version 2
+
+    Returns:
+        Modified config data dict at version 3
+    """
+    if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
+        data[SHOTGUN_INSTANCE_ID_FIELD] = data.pop("user_id")
+        data["config_version"] = 3
+        logger.info("Migrated config v2->v3: renamed user_id to shotgun_instance_id")
+
+    return data
+
+
+def _migrate_v3_to_v4(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 3 to version 4.
+
+    Changes:
+    - Add 'marketing' field with empty messages dict
+    - Set 'shown_welcome_screen' to False for existing BYOK users
+
+    Args:
+        data: Config data dict at version 3
+
+    Returns:
+        Modified config data dict at version 4
+    """
+    # Add marketing config
+    if "marketing" not in data:
+        data["marketing"] = {"messages": {}}
+        logger.info("Migrated config v3->v4: added marketing configuration")
+
+    # Set shown_welcome_screen for existing BYOK users
+    # If shown_welcome_screen doesn't exist AND any BYOK provider has a key,
+    # set it to False so they see the welcome screen once
+    if "shown_welcome_screen" not in data:
+        has_byok_key = False
+        for section in ["openai", "anthropic", "google"]:
+            if (
+                section in data
+                and isinstance(data[section], dict)
+                and data[section].get("api_key")
+            ):
+                has_byok_key = True
+                break
+
+        if has_byok_key:
+            data["shown_welcome_screen"] = False
+            logger.info(
+                "Existing BYOK user detected: set shown_welcome_screen=False to show welcome screen"
+            )
+
+    data["config_version"] = 4
+    return data
+
+
+def _migrate_v4_to_v5(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 4 to version 5.
+
+    Changes:
+    - Add 'supports_streaming' field to OpenAI config (initially None for auto-detection)
+
+    Args:
+        data: Config data dict at version 4
+
+    Returns:
+        Modified config data dict at version 5
+    """
+    if "openai" in data and isinstance(data["openai"], dict):
+        if "supports_streaming" not in data["openai"]:
+            data["openai"]["supports_streaming"] = None
+            logger.info(
+                "Migrated config v4->v5: added streaming capability detection for OpenAI"
+            )
+
+    data["config_version"] = 5
+    return data
+
+
+def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
+    """Apply all necessary migrations to bring config to current version.
+
+    Migrations are applied sequentially from the config's current version
+    to CURRENT_CONFIG_VERSION.
+
+    Args:
+        data: Config data dict at any version
+
+    Returns:
+        Config data dict at CURRENT_CONFIG_VERSION
+    """
+    # Get current version (default to 2 for very old configs)
+    current_version = data.get("config_version", 2)
+
+    # Define migrations in order
+    migrations = {
+        2: _migrate_v2_to_v3,
+        3: _migrate_v3_to_v4,
+        4: _migrate_v4_to_v5,
+    }
+
+    # Apply migrations sequentially
+    while current_version < CURRENT_CONFIG_VERSION:
+        if current_version in migrations:
+            logger.info(
+                f"Applying migration from v{current_version} to v{current_version + 1}"
+            )
+            data = migrations[current_version](data)
+            current_version = data.get("config_version", current_version + 1)
+        else:
+            logger.warning(
+                f"No migration defined for v{current_version}, skipping to v{current_version + 1}"
+            )
+            current_version += 1
+            data["config_version"] = current_version
+
+    return data
 
 
 class ConfigManager:
@@ -71,44 +260,49 @@ class ConfigManager:
             self._config = await self.initialize()
             return self._config
 
+        backup_path: Path | None = None
         try:
             async with aiofiles.open(self.config_path, encoding="utf-8") as f:
                 content = await f.read()
                 data = json.loads(content)
 
-            # Migration: Rename user_id to shotgun_instance_id (config v2 -> v3)
-            if "user_id" in data and SHOTGUN_INSTANCE_ID_FIELD not in data:
-                data[SHOTGUN_INSTANCE_ID_FIELD] = data.pop("user_id")
-                data["config_version"] = 3
+            # Get current version to determine if migration is needed
+            current_version = data.get("config_version", 2)
+
+            # Create backup before migration if config needs upgrading
+            if current_version < CURRENT_CONFIG_VERSION:
                 logger.info(
-                    "Migrated config v2->v3: renamed user_id to shotgun_instance_id"
+                    f"Config needs migration from v{current_version} to v{CURRENT_CONFIG_VERSION}"
                 )
-
-            # Migration: Set shown_welcome_screen for existing BYOK users
-            # If shown_welcome_screen doesn't exist AND any BYOK provider has a key,
-            # set it to False so they see the welcome screen once
-            if "shown_welcome_screen" not in data:
-                has_byok_key = False
-                for section in ["openai", "anthropic", "google"]:
-                    if (
-                        section in data
-                        and isinstance(data[section], dict)
-                        and data[section].get("api_key")
-                    ):
-                        has_byok_key = True
-                        break
-
-                if has_byok_key:
-                    data["shown_welcome_screen"] = False
-                    logger.info(
-                        "Existing BYOK user detected: set shown_welcome_screen=False to show welcome screen"
+                try:
+                    backup_path = _create_backup(self.config_path)
+                except OSError as backup_error:
+                    logger.warning(
+                        f"Could not create backup before migration: {backup_error}"
                     )
+                    # Continue without backup - better than failing completely
 
-            # Migration: Add marketing config for v3 -> v4
-            if "marketing" not in data:
-                data["marketing"] = {"messages": {}}
-                data["config_version"] = 4
-                logger.info("Migrated config v3->v4: added marketing configuration")
+            # Apply all necessary migrations to bring config to current version
+            try:
+                data = _apply_migrations(data)
+            except Exception as migration_error:
+                error_msg = (
+                    f"Failed to migrate configuration from v{current_version} to v{CURRENT_CONFIG_VERSION}. "
+                    f"Error: {migration_error}"
+                )
+                if backup_path:
+                    error_msg += f"\n\nYour original config has been backed up to:\n{backup_path}"
+                    error_msg += (
+                        "\n\nTo start fresh, delete or rename your config file:\n"
+                        f"  rm {self.config_path}\n"
+                        f"  shotgun config init\n\n"
+                        "To restore your backup:\n"
+                        f"  cp {backup_path} {self.config_path}"
+                    )
+                else:
+                    error_msg += "\n\nTo start fresh, run: shotgun config init"
+
+                raise ConfigMigrationError(error_msg, backup_path) from migration_error
 
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
@@ -169,12 +363,56 @@ class ConfigManager:
 
             return self._config
 
-        except Exception as e:
+        except ConfigMigrationError as migration_error:
+            # Migration failed - automatically create fresh config with migration info
             logger.error(
-                "Failed to load configuration from %s: %s", self.config_path, e
+                "Config migration failed, creating fresh config: %s", migration_error
             )
-            logger.info("Creating new configuration with generated shotgun_instance_id")
+            backup_path = migration_error.backup_path
+
+            # Create fresh config with migration failure info
             self._config = await self.initialize()
+            self._config.migration_failed = True
+            if backup_path:
+                self._config.migration_backup_path = str(backup_path)
+
+            # Save the fresh config
+            await self.save(self._config)
+            logger.info("Created fresh config after migration failure")
+
+            return self._config
+
+        except json.JSONDecodeError as json_error:
+            # Invalid JSON - create backup and fresh config
+            logger.error("Config file has invalid JSON: %s", json_error)
+
+            try:
+                backup_path = _create_backup(self.config_path)
+            except OSError:
+                backup_path = None
+
+            self._config = await self.initialize()
+            self._config.migration_failed = True
+            if backup_path:
+                self._config.migration_backup_path = str(backup_path)
+
+            await self.save(self._config)
+            logger.info("Created fresh config after JSON parse error")
+
+            return self._config
+
+        except Exception as e:
+            # Generic error - create fresh config
+            logger.error("Failed to load config: %s", e)
+
+            self._config = await self.initialize()
+            self._config.migration_failed = True
+            if backup_path:
+                self._config.migration_backup_path = str(backup_path)
+
+            await self.save(self._config)
+            logger.info("Created fresh config after load error")
+
             return self._config
 
     async def save(self, config: ShotgunConfig | None = None) -> None:
@@ -237,6 +475,11 @@ class ConfigManager:
                 SecretStr(api_key_value) if api_key_value is not None else None
             )
 
+            # Reset streaming capabilities when OpenAI API key is changed
+            if not is_shotgun and provider_enum == ProviderType.OPENAI:
+                if isinstance(provider_config, OpenAIConfig):
+                    provider_config.supports_streaming = None
+
         # Reject other fields
         unsupported_fields = set(kwargs.keys()) - {API_KEY_FIELD}
         if unsupported_fields:
@@ -266,6 +509,11 @@ class ConfigManager:
             # This prevents the welcome screen from showing again after user has made their choice
             config.shown_welcome_screen = True
 
+        # Clear migration failure flag when user successfully configures a provider
+        if API_KEY_FIELD in kwargs and api_key_value is not None:
+            config.migration_failed = False
+            config.migration_backup_path = None
+
         await self.save(config)
 
     async def clear_provider_key(self, provider: ProviderType | str) -> None:
@@ -282,6 +530,13 @@ class ConfigManager:
         # For Shotgun Account, also clear the JWT
         if is_shotgun and isinstance(provider_config, ShotgunAccountConfig):
             provider_config.supabase_jwt = None
+
+        # Reset streaming capabilities when OpenAI API key is cleared
+        if not is_shotgun:
+            provider_enum = self._ensure_provider_enum(provider)
+            if provider_enum == ProviderType.OPENAI:
+                if isinstance(provider_config, OpenAIConfig):
+                    provider_config.supports_streaming = None
 
         await self.save(config)
 

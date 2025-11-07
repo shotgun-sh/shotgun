@@ -25,6 +25,7 @@ from .models import (
     ProviderType,
     ShotgunConfig,
 )
+from .streaming_test import check_streaming_capability
 
 logger = get_logger(__name__)
 
@@ -207,6 +208,7 @@ async def get_provider_model(
         spec = MODEL_SPECS[model_name]
 
         # Use Shotgun Account with determined model (provider = actual LLM provider)
+        # Shotgun accounts always support streaming (via LiteLLM proxy)
         return ModelConfig(
             name=spec.name,
             provider=spec.provider,  # Actual LLM provider (OPENAI/ANTHROPIC/GOOGLE)
@@ -214,6 +216,7 @@ async def get_provider_model(
             max_input_tokens=spec.max_input_tokens,
             max_output_tokens=spec.max_output_tokens,
             api_key=shotgun_api_key,
+            supports_streaming=True,  # Shotgun accounts always support streaming
         )
 
     # Priority 2: Fall back to individual provider keys
@@ -260,6 +263,29 @@ async def get_provider_model(
             raise ValueError(f"Model '{model_name.value}' not found")
         spec = MODEL_SPECS[model_name]
 
+        # Check and test streaming capability for GPT-5 family models
+        supports_streaming = True  # Default to True for all models
+        if model_name in (ModelName.GPT_5, ModelName.GPT_5_MINI):
+            # Check if streaming capability has been tested
+            streaming_capability = config.openai.supports_streaming
+
+            if streaming_capability is None:
+                # Not tested yet - run streaming test (test once for all GPT-5 models)
+                logger.info("Testing streaming capability for OpenAI GPT-5 family...")
+                streaming_capability = await check_streaming_capability(
+                    api_key, model_name.value
+                )
+
+                # Save result to config (applies to all OpenAI models)
+                config.openai.supports_streaming = streaming_capability
+                await config_manager.save(config)
+                logger.info(
+                    f"Streaming test result: "
+                    f"{'enabled' if streaming_capability else 'disabled'}"
+                )
+
+            supports_streaming = streaming_capability
+
         # Create fully configured ModelConfig
         return ModelConfig(
             name=spec.name,
@@ -268,6 +294,7 @@ async def get_provider_model(
             max_input_tokens=spec.max_input_tokens,
             max_output_tokens=spec.max_output_tokens,
             api_key=api_key,
+            supports_streaming=supports_streaming,
         )
 
     elif provider_enum == ProviderType.ANTHROPIC:

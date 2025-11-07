@@ -55,6 +55,8 @@ logger = get_logger(__name__)
 logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
 # Initialize configuration
+# Note: If config migration fails, ConfigManager will auto-create fresh config
+# and set migration_failed flag for user notification
 try:
     import asyncio
 

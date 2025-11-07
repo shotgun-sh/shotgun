@@ -56,6 +56,10 @@ class ModelConfig(BaseModel):
     max_input_tokens: int
     max_output_tokens: int
     api_key: str
+    supports_streaming: bool = Field(
+        default=True,
+        description="Whether this model configuration supports streaming. False only for BYOK GPT-5 models without streaming enabled.",
+    )
     _model_instance: Model | None = PrivateAttr(default=None)
 
     class Config:
@@ -148,6 +152,10 @@ class OpenAIConfig(BaseModel):
     """Configuration for OpenAI provider."""
 
     api_key: SecretStr | None = None
+    supports_streaming: bool | None = Field(
+        default=None,
+        description="Whether streaming is supported for this API key. None = not tested yet",
+    )
 
 
 class AnthropicConfig(BaseModel):
@@ -200,7 +208,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=4, description="Configuration schema version")
+    config_version: int = Field(default=5, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",
@@ -212,4 +220,12 @@ class ShotgunConfig(BaseModel):
     marketing: MarketingConfig = Field(
         default_factory=MarketingConfig,
         description="Marketing messages configuration and tracking",
+    )
+    migration_failed: bool = Field(
+        default=False,
+        description="Whether the last config migration failed (cleared after user configures a provider)",
+    )
+    migration_backup_path: str | None = Field(
+        default=None,
+        description="Path to the backup file created when migration failed",
     )

@@ -65,7 +65,7 @@ async def test_load_config_not_exists(mock_logger):
         assert hasattr(config, "shotgun_instance_id")
         assert config.shotgun_instance_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 4
+        assert config.config_version == 5
 
 
 @patch("shotgun.agents.config.manager.logger")
@@ -128,10 +128,9 @@ async def test_load_config_valid_file(mock_logger):
             os.unlink(temp_file.name)
 
 
-@patch("shotgun.agents.config.manager.logger")
 @pytest.mark.asyncio
-async def test_load_config_invalid_json(mock_logger):
-    """Test loading config from invalid JSON file."""
+async def test_load_config_invalid_json():
+    """Test loading config from invalid JSON file auto-recovers with fresh config."""
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False
     ) as temp_file:
@@ -140,15 +139,16 @@ async def test_load_config_invalid_json(mock_logger):
 
         try:
             manager = ConfigManager(config_path=Path(temp_file.name))
+
+            # Should auto-recover by creating fresh config
             config = await manager.load()
 
+            # Verify fresh config was created with migration failure flag
             assert isinstance(config, ShotgunConfig)
-            assert config.selected_model is None
+            assert config.migration_failed is True
+            assert config.migration_backup_path is not None
             assert hasattr(config, "shotgun_instance_id")
             assert config.shotgun_instance_id is not None
-            mock_logger.error.assert_called_once()
-            # Now calls initialize() which logs twice
-            assert mock_logger.info.call_count == 2
         finally:
             os.unlink(temp_file.name)
 
@@ -658,7 +658,7 @@ async def test_initialize(mock_logger):
         assert hasattr(config, "shotgun_instance_id")
         assert config.shotgun_instance_id is not None
         assert hasattr(config, "config_version")
-        assert config.config_version == 4
+        assert config.config_version == 5
         # The log message now includes user_id
         assert mock_logger.info.call_count == 1
         call_args = mock_logger.info.call_args[0]
