@@ -351,4 +351,5 @@ class ProviderConfigScreen(Screen[None]):
         # Refresh provider status after auth completes
         if result:
             await self.refresh_provider_status()
-            # Notify handled by auth screen
+            # Auto-dismiss provider config screen after successful auth
+            self.dismiss()
