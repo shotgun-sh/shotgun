@@ -53,6 +53,21 @@ ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountC
 # Current config version
 CURRENT_CONFIG_VERSION = 5
 
+# Backup directory name
+BACKUP_DIR_NAME = "backup"
+
+
+def get_backup_dir(config_path: Path) -> Path:
+    """Get the backup directory path for a given config file.
+
+    Args:
+        config_path: Path to the config file
+
+    Returns:
+        Path to the backup directory (e.g., ~/.shotgun-sh/backup/)
+    """
+    return config_path.parent / BACKUP_DIR_NAME
+
 
 def _create_backup(config_path: Path) -> Path:
     """Create a timestamped backup of the config file before migration.
@@ -69,7 +84,7 @@ def _create_backup(config_path: Path) -> Path:
         OSError: If backup creation fails
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = config_path.parent / "backup"
+    backup_dir = get_backup_dir(config_path)
     backup_path = backup_dir / f"config.backup.{timestamp}.json"
 
     try:

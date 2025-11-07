@@ -17,6 +17,7 @@ from shotgun.agents.config.manager import (
     _migrate_v2_to_v3,
     _migrate_v3_to_v4,
     _migrate_v4_to_v5,
+    get_backup_dir,
 )
 from shotgun.agents.config.models import ProviderType, ShotgunConfig
 
@@ -558,7 +559,7 @@ def test_create_backup_success():
 
         # Verify backup was created in backup subdirectory
         assert backup_path.exists()
-        assert backup_path.parent == config_path.parent / "backup"
+        assert backup_path.parent == get_backup_dir(config_path)
         assert backup_path.name.startswith("config.backup.")
         assert backup_path.name.endswith(".json")
 
@@ -597,7 +598,7 @@ async def test_load_with_corrupted_json():
         assert config.migration_backup_path is not None
 
         # Verify backup was created
-        backup_dir = Path(tmpdir) / "backup"
+        backup_dir = get_backup_dir(config_path)
         assert backup_dir.exists()
         backup_files = list(backup_dir.glob("config.backup.*.json"))
         assert len(backup_files) == 1
@@ -631,7 +632,7 @@ async def test_load_with_migration_failure():
         assert config.migration_backup_path is not None
 
         # Verify backup was created
-        backup_dir = Path(tmpdir) / "backup"
+        backup_dir = get_backup_dir(config_path)
         assert backup_dir.exists()
         backup_files = list(backup_dir.glob("config.backup.*.json"))
         assert len(backup_files) == 1
@@ -653,7 +654,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config = await manager.load()
 
         # Verify no backup directory was created (no migration needed)
-        backup_dir = Path(tmpdir) / "backup"
+        backup_dir = get_backup_dir(config_path)
         assert not backup_dir.exists()
         assert config.config_version == CURRENT_CONFIG_VERSION
 
@@ -674,7 +675,7 @@ async def test_load_creates_backup_when_migration_needed():
         config = await manager.load()
 
         # Verify backup was created in backup subdirectory
-        backup_dir = Path(tmpdir) / "backup"
+        backup_dir = get_backup_dir(config_path)
         assert backup_dir.exists()
         backup_files = list(backup_dir.glob("config.backup.*.json"))
         assert len(backup_files) == 1
