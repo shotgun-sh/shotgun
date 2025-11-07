@@ -556,9 +556,9 @@ def test_create_backup_success():
         # Create backup
         backup_path = _create_backup(config_path)
 
-        # Verify backup was created
+        # Verify backup was created in backup subdirectory
         assert backup_path.exists()
-        assert backup_path.parent == config_path.parent
+        assert backup_path.parent == config_path.parent / "backup"
         assert backup_path.name.startswith("config.backup.")
         assert backup_path.name.endswith(".json")
 
@@ -645,9 +645,9 @@ async def test_load_creates_backup_only_when_migration_needed():
         # Load config
         config = await manager.load()
 
-        # Verify no backup files were created
-        backup_files = list(Path(tmpdir).glob("config.backup.*.json"))
-        assert len(backup_files) == 0
+        # Verify no backup directory was created (no migration needed)
+        backup_dir = Path(tmpdir) / "backup"
+        assert not backup_dir.exists()
         assert config.config_version == CURRENT_CONFIG_VERSION
 
 
@@ -666,8 +666,10 @@ async def test_load_creates_backup_when_migration_needed():
         # Load config (should succeed and create backup)
         config = await manager.load()
 
-        # Verify backup was created
-        backup_files = list(Path(tmpdir).glob("config.backup.*.json"))
+        # Verify backup was created in backup subdirectory
+        backup_dir = Path(tmpdir) / "backup"
+        assert backup_dir.exists()
+        backup_files = list(backup_dir.glob("config.backup.*.json"))
         assert len(backup_files) == 1
 
         # Verify backup contains original v2 config

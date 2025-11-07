@@ -56,19 +56,24 @@ CURRENT_CONFIG_VERSION = 5
 def _create_backup(config_path: Path) -> Path:
     """Create a timestamped backup of the config file before migration.
 
+    Backups are saved to ~/.shotgun-sh/backup/ directory.
+
     Args:
         config_path: Path to the config file to backup
 
     Returns:
-        Path to the backup file
+        Path to the backup file in the backup directory
 
     Raises:
-        IOError: If backup creation fails
+        OSError: If backup creation fails
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = config_path.parent / f"config.backup.{timestamp}.json"
+    backup_dir = config_path.parent / "backup"
+    backup_path = backup_dir / f"config.backup.{timestamp}.json"
 
     try:
+        # Create backup directory if it doesn't exist
+        backup_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(config_path, backup_path)
         logger.info(f"Created config backup at {backup_path}")
         return backup_path
