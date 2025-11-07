@@ -76,6 +76,13 @@ class FeedbackScreen(Screen[Feedback | None]):
         #feedback-type-list {
             padding: 1;
         }
+
+        #feedback-status {
+            height: auto;
+            padding: 0 1;
+            min-height: 1;
+            color: $error;
+        }
     """
 
     BINDINGS = [
@@ -96,6 +103,7 @@ class FeedbackScreen(Screen[Feedback | None]):
             "",
             id="feedback-description",
         )
+        yield Label("", id="feedback-status")
         with Horizontal(id="feedback-actions"):
             yield Button("Submit", variant="primary", id="submit")
             yield Button("Cancel \\[ESC]", id="cancel")
@@ -176,9 +184,8 @@ class FeedbackScreen(Screen[Feedback | None]):
         description = text_area.text.strip()
 
         if not description:
-            self.notify(
-                "Please enter a description before submitting.", severity="error"
-            )
+            status_label = self.query_one("#feedback-status", Label)
+            status_label.update("❌ Please enter a description before submitting.")
             return
 
         app = cast("ShotgunApp", self.app)

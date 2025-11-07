@@ -8,7 +8,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Markdown
+from textual.widgets import Button, Label, Markdown
 
 if TYPE_CHECKING:
     pass
@@ -50,6 +50,13 @@ class PipxMigrationScreen(ModalScreen[None]):
         .action-button {
             margin: 0 1;
             min-width: 20;
+        }
+
+        #migration-status {
+            height: auto;
+            padding: 1;
+            min-height: 1;
+            text-align: center;
         }
     """
 
@@ -106,6 +113,7 @@ Or install permanently: `uv tool install shotgun-sh`
                 )
 
                 with Container(id="buttons-container"):
+                    yield Label("", id="migration-status")
                     with Horizontal(id="action-buttons"):
                         yield Button(
                             "Copy Instructions to Clipboard",
@@ -136,16 +144,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Step 3: Run shotgun with uvx
 uvx shotgun-sh"""
+        status_label = self.query_one("#migration-status", Label)
         try:
             import pyperclip  # type: ignore[import-untyped]  # noqa: PGH003
 
             pyperclip.copy(instructions)
-            self.notify("Copied migration instructions to clipboard!")
+            status_label.update("✓ Copied migration instructions to clipboard!")
         except ImportError:
-            self.notify(
-                "Clipboard not available. See instructions above.",
-                severity="warning",
-            )
+            status_label.update("⚠️ Clipboard not available. See instructions above.")
 
     @on(Button.Pressed, "#continue")
     def _continue(self) -> None:

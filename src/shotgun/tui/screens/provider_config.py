@@ -77,6 +77,14 @@ class ProviderConfigScreen(Screen[None]):
         #provider-list {
             padding: 1;
         }
+        #provider-status {
+            height: auto;
+            padding: 0 1;
+            min-height: 1;
+        }
+        #provider-status.error {
+            color: $error;
+        }
     """
 
     BINDINGS = [
@@ -103,6 +111,7 @@ class ProviderConfigScreen(Screen[None]):
             password=True,
             id="api-key",
         )
+        yield Label("", id="provider-status")
         with Horizontal(id="provider-actions"):
             yield Button("Save key \\[ENTER]", variant="primary", id="save")
             yield Button("Authenticate", variant="success", id="authenticate")
@@ -280,9 +289,11 @@ class ProviderConfigScreen(Screen[None]):
         """Async implementation of API key saving."""
         input_widget = self.query_one("#api-key", Input)
         api_key = input_widget.value.strip()
+        status_label = self.query_one("#provider-status", Label)
 
         if not api_key:
-            self.notify("Enter an API key before saving.", severity="error")
+            status_label.update("❌ Enter an API key before saving.")
+            status_label.add_class("error")
             return
 
         try:
@@ -291,25 +302,29 @@ class ProviderConfigScreen(Screen[None]):
                 api_key=api_key,
             )
         except Exception as exc:  # pragma: no cover - defensive; textual path
-            self.notify(f"Failed to save key: {exc}", severity="error")
+            status_label.update(f"❌ Failed to save key: {exc}")
+            status_label.add_class("error")
             return
 
         input_widget.value = ""
         await self.refresh_provider_status()
         await self._update_done_button_visibility()
-        self.notify(
-            f"Saved API key for {self._provider_display_name(self.selected_provider)}."
+        status_label.update(
+            f"✓ Saved API key for {self._provider_display_name(self.selected_provider)}."
         )
+        status_label.remove_class("error")
 
     def _clear_api_key(self) -> None:
         self.run_worker(self._do_clear_api_key(), exclusive=True)
 
     async def _do_clear_api_key(self) -> None:
         """Async implementation of API key clearing."""
+        status_label = self.query_one("#provider-status", Label)
         try:
             await self.config_manager.clear_provider_key(self.selected_provider)
         except Exception as exc:  # pragma: no cover - defensive; textual path
-            self.notify(f"Failed to clear key: {exc}", severity="error")
+            status_label.update(f"❌ Failed to clear key: {exc}")
+            status_label.add_class("error")
             return
 
         await self.refresh_provider_status()
@@ -321,9 +336,10 @@ class ProviderConfigScreen(Screen[None]):
             auth_button = self.query_one("#authenticate", Button)
             auth_button.display = True
 
-        self.notify(
-            f"Cleared API key for {self._provider_display_name(self.selected_provider)}."
+        status_label.update(
+            f"✓ Cleared API key for {self._provider_display_name(self.selected_provider)}."
         )
+        status_label.remove_class("error")
 
     async def _start_shotgun_auth(self) -> None:
         """Launch Shotgun Account authentication flow."""

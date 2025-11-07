@@ -284,10 +284,8 @@ class ChatScreen(Screen[None]):
     def action_toggle_mode(self) -> None:
         # Prevent mode switching during Q&A
         if self.qa_mode:
-            self.notify(
-                "Cannot switch modes while answering questions",
-                severity="warning",
-                timeout=3,
+            self.agent_manager.add_hint_message(
+                HintMessage(message="⚠️ Cannot switch modes while answering questions")
             )
             return
 
@@ -309,14 +307,18 @@ class ChatScreen(Screen[None]):
         if usage_hint:
             self.mount_hint(usage_hint)
         else:
-            self.notify("No usage hint available", severity="error")
+            self.agent_manager.add_hint_message(
+                HintMessage(message="⚠️ No usage hint available")
+            )
 
     async def action_show_context(self) -> None:
         context_hint = await self.agent_manager.get_context_hint()
         if context_hint:
             self.mount_hint(context_hint)
         else:
-            self.notify("No context analysis available", severity="error")
+            self.agent_manager.add_hint_message(
+                HintMessage(message="⚠️ No context analysis available")
+            )
 
     def action_view_onboarding(self) -> None:
         """Show the onboarding modal."""
@@ -441,7 +443,9 @@ class ChatScreen(Screen[None]):
 
         except Exception as e:
             logger.error(f"Failed to compact conversation: {e}", exc_info=True)
-            self.notify(f"Failed to compact: {e}", severity="error")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"❌ Failed to compact: {e}")
+            )
         finally:
             # Hide spinner
             self.processing_state.stop_processing()
@@ -489,7 +493,9 @@ class ChatScreen(Screen[None]):
 
         except Exception as e:
             logger.error(f"Failed to clear conversation: {e}", exc_info=True)
-            self.notify(f"Failed to clear: {e}", severity="error")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"❌ Failed to clear: {e}")
+            )
 
     @work(exclusive=False)
     async def update_context_indicator(self) -> None:
@@ -939,11 +945,17 @@ class ChatScreen(Screen[None]):
     async def delete_codebase(self, graph_id: str) -> None:
         try:
             await self.codebase_sdk.delete_codebase(graph_id)
-            self.notify(f"Deleted codebase: {graph_id}", severity="information")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"✓ Deleted codebase: {graph_id}")
+            )
         except CodebaseNotFoundError as exc:
-            self.notify(str(exc), severity="error")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"❌ {exc}")
+            )
         except Exception as exc:  # pragma: no cover - defensive UI path
-            self.notify(f"Failed to delete codebase: {exc}", severity="error")
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"❌ Failed to delete codebase: {exc}")
+            )
 
     def _is_kuzu_corruption_error(self, exception: Exception) -> bool:
         """Check if error is related to kuzu database corruption.
@@ -1050,9 +1062,10 @@ class ChatScreen(Screen[None]):
                     )
                     cleaned = await manager.cleanup_corrupted_databases()
                     logger.info(f"Cleaned up {len(cleaned)} corrupted database(s)")
-                    self.notify(
-                        f"Retrying indexing after cleanup (attempt {attempt + 1}/{max_retries})...",
-                        severity="information",
+                    self.agent_manager.add_hint_message(
+                        HintMessage(
+                            message=f"🔄 Retrying indexing after cleanup (attempt {attempt + 1}/{max_retries})..."
+                        )
                     )
 
                 # Pass the current working directory as the indexed_from_cwd
@@ -1080,22 +1093,26 @@ class ChatScreen(Screen[None]):
                 logger.info(
                     f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
                 )
-                self.notify(
-                    f"Indexed codebase '{result.name}' (ID: {result.graph_id})",
-                    severity="information",
-                    timeout=8,
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message=f"✓ Indexed codebase '{result.name}' (ID: {result.graph_id})"
+                    )
                 )
                 break  # Success - exit retry loop
 
             except CodebaseAlreadyIndexedError as exc:
                 progress_timer.stop()
                 logger.warning(f"Codebase already indexed: {exc}")
-                self.notify(str(exc), severity="warning")
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"⚠️ {exc}")
+                )
                 return
             except InvalidPathError as exc:
                 progress_timer.stop()
                 logger.error(f"Invalid path error: {exc}")
-                self.notify(str(exc), severity="error")
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"❌ {exc}")
+                )
                 return
 
             except Exception as exc:  # pragma: no cover - defensive UI path
@@ -1114,10 +1131,10 @@ class ChatScreen(Screen[None]):
                     f"Failed to index codebase after {attempt + 1} attempts - "
                     f"repo_path: {selection.repo_path}, name: {selection.name}, error: {exc}"
                 )
-                self.notify(
-                    f"Failed to index codebase after {attempt + 1} attempts: {exc}",
-                    severity="error",
-                    timeout=30,  # Keep error visible for 30 seconds
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message=f"❌ Failed to index codebase after {attempt + 1} attempts: {exc}"
+                    )
                 )
                 break
 

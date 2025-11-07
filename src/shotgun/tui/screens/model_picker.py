@@ -72,6 +72,11 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             padding: 1 0;
             }
         }
+        #model-picker-status {
+            height: auto;
+            padding: 0 1;
+            color: $error;
+        }
         #model-actions {
             padding: 1;
         }
@@ -94,6 +99,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 id="model-picker-summary",
             )
         yield ListView(id="model-list")
+        yield Label("", id="model-picker-status")
         with Horizontal(id="model-actions"):
             yield Button("Select \\[ENTER]", variant="primary", id="select")
             yield Button("Done \\[ESC]", id="done")
@@ -349,4 +355,5 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 )
             )
         except Exception as exc:  # pragma: no cover - defensive; textual path
-            self.notify(f"Failed to select model: {exc}", severity="error")
+            status_label = self.query_one("#model-picker-status", Label)
+            status_label.update(f"❌ Failed to select model: {exc}")
