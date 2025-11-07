@@ -12,13 +12,13 @@ import pytest
 from shotgun.agents.config.manager import (
     CURRENT_CONFIG_VERSION,
     ConfigManager,
-    ConfigMigrationError,
     _apply_migrations,
     _create_backup,
     _migrate_v2_to_v3,
     _migrate_v3_to_v4,
     _migrate_v4_to_v5,
 )
+from shotgun.agents.config.models import ProviderType, ShotgunConfig
 
 # Example configs for each version based on git history
 V2_CONFIG = {
@@ -579,7 +579,7 @@ def test_create_backup_nonexistent_file():
 
 @pytest.mark.asyncio
 async def test_load_with_corrupted_json():
-    """Test that loading corrupted JSON raises ConfigMigrationError with helpful message."""
+    """Test that loading corrupted JSON auto-recovers with fresh config."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
@@ -588,19 +588,24 @@ async def test_load_with_corrupted_json():
 
         manager = ConfigManager(config_path=config_path)
 
-        # Should raise ConfigMigrationError with helpful message
-        with pytest.raises(ConfigMigrationError) as exc_info:
-            await manager.load()
+        # Should auto-recover by creating fresh config
+        config = await manager.load()
 
-        error_msg = str(exc_info.value)
-        assert "corrupted" in error_msg.lower()
-        assert "invalid JSON" in error_msg
-        assert "shotgun config init" in error_msg
+        # Verify fresh config was created with migration failure flag
+        assert isinstance(config, ShotgunConfig)
+        assert config.migration_failed is True
+        assert config.migration_backup_path is not None
+
+        # Verify backup was created
+        backup_dir = Path(tmpdir) / "backup"
+        assert backup_dir.exists()
+        backup_files = list(backup_dir.glob("config.backup.*.json"))
+        assert len(backup_files) == 1
 
 
 @pytest.mark.asyncio
 async def test_load_with_migration_failure():
-    """Test that migration failures raise ConfigMigrationError with backup path."""
+    """Test that migration failures auto-recover with fresh config and backup."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
@@ -617,17 +622,19 @@ async def test_load_with_migration_failure():
 
         manager = ConfigManager(config_path=config_path)
 
-        # Should raise ConfigMigrationError
-        with pytest.raises(ConfigMigrationError) as exc_info:
-            await manager.load()
+        # Should auto-recover by creating fresh config
+        config = await manager.load()
 
-        error_msg = str(exc_info.value)
+        # Verify fresh config was created with migration failure flag
+        assert isinstance(config, ShotgunConfig)
+        assert config.migration_failed is True
+        assert config.migration_backup_path is not None
 
-        # Verify backup was created and mentioned in error
-        assert exc_info.value.backup_path is not None
-        assert exc_info.value.backup_path.exists()
-        assert "backup" in error_msg.lower()
-        assert "shotgun config init" in error_msg
+        # Verify backup was created
+        backup_dir = Path(tmpdir) / "backup"
+        assert backup_dir.exists()
+        backup_files = list(backup_dir.glob("config.backup.*.json"))
+        assert len(backup_files) == 1
 
 
 @pytest.mark.asyncio
@@ -683,16 +690,16 @@ async def test_load_creates_backup_when_migration_needed():
 
 
 @pytest.mark.asyncio
-async def test_migration_error_message_includes_recovery_steps():
-    """Test that migration error messages include clear recovery instructions."""
+async def test_migration_failed_flag_cleared_after_provider_config():
+    """Test that migration_failed flag is cleared when user configures a provider."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
-        # Write config that will fail validation - string instead of dict for provider config
+        # Write config that will fail validation
         bad_config = {
             "config_version": 2,
             "user_id": "test-id",
-            "openai": "invalid string instead of dict",  # This will definitely fail validation
+            "openai": "invalid string instead of dict",
             "anthropic": {"api_key": None},
             "google": {"api_key": None},
             "shotgun": {"api_key": None},
@@ -701,17 +708,15 @@ async def test_migration_error_message_includes_recovery_steps():
 
         manager = ConfigManager(config_path=config_path)
 
-        with pytest.raises(ConfigMigrationError) as exc_info:
-            await manager.load()
+        # Load should auto-recover
+        config = await manager.load()
+        assert config.migration_failed is True
+        assert config.migration_backup_path is not None
 
-        error_msg = str(exc_info.value)
+        # Configure a provider
+        await manager.update_provider(ProviderType.OPENAI, api_key="test-key")
 
-        # Verify error message includes helpful recovery instructions
-        assert "backup" in error_msg.lower()
-        assert "start fresh" in error_msg.lower()
-        assert "rm" in error_msg or "delete" in error_msg.lower()
-        assert "shotgun config init" in error_msg
-
-        # If backup was created, should include restore instructions
-        if exc_info.value.backup_path:
-            assert "cp" in error_msg or "restore" in error_msg.lower()
+        # Reload and verify flag is cleared
+        config = await manager.load(force_reload=True)
+        assert config.migration_failed is False
+        assert config.migration_backup_path is None

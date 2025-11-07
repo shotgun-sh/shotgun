@@ -85,6 +85,21 @@ class WelcomeScreen(Screen[None]):
             margin: 1 0 0 0;
             width: 100%;
         }
+
+        #migration-warning {
+            width: 80%;
+            height: auto;
+            padding: 2;
+            margin: 1 0;
+            border: solid $warning;
+            background: $warning 20%;
+        }
+
+        #migration-warning-title {
+            text-style: bold;
+            color: $warning;
+            padding: 0 0 1 0;
+        }
     """
 
     BINDINGS = [
@@ -98,6 +113,20 @@ class WelcomeScreen(Screen[None]):
                 "Choose how you'd like to get started",
                 id="welcome-subtitle",
             )
+
+        # Show migration warning if migration failed
+        app = cast("ShotgunApp", self.app)
+        # Note: This is a synchronous call in compose, but config should already be loaded
+        if hasattr(app, "config_manager") and app.config_manager._config:
+            config = app.config_manager._config
+            if config.migration_failed:
+                with Vertical(id="migration-warning"):
+                    yield Static("⚠️  Configuration Migration Failed", id="migration-warning-title")
+                    backup_msg = "Your previous configuration couldn't be migrated automatically."
+                    if config.migration_backup_path:
+                        backup_msg += f"\n\nYour old configuration (including API keys) has been backed up to:\n{config.migration_backup_path}"
+                    backup_msg += "\n\nYou'll need to reconfigure Shotgun by choosing an option below."
+                    yield Markdown(backup_msg)
 
         with Container(id="options-container"):
             with Horizontal(id="options"):

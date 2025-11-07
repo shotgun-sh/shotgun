@@ -347,44 +347,57 @@ class ConfigManager:
 
             return self._config
 
-        except ConfigMigrationError:
-            # Re-raise migration errors with full context
-            raise
-        except json.JSONDecodeError as json_error:
-            error_msg = (
-                f"Configuration file is corrupted (invalid JSON): {self.config_path}\n"
-                f"Error: {json_error}\n\n"
+        except ConfigMigrationError as migration_error:
+            # Migration failed - automatically create fresh config with migration info
+            logger.error(
+                "Config migration failed, creating fresh config: %s", migration_error
             )
-            if backup_path:
-                error_msg += f"A backup was created at: {backup_path}\n"
+            backup_path = migration_error.backup_path
 
-            error_msg += (
-                "To start fresh, delete or rename your config file:\n"
-                f"  rm {self.config_path}\n"
-                f"  shotgun config init"
-            )
-            raise ConfigMigrationError(error_msg, backup_path) from json_error
-        except Exception as e:
-            error_msg = (
-                f"Failed to load configuration from {self.config_path}\n"
-                f"Error: {e}\n\n"
-            )
+            # Create fresh config with migration failure info
+            self._config = await self.initialize()
+            self._config.migration_failed = True
             if backup_path:
-                error_msg += f"A backup was created at: {backup_path}\n"
-                error_msg += (
-                    "\nTo start fresh, delete or rename your config file:\n"
-                    f"  rm {self.config_path}\n"
-                    f"  shotgun config init\n\n"
-                    "To restore your backup:\n"
-                    f"  cp {backup_path} {self.config_path}"
-                )
-            else:
-                error_msg += (
-                    "To start fresh, delete or rename your config file:\n"
-                    f"  rm {self.config_path}\n"
-                    f"  shotgun config init"
-                )
-            raise ConfigMigrationError(error_msg, backup_path) from e
+                self._config.migration_backup_path = str(backup_path)
+
+            # Save the fresh config
+            await self.save(self._config)
+            logger.info("Created fresh config after migration failure")
+
+            return self._config
+
+        except json.JSONDecodeError as json_error:
+            # Invalid JSON - create backup and fresh config
+            logger.error("Config file has invalid JSON: %s", json_error)
+
+            try:
+                backup_path = _create_backup(self.config_path)
+            except OSError:
+                backup_path = None
+
+            self._config = await self.initialize()
+            self._config.migration_failed = True
+            if backup_path:
+                self._config.migration_backup_path = str(backup_path)
+
+            await self.save(self._config)
+            logger.info("Created fresh config after JSON parse error")
+
+            return self._config
+
+        except Exception as e:
+            # Generic error - create fresh config
+            logger.error("Failed to load config: %s", e)
+
+            self._config = await self.initialize()
+            self._config.migration_failed = True
+            if backup_path:
+                self._config.migration_backup_path = str(backup_path)
+
+            await self.save(self._config)
+            logger.info("Created fresh config after load error")
+
+            return self._config
 
     async def save(self, config: ShotgunConfig | None = None) -> None:
         """Save configuration to file.
@@ -479,6 +492,11 @@ class ConfigManager:
             # Mark welcome screen as shown when BYOK provider is configured
             # This prevents the welcome screen from showing again after user has made their choice
             config.shown_welcome_screen = True
+
+        # Clear migration failure flag when user successfully configures a provider
+        if API_KEY_FIELD in kwargs and api_key_value is not None:
+            config.migration_failed = False
+            config.migration_backup_path = None
 
         await self.save(config)
 

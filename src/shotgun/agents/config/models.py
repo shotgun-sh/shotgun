@@ -221,3 +221,11 @@ class ShotgunConfig(BaseModel):
         default_factory=MarketingConfig,
         description="Marketing messages configuration and tracking",
     )
+    migration_failed: bool = Field(
+        default=False,
+        description="Whether the last config migration failed (cleared after user configures a provider)",
+    )
+    migration_backup_path: str | None = Field(
+        default=None,
+        description="Path to the backup file created when migration failed",
+    )

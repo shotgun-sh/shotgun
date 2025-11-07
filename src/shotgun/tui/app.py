@@ -8,7 +8,6 @@ from textual.screen import Screen
 from shotgun.agents.agent_manager import AgentManager
 from shotgun.agents.config import (
     ConfigManager,
-    ConfigMigrationError,
     get_config_manager,
 )
 from shotgun.agents.models import AgentType
@@ -103,20 +102,9 @@ class ShotgunApp(App[None]):
         # Run async config loading in worker
         async def _check_config() -> None:
             # Show welcome screen if no providers are configured OR if user hasn't seen it yet
-            try:
-                config = await self.config_manager.load()
-            except ConfigMigrationError as e:
-                # Show migration error and exit
-                from rich.console import Console
-
-                console = Console(stderr=True)
-                console.print(
-                    "\n[bold red]Configuration Migration Failed[/bold red]\n", style="red"
-                )
-                console.print(str(e))
-                console.print()
-                self.exit()
-                return
+            # Note: If config migration fails, ConfigManager will auto-create fresh config
+            # and set migration_failed flag, which WelcomeScreen will display
+            config = await self.config_manager.load()
 
             has_any_key = await self.config_manager.has_any_provider_key()
             if not has_any_key or not config.shown_welcome_screen:
