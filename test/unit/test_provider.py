@@ -366,11 +366,10 @@ async def test_custom_openai_base_url_byok(
         mock_settings.api.openai_base_url = "https://custom-openai.com/v1"
         mock_settings.api.anthropic_base_url = None
 
-        from shotgun.agents.config.provider import get_or_create_model
-        from shotgun.agents.config.models import KeyProvider, ModelName
-
         # Clear cache to force new model creation
         from shotgun.agents.config import provider
+        from shotgun.agents.config.models import KeyProvider, ModelName
+        from shotgun.agents.config.provider import get_or_create_model
 
         provider._model_cache.clear()
 
@@ -415,11 +414,10 @@ async def test_custom_anthropic_base_url_byok(
         mock_settings.api.openai_base_url = None
         mock_settings.api.anthropic_base_url = "https://custom-anthropic.com"
 
-        from shotgun.agents.config.provider import get_or_create_model
-        from shotgun.agents.config.models import KeyProvider, ModelName
-
         # Clear cache to force new model creation
         from shotgun.agents.config import provider
+        from shotgun.agents.config.models import KeyProvider, ModelName
+        from shotgun.agents.config.provider import get_or_create_model
 
         provider._model_cache.clear()
 
@@ -461,11 +459,10 @@ async def test_no_custom_base_url_when_none_set(
         mock_get_config_manager.return_value = manager
 
         # Import after env var is set so settings picks it up
-        from shotgun.agents.config.provider import get_or_create_model
-        from shotgun.agents.config.models import KeyProvider, ModelName
-
         # Clear cache to force new model creation
         from shotgun.agents.config import provider
+        from shotgun.agents.config.models import KeyProvider, ModelName
+        from shotgun.agents.config.provider import get_or_create_model
 
         provider._model_cache.clear()
 
@@ -508,11 +505,10 @@ async def test_custom_base_url_cache_invalidation(mock_get_config_manager):
         mock_get_config_manager.return_value = manager
 
         # Import after env var is set so settings picks it up
-        from shotgun.agents.config.provider import get_or_create_model
-        from shotgun.agents.config.models import KeyProvider, ModelName
-
         # Clear cache to start fresh
         from shotgun.agents.config import provider
+        from shotgun.agents.config.models import KeyProvider, ModelName
+        from shotgun.agents.config.provider import get_or_create_model
 
         provider._model_cache.clear()
 

@@ -85,12 +85,21 @@ def get_or_create_model(
         ValueError: If provider is not supported
     """
     # Get custom base URLs for BYOK providers
-    openai_base_url = settings.api.openai_base_url if key_provider == KeyProvider.BYOK else None
+    openai_base_url = (
+        settings.api.openai_base_url if key_provider == KeyProvider.BYOK else None
+    )
     anthropic_base_url = (
         settings.api.anthropic_base_url if key_provider == KeyProvider.BYOK else None
     )
 
-    cache_key = (provider, key_provider, model_name, api_key, openai_base_url, anthropic_base_url)
+    cache_key = (
+        provider,
+        key_provider,
+        model_name,
+        api_key,
+        openai_base_url,
+        anthropic_base_url,
+    )
 
     if cache_key not in _model_cache:
         logger.debug(

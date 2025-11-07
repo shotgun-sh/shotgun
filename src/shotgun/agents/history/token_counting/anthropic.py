@@ -47,7 +47,9 @@ class AnthropicTokenCounter(TokenCounter):
             else:
                 # Direct Anthropic API for BYOK - use async client
                 base_url = settings.api.anthropic_base_url
-                self.client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url)
+                self.client = anthropic.AsyncAnthropic(
+                    api_key=api_key, base_url=base_url
+                )
                 logger.debug(
                     f"Initialized async Anthropic token counter for {model_name} via direct API"
                 )

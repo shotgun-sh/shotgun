@@ -21,7 +21,9 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
         )
 
         # Check if validation should be skipped (for test/development environments)
-        skip_validation = os.environ.get("SHOTGUN_BUILD_SKIP_VALIDATION", "").lower() in (
+        skip_validation = os.environ.get(
+            "SHOTGUN_BUILD_SKIP_VALIDATION", ""
+        ).lower() in (
             "1",
             "true",
             "yes",
