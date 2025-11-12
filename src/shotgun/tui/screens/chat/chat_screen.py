@@ -73,9 +73,6 @@ from shotgun.tui.screens.chat_screen.command_providers import (
     UnifiedCommandProvider,
 )
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
-from shotgun.tui.screens.chat_screen.hint_with_email_copy import (
-    HintWithEmailCopyWidget,
-)
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.onboarding import OnboardingModal
@@ -329,12 +326,10 @@ class ChatScreen(Screen[None]):
 **Questions or need help?**"""
 
                 # Build markdown_before (usage + budget info before email)
-                markdown_before = usage_hint if usage_hint else ""
-                markdown_before = (
-                    f"{markdown_before}\n\n{budget_section}"
-                    if markdown_before
-                    else budget_section
-                )
+                if usage_hint:
+                    markdown_before = f"{usage_hint}\n\n{budget_section}"
+                else:
+                    markdown_before = budget_section
 
                 markdown_after = (
                     "\n\n_Reach out anytime for billing questions "
@@ -352,9 +347,29 @@ class ChatScreen(Screen[None]):
 
             except Exception as e:
                 logger.warning(f"Failed to fetch budget info: {e}")
-                # Don't fail the command if budget fetch fails
-                # Fall through to normal mount_hint
+                # For Shotgun Account, show budget fetch error
+                # If we have usage data, still show it
+                if usage_hint:
+                    # Show usage even though budget fetch failed
+                    self.mount_hint(usage_hint)
+                else:
+                    # No usage and budget fetch failed - show specific error with email
+                    markdown_before = (
+                        "⚠️ **Unable to fetch budget information**\n\n"
+                        "There was an error retrieving your budget data."
+                    )
+                    markdown_after = (
+                        "\n\n_Try the command again in a moment. "
+                        "If the issue persists, reach out for help._"
+                    )
+                    self.mount_hint_with_email(
+                        markdown_before=markdown_before,
+                        email="contact@shotgun.sh",
+                        markdown_after=markdown_after,
+                    )
+                return  # Exit early
 
+        # Fallback for non-Shotgun Account users
         if usage_hint:
             self.mount_hint(usage_hint)
         else:
@@ -643,9 +658,10 @@ class ChatScreen(Screen[None]):
             email: Email address to display with copy button
             markdown_after: Optional markdown content to display after the email line
         """
-        widget = HintWithEmailCopyWidget(markdown_before, email, markdown_after)
-        self.chat_log.mount(widget)
-        self.chat_log.scroll_end(animate=False)
+        hint = HintMessage(
+            message=markdown_before, email=email, markdown_after=markdown_after
+        )
+        self.agent_manager.add_hint_message(hint)
 
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
