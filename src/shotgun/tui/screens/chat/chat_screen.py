@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
+# Import API exception classes for proper error detection
+from anthropic import APIStatusError as AnthropicAPIStatusError
+from openai import APIStatusError as OpenAIAPIStatusError
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -82,22 +86,6 @@ from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 from shotgun.utils.marketing import MarketingManager
-
-# Import API exception classes for proper error detection
-try:
-    from anthropic import APIStatusError as AnthropicAPIStatusError
-except ImportError:
-    AnthropicAPIStatusError = None  # type: ignore[misc, assignment]
-
-try:
-    from openai import APIStatusError as OpenAIAPIStatusError
-except ImportError:
-    OpenAIAPIStatusError = None  # type: ignore[misc, assignment]
-
-try:
-    from pydantic_ai.exceptions import ModelHTTPError
-except ImportError:
-    ModelHTTPError = None  # type: ignore[misc, assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -1322,13 +1310,11 @@ class ChatScreen(Screen[None]):
             # Check for BYOK users experiencing API errors - suggest Shotgun Account
             # Use isinstance() to properly detect API errors and their subclasses
             is_api_error = False
-            if OpenAIAPIStatusError is not None and isinstance(e, OpenAIAPIStatusError):
+            if isinstance(e, OpenAIAPIStatusError):
                 is_api_error = True
-            elif AnthropicAPIStatusError is not None and isinstance(
-                e, AnthropicAPIStatusError
-            ):
+            elif isinstance(e, AnthropicAPIStatusError):
                 is_api_error = True
-            elif ModelHTTPError is not None and isinstance(e, ModelHTTPError):
+            elif isinstance(e, ModelHTTPError):
                 # pydantic_ai wraps API errors in ModelHTTPError
                 # Check for HTTP error status codes (4xx client errors)
                 if 400 <= e.status_code < 500:
