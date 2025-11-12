@@ -23,7 +23,6 @@ def test_client_init():
     assert client.api_key == "test-key"
     assert client.base_url == LITELLM_PROXY_BASE_URL
     assert client.timeout == 10.0
-    assert client.max_retries == 3
 
 
 def test_client_init_custom():
@@ -32,12 +31,10 @@ def test_client_init_custom():
         api_key="custom-key",
         base_url="https://custom.url",
         timeout=30.0,
-        max_retries=5,
     )
     assert client.api_key == "custom-key"
     assert client.base_url == "https://custom.url"
     assert client.timeout == 30.0
-    assert client.max_retries == 5
 
 
 def test_get_key_info_success(mock_httpx_request):
@@ -253,7 +250,7 @@ def test_retry_on_server_error(mock_httpx_request):
         mock_response_success,
     ]
 
-    client = LiteLLMProxyClient(api_key="test-key", max_retries=3)
+    client = LiteLLMProxyClient(api_key="test-key")
     result = client.get_key_info()
 
     # Should succeed after retries
@@ -270,7 +267,7 @@ def test_no_retry_on_client_error(mock_httpx_request):
         "Not Found", request=MagicMock(), response=mock_response
     )
 
-    client = LiteLLMProxyClient(api_key="test-key", max_retries=3)
+    client = LiteLLMProxyClient(api_key="test-key")
 
     with pytest.raises(httpx.HTTPStatusError):
         client.get_key_info()
@@ -280,10 +277,10 @@ def test_no_retry_on_client_error(mock_httpx_request):
 
 
 def test_http_error_propagation(mock_httpx_request):
-    """Test that HTTP errors are propagated."""
+    """Test that HTTP errors are propagated after retries."""
     mock_httpx_request.side_effect = httpx.RequestError("Connection failed", request=MagicMock())
 
-    client = LiteLLMProxyClient(api_key="test-key", max_retries=1)
+    client = LiteLLMProxyClient(api_key="test-key")
 
     with pytest.raises(httpx.RequestError):
         client.get_key_info()

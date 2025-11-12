@@ -1,9 +1,16 @@
 """HTTP client for LiteLLM Proxy API."""
 
-import time
+import logging
 from typing import Any
 
 import httpx
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from shotgun.api_endpoints import LITELLM_PROXY_BASE_URL
 from shotgun.logging_config import get_logger
@@ -11,6 +18,28 @@ from shotgun.logging_config import get_logger
 from .models import BudgetInfo, KeyInfoResponse, TeamInfoResponse
 
 logger = get_logger(__name__)
+
+
+def _is_retryable_http_error(exception: BaseException) -> bool:
+    """Check if HTTP exception should trigger a retry.
+
+    Args:
+        exception: The exception to check
+
+    Returns:
+        True if the exception is a transient error that should be retried
+    """
+    # Retry on network errors and timeouts
+    if isinstance(exception, (httpx.RequestError, httpx.TimeoutException)):
+        return True
+
+    # Retry on server errors (5xx) and rate limits (429)
+    if isinstance(exception, httpx.HTTPStatusError):
+        status_code = exception.response.status_code
+        return status_code >= 500 or status_code == 429
+
+    # Don't retry on other errors (e.g., 4xx client errors)
+    return False
 
 
 class LiteLLMProxyClient:
@@ -25,7 +54,6 @@ class LiteLLMProxyClient:
         api_key: str,
         base_url: str | None = None,
         timeout: float = 10.0,
-        max_retries: int = 3,
     ):
         """Initialize LiteLLM Proxy client.
 
@@ -33,20 +61,29 @@ class LiteLLMProxyClient:
             api_key: LiteLLM API key for authentication
             base_url: Base URL for LiteLLM proxy. If None, uses LITELLM_PROXY_BASE_URL
             timeout: Request timeout in seconds
-            max_retries: Maximum number of retry attempts for failed requests
         """
         self.api_key = api_key
         self.base_url = base_url or LITELLM_PROXY_BASE_URL
         self.timeout = timeout
-        self.max_retries = max_retries
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception(_is_retryable_http_error),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
     def _request_with_retry(
         self,
         method: str,
         url: str,
         **kwargs: Any,
     ) -> httpx.Response:
-        """Make HTTP request with exponential backoff retry.
+        """Make HTTP request with exponential backoff retry and jitter.
+
+        Uses tenacity to retry on transient errors (5xx, 429, network errors)
+        with exponential backoff and jitter. Client errors (4xx except 429)
+        are not retried.
 
         Args:
             method: HTTP method (GET, POST, etc.)
@@ -59,45 +96,9 @@ class LiteLLMProxyClient:
         Raises:
             httpx.HTTPError: If request fails after all retries
         """
-        last_exception = None
-
-        for attempt in range(self.max_retries):
-            try:
-                response = httpx.request(method, url, timeout=self.timeout, **kwargs)
-                response.raise_for_status()
-                return response
-
-            except httpx.HTTPError as e:
-                last_exception = e
-                # Don't retry on client errors (4xx) except 429 (rate limit)
-                if isinstance(e, httpx.HTTPStatusError):
-                    if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
-                        logger.error(
-                            "Client error from LiteLLM proxy: %s - %s",
-                            e.response.status_code,
-                            e.response.text,
-                        )
-                        raise
-
-                # Log and retry on server errors (5xx) or network errors
-                if attempt < self.max_retries - 1:
-                    wait_seconds = 2**attempt  # 1s, 2s, 4s
-                    logger.warning(
-                        "Request failed (attempt %d/%d): %s. Retrying in %ds...",
-                        attempt + 1,
-                        self.max_retries,
-                        e,
-                        wait_seconds,
-                    )
-                    time.sleep(wait_seconds)
-                else:
-                    logger.error(
-                        "Request failed after %d attempts: %s", self.max_retries, e
-                    )
-
-        if last_exception:
-            raise last_exception
-        raise RuntimeError("Request failed with no exception captured")
+        response = httpx.request(method, url, timeout=self.timeout, **kwargs)
+        response.raise_for_status()
+        return response
 
     def get_key_info(self) -> KeyInfoResponse:
         """Get key information from LiteLLM proxy.
