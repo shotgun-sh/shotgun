@@ -301,9 +301,40 @@ class ChatScreen(Screen[None]):
         # Re-focus input after mode change
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
 
-    def action_show_usage(self) -> None:
+    async def action_show_usage(self) -> None:
         usage_hint = self.agent_manager.get_usage_hint()
         logger.info(f"Usage hint: {usage_hint}")
+
+        # Add budget info for Shotgun Account users
+        if self.deps.llm_model.is_shotgun_account:
+            try:
+                from shotgun.llm_proxy import LiteLLMProxyClient
+
+                logger.debug("Fetching budget info for Shotgun Account")
+                client = LiteLLMProxyClient(self.deps.llm_model.api_key)
+                budget_info = await client.get_budget_info()
+
+                # Format budget section
+                source_label = "Key" if budget_info.source == "key" else "Team"
+                budget_section = f"""## Shotgun Account Budget
+
+* Max Budget:     ${budget_info.max_budget:.2f}
+* Current Spend:  ${budget_info.spend:.2f}
+* Remaining:      ${budget_info.remaining:.2f} ({100 - budget_info.percentage_used:.1f}%)
+* Budget Source:  {source_label}-level"""
+
+                # Append budget to usage hint
+                if usage_hint:
+                    usage_hint = f"{usage_hint}\n\n{budget_section}"
+                else:
+                    usage_hint = budget_section
+
+                logger.debug("Successfully added budget info to usage hint")
+
+            except Exception as e:
+                logger.warning(f"Failed to fetch budget info: {e}")
+                # Don't fail the command if budget fetch fails
+
         if usage_hint:
             self.mount_hint(usage_hint)
         else:
