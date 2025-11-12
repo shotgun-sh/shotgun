@@ -1,6 +1,5 @@
 """Unit tests for error message generation."""
 
-
 from shotgun.agents.error_classifier import AgentErrorContext, ErrorType
 from shotgun.agents.error_messages import ErrorMessageGenerator
 from shotgun.agents.models import AgentType

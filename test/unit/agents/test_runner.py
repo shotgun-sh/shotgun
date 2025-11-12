@@ -26,9 +26,7 @@ class MockErrorHandler:
         """Track cancellation calls."""
         self.cancellation_called = True
 
-    def handle_error(
-        self, error_type: ErrorType, error_message: ErrorMessage
-    ) -> None:
+    def handle_error(self, error_type: ErrorType, error_message: ErrorMessage) -> None:
         """Track error calls."""
         self.error_called = True
         self.last_error_type = error_type

@@ -37,9 +37,7 @@ class CLIErrorHandler:
         """Handle operation cancellation by printing a message."""
         console.print("⚠️  Operation cancelled by user", style="yellow")
 
-    def handle_error(
-        self, error_type: ErrorType, error_message: ErrorMessage
-    ) -> None:
+    def handle_error(self, error_type: ErrorType, error_message: ErrorMessage) -> None:
         """Handle an agent execution error by printing to console.
 
         Args:

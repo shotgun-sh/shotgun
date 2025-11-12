@@ -31,9 +31,7 @@ class AgentErrorHandler(Protocol):
         """
         ...
 
-    def handle_error(
-        self, error_type: ErrorType, error_message: ErrorMessage
-    ) -> None:
+    def handle_error(self, error_type: ErrorType, error_message: ErrorMessage) -> None:
         """Handle an agent execution error.
 
         Args:

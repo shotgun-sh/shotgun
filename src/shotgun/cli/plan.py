@@ -59,9 +59,7 @@ def plan(
     # Start planning process with error handling
     logger.info("🎯 Starting planning...")
     result = asyncio.run(
-        run_with_error_handling(
-            run_plan_agent, deps, AgentType.PLAN, agent, goal, deps
-        )
+        run_with_error_handling(run_plan_agent, deps, AgentType.PLAN, agent, goal, deps)
     )
 
     # Display results if successful

@@ -233,12 +233,11 @@ class ErrorMessageGenerator:
 
         if use_markdown:
             message = (
-                f"⚠️ An error occurred: {error_message}\n\n"
-                f"Check logs at {log_path}"
+                f"⚠️ An error occurred: {error_message}\n\nCheck logs at {log_path}"
             )
         else:
             message = (
-                f"⚠️  An error occurred: {error_message}\n\n" f"Check logs at {log_path}"
+                f"⚠️  An error occurred: {error_message}\n\nCheck logs at {log_path}"
             )
 
         return ErrorMessage(message=message)

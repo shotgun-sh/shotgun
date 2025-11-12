@@ -34,9 +34,7 @@ class AgentRunner:
         >>> await runner.run("Write a hello world function")
     """
 
-    def __init__(
-        self, agent_manager: "AgentManager", error_handler: AgentErrorHandler
-    ):
+    def __init__(self, agent_manager: "AgentManager", error_handler: AgentErrorHandler):
         """Initialize the agent runner.
 
         Args:
