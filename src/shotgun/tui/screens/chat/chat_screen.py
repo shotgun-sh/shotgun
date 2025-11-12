@@ -73,6 +73,9 @@ from shotgun.tui.screens.chat_screen.command_providers import (
     UnifiedCommandProvider,
 )
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+from shotgun.tui.screens.chat_screen.hint_with_email_copy import (
+    HintWithEmailCopyWidget,
+)
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.onboarding import OnboardingModal
@@ -321,19 +324,36 @@ class ChatScreen(Screen[None]):
 * Max Budget:     ${budget_info.max_budget:.2f}
 * Current Spend:  ${budget_info.spend:.2f}
 * Remaining:      ${budget_info.remaining:.2f} ({100 - budget_info.percentage_used:.1f}%)
-* Budget Source:  {source_label}-level"""
+* Budget Source:  {source_label}-level
 
-                # Append budget to usage hint
-                if usage_hint:
-                    usage_hint = f"{usage_hint}\n\n{budget_section}"
-                else:
-                    usage_hint = budget_section
+**Questions or need help?**"""
 
+                # Build markdown_before (usage + budget info before email)
+                markdown_before = usage_hint if usage_hint else ""
+                markdown_before = (
+                    f"{markdown_before}\n\n{budget_section}"
+                    if markdown_before
+                    else budget_section
+                )
+
+                markdown_after = (
+                    "\n\n_Reach out anytime for billing questions "
+                    "or to increase your budget._"
+                )
+
+                # Mount with email copy button
+                self.mount_hint_with_email(
+                    markdown_before=markdown_before,
+                    email="contact@shotgun.sh",
+                    markdown_after=markdown_after,
+                )
                 logger.debug("Successfully added budget info to usage hint")
+                return  # Exit early since we've already mounted
 
             except Exception as e:
                 logger.warning(f"Failed to fetch budget info: {e}")
                 # Don't fail the command if budget fetch fails
+                # Fall through to normal mount_hint
 
         if usage_hint:
             self.mount_hint(usage_hint)
@@ -612,6 +632,20 @@ class ChatScreen(Screen[None]):
     def mount_hint(self, markdown: str) -> None:
         hint = HintMessage(message=markdown)
         self.agent_manager.add_hint_message(hint)
+
+    def mount_hint_with_email(
+        self, markdown_before: str, email: str, markdown_after: str = ""
+    ) -> None:
+        """Mount a hint with inline email copy button.
+
+        Args:
+            markdown_before: Markdown content to display before the email line
+            email: Email address to display with copy button
+            markdown_after: Optional markdown content to display after the email line
+        """
+        widget = HintWithEmailCopyWidget(markdown_before, email, markdown_after)
+        self.chat_log.mount(widget)
+        self.chat_log.scroll_end(animate=False)
 
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
@@ -1232,14 +1266,23 @@ class ChatScreen(Screen[None]):
                 and "budget" in error_message.lower()
                 and "exceeded" in error_message.lower()
             ):
-                hint = (
+                markdown_before = (
                     "⚠️ **Your Shotgun Account budget has been exceeded!**\n\n"
                     "Your account has reached its spending limit and cannot process more requests.\n\n"
-                    "**Next steps:**\n\n"
-                    "• Contact support to increase your budget: **support@shotgun.dev**\n"
-                    "• Self-service budget increases are coming soon!\n\n"
+                    "**Need help?**"
+                )
+
+                markdown_after = (
+                    "\n\n• Self-service budget increases are coming soon!\n\n"
                     f"_Error details: {error_message}_"
                 )
+
+                self.mount_hint_with_email(
+                    markdown_before=markdown_before,
+                    email="contact@shotgun.sh",
+                    markdown_after=markdown_after,
+                )
+                return  # Exit early since we've already mounted the hint
             elif "APIStatusError" in error_name and "overload" in error_message.lower():
                 hint = "⚠️ The AI service is temporarily overloaded. Please wait a moment and try again."
             elif "APIStatusError" in error_name and "rate" in error_message.lower():
