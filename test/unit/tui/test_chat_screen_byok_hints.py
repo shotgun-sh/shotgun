@@ -1,7 +1,5 @@
 """Tests for BYOK signup hints in ChatScreen error handling."""
 
-import pytest
-
 from shotgun.agents.config.models import KeyProvider
 from shotgun.tui.screens.chat.chat_screen import SHOTGUN_SIGNUP_URL
 
@@ -51,6 +49,7 @@ def test_error_message_detection_overload():
 
 def test_error_name_detection():
     """Test that APIStatusError can be detected from exception type name."""
+
     # Simulate what happens in the error handler
     class APIStatusError(Exception):
         pass

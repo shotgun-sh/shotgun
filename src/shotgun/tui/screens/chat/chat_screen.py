@@ -1304,14 +1304,21 @@ class ChatScreen(Screen[None]):
                 return  # Exit early since we've already mounted the hint
 
             # Check for BYOK users experiencing API errors - suggest Shotgun Account
-            if not self.deps.llm_model.is_shotgun_account and "APIStatusError" in error_name:
+            if (
+                not self.deps.llm_model.is_shotgun_account
+                and "APIStatusError" in error_name
+            ):
                 # Customize message based on specific error type
                 if "rate" in error_message.lower():
                     specific_error = "Rate limit reached"
-                elif "quota" in error_message.lower() or "billing" in error_message.lower():
+                elif (
+                    "quota" in error_message.lower()
+                    or "billing" in error_message.lower()
+                ):
                     specific_error = "Quota or billing issue"
                 elif "authentication" in error_message.lower() or (
-                    "invalid" in error_message.lower() and "key" in error_message.lower()
+                    "invalid" in error_message.lower()
+                    and "key" in error_message.lower()
                 ):
                     specific_error = "Authentication error"
                 elif "overload" in error_message.lower():
