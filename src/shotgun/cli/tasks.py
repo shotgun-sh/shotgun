@@ -6,12 +6,14 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import AgentRuntimeOptions
+from shotgun.agents.models import AgentRuntimeOptions, AgentType
 from shotgun.agents.tasks import (
     create_tasks_agent,
     run_tasks_agent,
 )
+from shotgun.cli.error_handler import run_with_error_handling
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(name="tasks", help="Generate task lists with agentic approach")
 logger = get_logger(__name__)
@@ -43,10 +45,6 @@ def tasks(
     logger.info("📋 Task Creation Instruction: %s", instruction)
 
     # Track tasks command usage
-    from shotgun.agents.models import AgentType
-    from shotgun.cli.error_handler import run_with_error_handling
-    from shotgun.posthog_telemetry import track_event
-
     track_event(
         "tasks_command",
         {

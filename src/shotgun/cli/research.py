@@ -6,12 +6,14 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import AgentRuntimeOptions
+from shotgun.agents.models import AgentRuntimeOptions, AgentType
 from shotgun.agents.research import (
     create_research_agent,
     run_research_agent,
 )
+from shotgun.cli.error_handler import run_with_error_handling
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(
     name="research", help="Perform research with agentic loops", no_args_is_help=True
@@ -59,10 +61,6 @@ async def async_research(
 ) -> None:
     """Async wrapper for research process."""
     # Track research command usage
-    from shotgun.agents.models import AgentType
-    from shotgun.cli.error_handler import run_with_error_handling
-    from shotgun.posthog_telemetry import track_event
-
     track_event(
         "research_command",
         {

@@ -6,7 +6,7 @@ from anthropic import APIStatusError as AnthropicAPIStatusError
 from openai import APIStatusError as OpenAIAPIStatusError
 from pydantic_ai.exceptions import ModelHTTPError
 
-from shotgun.agents.error_classifier import (
+from shotgun.agents.error import (
     AgentErrorClassifier,
     AgentErrorContext,
     ErrorType,

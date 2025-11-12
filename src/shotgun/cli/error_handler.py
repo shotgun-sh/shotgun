@@ -10,12 +10,13 @@ from typing import Any, TypeVar
 
 from rich.console import Console
 
-from shotgun.agents.error_classifier import (
+from shotgun.agents.error import (
     AgentErrorClassifier,
     AgentErrorContext,
+    ErrorMessage,
+    ErrorMessageGenerator,
     ErrorType,
 )
-from shotgun.agents.error_messages import ErrorMessage, ErrorMessageGenerator
 from shotgun.agents.models import AgentDeps, AgentType
 from shotgun.exceptions import ContextSizeLimitExceeded
 

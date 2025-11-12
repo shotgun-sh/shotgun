@@ -6,8 +6,7 @@ using hint messages in the chat interface.
 
 from typing import TYPE_CHECKING
 
-from shotgun.agents.error_classifier import ErrorType
-from shotgun.agents.error_messages import ErrorMessage
+from shotgun.agents.error import ErrorMessage, ErrorType
 
 if TYPE_CHECKING:
     from shotgun.tui.screens.chat.chat_screen import ChatScreen

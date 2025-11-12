@@ -4,30 +4,13 @@ This module provides utilities to generate clear, actionable error messages
 for different types of agent execution failures.
 """
 
-from dataclasses import dataclass
-
-from shotgun.agents.error_classifier import AgentErrorContext, ErrorType
+from shotgun.agents.error.classifier import ErrorType
+from shotgun.agents.error.models import AgentErrorContext, ErrorMessage
+from shotgun.exceptions import ContextSizeLimitExceeded
 from shotgun.utils import get_shotgun_home
 
 # Shotgun Account signup URL for BYOK users
 SHOTGUN_SIGNUP_URL = "https://shotgun.sh"
-
-
-@dataclass
-class ErrorMessage:
-    """Container for error message components.
-
-    Attributes:
-        message: The main error message (markdown or plain text)
-        requires_email_component: Whether this error needs an email contact component
-        email: Optional email address for contact (if requires_email_component is True)
-        email_context: Additional context to show after email component
-    """
-
-    message: str
-    requires_email_component: bool = False
-    email: str | None = None
-    email_context: str | None = None
 
 
 class ErrorMessageGenerator:
@@ -96,8 +79,6 @@ class ErrorMessageGenerator:
         context: AgentErrorContext, use_markdown: bool
     ) -> ErrorMessage:
         """Generate message for context size limit exceeded."""
-        from shotgun.exceptions import ContextSizeLimitExceeded
-
         exc = context.exception
         if not isinstance(exc, ContextSizeLimitExceeded):
             # Fallback if wrong exception type

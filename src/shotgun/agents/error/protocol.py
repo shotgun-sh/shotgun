@@ -8,8 +8,8 @@ Following the Protocol-based Dependency Inversion pattern from CLAUDE.md.
 
 from typing import Protocol, runtime_checkable
 
-from shotgun.agents.error_classifier import ErrorType
-from shotgun.agents.error_messages import ErrorMessage
+from shotgun.agents.error.classifier import ErrorType
+from shotgun.agents.error.models import ErrorMessage
 
 
 @runtime_checkable

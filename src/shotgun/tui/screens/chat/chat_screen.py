@@ -44,6 +44,7 @@ from shotgun.agents.models import (
     AgentType,
     FileOperationTracker,
 )
+from shotgun.agents.runner import AgentRunner
 from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
     CodebaseGraphManager,
@@ -58,6 +59,7 @@ from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
 from shotgun.tui.components.status_bar import StatusBar
+from shotgun.tui.error_handler import TUIErrorHandler
 from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
     CodebaseIndexPromptScreen,
 )
@@ -1221,9 +1223,6 @@ class ChatScreen(Screen[None]):
     async def run_agent(self, message: str) -> None:
         # Start processing with spinner
         from textual.worker import get_current_worker
-
-        from shotgun.agents.runner import AgentRunner
-        from shotgun.tui.error_handler import TUIErrorHandler
 
         self.processing_state.start_processing("Processing...")
         self.processing_state.bind_worker(get_current_worker())

@@ -8,9 +8,12 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from shotgun.agents.error_classifier import AgentErrorClassifier, AgentErrorContext
-from shotgun.agents.error_messages import ErrorMessageGenerator
-from shotgun.agents.execution_protocol import AgentErrorHandler
+from shotgun.agents.error import (
+    AgentErrorClassifier,
+    AgentErrorContext,
+    AgentErrorHandler,
+    ErrorMessageGenerator,
+)
 from shotgun.exceptions import ContextSizeLimitExceeded
 
 if TYPE_CHECKING:

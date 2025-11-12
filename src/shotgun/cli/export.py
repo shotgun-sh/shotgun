@@ -10,8 +10,10 @@ from shotgun.agents.export import (
     create_export_agent,
     run_export_agent,
 )
-from shotgun.agents.models import AgentRuntimeOptions
+from shotgun.agents.models import AgentRuntimeOptions, AgentType
+from shotgun.cli.error_handler import run_with_error_handling
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(
     name="export", help="Export artifacts to various formats with agentic approach"
@@ -46,10 +48,6 @@ def export(
     logger.info("📤 Export Instruction: %s", instruction)
 
     # Track export command usage
-    from shotgun.agents.models import AgentType
-    from shotgun.cli.error_handler import run_with_error_handling
-    from shotgun.posthog_telemetry import track_event
-
     track_event(
         "export_command",
         {

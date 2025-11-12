@@ -6,11 +6,12 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import AgentRuntimeOptions
+from shotgun.agents.models import AgentRuntimeOptions, AgentType
 from shotgun.agents.specify import (
     create_specify_agent,
     run_specify_agent,
 )
+from shotgun.cli.error_handler import run_with_error_handling
 from shotgun.logging_config import get_logger
 
 app = typer.Typer(
@@ -43,9 +44,6 @@ def specify(
     """
 
     logger.info("📝 Specification Requirement: %s", requirement)
-
-    from shotgun.agents.models import AgentType
-    from shotgun.cli.error_handler import run_with_error_handling
 
     # Create agent dependencies
     agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)

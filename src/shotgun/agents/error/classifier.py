@@ -5,14 +5,13 @@ agent execution, making error handling consistent across TUI and CLI interfaces.
 """
 
 import asyncio
-from dataclasses import dataclass
 from enum import Enum
 
 from anthropic import APIStatusError as AnthropicAPIStatusError
 from openai import APIStatusError as OpenAIAPIStatusError
 from pydantic_ai.exceptions import ModelHTTPError
 
-from shotgun.agents.models import AgentType
+from shotgun.agents.error.models import AgentErrorContext
 from shotgun.exceptions import ContextSizeLimitExceeded
 
 
@@ -31,23 +30,6 @@ class ErrorType(str, Enum):
     SHOTGUN_RATE_LIMIT = "shotgun_rate_limit"
     GENERIC_API_STATUS = "generic_api_status"
     UNKNOWN = "unknown"
-
-
-@dataclass
-class AgentErrorContext:
-    """Context information needed to classify and handle agent errors.
-
-    Attributes:
-        exception: The exception that was raised
-        is_shotgun_account: Whether the user is using a Shotgun Account
-        model_name: Name of the model being used
-        agent_mode: Current agent type (research, tasks, etc.)
-    """
-
-    exception: Exception
-    is_shotgun_account: bool
-    model_name: str
-    agent_mode: AgentType
 
 
 class AgentErrorClassifier:

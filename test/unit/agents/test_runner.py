@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from shotgun.agents.error_classifier import ErrorType
-from shotgun.agents.error_messages import ErrorMessage
+from shotgun.agents.error import ErrorMessage, ErrorType
 from shotgun.agents.models import AgentType
 from shotgun.agents.runner import AgentRunner
 from shotgun.exceptions import ContextSizeLimitExceeded
@@ -50,7 +49,7 @@ def create_mock_agent_manager(exception_to_raise=None):
     mock_deps.llm_model = mock_llm_model
 
     mock_manager.deps = mock_deps
-    mock_manager.agent_type = AgentType.RESEARCH
+    mock_manager._current_agent_type = AgentType.RESEARCH
 
     # Configure run behavior
     if exception_to_raise:
@@ -228,7 +227,7 @@ async def test_runner_error_context_includes_agent_info():
     """Test that error context includes agent type and model info."""
     exc = ValueError("Test error")
     mock_manager = create_mock_agent_manager(exc)
-    mock_manager.agent_type = AgentType.TASKS
+    mock_manager._current_agent_type = AgentType.TASKS
     mock_manager.deps.llm_model.name = "claude-3-opus"
 
     error_handler = MockErrorHandler()
