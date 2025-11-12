@@ -132,8 +132,6 @@ class AgentRunner:
         return AgentErrorContext(
             exception=exception,
             is_shotgun_account=self.agent_manager.deps.llm_model.is_shotgun_account,
-            model_name=self.agent_manager.deps.llm_model.name,
-            agent_mode=self.agent_manager._current_agent_type,
         )
 
     def _classify_and_raise(self, context: AgentErrorContext) -> NoReturn:
