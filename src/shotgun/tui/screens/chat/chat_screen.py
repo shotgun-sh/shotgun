@@ -1194,7 +1194,17 @@ class ChatScreen(Screen[None]):
             error_name = type(e).__name__
             error_message = str(e)
 
-            if "APIStatusError" in error_name and "overload" in error_message.lower():
+            # Check for budget exceeded error
+            if "APIStatusError" in error_name and "budget" in error_message.lower() and "exceeded" in error_message.lower():
+                hint = (
+                    "⚠️ **Your Shotgun Account budget has been exceeded!**\n\n"
+                    "Your account has reached its spending limit and cannot process more requests.\n\n"
+                    "**Next steps:**\n\n"
+                    "• Contact support to increase your budget: **support@shotgun.dev**\n"
+                    "• Self-service budget increases are coming soon!\n\n"
+                    f"_Error details: {error_message}_"
+                )
+            elif "APIStatusError" in error_name and "overload" in error_message.lower():
                 hint = "⚠️ The AI service is temporarily overloaded. Please wait a moment and try again."
             elif "APIStatusError" in error_name and "rate" in error_message.lower():
                 hint = "⚠️ Rate limit reached. Please wait before trying again."
