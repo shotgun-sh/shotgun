@@ -1,6 +1,7 @@
 """Anthropic token counting using official client."""
 
 import logfire
+from anthropic import APIStatusError
 from pydantic_ai.messages import ModelMessage
 
 from shotgun.agents.config.models import KeyProvider
@@ -103,6 +104,13 @@ class AnthropicTokenCounter(TokenCounter):
                 exception_type=type(e).__name__,
                 exception_message=str(e),
             )
+
+            # Re-raise API errors directly so they can be classified by the runner
+            # This allows proper error classification for BYOK users (authentication, rate limits, etc.)
+            if isinstance(e, APIStatusError):
+                raise
+
+            # Only wrap library-level errors in RuntimeError
             raise RuntimeError(
                 f"Anthropic token counting API failed for {self.model_name}: {type(e).__name__}: {str(e)}"
             ) from e
