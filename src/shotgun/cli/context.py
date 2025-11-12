@@ -121,14 +121,8 @@ async def analyze_context() -> ContextAnalysisOutput:
             budget_markdown = _format_budget_markdown(budget_info)
             markdown = f"{markdown}\n\n{budget_markdown}"
 
-            # Add budget info to JSON
-            json_data["budget"] = {
-                "max_budget": budget_info.max_budget,
-                "spend": budget_info.spend,
-                "remaining": budget_info.remaining,
-                "percentage_used": budget_info.percentage_used,
-                "source": budget_info.source.value,
-            }
+            # Add budget info to JSON using Pydantic model
+            json_data["budget"] = budget_info.model_dump()
             logger.debug("Successfully added budget info to context output")
 
         except httpx.HTTPError as e:

@@ -39,7 +39,9 @@ class TeamInfoData(BaseModel):
     """Team information data from /team/info endpoint."""
 
     team_id: str = Field(description="Team identifier")
-    team_alias: str | None = Field(default=None, description="Human-readable team alias")
+    team_alias: str | None = Field(
+        default=None, description="Human-readable team alias"
+    )
     max_budget: float | None = Field(
         default=None, description="Maximum budget for this team in USD"
     )
@@ -70,9 +72,7 @@ class BudgetInfo(BaseModel):
     source: BudgetSource = Field(
         description="Source of budget information (key or team)"
     )
-    percentage_used: float = Field(
-        description="Percentage of budget used (0-100)"
-    )
+    percentage_used: float = Field(description="Percentage of budget used (0-100)")
 
     @classmethod
     def from_key_info(cls, key_info: KeyInfoData) -> "BudgetInfo":

@@ -40,7 +40,9 @@ class BudgetExceededException(ErrorNotPickedUpBySentry):
     until self-service budget increases are implemented.
     """
 
-    def __init__(self, current_cost: float, max_budget: float, message: str | None = None):
+    def __init__(
+        self, current_cost: float, max_budget: float, message: str | None = None
+    ):
         """Initialize the exception.
 
         Args:

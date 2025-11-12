@@ -157,32 +157,28 @@ class LiteLLMProxyClient:
         return result
 
     def get_budget_info(self) -> BudgetInfo:
-        """Get budget information with automatic key/team resolution.
+        """Get team-level budget information for this key.
 
-        Checks if the key has a budget set. If yes, returns key-level budget.
-        If no, fetches and returns team-level budget.
+        Budget is always configured at the team level, never at the key level.
+        This method fetches the team_id from the key info, then retrieves
+        the team's budget information.
 
         Returns:
-            Unified budget information
+            Team-level budget information
 
         Raises:
             httpx.HTTPError: If request fails
-            ValueError: If neither key nor team has budget configured
+            ValueError: If team has no budget configured
         """
         logger.debug("Fetching budget info")
 
-        # Get key info first
+        # Get key info to retrieve team_id
         key_response = self.get_key_info()
         key_info = key_response.info
 
-        # Check if key has its own budget
-        if key_info.max_budget is not None:
-            logger.debug("Using key-level budget: $%.6f", key_info.max_budget)
-            return BudgetInfo.from_key_info(key_info)
-
-        # Key doesn't have budget, fetch team budget
+        # Fetch team budget (budget is always at team level)
         logger.debug(
-            "Key has no budget, fetching team budget for team_id=%s",
+            "Fetching team budget for team_id=%s",
             key_info.team_id,
         )
         team_response = self.get_team_info(key_info.team_id)
@@ -190,7 +186,7 @@ class LiteLLMProxyClient:
 
         if team_info.max_budget is None:
             raise ValueError(
-                f"Neither key nor team (team_id={key_info.team_id}) has max_budget configured"
+                f"Team (team_id={key_info.team_id}) has no max_budget configured"
             )
 
         logger.debug("Using team-level budget: $%.6f", team_info.max_budget)

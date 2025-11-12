@@ -70,7 +70,9 @@ def test_get_key_info_success(mock_httpx_request):
     mock_httpx_request.assert_called_once()
     call_args = mock_httpx_request.call_args
     assert call_args[0][0] == "GET"
-    assert "key=test-key" in call_args[0][1] or call_args[1]["params"]["key"] == "test-key"
+    assert (
+        "key=test-key" in call_args[0][1] or call_args[1]["params"]["key"] == "test-key"
+    )
     assert call_args[1]["headers"]["Authorization"] == "Bearer test-key"
 
 
@@ -104,54 +106,22 @@ def test_get_team_info_success(mock_httpx_request):
     mock_httpx_request.assert_called_once()
 
 
-def test_get_budget_info_key_level(mock_httpx_request):
-    """Test get_budget_info with key-level budget."""
-    # Setup mock response for get_key_info
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "key": "sk-test",
-        "info": {
-            "key_name": "sk-...test",
-            "spend": 3.0,
-            "max_budget": 10.0,  # Key has budget
-            "team_id": "team-123",
-            "user_id": "user-456",
-            "models": [],
-        },
-    }
-    mock_response.raise_for_status = MagicMock()
-    mock_httpx_request.return_value = mock_response
-
-    # Call method
-    client = LiteLLMProxyClient(api_key="test-key")
-    result = client.get_budget_info()
-
-    # Assertions
-    assert result.max_budget == 10.0
-    assert result.spend == 3.0
-    assert result.remaining == 7.0
-    assert result.source == BudgetSource.KEY
-    assert result.percentage_used == 30.0
-
-    # Should only call get_key_info, not get_team_info
-    mock_httpx_request.assert_called_once()
-
-
 def test_get_budget_info_team_level(mock_httpx_request):
-    """Test get_budget_info with team-level budget (key has no budget)."""
+    """Test get_budget_info fetches team-level budget."""
+
     # Setup mock responses
     def mock_request_side_effect(method, url, *args, **kwargs):
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
 
         if "/key/info" in url:
-            # Key has no budget, must fetch team budget
+            # Key info provides team_id for budget lookup
             mock_response.json.return_value = {
                 "key": "sk-test",
                 "info": {
                     "key_name": "sk-...test",
                     "spend": 0.0,
-                    "max_budget": None,  # No key budget
+                    "max_budget": None,
                     "team_id": "team-456",
                     "user_id": "user-789",
                     "models": [],
@@ -188,7 +158,8 @@ def test_get_budget_info_team_level(mock_httpx_request):
 
 
 def test_get_budget_info_no_budget_configured(mock_httpx_request):
-    """Test get_budget_info when neither key nor team has budget."""
+    """Test get_budget_info when team has no budget configured."""
+
     # Setup mock responses
     def mock_request_side_effect(method, url, *args, **kwargs):
         mock_response = MagicMock()
@@ -211,7 +182,7 @@ def test_get_budget_info_no_budget_configured(mock_httpx_request):
                 "team_id": "team-789",
                 "team_info": {
                     "team_id": "team-789",
-                    "max_budget": None,  # No team budget either
+                    "max_budget": None,  # No team budget configured
                     "spend": 0.0,
                     "models": [],
                 },
@@ -223,7 +194,7 @@ def test_get_budget_info_no_budget_configured(mock_httpx_request):
 
     # Call method and expect ValueError
     client = LiteLLMProxyClient(api_key="test-key")
-    with pytest.raises(ValueError, match="Neither key nor team.*has max_budget configured"):
+    with pytest.raises(ValueError, match="Team.*has no max_budget configured"):
         client.get_budget_info()
 
 
@@ -245,8 +216,12 @@ def test_retry_on_server_error(mock_httpx_request):
     mock_response_success.raise_for_status = MagicMock()
 
     mock_httpx_request.side_effect = [
-        httpx.HTTPStatusError("Server Error", request=MagicMock(), response=MagicMock(status_code=500)),
-        httpx.HTTPStatusError("Server Error", request=MagicMock(), response=MagicMock(status_code=503)),
+        httpx.HTTPStatusError(
+            "Server Error", request=MagicMock(), response=MagicMock(status_code=500)
+        ),
+        httpx.HTTPStatusError(
+            "Server Error", request=MagicMock(), response=MagicMock(status_code=503)
+        ),
         mock_response_success,
     ]
 
@@ -278,7 +253,9 @@ def test_no_retry_on_client_error(mock_httpx_request):
 
 def test_http_error_propagation(mock_httpx_request):
     """Test that HTTP errors are propagated after retries."""
-    mock_httpx_request.side_effect = httpx.RequestError("Connection failed", request=MagicMock())
+    mock_httpx_request.side_effect = httpx.RequestError(
+        "Connection failed", request=MagicMock()
+    )
 
     client = LiteLLMProxyClient(api_key="test-key")
 
