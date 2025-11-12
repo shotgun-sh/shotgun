@@ -1,14 +1,23 @@
 from typing import Literal
 
 from pydantic import BaseModel
+from textual import on
 from textual.app import ComposeResult
+from textual.containers import Horizontal
 from textual.widget import Widget
-from textual.widgets import Markdown
+from textual.widgets import Button, Label, Markdown, Static
+
+from shotgun.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class HintMessage(BaseModel):
     message: str
     kind: Literal["hint"] = "hint"
+    # Optional email copy functionality
+    email: str | None = None
+    markdown_after: str | None = None
 
 
 class HintMessageWidget(Widget):
@@ -30,6 +39,30 @@ class HintMessageWidget(Widget):
           }
         }
 
+        HintMessageWidget .email-copy-row {
+            width: auto;
+            height: auto;
+            margin: 1 0;
+        }
+
+        HintMessageWidget .email-text {
+            width: auto;
+            margin-right: 1;
+            content-align: left middle;
+        }
+
+        HintMessageWidget .copy-btn {
+            width: auto;
+            min-width: 12;
+        }
+
+        HintMessageWidget #copy-status {
+            height: 1;
+            width: 100%;
+            margin-top: 1;
+            content-align: left middle;
+        }
+
     """
 
     def __init__(self, message: HintMessage) -> None:
@@ -37,4 +70,46 @@ class HintMessageWidget(Widget):
         self.message = message
 
     def compose(self) -> ComposeResult:
+        # Main message markdown
         yield Markdown(markdown=f"{self.message.message}")
+
+        # Optional email copy section
+        if self.message.email:
+            # Email + copy button on same line
+            with Horizontal(classes="email-copy-row"):
+                yield Static(f"Contact: {self.message.email}", classes="email-text")
+                yield Button("Copy email", id="copy-email-btn", classes="copy-btn")
+
+            # Status feedback label
+            yield Label("", id="copy-status")
+
+            # Optional markdown after email
+            if self.message.markdown_after:
+                yield Markdown(self.message.markdown_after)
+
+    @on(Button.Pressed, "#copy-email-btn")
+    def _copy_email(self) -> None:
+        """Copy email address to clipboard when button is pressed."""
+        if not self.message.email:
+            return
+
+        status_label = self.query_one("#copy-status", Label)
+
+        try:
+            import pyperclip  # type: ignore[import-untyped]  # noqa: PGH003
+
+            pyperclip.copy(self.message.email)
+            status_label.update("✓ Copied to clipboard!")
+            logger.debug(
+                f"Successfully copied email to clipboard: {self.message.email}"
+            )
+
+        except ImportError:
+            status_label.update(
+                f"⚠️ Clipboard unavailable. Please manually copy: {self.message.email}"
+            )
+            logger.warning("pyperclip not available for clipboard operations")
+
+        except Exception as e:
+            status_label.update(f"⚠️ Copy failed: {e}")
+            logger.error(f"Failed to copy email to clipboard: {e}", exc_info=True)

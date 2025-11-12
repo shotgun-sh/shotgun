@@ -141,7 +141,9 @@ def test_cleanup_old_log_files_handles_permission_errors(tmp_path: Path) -> None
 
     # Verify at least some cleanup occurred (may be 2 or 3 files depending on permissions)
     remaining_files = list(tmp_path.glob("shotgun-*.log"))
-    assert len(remaining_files) <= 3  # Should be close to 2, might include read-only file
+    assert (
+        len(remaining_files) <= 3
+    )  # Should be close to 2, might include read-only file
 
     # Restore permissions for cleanup
     try:

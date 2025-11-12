@@ -30,3 +30,33 @@ class ContextSizeLimitExceeded(ErrorNotPickedUpBySentry):
         super().__init__(
             f"Context too large for {model_name} (limit: {max_tokens:,} tokens)"
         )
+
+
+class BudgetExceededException(ErrorNotPickedUpBySentry):
+    """Raised when Shotgun Account budget has been exceeded.
+
+    This is a user-actionable error - they need to contact support
+    to increase their budget limit. This is a temporary exception
+    until self-service budget increases are implemented.
+    """
+
+    def __init__(
+        self, current_cost: float, max_budget: float, message: str | None = None
+    ):
+        """Initialize the exception.
+
+        Args:
+            current_cost: Current total spend/cost
+            max_budget: Maximum budget limit
+            message: Optional custom error message from API
+        """
+        self.current_cost = current_cost
+        self.max_budget = max_budget
+        self.api_message = message
+
+        error_msg = (
+            message
+            if message
+            else f"Budget exceeded: ${current_cost:.2f} / ${max_budget:.2f}"
+        )
+        super().__init__(error_msg)

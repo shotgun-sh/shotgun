@@ -395,9 +395,7 @@ def test_migrate_v4_to_v5_preserves_all_fields():
     config["selected_model"] = "claude-opus-4-1"
     config["shown_welcome_screen"] = True
     config["marketing"]["messages"] = {
-        "github_star_v1": {
-            "shown_at": "2025-11-01T12:00:00Z"
-        }
+        "github_star_v1": {"shown_at": "2025-11-01T12:00:00Z"}
     }
 
     result = _migrate_v4_to_v5(config)
@@ -411,7 +409,10 @@ def test_migrate_v4_to_v5_preserves_all_fields():
     assert result["shotgun"]["api_key"] == "sg_test"
     assert result["selected_model"] == "claude-opus-4-1"
     assert result["shown_welcome_screen"] is True
-    assert result["marketing"]["messages"]["github_star_v1"]["shown_at"] == "2025-11-01T12:00:00Z"
+    assert (
+        result["marketing"]["messages"]["github_star_v1"]["shown_at"]
+        == "2025-11-01T12:00:00Z"
+    )
 
 
 def test_migrate_v4_to_v5_with_multiple_marketing_messages():
@@ -427,9 +428,18 @@ def test_migrate_v4_to_v5_with_multiple_marketing_messages():
 
     assert result["config_version"] == 5
     assert len(result["marketing"]["messages"]) == 3
-    assert result["marketing"]["messages"]["github_star_v1"]["shown_at"] == "2025-11-01T10:00:00Z"
-    assert result["marketing"]["messages"]["feedback_prompt_v1"]["shown_at"] == "2025-11-02T15:30:00Z"
-    assert result["marketing"]["messages"]["survey_v2"]["shown_at"] == "2025-11-03T09:45:00Z"
+    assert (
+        result["marketing"]["messages"]["github_star_v1"]["shown_at"]
+        == "2025-11-01T10:00:00Z"
+    )
+    assert (
+        result["marketing"]["messages"]["feedback_prompt_v1"]["shown_at"]
+        == "2025-11-02T15:30:00Z"
+    )
+    assert (
+        result["marketing"]["messages"]["survey_v2"]["shown_at"]
+        == "2025-11-03T09:45:00Z"
+    )
 
 
 @pytest.mark.asyncio
@@ -441,7 +451,9 @@ async def test_config_manager_loads_v3_with_supabase_jwt():
         # Create v3 config with Supabase JWT
         v3_with_jwt = V3_CONFIG.copy()
         v3_with_jwt["shotgun"]["api_key"] = "sg_api_key_test"
-        v3_with_jwt["shotgun"]["supabase_jwt"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
+        v3_with_jwt["shotgun"]["supabase_jwt"] = (
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
+        )
         v3_with_jwt["openai"]["api_key"] = "sk-proj-test"
 
         with open(config_path, "w") as f:
@@ -452,7 +464,10 @@ async def test_config_manager_loads_v3_with_supabase_jwt():
 
         assert config.config_version == CURRENT_CONFIG_VERSION
         assert config.shotgun.api_key.get_secret_value() == "sg_api_key_test"
-        assert config.shotgun.supabase_jwt.get_secret_value() == "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
+        assert (
+            config.shotgun.supabase_jwt.get_secret_value()
+            == "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
+        )
         assert config.openai.api_key.get_secret_value() == "sk-proj-test"
 
 
@@ -480,7 +495,10 @@ async def test_config_manager_loads_v4_with_marketing_data():
         assert config.openai.api_key.get_secret_value() == "sk-proj-xyz"
         assert config.shown_welcome_screen is True
         assert "github_star_v1" in config.marketing.messages
-        assert config.marketing.messages["github_star_v1"].shown_at.isoformat() == "2025-11-01T12:00:00+00:00"
+        assert (
+            config.marketing.messages["github_star_v1"].shown_at.isoformat()
+            == "2025-11-01T12:00:00+00:00"
+        )
 
 
 def test_apply_migrations_v2_to_current_with_full_config():

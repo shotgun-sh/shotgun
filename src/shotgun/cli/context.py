@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
 from rich.console import Console
 
@@ -16,6 +17,7 @@ from shotgun.agents.context_analyzer import (
 )
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.cli.models import OutputFormat
+from shotgun.llm_proxy import BudgetInfo, LiteLLMProxyClient
 from shotgun.logging_config import get_logger
 
 app = typer.Typer(
@@ -108,4 +110,45 @@ async def analyze_context() -> ContextAnalysisOutput:
     markdown = ContextFormatter.format_markdown(analysis)
     json_data = ContextFormatter.format_json(analysis)
 
+    # Add budget info for Shotgun Account users
+    if model_config.is_shotgun_account:
+        try:
+            logger.debug("Fetching budget info for Shotgun Account")
+            client = LiteLLMProxyClient(model_config.api_key)
+            budget_info = await client.get_budget_info()
+
+            # Format budget section for markdown
+            budget_markdown = _format_budget_markdown(budget_info)
+            markdown = f"{markdown}\n\n{budget_markdown}"
+
+            # Add budget info to JSON using Pydantic model
+            json_data["budget"] = budget_info.model_dump()
+            logger.debug("Successfully added budget info to context output")
+
+        except httpx.HTTPError as e:
+            logger.warning(f"Failed to fetch budget info: {e}")
+            # Don't fail the entire command if budget fetch fails
+        except Exception as e:
+            logger.warning(f"Unexpected error fetching budget info: {e}")
+            # Don't fail the entire command if budget fetch fails
+
     return ContextAnalysisOutput(markdown=markdown, json_data=json_data)
+
+
+def _format_budget_markdown(budget_info: BudgetInfo) -> str:
+    """Format budget information as markdown.
+
+    Args:
+        budget_info: BudgetInfo instance
+
+    Returns:
+        Formatted markdown string
+    """
+    source_label = "Key" if budget_info.source == "key" else "Team"
+
+    return f"""## Shotgun Account Budget
+
+* Max Budget:     ${budget_info.max_budget:.2f}
+* Current Spend:  ${budget_info.spend:.2f}
+* Remaining:      ${budget_info.remaining:.2f} ({100 - budget_info.percentage_used:.1f}%)
+* Budget Source:  {source_label}-level"""
