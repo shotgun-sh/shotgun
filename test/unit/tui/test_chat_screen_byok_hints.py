@@ -1,7 +1,7 @@
 """Tests for BYOK signup hints in ChatScreen error handling."""
 
 from shotgun.agents.config.models import KeyProvider
-from shotgun.tui.screens.chat.chat_screen import SHOTGUN_SIGNUP_URL
+from shotgun.exceptions import SHOTGUN_SIGNUP_URL
 
 
 def test_signup_url_constant_defined():

@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from anthropic import APIStatusError, AuthenticationError
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 from shotgun.agents.history.token_counting.anthropic import AnthropicTokenCounter
@@ -162,3 +163,71 @@ async def test_messages_with_content():
         # Verify the extracted text was passed
         call_args = counter.client.messages.count_tokens.call_args
         assert "Test message" in call_args[1]["messages"][0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_anthropic_authentication_error_propagates():
+    """Test that authentication errors (401) propagate without being wrapped in RuntimeError."""
+    with patch("anthropic.AsyncAnthropic") as mock_anthropic:
+        mock_client = AsyncMock()
+        mock_anthropic.return_value = mock_client
+        counter = AnthropicTokenCounter("claude-3-opus", "test-key")
+        counter.client = mock_client
+
+        # Create a mock AuthenticationError (401)
+        auth_error = AuthenticationError(
+            "invalid x-api-key",
+            response=MagicMock(status_code=401),
+            body={"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}},
+        )
+        counter.client.messages.count_tokens.side_effect = auth_error
+
+        # The error should propagate as AuthenticationError, not RuntimeError
+        with pytest.raises(AuthenticationError) as exc_info:
+            await counter.count_tokens("Hello world")
+
+        assert "invalid x-api-key" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_anthropic_api_status_error_propagates():
+    """Test that other API errors (like rate limits) propagate without being wrapped."""
+    with patch("anthropic.AsyncAnthropic") as mock_anthropic:
+        mock_client = AsyncMock()
+        mock_anthropic.return_value = mock_client
+        counter = AnthropicTokenCounter("claude-3-opus", "test-key")
+        counter.client = mock_client
+
+        # Create a mock APIStatusError (429 rate limit)
+        rate_limit_error = APIStatusError(
+            "rate limit exceeded",
+            response=MagicMock(status_code=429),
+            body={"type": "error", "error": {"type": "rate_limit_error", "message": "rate limit exceeded"}},
+        )
+        counter.client.messages.count_tokens.side_effect = rate_limit_error
+
+        # The error should propagate as APIStatusError, not RuntimeError
+        with pytest.raises(APIStatusError) as exc_info:
+            await counter.count_tokens("Hello world")
+
+        assert "rate limit exceeded" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_anthropic_non_api_error_wrapped_in_runtime_error():
+    """Test that non-API exceptions are still wrapped in RuntimeError."""
+    with patch("anthropic.AsyncAnthropic") as mock_anthropic:
+        mock_client = AsyncMock()
+        mock_anthropic.return_value = mock_client
+        counter = AnthropicTokenCounter("claude-3-opus", "test-key")
+        counter.client = mock_client
+
+        # Simulate a library-level error (not an API error)
+        counter.client.messages.count_tokens.side_effect = ValueError("Invalid input format")
+
+        # Non-API errors should be wrapped in RuntimeError
+        with pytest.raises(RuntimeError) as exc_info:
+            await counter.count_tokens("Hello world")
+
+        assert "Anthropic token counting API failed" in str(exc_info.value)
+        assert "ValueError" in str(exc_info.value)

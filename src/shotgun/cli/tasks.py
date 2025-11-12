@@ -11,7 +11,10 @@ from shotgun.agents.tasks import (
     create_tasks_agent,
     run_tasks_agent,
 )
+from shotgun.cli.error_handler import print_agent_error
+from shotgun.exceptions import ErrorNotPickedUpBySentry
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(name="tasks", help="Generate task lists with agentic approach")
 logger = get_logger(__name__)
@@ -42,37 +45,34 @@ def tasks(
 
     logger.info("📋 Task Creation Instruction: %s", instruction)
 
-    try:
-        # Track tasks command usage
-        from shotgun.posthog_telemetry import track_event
+    # Track tasks command usage
+    track_event(
+        "tasks_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
 
-        track_event(
-            "tasks_command",
-            {
-                "non_interactive": non_interactive,
-                "provider": provider.value if provider else "default",
-            },
-        )
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
 
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
-        )
+    # Create the tasks agent with deps and provider
+    agent, deps = asyncio.run(create_tasks_agent(agent_runtime_options, provider))
 
-        # Create the tasks agent with deps and provider
-        agent, deps = asyncio.run(create_tasks_agent(agent_runtime_options, provider))
+    # Start task creation process with error handling
+    logger.info("🎯 Starting task creation...")
 
-        # Start task creation process
-        logger.info("🎯 Starting task creation...")
-        result = asyncio.run(run_tasks_agent(agent, instruction, deps))
+    async def async_tasks() -> None:
+        try:
+            result = await run_tasks_agent(agent, instruction, deps)
+            logger.info("✅ Task Creation Complete!")
+            logger.info("📋 Results:")
+            logger.info("%s", result.output)
+        except ErrorNotPickedUpBySentry as e:
+            print_agent_error(e)
+        except Exception as e:
+            logger.exception("Unexpected error in tasks command")
+            print(f"⚠️  An unexpected error occurred: {str(e)}")
 
-        # Display results
-        logger.info("✅ Task Creation Complete!")
-        logger.info("📋 Results:")
-        logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during task creation: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())
+    asyncio.run(async_tasks())

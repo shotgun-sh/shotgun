@@ -8,7 +8,10 @@ import typer
 from shotgun.agents.config import ProviderType
 from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.plan import create_plan_agent, run_plan_agent
+from shotgun.cli.error_handler import print_agent_error
+from shotgun.exceptions import ErrorNotPickedUpBySentry
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(name="plan", help="Generate structured plans", no_args_is_help=True)
 logger = get_logger(__name__)
@@ -37,37 +40,34 @@ def plan(
 
     logger.info("📋 Planning Goal: %s", goal)
 
-    try:
-        # Track plan command usage
-        from shotgun.posthog_telemetry import track_event
+    # Track plan command usage
+    track_event(
+        "plan_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
 
-        track_event(
-            "plan_command",
-            {
-                "non_interactive": non_interactive,
-                "provider": provider.value if provider else "default",
-            },
-        )
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
 
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
-        )
+    # Create the plan agent with deps and provider
+    agent, deps = asyncio.run(create_plan_agent(agent_runtime_options, provider))
 
-        # Create the plan agent with deps and provider
-        agent, deps = asyncio.run(create_plan_agent(agent_runtime_options, provider))
+    # Start planning process with error handling
+    logger.info("🎯 Starting planning...")
 
-        # Start planning process
-        logger.info("🎯 Starting planning...")
-        result = asyncio.run(run_plan_agent(agent, goal, deps))
+    async def async_plan() -> None:
+        try:
+            result = await run_plan_agent(agent, goal, deps)
+            logger.info("✅ Planning Complete!")
+            logger.info("📋 Results:")
+            logger.info("%s", result.output)
+        except ErrorNotPickedUpBySentry as e:
+            print_agent_error(e)
+        except Exception as e:
+            logger.exception("Unexpected error in plan command")
+            print(f"⚠️  An unexpected error occurred: {str(e)}")
 
-        # Display results
-        logger.info("✅ Planning Complete!")
-        logger.info("📋 Results:")
-        logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during planning: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())
+    asyncio.run(async_plan())

@@ -11,7 +11,10 @@ from shotgun.agents.export import (
     run_export_agent,
 )
 from shotgun.agents.models import AgentRuntimeOptions
+from shotgun.cli.error_handler import print_agent_error
+from shotgun.exceptions import ErrorNotPickedUpBySentry
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(
     name="export", help="Export artifacts to various formats with agentic approach"
@@ -45,37 +48,34 @@ def export(
 
     logger.info("📤 Export Instruction: %s", instruction)
 
-    try:
-        # Track export command usage
-        from shotgun.posthog_telemetry import track_event
+    # Track export command usage
+    track_event(
+        "export_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
 
-        track_event(
-            "export_command",
-            {
-                "non_interactive": non_interactive,
-                "provider": provider.value if provider else "default",
-            },
-        )
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
 
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
-        )
+    # Create the export agent with deps and provider
+    agent, deps = asyncio.run(create_export_agent(agent_runtime_options, provider))
 
-        # Create the export agent with deps and provider
-        agent, deps = asyncio.run(create_export_agent(agent_runtime_options, provider))
+    # Start export process with error handling
+    logger.info("🎯 Starting export...")
 
-        # Start export process
-        logger.info("🎯 Starting export...")
-        result = asyncio.run(run_export_agent(agent, instruction, deps))
+    async def async_export() -> None:
+        try:
+            result = await run_export_agent(agent, instruction, deps)
+            logger.info("✅ Export Complete!")
+            logger.info("📤 Results:")
+            logger.info("%s", result.output)
+        except ErrorNotPickedUpBySentry as e:
+            print_agent_error(e)
+        except Exception as e:
+            logger.exception("Unexpected error in export command")
+            print(f"⚠️  An unexpected error occurred: {str(e)}")
 
-        # Display results
-        logger.info("✅ Export Complete!")
-        logger.info("📤 Results:")
-        logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during export: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())
+    asyncio.run(async_export())

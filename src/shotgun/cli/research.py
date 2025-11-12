@@ -11,7 +11,10 @@ from shotgun.agents.research import (
     create_research_agent,
     run_research_agent,
 )
+from shotgun.cli.error_handler import print_agent_error
+from shotgun.exceptions import ErrorNotPickedUpBySentry
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 app = typer.Typer(
     name="research", help="Perform research with agentic loops", no_args_is_help=True
@@ -59,8 +62,6 @@ async def async_research(
 ) -> None:
     """Async wrapper for research process."""
     # Track research command usage
-    from shotgun.posthog_telemetry import track_event
-
     track_event(
         "research_command",
         {
@@ -75,11 +76,18 @@ async def async_research(
     # Create the research agent with deps and provider
     agent, deps = await create_research_agent(agent_runtime_options, provider)
 
-    # Start research process
+    # Start research process with error handling
     logger.info("🔬 Starting research...")
-    result = await run_research_agent(agent, query, deps)
-
-    # Display results
-    print("✅ Research Complete!")
-    print("📋 Findings:")
-    print(result.output)
+    try:
+        result = await run_research_agent(agent, query, deps)
+        # Display results
+        print("✅ Research Complete!")
+        print("📋 Findings:")
+        print(result.output)
+    except ErrorNotPickedUpBySentry as e:
+        # All user-actionable errors - display with plain text
+        print_agent_error(e)
+    except Exception as e:
+        # Unexpected errors that weren't wrapped (shouldn't happen)
+        logger.exception("Unexpected error in research command")
+        print(f"⚠️  An unexpected error occurred: {str(e)}")
