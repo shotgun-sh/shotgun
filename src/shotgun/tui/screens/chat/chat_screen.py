@@ -50,6 +50,11 @@ from shotgun.codebase.core.manager import (
     CodebaseGraphManager,
 )
 from shotgun.codebase.models import IndexProgress, ProgressPhase
+from shotgun.exceptions import (
+    SHOTGUN_CONTACT_EMAIL,
+    ErrorNotPickedUpBySentry,
+    ShotgunAccountException,
+)
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
@@ -59,7 +64,8 @@ from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
 from shotgun.tui.components.status_bar import StatusBar
-from shotgun.tui.error_handler import TUIErrorHandler
+
+# TUIErrorHandler removed - exceptions now caught directly
 from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
     CodebaseIndexPromptScreen,
 )
@@ -1231,10 +1237,30 @@ class ChatScreen(Screen[None]):
         self.widget_coordinator.set_context_streaming(True)
 
         try:
-            # Use unified agent runner with TUI error handler
-            error_handler = TUIErrorHandler(self)
-            runner = AgentRunner(self.agent_manager, error_handler)
-            await runner.run(message, use_markdown=True)
+            # Use unified agent runner - exceptions propagate for handling
+            runner = AgentRunner(self.agent_manager)
+            await runner.run(message)
+        except ShotgunAccountException as e:
+            # Shotgun Account errors show contact email UI
+            message_parts = e.to_markdown().split("**Need help?**")
+            if len(message_parts) == 2:
+                markdown_before = message_parts[0] + "**Need help?**"
+                markdown_after = message_parts[1].strip()
+                self.mount_hint_with_email(
+                    markdown_before=markdown_before,
+                    email=SHOTGUN_CONTACT_EMAIL,
+                    markdown_after=markdown_after,
+                )
+            else:
+                # Fallback if message format is unexpected
+                self.mount_hint(e.to_markdown())
+        except ErrorNotPickedUpBySentry as e:
+            # All other user-actionable errors - display with markdown
+            self.mount_hint(e.to_markdown())
+        except Exception as e:
+            # Unexpected errors that weren't wrapped (shouldn't happen)
+            logger.exception("Unexpected error in run_agent")
+            self.mount_hint(f"⚠️ An unexpected error occurred: {str(e)}")
         finally:
             self.processing_state.stop_processing()
             # Stop context indicator animation

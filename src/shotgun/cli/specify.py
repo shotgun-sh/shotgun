@@ -6,12 +6,13 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import AgentRuntimeOptions, AgentType
+from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.specify import (
     create_specify_agent,
     run_specify_agent,
 )
-from shotgun.cli.error_handler import run_with_error_handling
+from shotgun.cli.error_handler import print_agent_error
+from shotgun.exceptions import ErrorNotPickedUpBySentry
 from shotgun.logging_config import get_logger
 
 app = typer.Typer(
@@ -53,14 +54,17 @@ def specify(
 
     # Start specification process with error handling
     logger.info("📋 Starting specification generation...")
-    result = asyncio.run(
-        run_with_error_handling(
-            run_specify_agent, deps, AgentType.SPECIFY, agent, requirement, deps
-        )
-    )
 
-    # Display results if successful
-    if result:
-        logger.info("✅ Specification Complete!")
-        logger.info("📋 Results:")
-        logger.info("%s", result.output)
+    async def async_specify() -> None:
+        try:
+            result = await run_specify_agent(agent, requirement, deps)
+            logger.info("✅ Specification Complete!")
+            logger.info("📋 Results:")
+            logger.info("%s", result.output)
+        except ErrorNotPickedUpBySentry as e:
+            print_agent_error(e)
+        except Exception as e:
+            logger.exception("Unexpected error in specify command")
+            print(f"⚠️  An unexpected error occurred: {str(e)}")
+
+    asyncio.run(async_specify())

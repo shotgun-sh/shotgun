@@ -1,19 +1,11 @@
 """Agent error handling module.
 
-This module provides error classification, message generation, and protocol
-definitions for consistent error handling across TUI and CLI interfaces.
+This module provides the AgentErrorContext model used by AgentRunner
+for error classification.
 """
 
-from shotgun.agents.error.classifier import AgentErrorClassifier, ErrorType
-from shotgun.agents.error.messages import ErrorMessageGenerator
-from shotgun.agents.error.models import AgentErrorContext, ErrorMessage
-from shotgun.agents.error.protocol import AgentErrorHandler
+from shotgun.agents.error.models import AgentErrorContext
 
 __all__ = [
-    "AgentErrorClassifier",
     "AgentErrorContext",
-    "AgentErrorHandler",
-    "ErrorMessage",
-    "ErrorMessageGenerator",
-    "ErrorType",
 ]

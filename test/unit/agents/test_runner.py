@@ -1,39 +1,18 @@
-"""Integration tests for AgentRunner."""
+"""Tests for AgentRunner."""
 
 import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from shotgun.agents.error import ErrorMessage, ErrorType
 from shotgun.agents.models import AgentType
 from shotgun.agents.runner import AgentRunner
-from shotgun.exceptions import ContextSizeLimitExceeded
-
-
-class MockErrorHandler:
-    """Mock error handler for testing."""
-
-    def __init__(self):
-        self.cancellation_called = False
-        self.error_called = False
-        self.success_called = False
-        self.last_error_type = None
-        self.last_error_message = None
-
-    def handle_cancellation(self) -> None:
-        """Track cancellation calls."""
-        self.cancellation_called = True
-
-    def handle_error(self, error_type: ErrorType, error_message: ErrorMessage) -> None:
-        """Track error calls."""
-        self.error_called = True
-        self.last_error_type = error_type
-        self.last_error_message = error_message
-
-    def handle_success(self) -> None:
-        """Track success calls."""
-        self.success_called = True
+from shotgun.exceptions import (
+    AgentCancelledException,
+    BudgetExceededException,
+    ContextSizeLimitExceeded,
+    UnknownAgentException,
+)
 
 
 def create_mock_agent_manager(exception_to_raise=None):
@@ -64,70 +43,41 @@ def create_mock_agent_manager(exception_to_raise=None):
 async def test_runner_success():
     """Test successful agent execution."""
     mock_manager = create_mock_agent_manager()
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
+    runner = AgentRunner(mock_manager)
 
-    result = await runner.run("test prompt", use_markdown=True)
+    # Should not raise any exception
+    await runner.run("test prompt")
 
-    assert result is True
-    assert error_handler.success_called
-    assert not error_handler.error_called
-    assert not error_handler.cancellation_called
     mock_manager.run.assert_called_once_with(prompt="test prompt")
 
 
 @pytest.mark.asyncio
 async def test_runner_cancelled_error():
-    """Test handling of CancelledError."""
+    """Test that CancelledError is wrapped in AgentCancelledException."""
     mock_manager = create_mock_agent_manager(asyncio.CancelledError())
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
+    runner = AgentRunner(mock_manager)
 
-    result = await runner.run("test prompt", use_markdown=True)
-
-    assert result is False
-    assert error_handler.cancellation_called
-    assert not error_handler.error_called
-    assert not error_handler.success_called
+    with pytest.raises(AgentCancelledException):
+        await runner.run("test prompt")
 
 
 @pytest.mark.asyncio
 async def test_runner_context_size_exceeded():
-    """Test handling of ContextSizeLimitExceeded."""
+    """Test that ContextSizeLimitExceeded is re-raised."""
     exc = ContextSizeLimitExceeded(model_name="gpt-4", max_tokens=8000)
     mock_manager = create_mock_agent_manager(exc)
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
+    runner = AgentRunner(mock_manager)
 
-    result = await runner.run("test prompt", use_markdown=True)
+    with pytest.raises(ContextSizeLimitExceeded) as exc_info:
+        await runner.run("test prompt")
 
-    assert result is False
-    assert error_handler.error_called
-    assert error_handler.last_error_type == ErrorType.CONTEXT_SIZE_EXCEEDED
-    assert "Context too large" in error_handler.last_error_message.message
-    assert not error_handler.success_called
-
-
-@pytest.mark.asyncio
-async def test_runner_generic_exception():
-    """Test handling of generic exceptions."""
-    exc = ValueError("Something went wrong")
-    mock_manager = create_mock_agent_manager(exc)
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
-
-    result = await runner.run("test prompt", use_markdown=True)
-
-    assert result is False
-    assert error_handler.error_called
-    assert error_handler.last_error_type == ErrorType.UNKNOWN
-    assert "Something went wrong" in error_handler.last_error_message.message
-    assert not error_handler.success_called
+    assert exc_info.value.model_name == "gpt-4"
+    assert exc_info.value.max_tokens == 8000
 
 
 @pytest.mark.asyncio
 async def test_runner_budget_exceeded():
-    """Test handling of budget exceeded error."""
+    """Test that budget exceeded error is wrapped in BudgetExceededException."""
 
     class MockAPIStatusError(Exception):
         def __init__(self, message: str):
@@ -145,81 +95,23 @@ async def test_runner_budget_exceeded():
     mock_manager = create_mock_agent_manager(exc)
     mock_manager.deps.llm_model.is_shotgun_account = True
 
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
+    runner = AgentRunner(mock_manager)
 
-    result = await runner.run("test prompt", use_markdown=True)
-
-    assert result is False
-    assert error_handler.error_called
-    assert error_handler.last_error_type == ErrorType.BUDGET_EXCEEDED
-    assert "budget" in error_handler.last_error_message.message.lower()
+    with pytest.raises(BudgetExceededException):
+        await runner.run("test prompt")
 
 
 @pytest.mark.asyncio
-async def test_runner_use_markdown_false():
-    """Test that use_markdown parameter is respected."""
-    exc = ValueError("Test error")
+async def test_runner_generic_exception():
+    """Test that generic exceptions are wrapped in UnknownAgentException."""
+    exc = ValueError("Something went wrong")
     mock_manager = create_mock_agent_manager(exc)
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
+    runner = AgentRunner(mock_manager)
 
-    result = await runner.run("test prompt", use_markdown=False)
+    with pytest.raises(UnknownAgentException) as exc_info:
+        await runner.run("test prompt")
 
-    assert result is False
-    assert error_handler.error_called
-    # Plain text should not have markdown formatting like backticks
-    assert "**" not in error_handler.last_error_message.message
-
-
-@pytest.mark.asyncio
-async def test_runner_protocol_compliance():
-    """Test that runner works with any AgentErrorHandler protocol implementation."""
-
-    class CustomHandler:
-        """Custom handler implementing the protocol."""
-
-        def __init__(self):
-            self.handled = []
-
-        def handle_cancellation(self) -> None:
-            self.handled.append("cancellation")
-
-        def handle_error(
-            self, error_type: ErrorType, error_message: ErrorMessage
-        ) -> None:
-            self.handled.append(("error", error_type))
-
-        def handle_success(self) -> None:
-            self.handled.append("success")
-
-    mock_manager = create_mock_agent_manager()
-    custom_handler = CustomHandler()
-    runner = AgentRunner(mock_manager, custom_handler)
-
-    result = await runner.run("test prompt")
-
-    assert result is True
-    assert "success" in custom_handler.handled
-
-
-@pytest.mark.asyncio
-async def test_runner_multiple_runs():
-    """Test that runner can be reused for multiple runs."""
-    mock_manager = create_mock_agent_manager()
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
-
-    # First run - success
-    result1 = await runner.run("prompt 1")
-    assert result1 is True
-
-    # Second run - success
-    result2 = await runner.run("prompt 2")
-    assert result2 is True
-
-    assert mock_manager.run.call_count == 2
-    assert error_handler.success_called
+    assert exc_info.value.original_exception == exc
 
 
 @pytest.mark.asyncio
@@ -230,12 +122,7 @@ async def test_runner_error_context_includes_agent_info():
     mock_manager._current_agent_type = AgentType.TASKS
     mock_manager.deps.llm_model.name = "claude-3-opus"
 
-    error_handler = MockErrorHandler()
-    runner = AgentRunner(mock_manager, error_handler)
+    runner = AgentRunner(mock_manager)
 
-    result = await runner.run("test prompt")
-
-    assert result is False
-    assert error_handler.error_called
-    # Error message should be generated with correct context
-    assert error_handler.last_error_message is not None
+    with pytest.raises(UnknownAgentException):
+        await runner.run("test prompt")

@@ -6,9 +6,10 @@ from typing import Annotated
 import typer
 
 from shotgun.agents.config import ProviderType
-from shotgun.agents.models import AgentRuntimeOptions, AgentType
+from shotgun.agents.models import AgentRuntimeOptions
 from shotgun.agents.plan import create_plan_agent, run_plan_agent
-from shotgun.cli.error_handler import run_with_error_handling
+from shotgun.cli.error_handler import print_agent_error
+from shotgun.exceptions import ErrorNotPickedUpBySentry
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 
@@ -56,12 +57,17 @@ def plan(
 
     # Start planning process with error handling
     logger.info("🎯 Starting planning...")
-    result = asyncio.run(
-        run_with_error_handling(run_plan_agent, deps, AgentType.PLAN, agent, goal, deps)
-    )
 
-    # Display results if successful
-    if result:
-        logger.info("✅ Planning Complete!")
-        logger.info("📋 Results:")
-        logger.info("%s", result.output)
+    async def async_plan() -> None:
+        try:
+            result = await run_plan_agent(agent, goal, deps)
+            logger.info("✅ Planning Complete!")
+            logger.info("📋 Results:")
+            logger.info("%s", result.output)
+        except ErrorNotPickedUpBySentry as e:
+            print_agent_error(e)
+        except Exception as e:
+            logger.exception("Unexpected error in plan command")
+            print(f"⚠️  An unexpected error occurred: {str(e)}")
+
+    asyncio.run(async_plan())

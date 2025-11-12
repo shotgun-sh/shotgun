@@ -23,19 +23,3 @@ class AgentErrorContext(BaseModel):
     is_shotgun_account: bool
     model_name: str
     agent_mode: AgentType
-
-
-class ErrorMessage(BaseModel):
-    """Container for error message components.
-
-    Attributes:
-        message: The main error message (markdown or plain text)
-        requires_email_component: Whether this error needs an email contact component
-        email: Optional email address for contact (if requires_email_component is True)
-        email_context: Additional context to show after email component
-    """
-
-    message: str
-    requires_email_component: bool = False
-    email: str | None = None
-    email_context: str | None = None
