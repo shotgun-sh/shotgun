@@ -94,6 +94,11 @@ try:
 except ImportError:
     OpenAIAPIStatusError = None  # type: ignore[misc, assignment]
 
+try:
+    from pydantic_ai.exceptions import ModelHTTPError
+except ImportError:
+    ModelHTTPError = None  # type: ignore[misc, assignment]
+
 logger = logging.getLogger(__name__)
 
 # Shotgun Account signup URL for BYOK users
@@ -1323,6 +1328,11 @@ class ChatScreen(Screen[None]):
                 e, AnthropicAPIStatusError
             ):
                 is_api_error = True
+            elif ModelHTTPError is not None and isinstance(e, ModelHTTPError):
+                # pydantic_ai wraps API errors in ModelHTTPError
+                # Check for HTTP error status codes (4xx client errors)
+                if 400 <= e.status_code < 500:
+                    is_api_error = True
 
             if not self.deps.llm_model.is_shotgun_account and is_api_error:
                 # Customize message based on specific error type
