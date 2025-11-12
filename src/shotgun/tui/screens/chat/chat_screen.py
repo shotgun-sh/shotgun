@@ -83,6 +83,17 @@ from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 from shotgun.utils.marketing import MarketingManager
 
+# Import API exception classes for proper error detection
+try:
+    from anthropic import APIStatusError as AnthropicAPIStatusError
+except ImportError:
+    AnthropicAPIStatusError = None  # type: ignore[misc, assignment]
+
+try:
+    from openai import APIStatusError as OpenAIAPIStatusError
+except ImportError:
+    OpenAIAPIStatusError = None  # type: ignore[misc, assignment]
+
 logger = logging.getLogger(__name__)
 
 # Shotgun Account signup URL for BYOK users
@@ -1304,10 +1315,16 @@ class ChatScreen(Screen[None]):
                 return  # Exit early since we've already mounted the hint
 
             # Check for BYOK users experiencing API errors - suggest Shotgun Account
-            if (
-                not self.deps.llm_model.is_shotgun_account
-                and "APIStatusError" in error_name
+            # Use isinstance() to properly detect API errors and their subclasses
+            is_api_error = False
+            if OpenAIAPIStatusError is not None and isinstance(e, OpenAIAPIStatusError):
+                is_api_error = True
+            elif AnthropicAPIStatusError is not None and isinstance(
+                e, AnthropicAPIStatusError
             ):
+                is_api_error = True
+
+            if not self.deps.llm_model.is_shotgun_account and is_api_error:
                 # Customize message based on specific error type
                 if "rate" in error_message.lower():
                     specific_error = "Rate limit reached"
