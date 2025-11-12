@@ -7,10 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-# Import API exception classes for proper error detection
-from anthropic import APIStatusError as AnthropicAPIStatusError
-from openai import APIStatusError as OpenAIAPIStatusError
-from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -53,7 +49,6 @@ from shotgun.codebase.core.manager import (
     CodebaseGraphManager,
 )
 from shotgun.codebase.models import IndexProgress, ProgressPhase
-from shotgun.exceptions import ContextSizeLimitExceeded
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
@@ -88,9 +83,6 @@ from shotgun.utils import get_shotgun_home
 from shotgun.utils.marketing import MarketingManager
 
 logger = logging.getLogger(__name__)
-
-# Shotgun Account signup URL for BYOK users
-SHOTGUN_SIGNUP_URL = "https://shotgun.sh"
 
 
 class ChatScreen(Screen[None]):
@@ -1227,10 +1219,11 @@ class ChatScreen(Screen[None]):
 
     @work
     async def run_agent(self, message: str) -> None:
-        prompt = None
-
         # Start processing with spinner
         from textual.worker import get_current_worker
+
+        from shotgun.agents.runner import AgentRunner
+        from shotgun.tui.error_handler import TUIErrorHandler
 
         self.processing_state.start_processing("Processing...")
         self.processing_state.bind_worker(get_current_worker())
@@ -1238,123 +1231,11 @@ class ChatScreen(Screen[None]):
         # Start context indicator animation immediately
         self.widget_coordinator.set_context_streaming(True)
 
-        prompt = message
-
         try:
-            await self.agent_manager.run(
-                prompt=prompt,
-            )
-        except asyncio.CancelledError:
-            # Handle cancellation gracefully - DO NOT re-raise
-            self.mount_hint("⚠️ Operation cancelled by user")
-        except ContextSizeLimitExceeded as e:
-            # User-friendly error with actionable options
-            hint = (
-                f"⚠️ **Context too large for {e.model_name}**\n\n"
-                f"Your conversation history exceeds this model's limit ({e.max_tokens:,} tokens).\n\n"
-                f"**Choose an action:**\n\n"
-                f"1. Switch to a larger model (`Ctrl+P` → Change Model)\n"
-                f"2. Switch to a larger model, compact (`/compact`), then switch back to {e.model_name}\n"
-                f"3. Clear conversation (`/clear`)\n"
-            )
-
-            self.mount_hint(hint)
-
-            # Log for debugging (won't send to Sentry due to ErrorNotPickedUpBySentry)
-            logger.info(
-                "Context size limit exceeded",
-                extra={
-                    "max_tokens": e.max_tokens,
-                    "model_name": e.model_name,
-                },
-            )
-        except Exception as e:
-            # Log with full stack trace to shotgun.log
-            logger.exception(
-                "Agent run failed",
-                extra={
-                    "agent_mode": self.mode.value,
-                    "error_type": type(e).__name__,
-                },
-            )
-
-            # Determine user-friendly message based on error type
-            error_name = type(e).__name__
-            error_message = str(e)
-
-            # Check for budget exceeded error (Shotgun Account only)
-            if (
-                self.deps.llm_model.is_shotgun_account
-                and "apistatuserror" in error_name.lower()
-                and "budget" in error_message.lower()
-                and "exceeded" in error_message.lower()
-            ):
-                markdown_before = (
-                    "⚠️ **Your Shotgun Account budget has been exceeded!**\n\n"
-                    "Your account has reached its spending limit and cannot process more requests.\n\n"
-                    "**Need help?**"
-                )
-
-                markdown_after = (
-                    "\n\n• Self-service budget increases are coming soon!\n\n"
-                    f"_Error details: {error_message}_"
-                )
-
-                self.mount_hint_with_email(
-                    markdown_before=markdown_before,
-                    email="contact@shotgun.sh",
-                    markdown_after=markdown_after,
-                )
-                return  # Exit early since we've already mounted the hint
-
-            # Check for BYOK users experiencing API errors - suggest Shotgun Account
-            # Use isinstance() to properly detect API errors and their subclasses
-            is_api_error = False
-            if isinstance(e, OpenAIAPIStatusError):
-                is_api_error = True
-            elif isinstance(e, AnthropicAPIStatusError):
-                is_api_error = True
-            elif isinstance(e, ModelHTTPError):
-                # pydantic_ai wraps API errors in ModelHTTPError
-                # Check for HTTP error status codes (4xx client errors)
-                if 400 <= e.status_code < 500:
-                    is_api_error = True
-
-            if not self.deps.llm_model.is_shotgun_account and is_api_error:
-                # Customize message based on specific error type
-                if "rate" in error_message.lower():
-                    specific_error = "Rate limit reached"
-                elif (
-                    "quota" in error_message.lower()
-                    or "billing" in error_message.lower()
-                ):
-                    specific_error = "Quota or billing issue"
-                elif "authentication" in error_message.lower() or (
-                    "invalid" in error_message.lower()
-                    and "key" in error_message.lower()
-                ):
-                    specific_error = "Authentication error"
-                elif "overload" in error_message.lower():
-                    specific_error = "Service overloaded"
-                else:
-                    specific_error = "API error"
-
-                hint = (
-                    f"⚠️ **{specific_error}**: {error_message}\n\n"
-                    f"_This could be avoided with a [Shotgun Account]({SHOTGUN_SIGNUP_URL})._"
-                )
-                self.mount_hint(hint)
-                return  # Exit early since we've already mounted the hint
-            elif "APIStatusError" in error_name and "overload" in error_message.lower():
-                hint = "⚠️ The AI service is temporarily overloaded. Please wait a moment and try again."
-            elif "APIStatusError" in error_name and "rate" in error_message.lower():
-                hint = "⚠️ Rate limit reached. Please wait before trying again."
-            elif "APIStatusError" in error_name:
-                hint = f"⚠️ AI service error: {error_message}"
-            else:
-                hint = f"⚠️ An error occurred: {error_message}\n\nCheck logs at ~/.shotgun-sh/logs/shotgun.log"
-
-            self.mount_hint(hint)
+            # Use unified agent runner with TUI error handler
+            error_handler = TUIErrorHandler(self)
+            runner = AgentRunner(self.agent_manager, error_handler)
+            await runner.run(message, use_markdown=True)
         finally:
             self.processing_state.stop_processing()
             # Stop context indicator animation

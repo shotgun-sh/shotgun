@@ -45,37 +45,35 @@ def export(
 
     logger.info("📤 Export Instruction: %s", instruction)
 
-    try:
-        # Track export command usage
-        from shotgun.posthog_telemetry import track_event
+    # Track export command usage
+    from shotgun.agents.models import AgentType
+    from shotgun.cli.error_handler import run_with_error_handling
+    from shotgun.posthog_telemetry import track_event
 
-        track_event(
-            "export_command",
-            {
-                "non_interactive": non_interactive,
-                "provider": provider.value if provider else "default",
-            },
+    track_event(
+        "export_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
+
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
+
+    # Create the export agent with deps and provider
+    agent, deps = asyncio.run(create_export_agent(agent_runtime_options, provider))
+
+    # Start export process with error handling
+    logger.info("🎯 Starting export...")
+    result = asyncio.run(
+        run_with_error_handling(
+            run_export_agent, deps, AgentType.EXPORT, agent, instruction, deps
         )
+    )
 
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
-        )
-
-        # Create the export agent with deps and provider
-        agent, deps = asyncio.run(create_export_agent(agent_runtime_options, provider))
-
-        # Start export process
-        logger.info("🎯 Starting export...")
-        result = asyncio.run(run_export_agent(agent, instruction, deps))
-
-        # Display results
+    # Display results if successful
+    if result:
         logger.info("✅ Export Complete!")
         logger.info("📤 Results:")
         logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during export: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())

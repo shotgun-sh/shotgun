@@ -42,37 +42,35 @@ def tasks(
 
     logger.info("📋 Task Creation Instruction: %s", instruction)
 
-    try:
-        # Track tasks command usage
-        from shotgun.posthog_telemetry import track_event
+    # Track tasks command usage
+    from shotgun.agents.models import AgentType
+    from shotgun.cli.error_handler import run_with_error_handling
+    from shotgun.posthog_telemetry import track_event
 
-        track_event(
-            "tasks_command",
-            {
-                "non_interactive": non_interactive,
-                "provider": provider.value if provider else "default",
-            },
+    track_event(
+        "tasks_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
+
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
+
+    # Create the tasks agent with deps and provider
+    agent, deps = asyncio.run(create_tasks_agent(agent_runtime_options, provider))
+
+    # Start task creation process with error handling
+    logger.info("🎯 Starting task creation...")
+    result = asyncio.run(
+        run_with_error_handling(
+            run_tasks_agent, deps, AgentType.TASKS, agent, instruction, deps
         )
+    )
 
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
-        )
-
-        # Create the tasks agent with deps and provider
-        agent, deps = asyncio.run(create_tasks_agent(agent_runtime_options, provider))
-
-        # Start task creation process
-        logger.info("🎯 Starting task creation...")
-        result = asyncio.run(run_tasks_agent(agent, instruction, deps))
-
-        # Display results
+    # Display results if successful
+    if result:
         logger.info("✅ Task Creation Complete!")
         logger.info("📋 Results:")
         logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during task creation: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())

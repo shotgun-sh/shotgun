@@ -37,37 +37,35 @@ def plan(
 
     logger.info("📋 Planning Goal: %s", goal)
 
-    try:
-        # Track plan command usage
-        from shotgun.posthog_telemetry import track_event
+    # Track plan command usage
+    from shotgun.agents.models import AgentType
+    from shotgun.cli.error_handler import run_with_error_handling
+    from shotgun.posthog_telemetry import track_event
 
-        track_event(
-            "plan_command",
-            {
-                "non_interactive": non_interactive,
-                "provider": provider.value if provider else "default",
-            },
+    track_event(
+        "plan_command",
+        {
+            "non_interactive": non_interactive,
+            "provider": provider.value if provider else "default",
+        },
+    )
+
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
+
+    # Create the plan agent with deps and provider
+    agent, deps = asyncio.run(create_plan_agent(agent_runtime_options, provider))
+
+    # Start planning process with error handling
+    logger.info("🎯 Starting planning...")
+    result = asyncio.run(
+        run_with_error_handling(
+            run_plan_agent, deps, AgentType.PLAN, agent, goal, deps
         )
+    )
 
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
-        )
-
-        # Create the plan agent with deps and provider
-        agent, deps = asyncio.run(create_plan_agent(agent_runtime_options, provider))
-
-        # Start planning process
-        logger.info("🎯 Starting planning...")
-        result = asyncio.run(run_plan_agent(agent, goal, deps))
-
-        # Display results
+    # Display results if successful
+    if result:
         logger.info("✅ Planning Complete!")
         logger.info("📋 Results:")
         logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during planning: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())

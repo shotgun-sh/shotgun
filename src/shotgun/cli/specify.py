@@ -44,26 +44,25 @@ def specify(
 
     logger.info("📝 Specification Requirement: %s", requirement)
 
-    try:
-        # Create agent dependencies
-        agent_runtime_options = AgentRuntimeOptions(
-            interactive_mode=not non_interactive
+    from shotgun.agents.models import AgentType
+    from shotgun.cli.error_handler import run_with_error_handling
+
+    # Create agent dependencies
+    agent_runtime_options = AgentRuntimeOptions(interactive_mode=not non_interactive)
+
+    # Create the specify agent with deps and provider
+    agent, deps = asyncio.run(create_specify_agent(agent_runtime_options, provider))
+
+    # Start specification process with error handling
+    logger.info("📋 Starting specification generation...")
+    result = asyncio.run(
+        run_with_error_handling(
+            run_specify_agent, deps, AgentType.SPECIFY, agent, requirement, deps
         )
+    )
 
-        # Create the specify agent with deps and provider
-        agent, deps = asyncio.run(create_specify_agent(agent_runtime_options, provider))
-
-        # Start specification process
-        logger.info("📋 Starting specification generation...")
-        result = asyncio.run(run_specify_agent(agent, requirement, deps))
-
-        # Display results
+    # Display results if successful
+    if result:
         logger.info("✅ Specification Complete!")
         logger.info("📋 Results:")
         logger.info("%s", result.output)
-
-    except Exception as e:
-        logger.error("❌ Error during specification: %s", str(e))
-        import traceback
-
-        logger.debug("Full traceback:\n%s", traceback.format_exc())

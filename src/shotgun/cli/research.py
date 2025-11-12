@@ -59,6 +59,8 @@ async def async_research(
 ) -> None:
     """Async wrapper for research process."""
     # Track research command usage
+    from shotgun.agents.models import AgentType
+    from shotgun.cli.error_handler import run_with_error_handling
     from shotgun.posthog_telemetry import track_event
 
     track_event(
@@ -75,11 +77,14 @@ async def async_research(
     # Create the research agent with deps and provider
     agent, deps = await create_research_agent(agent_runtime_options, provider)
 
-    # Start research process
+    # Start research process with error handling
     logger.info("🔬 Starting research...")
-    result = await run_research_agent(agent, query, deps)
+    result = await run_with_error_handling(
+        run_research_agent, deps, AgentType.RESEARCH, agent, query, deps
+    )
 
-    # Display results
-    print("✅ Research Complete!")
-    print("📋 Findings:")
-    print(result.output)
+    # Display results if successful
+    if result:
+        print("✅ Research Complete!")
+        print("📋 Findings:")
+        print(result.output)
