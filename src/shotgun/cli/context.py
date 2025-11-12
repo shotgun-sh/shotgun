@@ -115,7 +115,7 @@ async def analyze_context() -> ContextAnalysisOutput:
         try:
             logger.debug("Fetching budget info for Shotgun Account")
             client = LiteLLMProxyClient(model_config.api_key)
-            budget_info = client.get_budget_info()
+            budget_info = await client.get_budget_info()
 
             # Format budget section for markdown
             budget_markdown = _format_budget_markdown(budget_info)

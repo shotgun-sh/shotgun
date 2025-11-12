@@ -73,13 +73,13 @@ class LiteLLMProxyClient:
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def _request_with_retry(
+    async def _request_with_retry(
         self,
         method: str,
         url: str,
         **kwargs: Any,
     ) -> httpx.Response:
-        """Make HTTP request with exponential backoff retry and jitter.
+        """Make async HTTP request with exponential backoff retry and jitter.
 
         Uses tenacity to retry on transient errors (5xx, 429, network errors)
         with exponential backoff and jitter. Client errors (4xx except 429)
@@ -96,11 +96,12 @@ class LiteLLMProxyClient:
         Raises:
             httpx.HTTPError: If request fails after all retries
         """
-        response = httpx.request(method, url, timeout=self.timeout, **kwargs)
-        response.raise_for_status()
-        return response
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.request(method, url, **kwargs)
+            response.raise_for_status()
+            return response
 
-    def get_key_info(self) -> KeyInfoResponse:
+    async def get_key_info(self) -> KeyInfoResponse:
         """Get key information from LiteLLM proxy.
 
         Returns:
@@ -115,7 +116,9 @@ class LiteLLMProxyClient:
 
         logger.debug("Fetching key info from %s", url)
 
-        response = self._request_with_retry("GET", url, params=params, headers=headers)
+        response = await self._request_with_retry(
+            "GET", url, params=params, headers=headers
+        )
 
         data = response.json()
         result = KeyInfoResponse.model_validate(data)
@@ -127,7 +130,7 @@ class LiteLLMProxyClient:
         )
         return result
 
-    def get_team_info(self, team_id: str) -> TeamInfoResponse:
+    async def get_team_info(self, team_id: str) -> TeamInfoResponse:
         """Get team information from LiteLLM proxy.
 
         Args:
@@ -145,7 +148,9 @@ class LiteLLMProxyClient:
 
         logger.debug("Fetching team info from %s for team_id=%s", url, team_id)
 
-        response = self._request_with_retry("GET", url, params=params, headers=headers)
+        response = await self._request_with_retry(
+            "GET", url, params=params, headers=headers
+        )
 
         data = response.json()
         result = TeamInfoResponse.model_validate(data)
@@ -156,7 +161,7 @@ class LiteLLMProxyClient:
         )
         return result
 
-    def get_budget_info(self) -> BudgetInfo:
+    async def get_budget_info(self) -> BudgetInfo:
         """Get team-level budget information for this key.
 
         Budget is always configured at the team level, never at the key level.
@@ -173,7 +178,7 @@ class LiteLLMProxyClient:
         logger.debug("Fetching budget info")
 
         # Get key info to retrieve team_id
-        key_response = self.get_key_info()
+        key_response = await self.get_key_info()
         key_info = key_response.info
 
         # Fetch team budget (budget is always at team level)
@@ -181,7 +186,7 @@ class LiteLLMProxyClient:
             "Fetching team budget for team_id=%s",
             key_info.team_id,
         )
-        team_response = self.get_team_info(key_info.team_id)
+        team_response = await self.get_team_info(key_info.team_id)
         team_info = team_response.team_info
 
         if team_info.max_budget is None:
@@ -194,7 +199,7 @@ class LiteLLMProxyClient:
 
 
 # Convenience function for standalone use
-def get_budget_info(api_key: str, base_url: str | None = None) -> BudgetInfo:
+async def get_budget_info(api_key: str, base_url: str | None = None) -> BudgetInfo:
     """Get budget information for an API key.
 
     Convenience function that creates a client and calls get_budget_info.
@@ -207,4 +212,4 @@ def get_budget_info(api_key: str, base_url: str | None = None) -> BudgetInfo:
         Budget information
     """
     client = LiteLLMProxyClient(api_key, base_url=base_url)
-    return client.get_budget_info()
+    return await client.get_budget_info()
