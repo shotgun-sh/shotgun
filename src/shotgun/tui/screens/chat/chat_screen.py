@@ -85,6 +85,9 @@ from shotgun.utils.marketing import MarketingManager
 
 logger = logging.getLogger(__name__)
 
+# Shotgun Account signup URL for BYOK users
+SHOTGUN_SIGNUP_URL = "https://shotgun.sh"
+
 
 class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
@@ -1298,6 +1301,29 @@ class ChatScreen(Screen[None]):
                     email="contact@shotgun.sh",
                     markdown_after=markdown_after,
                 )
+                return  # Exit early since we've already mounted the hint
+
+            # Check for BYOK users experiencing API errors - suggest Shotgun Account
+            if not self.deps.llm_model.is_shotgun_account and "APIStatusError" in error_name:
+                # Customize message based on specific error type
+                if "rate" in error_message.lower():
+                    specific_error = "Rate limit reached"
+                elif "quota" in error_message.lower() or "billing" in error_message.lower():
+                    specific_error = "Quota or billing issue"
+                elif "authentication" in error_message.lower() or (
+                    "invalid" in error_message.lower() and "key" in error_message.lower()
+                ):
+                    specific_error = "Authentication error"
+                elif "overload" in error_message.lower():
+                    specific_error = "Service overloaded"
+                else:
+                    specific_error = "API error"
+
+                hint = (
+                    f"⚠️ **{specific_error}**: {error_message}\n\n"
+                    f"_This could be avoided with a [Shotgun Account]({SHOTGUN_SIGNUP_URL})._"
+                )
+                self.mount_hint(hint)
                 return  # Exit early since we've already mounted the hint
             elif "APIStatusError" in error_name and "overload" in error_message.lower():
                 hint = "⚠️ The AI service is temporarily overloaded. Please wait a moment and try again."
