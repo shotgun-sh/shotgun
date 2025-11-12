@@ -10,7 +10,6 @@ import typer
 from rich.console import Console
 
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.config.models import KeyProvider
 from shotgun.agents.context_analyzer import (
     ContextAnalysisOutput,
     ContextAnalyzer,
@@ -112,7 +111,7 @@ async def analyze_context() -> ContextAnalysisOutput:
     json_data = ContextFormatter.format_json(analysis)
 
     # Add budget info for Shotgun Account users
-    if model_config.key_provider == KeyProvider.SHOTGUN:
+    if model_config.is_shotgun_account:
         try:
             logger.debug("Fetching budget info for Shotgun Account")
             client = LiteLLMProxyClient(model_config.api_key)

@@ -1194,8 +1194,13 @@ class ChatScreen(Screen[None]):
             error_name = type(e).__name__
             error_message = str(e)
 
-            # Check for budget exceeded error
-            if "APIStatusError" in error_name and "budget" in error_message.lower() and "exceeded" in error_message.lower():
+            # Check for budget exceeded error (Shotgun Account only)
+            if (
+                self.deps.llm_model.is_shotgun_account
+                and "apistatuserror" in error_name.lower()
+                and "budget" in error_message.lower()
+                and "exceeded" in error_message.lower()
+            ):
                 hint = (
                     "⚠️ **Your Shotgun Account budget has been exceeded!**\n\n"
                     "Your account has reached its spending limit and cannot process more requests.\n\n"

@@ -86,6 +86,15 @@ class ModelConfig(BaseModel):
         }
         return f"{provider_prefix[self.provider]}:{self.name}"
 
+    @property
+    def is_shotgun_account(self) -> bool:
+        """Check if this model is using Shotgun Account authentication.
+
+        Returns:
+            True if using Shotgun Account, False if BYOK
+        """
+        return self.key_provider == KeyProvider.SHOTGUN
+
 
 # Model specifications registry (static metadata)
 MODEL_SPECS: dict[ModelName, ModelSpec] = {
