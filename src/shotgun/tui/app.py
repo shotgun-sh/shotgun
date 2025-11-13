@@ -14,7 +14,10 @@ from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
 from shotgun.tui.containers import TUIContainer
 from shotgun.tui.screens.splash import SplashScreen
-from shotgun.utils.file_system_utils import get_shotgun_base_path
+from shotgun.utils.file_system_utils import (
+    ensure_shotgun_directory_exists,
+    get_shotgun_base_path,
+)
 from shotgun.utils.update_checker import (
     detect_installation_method,
     perform_auto_update_async,
@@ -34,10 +37,10 @@ logger = get_logger(__name__)
 class ShotgunApp(App[None]):
     # ChatScreen removed from SCREENS dict since it requires dependency injection
     # and is instantiated manually in refresh_startup_screen()
+    # DirectorySetupScreen also removed since it requires error_message parameter
     SCREENS = {
         "provider_config": ProviderConfigScreen,
         "model_picker": ModelPickerScreen,
-        "directory_setup": DirectorySetupScreen,
         "github_issue": GitHubIssueScreen,
     }
     BINDINGS = [
@@ -117,15 +120,31 @@ class ShotgunApp(App[None]):
                 )
                 return
 
+            # Try to create .shotgun directory if it doesn't exist
             if not self.check_local_shotgun_directory_exists():
-                if isinstance(self.screen, DirectorySetupScreen):
+                try:
+                    path = ensure_shotgun_directory_exists()
+                    # Verify directory was created successfully
+                    if not path.is_dir():
+                        # Show error screen if creation failed
+                        if isinstance(self.screen, DirectorySetupScreen):
+                            return
+                        self.push_screen(
+                            DirectorySetupScreen(
+                                error_message="Unable to create .shotgun directory due to filesystem conflict."
+                            ),
+                            callback=lambda _arg: self.refresh_startup_screen(),
+                        )
+                        return
+                except Exception as exc:
+                    # Show error screen if creation failed with exception
+                    if isinstance(self.screen, DirectorySetupScreen):
+                        return
+                    self.push_screen(
+                        DirectorySetupScreen(error_message=str(exc)),
+                        callback=lambda _arg: self.refresh_startup_screen(),
+                    )
                     return
-
-                self.push_screen(
-                    DirectorySetupScreen(),
-                    callback=lambda _arg: self.refresh_startup_screen(),
-                )
-                return
 
             if isinstance(self.screen, ChatScreen):
                 return

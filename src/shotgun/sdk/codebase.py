@@ -93,6 +93,19 @@ class CodebaseSDK:
         if indexed_from_cwd is None:
             indexed_from_cwd = str(Path.cwd().resolve())
 
+        # Track codebase indexing started event
+        source = detect_source()
+        logger.debug(
+            "Tracking codebase_index_started event: source=%s",
+            source,
+        )
+        track_event(
+            "codebase_index_started",
+            {
+                "source": source,
+            },
+        )
+
         graph = await self.service.create_graph(
             resolved_path,
             name,
@@ -101,9 +114,7 @@ class CodebaseSDK:
         )
         file_count = sum(graph.language_stats.values()) if graph.language_stats else 0
 
-        # Track codebase indexing event
-        # Detect if called from TUI by checking the call stack
-        source = detect_source()
+        # Track codebase indexing completion event (reuse source from start event)
 
         logger.debug(
             "Tracking codebase_indexed event: file_count=%d, node_count=%d, relationship_count=%d, source=%s",
