@@ -14,9 +14,13 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
 
         This runs immediately before each build.
         """
-        # Check if this is a development build based on version
+        # Get actual package version from metadata (not the 'version' param which is build target)
+        # The 'version' parameter is the build target ('standard', 'editable', etc.), NOT the package version
+        package_version = self.metadata.core.version
+
+        # Check if this is a development build based on package version
         is_dev_build = any(
-            marker in str(version)
+            marker in str(package_version)
             for marker in ["dev", "rc", "alpha", "beta", "a", "b"]
         )
 
@@ -106,9 +110,9 @@ IS_DEV_BUILD = {repr(is_dev_build)}
         if features:
             build_type = "development" if is_dev_build else "production"
             print(
-                f"✅ Generated build_constants.py with {', '.join(features)} ({build_type} build)"
+                f"✅ Generated build_constants.py for v{package_version} with {', '.join(features)} ({build_type} build)"
             )
         else:
             print(
-                "⚠️  Generated build_constants.py without analytics keys (development build)"
+                f"⚠️  Generated build_constants.py for v{package_version} without analytics keys (development build)"
             )
