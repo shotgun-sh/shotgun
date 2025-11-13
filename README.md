@@ -318,6 +318,12 @@ We had to implement payments. Cursor, Claude Code, and Copilot all suggested bui
 
 A: We only gather minimal, anonymous events (e.g., install, server start, tool call). We don't collect the content itself—only that an event occurred. We use Sentry for error reporting to improve stability.
 
+**Q: Does my code leave my computer when indexing?**
+
+A: No. When you index your codebase, all indexing happens locally on your machine. The index is stored in `~/.shotgun-sh/codebases/` and never sent to any server. Your code stays on your computer.
+
+![Indexing Privacy](docs/index_codebase_privacy.png)
+
 **Q: Local LLMs?**
 
 A: Planned. We'll publish compatibility notes and local provider integrations.

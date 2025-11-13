@@ -1,4 +1,4 @@
-"""Screen for setting up the local .shotgun directory."""
+"""Screen for displaying .shotgun directory creation errors."""
 
 from __future__ import annotations
 
@@ -10,11 +10,18 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Label, Static
 
-from shotgun.utils.file_system_utils import ensure_shotgun_directory_exists
-
 
 class DirectorySetupScreen(Screen[None]):
-    """Prompt the user to initialize the .shotgun directory."""
+    """Display an error when .shotgun directory creation fails."""
+
+    def __init__(self, error_message: str) -> None:
+        """Initialize the error screen.
+
+        Args:
+            error_message: The error message to display to the user.
+        """
+        super().__init__()
+        self.error_message = error_message
 
     CSS = """
         DirectorySetupScreen {
@@ -67,56 +74,44 @@ class DirectorySetupScreen(Screen[None]):
     """
 
     BINDINGS = [
-        ("enter", "confirm", "Initialize"),
+        ("enter", "retry", "Retry"),
         ("escape", "cancel", "Exit"),
     ]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
-            yield Static("Directory setup", id="directory-setup-title")
-            yield Static("Shotgun keeps workspace data in a .shotgun directory.\n")
-            yield Static("Initialize it in the current directory?\n")
-            yield Static(f"[$foreground-muted]({Path.cwd().resolve()})[/]")
+            yield Static(
+                "Failed to create .shotgun directory", id="directory-setup-title"
+            )
+            yield Static("Shotgun was unable to create the .shotgun directory in:\n")
+            yield Static(f"[$foreground-muted]({Path.cwd().resolve()})[/]\n")
+            yield Static(f"[bold red]Error:[/] {self.error_message}\n")
+            yield Static(
+                "This directory is required for storing workspace data. "
+                "Please check permissions and try again."
+            )
         yield Label("", id="directory-status")
         with Horizontal(id="directory-actions"):
-            yield Button(
-                "Initialize and proceed \\[ENTER]", variant="primary", id="initialize"
-            )
-            yield Button("Exit without setup \\[ESC]", variant="default", id="exit")
+            yield Button("Retry \\[ENTER]", variant="primary", id="retry")
+            yield Button("Exit \\[ESC]", variant="default", id="exit")
 
     def on_mount(self) -> None:
-        self.set_focus(self.query_one("#initialize", Button))
+        self.set_focus(self.query_one("#retry", Button))
 
-    def action_confirm(self) -> None:
-        self._initialize_directory()
+    def action_retry(self) -> None:
+        """Retry by dismissing the screen, which will trigger refresh_startup_screen."""
+        self.dismiss()
 
     def action_cancel(self) -> None:
-        self._exit_application()
+        """Exit the application."""
+        self.app.exit()
 
-    @on(Button.Pressed, "#initialize")
-    def _on_initialize_pressed(self) -> None:
-        self._initialize_directory()
+    @on(Button.Pressed, "#retry")
+    def _on_retry_pressed(self) -> None:
+        """Retry by dismissing the screen."""
+        self.dismiss()
 
     @on(Button.Pressed, "#exit")
     def _on_exit_pressed(self) -> None:
-        self._exit_application()
-
-    def _initialize_directory(self) -> None:
-        status_label = self.query_one("#directory-status", Label)
-        try:
-            path = ensure_shotgun_directory_exists()
-        except Exception as exc:  # pragma: no cover - defensive; textual path
-            status_label.update(f"❌ Failed to initialize directory: {exc}")
-            return
-
-        # Double-check a directory now exists; guard against unexpected filesystem state.
-        if not path.is_dir():
-            status_label.update(
-                "❌ Unable to initialize .shotgun directory due to filesystem conflict."
-            )
-            return
-
-        self.dismiss()
-
-    def _exit_application(self) -> None:
+        """Exit the application."""
         self.app.exit()

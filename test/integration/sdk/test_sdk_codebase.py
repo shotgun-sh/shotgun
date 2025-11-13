@@ -5,6 +5,7 @@ These tests create actual graphs and test the complete SDK workflow.
 
 import asyncio
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -281,3 +282,35 @@ async def test_reindex_codebase_not_found(temp_storage_dir):
         await sdk.reindex_codebase("nonexistent_id")
 
     assert "Graph not found" in str(exc_info.value)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_codebase_index_started_event(temp_storage_dir, simple_python_codebase):
+    """Test that codebase_index_started event is tracked when indexing starts."""
+    sdk = CodebaseSDK(temp_storage_dir / "event_test")
+
+    with patch("shotgun.sdk.codebase.track_event") as mock_track_event:
+        # Index codebase
+        result = await sdk.index_codebase(simple_python_codebase, "Event Test")
+
+        # Verify codebase_index_started event was tracked
+        # Should be first call (before codebase_indexed)
+        assert mock_track_event.call_count >= 2
+        first_call = mock_track_event.call_args_list[0]
+
+        # Check event name
+        assert first_call[0][0] == "codebase_index_started"
+
+        # Check properties (name excluded for privacy)
+        properties = first_call[0][1]
+        assert "source" in properties
+        assert properties["source"] in ["cli", "tui"]
+
+        # Verify second call is codebase_indexed
+        second_call = mock_track_event.call_args_list[1]
+        assert second_call[0][0] == "codebase_indexed"
+
+        # Verify indexing actually succeeded
+        assert result.name == "Event Test"
+        assert result.file_count > 0
