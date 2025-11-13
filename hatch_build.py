@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+from packaging.version import InvalidVersion, Version
 
 
 class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
@@ -14,9 +15,36 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
 
         This runs immediately before each build.
         """
-        # Check if this is a development build based on version
+        # Get actual package version from metadata (not the 'version' param which is build target)
+        # The 'version' parameter is the build target ('standard', 'editable', etc.), NOT the package version
+        package_version = self.metadata.core.version
+
+        # First validate it's a valid PEP 440 version (catches things like "abc.def.ghi")
+        try:
+            Version(str(package_version))
+        except InvalidVersion as e:
+            raise ValueError(
+                f"❌ Invalid version format: {package_version!r}\n"
+                f"   Must be a valid PEP 440 version string\n"
+                f"   Error: {e}"
+            )
+
+        # Then enforce strict X.Y.Z format (packaging.version accepts "1.0" but we require "1.0.0")
+        version_parts = str(package_version).split(".")
+        if len(version_parts) < 3 or not all(
+            part.split("dev")[0].split("rc")[0].split("a")[0].split("b")[0].isdigit()
+            for part in version_parts[:3]
+        ):
+            raise ValueError(
+                f"❌ Invalid version format: {package_version!r}\n"
+                f"   Must start with X.Y.Z where X, Y, Z are numbers (e.g., 0.2.22, 1.0.0)\n"
+                f"   Valid: 0.2.22, 1.0.0, 0.2.22.dev1\n"
+                f"   Invalid: 1.0, 2022.1, abc.def.ghi"
+            )
+
+        # Check if this is a development build based on package version
         is_dev_build = any(
-            marker in str(version)
+            marker in str(package_version)
             for marker in ["dev", "rc", "alpha", "beta", "a", "b"]
         )
 
@@ -106,9 +134,9 @@ IS_DEV_BUILD = {repr(is_dev_build)}
         if features:
             build_type = "development" if is_dev_build else "production"
             print(
-                f"✅ Generated build_constants.py with {', '.join(features)} ({build_type} build)"
+                f"✅ Generated build_constants.py for v{package_version} with {', '.join(features)} ({build_type} build)"
             )
         else:
             print(
-                "⚠️  Generated build_constants.py without analytics keys (development build)"
+                f"⚠️  Generated build_constants.py for v{package_version} without analytics keys (development build)"
             )
