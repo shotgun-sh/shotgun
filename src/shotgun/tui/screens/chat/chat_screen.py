@@ -1271,10 +1271,23 @@ class ChatScreen(Screen[None]):
         except ErrorNotPickedUpBySentry as e:
             # All other user-actionable errors - display with markdown
             self.mount_hint(e.to_markdown())
+            # Also show a notification to ensure user sees the error
+            self.notify(
+                "An error occurred. Press Ctrl+M to switch models.",
+                title="Error",
+                severity="error",
+                timeout=10,
+            )
         except Exception as e:
             # Unexpected errors that weren't wrapped (shouldn't happen)
             logger.exception("Unexpected error in run_agent")
             self.mount_hint(f"⚠️ An unexpected error occurred: {str(e)}")
+            self.notify(
+                f"Unexpected error: {str(e)[:100]}",
+                title="Error",
+                severity="error",
+                timeout=10,
+            )
         finally:
             self.processing_state.stop_processing()
             # Stop context indicator animation
