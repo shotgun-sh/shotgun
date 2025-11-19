@@ -47,7 +47,7 @@ class ChatHistory(Widget):
         super().__init__()
         self.items: Sequence[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
-        self._rendered_count = 0  # Track how many messages have been mounted
+        self._rendered_ids: list[int] = []  # Track id() of rendered items
 
     def compose(self) -> ComposeResult:
         """Compose the chat history widget."""
@@ -66,8 +66,8 @@ class ChatHistory(Widget):
                 item=ChatHistory.partial_response
             )
 
-        # Track how many messages were rendered during initial compose
-        self._rendered_count = len(filtered)
+        # Track which items were rendered during initial compose
+        self._rendered_ids = [id(item) for item in filtered]
 
     def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
         """Filter and yield items for display."""
@@ -91,10 +91,23 @@ class ChatHistory(Widget):
 
         self.items = messages
         filtered = list(self.filtered_items())
+        filtered_ids = [id(item) for item in filtered]
 
-        # Only mount new messages that haven't been rendered yet
-        if len(filtered) > self._rendered_count:
-            new_messages = filtered[self._rendered_count :]
+        # Check if existing items match (for incremental mounting)
+        can_append = True
+        if len(filtered_ids) >= len(self._rendered_ids):
+            # Check that all previously rendered items are still in same position
+            for i, prev_id in enumerate(self._rendered_ids):
+                if filtered_ids[i] != prev_id:
+                    can_append = False
+                    break
+        else:
+            # Fewer items than before (shouldn't normally happen)
+            can_append = False
+
+        if can_append and len(filtered) > len(self._rendered_ids):
+            # Just append new messages
+            new_messages = filtered[len(self._rendered_ids):]
             for item in new_messages:
                 widget: Widget
                 if isinstance(item, ModelRequest):
@@ -109,7 +122,29 @@ class ChatHistory(Widget):
                 # Mount before the PartialResponseWidget
                 self.vertical_tail.mount(widget, before=self.vertical_tail.children[-1])
 
-            self._rendered_count = len(filtered)
+            self._rendered_ids = filtered_ids
+            self.vertical_tail.scroll_end(animate=False)
 
-            # Scroll to bottom to show newly added messages
+        elif not can_append:
+            # Items changed - clear and remount all
+            # Remove all children except the last one (PartialResponseWidget)
+            for child in list(self.vertical_tail.children)[:-1]:
+                child.remove()
+
+            # Remount all items
+            for item in filtered:
+                new_widget: Widget
+                if isinstance(item, ModelRequest):
+                    new_widget = UserQuestionWidget(item)
+                elif isinstance(item, HintMessage):
+                    new_widget = HintMessageWidget(item)
+                elif isinstance(item, ModelResponse):
+                    new_widget = AgentResponseWidget(item)
+                else:
+                    continue
+
+                # Mount before the PartialResponseWidget
+                self.vertical_tail.mount(new_widget, before=self.vertical_tail.children[-1])
+
+            self._rendered_ids = filtered_ids
             self.vertical_tail.scroll_end(animate=False)
