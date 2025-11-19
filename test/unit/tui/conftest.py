@@ -141,6 +141,7 @@ def mock_widget_coordinator():
     coordinator.update_for_qa_mode = Mock()
     coordinator.update_messages = Mock()
     coordinator.set_partial_response = Mock()
+    coordinator.clear_partial_response = Mock()
     coordinator.update_context_indicator = Mock()
     coordinator.update_prompt_input = Mock()
     coordinator.refresh_mode_indicator = Mock()
