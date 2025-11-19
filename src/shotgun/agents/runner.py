@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, NoReturn
 
 from anthropic import APIStatusError as AnthropicAPIStatusError
 from openai import APIStatusError as OpenAIAPIStatusError
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 
 from shotgun.agents.error.models import AgentErrorContext
 from shotgun.exceptions import (
@@ -164,6 +164,15 @@ class AgentRunner:
             and "exceeded" in error_message.lower()
         ):
             raise BudgetExceededException(message=error_message) from exception
+
+        # Check for empty model response (e.g., model unavailable or misconfigured)
+        if isinstance(exception, UnexpectedModelBehavior):
+            raise GenericAPIStatusException(
+                "The model returned an empty response. This may indicate:\n"
+                "- The model is unavailable or misconfigured\n"
+                "- A temporary service issue\n\n"
+                "Try switching to a different model or try again later."
+            ) from exception
 
         # Detect API errors
         is_api_error = False
