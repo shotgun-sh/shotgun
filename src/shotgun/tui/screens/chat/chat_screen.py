@@ -768,9 +768,8 @@ class ChatScreen(Screen[None]):
         self, event: MessageHistoryUpdated
     ) -> None:
         """Handle message history updates from the agent manager."""
-        # Update messages BEFORE clearing partial response so it uses the new messages
-        self.messages = event.messages
         self._clear_partial_response()
+        self.messages = event.messages
 
         # Use widget coordinator to refresh placeholder and mode indicator
         self.widget_coordinator.update_prompt_input(
