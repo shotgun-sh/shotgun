@@ -856,6 +856,19 @@ class ChatScreen(Screen[None]):
             # Update the agent manager's model configuration
             self.agent_manager.deps.llm_model = result.model_config
 
+            # Reset agents so they get recreated with new model
+            self.agent_manager._agents_initialized = False
+            self.agent_manager._research_agent = None
+            self.agent_manager._plan_agent = None
+            self.agent_manager._tasks_agent = None
+            self.agent_manager._specify_agent = None
+            self.agent_manager._export_agent = None
+            self.agent_manager._research_deps = None
+            self.agent_manager._plan_deps = None
+            self.agent_manager._tasks_deps = None
+            self.agent_manager._specify_deps = None
+            self.agent_manager._export_deps = None
+
             # Get current analysis and update context indicator via coordinator
             analysis = await self.agent_manager.get_context_analysis()
             self.widget_coordinator.update_context_indicator(analysis, result.new_model)

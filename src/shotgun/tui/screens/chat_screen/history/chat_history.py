@@ -92,6 +92,42 @@ class ChatHistory(Widget):
         self.items = messages
         filtered = list(self.filtered_items())
 
+        # Handle case where streaming inflated _rendered_count but final messages differ
+        # This happens when error replaces ModelResponse with HintMessage
+        if len(filtered) <= self._rendered_count and filtered:
+            # Check if the last rendered item type differs from what should be there
+            # Children: [UserQuestion, AgentResponse, ..., PartialResponse]
+            # We need to check the item before PartialResponseWidget
+            num_children = len(self.vertical_tail.children)
+            if num_children > 1:  # Has items besides PartialResponseWidget
+                last_widget = self.vertical_tail.children[-2]  # Item before Partial
+                last_filtered = filtered[-1]
+
+                # Check type mismatch
+                type_mismatch = (
+                    (
+                        isinstance(last_widget, AgentResponseWidget)
+                        and isinstance(last_filtered, HintMessage)
+                    )
+                    or (
+                        isinstance(last_widget, HintMessageWidget)
+                        and isinstance(last_filtered, ModelResponse)
+                    )
+                    or (
+                        isinstance(last_widget, AgentResponseWidget)
+                        and isinstance(last_filtered, ModelRequest)
+                    )
+                    or (
+                        isinstance(last_widget, UserQuestionWidget)
+                        and not isinstance(last_filtered, ModelRequest)
+                    )
+                )
+
+                if type_mismatch:
+                    # Remove the mismatched widget and adjust count
+                    last_widget.remove()
+                    self._rendered_count = len(filtered) - 1
+
         # Only mount new messages that haven't been rendered yet
         if len(filtered) > self._rendered_count:
             new_messages = filtered[self._rendered_count :]
