@@ -173,22 +173,6 @@ class WidgetCoordinator:
         except Exception as e:
             logger.exception(f"Failed to set partial response: {e}")
 
-    def clear_partial_response(self) -> None:
-        """Clear the partial response widget without updating messages.
-
-        Use this when clearing the streaming display but letting the reactive
-        watcher handle message updates separately.
-        """
-        if not self.screen.is_mounted:
-            return
-
-        try:
-            chat_history = self.screen.query_one(ChatHistory)
-            # Only clear the partial response, don't update messages
-            chat_history.partial_response = None
-        except Exception as e:
-            logger.exception(f"Failed to clear partial response: {e}")
-
     def update_context_indicator(
         self, analysis: "ContextAnalysis | None", model_name: str
     ) -> None:

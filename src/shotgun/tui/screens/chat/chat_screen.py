@@ -724,9 +724,8 @@ class ChatScreen(Screen[None]):
             )
 
     def _clear_partial_response(self) -> None:
-        # Use widget coordinator to clear partial response only
-        # Don't update messages here - let the reactive watcher handle that
-        self.widget_coordinator.clear_partial_response()
+        # Use widget coordinator to clear partial response
+        self.widget_coordinator.set_partial_response(None, self.messages)
 
     def _exit_qa_mode(self) -> None:
         """Exit Q&A mode and clean up state."""
