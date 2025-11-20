@@ -64,7 +64,7 @@ async def openai_web_search_tool(query: str) -> str:
         )
 
         client = AsyncOpenAI(api_key=api_key)
-        response = await client.responses.create(  # type: ignore[call-overload]
+        response = await client.responses.create(
             model="gpt-5-mini",
             input=[
                 {"role": "user", "content": [{"type": "input_text", "text": prompt}]}
