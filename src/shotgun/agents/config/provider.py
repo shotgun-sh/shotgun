@@ -47,13 +47,13 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
-        return ModelName.GPT_5
+        return ModelName.GPT_5_1
 
     # Priority 2: Individual provider keys
     if _get_api_key(config.anthropic.api_key):
         return ModelName.CLAUDE_HAIKU_4_5
     if _get_api_key(config.openai.api_key):
-        return ModelName.GPT_5
+        return ModelName.GPT_5_1
     if _get_api_key(config.google.api_key):
         return ModelName.GEMINI_2_5_PRO
 
@@ -201,10 +201,16 @@ async def get_provider_model(
             model_name = provider_or_model
         else:
             # No specific model requested - use selected or default
-            model_name = config.selected_model or ModelName.GPT_5
+            model_name = config.selected_model or get_default_model_for_provider(config)
 
+        # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
         if model_name not in MODEL_SPECS:
-            raise ValueError(f"Model '{model_name.value}' not found")
+            logger.warning(
+                "Selected model '%s' not found in MODEL_SPECS, falling back to default",
+                model_name.value if hasattr(model_name, "value") else model_name,
+            )
+            model_name = get_default_model_for_provider(config)
+
         spec = MODEL_SPECS[model_name]
 
         # Use Shotgun Account with determined model (provider = actual LLM provider)
@@ -225,10 +231,16 @@ async def get_provider_model(
     if isinstance(provider_or_model, ModelName):
         # Look up the model spec
         if provider_or_model not in MODEL_SPECS:
-            raise ValueError(f"Model '{provider_or_model.value}' not found")
-        spec = MODEL_SPECS[provider_or_model]
-        provider_enum = spec.provider
-        requested_model = provider_or_model
+            logger.warning(
+                "Requested model '%s' not found, will use provider default",
+                provider_or_model.value,
+            )
+            requested_model = None  # Fall back to provider default
+            provider_enum = None  # Will be determined below
+        else:
+            spec = MODEL_SPECS[provider_or_model]
+            provider_enum = spec.provider
+            requested_model = provider_or_model
     else:
         # Convert string to ProviderType enum if needed (backward compatible)
         if provider_or_model:
@@ -257,15 +269,26 @@ async def get_provider_model(
         if not api_key:
             raise ValueError("OpenAI API key not configured. Set via config.")
 
-        # Use requested model or default to gpt-5
-        model_name = requested_model if requested_model else ModelName.GPT_5
+        # Use requested model or default to gpt-5.1
+        model_name = requested_model if requested_model else ModelName.GPT_5_1
+        # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            raise ValueError(f"Model '{model_name.value}' not found")
+            logger.warning(
+                "OpenAI model '%s' not found, falling back to GPT-5.1",
+                model_name.value if hasattr(model_name, "value") else model_name,
+            )
+            model_name = ModelName.GPT_5_1
         spec = MODEL_SPECS[model_name]
 
         # Check and test streaming capability for GPT-5 family models
         supports_streaming = True  # Default to True for all models
-        if model_name in (ModelName.GPT_5, ModelName.GPT_5_MINI):
+        if model_name in (
+            ModelName.GPT_5,
+            ModelName.GPT_5_MINI,
+            ModelName.GPT_5_1,
+            ModelName.GPT_5_1_CODEX,
+            ModelName.GPT_5_1_CODEX_MINI,
+        ):
             # Check if streaming capability has been tested
             streaming_capability = config.openai.supports_streaming
 
@@ -304,8 +327,13 @@ async def get_provider_model(
 
         # Use requested model or default to claude-haiku-4-5
         model_name = requested_model if requested_model else ModelName.CLAUDE_HAIKU_4_5
+        # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            raise ValueError(f"Model '{model_name.value}' not found")
+            logger.warning(
+                "Anthropic model '%s' not found, falling back to Claude Haiku 4.5",
+                model_name.value if hasattr(model_name, "value") else model_name,
+            )
+            model_name = ModelName.CLAUDE_HAIKU_4_5
         spec = MODEL_SPECS[model_name]
 
         # Create fully configured ModelConfig
@@ -325,8 +353,13 @@ async def get_provider_model(
 
         # Use requested model or default to gemini-2.5-pro
         model_name = requested_model if requested_model else ModelName.GEMINI_2_5_PRO
+        # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            raise ValueError(f"Model '{model_name.value}' not found")
+            logger.warning(
+                "Google model '%s' not found, falling back to Gemini 2.5 Pro",
+                model_name.value if hasattr(model_name, "value") else model_name,
+            )
+            model_name = ModelName.GEMINI_2_5_PRO
         spec = MODEL_SPECS[model_name]
 
         # Create fully configured ModelConfig
