@@ -340,6 +340,10 @@ class ConfigManager:
                     spec = MODEL_SPECS[self._config.selected_model]
                     if not await self.has_provider_key(spec.provider):
                         # Provider has no key - reset to None
+                        logger.info(
+                            "Selected model %s provider has no API key, finding available model",
+                            self._config.selected_model.value,
+                        )
                         self._config.selected_model = None
                         should_save = True
 
