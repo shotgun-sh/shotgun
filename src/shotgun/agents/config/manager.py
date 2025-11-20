@@ -324,8 +324,14 @@ class ConfigManager:
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
 
-            # Validate selected_model for BYOK mode - verify provider has a key
+            # Clear migration_failed flag if config loaded successfully
             should_save = False
+            if self._config.migration_failed:
+                self._config.migration_failed = False
+                self._config.migration_backup_path = None
+                should_save = True
+
+            # Validate selected_model for BYOK mode - verify provider has a key
             if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
                 if self._config.selected_model:
