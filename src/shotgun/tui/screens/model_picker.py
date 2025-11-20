@@ -89,7 +89,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         ("escape", "done", "Back"),
     ]
 
-    selected_model: reactive[ModelName] = reactive(ModelName.GPT_5)
+    selected_model: reactive[ModelName] = reactive(ModelName.GPT_5_1)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
@@ -320,9 +320,15 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         """Get human-readable model name."""
         names = {
             ModelName.GPT_5: "GPT-5 (OpenAI)",
+            ModelName.GPT_5_MINI: "GPT-5 Mini (OpenAI)",
+            ModelName.GPT_5_1: "GPT-5.1 (OpenAI)",
+            ModelName.GPT_5_1_CODEX: "GPT-5.1 Codex (OpenAI)",
+            ModelName.GPT_5_1_CODEX_MINI: "GPT-5.1 Codex Mini (OpenAI)",
             ModelName.CLAUDE_OPUS_4_1: "Claude Opus 4.1 (Anthropic)",
             ModelName.CLAUDE_SONNET_4_5: "Claude Sonnet 4.5 (Anthropic)",
+            ModelName.CLAUDE_HAIKU_4_5: "Claude Haiku 4.5 (Anthropic)",
             ModelName.GEMINI_2_5_PRO: "Gemini 2.5 Pro (Google)",
+            ModelName.GEMINI_2_5_FLASH: "Gemini 2.5 Flash (Google)",
         }
         return names.get(model_name, model_name.value)
 

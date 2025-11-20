@@ -307,29 +307,41 @@ class ConfigManager:
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
 
+            # Clean up invalid selected_model before Pydantic validation
+            if "selected_model" in data and data["selected_model"] is not None:
+                from .models import MODEL_SPECS, ModelName
+
+                try:
+                    # Try to convert to ModelName enum
+                    model_name = ModelName(data["selected_model"])
+                    # Check if it exists in MODEL_SPECS
+                    if model_name not in MODEL_SPECS:
+                        data["selected_model"] = None
+                except (ValueError, KeyError):
+                    # Invalid model name - reset to None
+                    data["selected_model"] = None
+
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
 
-            # Validate selected_model if in BYOK mode (no Shotgun key)
-            if not self._provider_has_api_key(self._config.shotgun):
-                should_save = False
+            # Clear migration_failed flag if config loaded successfully
+            should_save = False
+            if self._config.migration_failed:
+                self._config.migration_failed = False
+                self._config.migration_backup_path = None
+                should_save = True
 
+            # Validate selected_model for BYOK mode - verify provider has a key
+            if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
                 if self._config.selected_model:
                     from .models import MODEL_SPECS
 
-                    if self._config.selected_model in MODEL_SPECS:
-                        spec = MODEL_SPECS[self._config.selected_model]
-                        if not await self.has_provider_key(spec.provider):
-                            logger.info(
-                                "Selected model %s provider has no API key, finding available model",
-                                self._config.selected_model.value,
-                            )
-                            self._config.selected_model = None
-                            should_save = True
-                    else:
+                    spec = MODEL_SPECS[self._config.selected_model]
+                    if not await self.has_provider_key(spec.provider):
+                        # Provider has no key - reset to None
                         logger.info(
-                            "Selected model %s not found in MODEL_SPECS, resetting",
+                            "Selected model %s provider has no API key, finding available model",
                             self._config.selected_model.value,
                         )
                         self._config.selected_model = None
@@ -344,17 +356,13 @@ class ConfigManager:
 
                             # Find default model for this provider
                             provider_models = {
-                                ProviderType.OPENAI: ModelName.GPT_5,
+                                ProviderType.OPENAI: ModelName.GPT_5_1,
                                 ProviderType.ANTHROPIC: ModelName.CLAUDE_HAIKU_4_5,
                                 ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
                             }
 
                             if provider in provider_models:
                                 self._config.selected_model = provider_models[provider]
-                                logger.info(
-                                    "Set selected_model to %s (first available provider)",
-                                    self._config.selected_model.value,
-                                )
                                 should_save = True
                                 break
 
@@ -498,7 +506,7 @@ class ConfigManager:
                 from .models import ModelName
 
                 provider_models = {
-                    ProviderType.OPENAI: ModelName.GPT_5,
+                    ProviderType.OPENAI: ModelName.GPT_5_1,
                     ProviderType.ANTHROPIC: ModelName.CLAUDE_HAIKU_4_5,
                     ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
                 }
