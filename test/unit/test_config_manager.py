@@ -269,7 +269,7 @@ async def test_get_provider_model_openai_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
+        assert model.name == "gpt-5.1"
         assert model.api_key == "test-openai-key"
 
 
@@ -388,7 +388,7 @@ async def test_get_provider_model_string_provider(mock_get_config_manager):
         model = await get_provider_model("openai")
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
+        assert model.name == "gpt-5.1"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -838,14 +838,14 @@ async def test_update_provider_keeps_selected_model_when_other_keys_exist():
             ProviderType.OPENAI, **{API_KEY_FIELD: "test-openai-key"}
         )
         config = await manager.load()
-        assert config.selected_model == ModelName.GPT_5
+        assert config.selected_model == ModelName.GPT_5_1
 
         # Now add Anthropic key (should NOT change selected_model)
         await manager.update_provider(
             ProviderType.ANTHROPIC, **{API_KEY_FIELD: "test-anthropic-key"}
         )
         config = await manager.load()
-        assert config.selected_model == ModelName.GPT_5  # Still GPT-5
+        assert config.selected_model == ModelName.GPT_5_1  # Still GPT-5.1
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
@@ -997,7 +997,7 @@ async def test_clear_provider_key_updates_selected_model():
         # The load() method should detect that the selected model's provider has no key
         # and switch to an available provider
         assert config.selected_model != ModelName.CLAUDE_HAIKU_4_5
-        assert config.selected_model == ModelName.GPT_5  # Should switch to OpenAI
+        assert config.selected_model == ModelName.GPT_5_1  # Should switch to OpenAI
 
 
 @pytest.mark.asyncio
@@ -1010,7 +1010,7 @@ async def test_clear_all_provider_keys_sets_selected_model_to_none():
         # Set up a provider
         await manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
         config = await manager.load(force_reload=True)
-        assert config.selected_model == ModelName.GPT_5
+        assert config.selected_model == ModelName.GPT_5_1
 
         # Clear the only provider key
         await manager.clear_provider_key(ProviderType.OPENAI)

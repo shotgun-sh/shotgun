@@ -42,8 +42,8 @@ async def test_get_provider_model_openai_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
-        assert model.name == "gpt-5"
+        assert model.name == "gpt-5.1"
+        assert model.name == "gpt-5.1"
         assert model.provider == ProviderType.OPENAI
         assert model.api_key == "test-openai-key"
 
@@ -163,7 +163,7 @@ async def test_get_provider_model_with_enum(mock_get_config_manager):
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
+        assert model.name == "gpt-5.1"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -225,7 +225,7 @@ async def test_get_provider_model_prefers_config_over_env(mock_get_config_manage
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5"
+        assert model.name == "gpt-5.1"
         # Should use config key, not environment variable
         assert model.api_key == "config-key"
 
