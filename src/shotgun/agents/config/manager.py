@@ -310,28 +310,26 @@ class ConfigManager:
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
 
-            # Validate selected_model if in BYOK mode (no Shotgun key)
-            if not self._provider_has_api_key(self._config.shotgun):
-                should_save = False
+            # Validate selected_model - reset to None if invalid
+            should_save = False
+            if self._config.selected_model:
+                from .models import MODEL_SPECS
 
+                # Check if selected model exists in MODEL_SPECS
+                if self._config.selected_model not in MODEL_SPECS:
+                    # Invalid model - silently reset to None
+                    self._config.selected_model = None
+                    should_save = True
+
+            # Additional validation for BYOK mode - verify provider has a key
+            if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
                 if self._config.selected_model:
                     from .models import MODEL_SPECS
 
-                    if self._config.selected_model in MODEL_SPECS:
-                        spec = MODEL_SPECS[self._config.selected_model]
-                        if not await self.has_provider_key(spec.provider):
-                            logger.info(
-                                "Selected model %s provider has no API key, finding available model",
-                                self._config.selected_model.value,
-                            )
-                            self._config.selected_model = None
-                            should_save = True
-                    else:
-                        logger.info(
-                            "Selected model %s not found in MODEL_SPECS, resetting",
-                            self._config.selected_model.value,
-                        )
+                    spec = MODEL_SPECS[self._config.selected_model]
+                    if not await self.has_provider_key(spec.provider):
+                        # Provider has no key - reset to None
                         self._config.selected_model = None
                         should_save = True
 
@@ -351,10 +349,6 @@ class ConfigManager:
 
                             if provider in provider_models:
                                 self._config.selected_model = provider_models[provider]
-                                logger.info(
-                                    "Set selected_model to %s (first available provider)",
-                                    self._config.selected_model.value,
-                                )
                                 should_save = True
                                 break
 

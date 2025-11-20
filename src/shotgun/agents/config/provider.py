@@ -205,10 +205,6 @@ async def get_provider_model(
 
         # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
         if model_name not in MODEL_SPECS:
-            logger.warning(
-                "Selected model '%s' not found in MODEL_SPECS, falling back to default",
-                model_name.value if hasattr(model_name, "value") else model_name,
-            )
             model_name = get_default_model_for_provider(config)
 
         spec = MODEL_SPECS[model_name]
@@ -231,10 +227,6 @@ async def get_provider_model(
     if isinstance(provider_or_model, ModelName):
         # Look up the model spec
         if provider_or_model not in MODEL_SPECS:
-            logger.warning(
-                "Requested model '%s' not found, will use provider default",
-                provider_or_model.value,
-            )
             requested_model = None  # Fall back to provider default
             provider_enum = None  # Will be determined below
         else:
@@ -273,10 +265,6 @@ async def get_provider_model(
         model_name = requested_model if requested_model else ModelName.GPT_5_1
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            logger.warning(
-                "OpenAI model '%s' not found, falling back to GPT-5.1",
-                model_name.value if hasattr(model_name, "value") else model_name,
-            )
             model_name = ModelName.GPT_5_1
         spec = MODEL_SPECS[model_name]
 
@@ -329,10 +317,6 @@ async def get_provider_model(
         model_name = requested_model if requested_model else ModelName.CLAUDE_HAIKU_4_5
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            logger.warning(
-                "Anthropic model '%s' not found, falling back to Claude Haiku 4.5",
-                model_name.value if hasattr(model_name, "value") else model_name,
-            )
             model_name = ModelName.CLAUDE_HAIKU_4_5
         spec = MODEL_SPECS[model_name]
 
@@ -355,10 +339,6 @@ async def get_provider_model(
         model_name = requested_model if requested_model else ModelName.GEMINI_2_5_PRO
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            logger.warning(
-                "Google model '%s' not found, falling back to Gemini 2.5 Pro",
-                model_name.value if hasattr(model_name, "value") else model_name,
-            )
             model_name = ModelName.GEMINI_2_5_PRO
         spec = MODEL_SPECS[model_name]
 
