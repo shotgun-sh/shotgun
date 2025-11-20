@@ -307,21 +307,25 @@ class ConfigManager:
             # Convert plain text secrets to SecretStr objects
             self._convert_secrets_to_secretstr(data)
 
+            # Clean up invalid selected_model before Pydantic validation
+            if "selected_model" in data and data["selected_model"] is not None:
+                from .models import MODEL_SPECS, ModelName
+
+                try:
+                    # Try to convert to ModelName enum
+                    model_name = ModelName(data["selected_model"])
+                    # Check if it exists in MODEL_SPECS
+                    if model_name not in MODEL_SPECS:
+                        data["selected_model"] = None
+                except (ValueError, KeyError):
+                    # Invalid model name - reset to None
+                    data["selected_model"] = None
+
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
 
-            # Validate selected_model - reset to None if invalid
+            # Validate selected_model for BYOK mode - verify provider has a key
             should_save = False
-            if self._config.selected_model:
-                from .models import MODEL_SPECS
-
-                # Check if selected model exists in MODEL_SPECS
-                if self._config.selected_model not in MODEL_SPECS:
-                    # Invalid model - silently reset to None
-                    self._config.selected_model = None
-                    should_save = True
-
-            # Additional validation for BYOK mode - verify provider has a key
             if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
                 if self._config.selected_model:
