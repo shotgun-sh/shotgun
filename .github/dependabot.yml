@@ -3,8 +3,8 @@
 
 version: 2
 updates:
-  # Python dependencies
-  - package-ecosystem: "pip"
+  # Python dependencies (using uv)
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "daily"
