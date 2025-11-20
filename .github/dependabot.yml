@@ -10,7 +10,7 @@ updates:
       interval: "daily"
       time: "04:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 10
     assignees:
       - "scottfrasso"
     labels:
@@ -28,7 +28,7 @@ updates:
       interval: "daily"
       time: "04:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 10
     assignees:
       - "scottfrasso"
     labels:
