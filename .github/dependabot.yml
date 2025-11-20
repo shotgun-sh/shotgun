@@ -20,11 +20,6 @@ updates:
       prefix: "build"
       prefix-development: "build"
       include: "scope"
-    groups:
-      development-dependencies:
-        dependency-type: "development"
-      production-dependencies:
-        dependency-type: "production"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
