@@ -1317,7 +1317,9 @@ class ChatScreen(Screen[None]):
                     f"Your Shotgun Account has **${budget_info.remaining:.2f}** remaining.\n\n"
                     f"👉 **[Top Up Now at https://app.shotgun.sh/dashboard](https://app.shotgun.sh/dashboard)**"
                 )
-                self.agent_manager.add_hint_message(HintMessage(message=warning_message))
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=warning_message)
+                )
         except Exception as e:
             # Silently log and continue - don't block user workflow
             logger.debug(f"Failed to check low balance warning: {e}")
