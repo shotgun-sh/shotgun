@@ -153,8 +153,9 @@ class BudgetExceededException(ShotgunAccountException):
         return (
             "⚠️ **Your Shotgun Account budget has been exceeded!**\n\n"
             "Your account has reached its spending limit and cannot process more requests.\n\n"
-            "**Need help?** Contact us for budget increase.\n\n"
-            "• Self-service budget increases are coming soon!\n\n"
+            "**Action Required:** Top up your account to continue using Shotgun.\n\n"
+            "👉 **[Top Up Now at https://app.shotgun.sh/dashboard](https://app.shotgun.sh/dashboard)**\n\n"
+            "**Need help?** Contact us if you have questions about your budget.\n\n"
             f"_Error details: {str(self)}_"
         )
 
@@ -163,8 +164,9 @@ class BudgetExceededException(ShotgunAccountException):
         return (
             "⚠️  Your Shotgun Account budget has been exceeded!\n\n"
             "Your account has reached its spending limit and cannot process more requests.\n\n"
+            "Action Required: Top up your account to continue using Shotgun.\n\n"
+            "→ Top Up Now: https://app.shotgun.sh/dashboard\n\n"
             f"Need help? Contact: {SHOTGUN_CONTACT_EMAIL}\n\n"
-            "• Self-service budget increases are coming soon!\n\n"
             f"Error details: {str(self)}"
         )
 

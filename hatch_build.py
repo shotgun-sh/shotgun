@@ -27,7 +27,7 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
                 f"❌ Invalid version format: {package_version!r}\n"
                 f"   Must be a valid PEP 440 version string\n"
                 f"   Error: {e}"
-            )
+            ) from e
 
         # Then enforce strict X.Y.Z format (packaging.version accepts "1.0" but we require "1.0.0")
         version_parts = str(package_version).split(".")

@@ -1279,6 +1279,11 @@ class ChatScreen(Screen[None]):
             # Stop context indicator animation
             self.widget_coordinator.set_context_streaming(False)
 
+            # Check for low balance after agent loop completes (only for Shotgun Account)
+            # This runs after processing but doesn't interfere with Q&A mode
+            if self.deps.llm_model.is_shotgun_account:
+                await self._check_low_balance_warning()
+
         # Save conversation after each interaction
         self._save_conversation()
 
@@ -1292,6 +1297,32 @@ class ChatScreen(Screen[None]):
             self.conversation_service.save_conversation(self.agent_manager),
             exclusive=True,
         )
+
+    async def _check_low_balance_warning(self) -> None:
+        """Check account balance and show warning if $2.50 or less remaining.
+
+        This runs after every agent loop completion for Shotgun Account users.
+        Errors are silently caught to avoid disrupting user workflow.
+        """
+        try:
+            from shotgun.llm_proxy import LiteLLMProxyClient
+
+            client = LiteLLMProxyClient(self.deps.llm_model.api_key)
+            budget_info = await client.get_budget_info()
+
+            # Show warning if remaining balance is $2.50 or less
+            if budget_info.remaining <= 2.50:
+                warning_message = (
+                    f"⚠️ **Low Balance Warning**\n\n"
+                    f"Your Shotgun Account has **${budget_info.remaining:.2f}** remaining.\n\n"
+                    f"👉 **[Top Up Now at https://app.shotgun.sh/dashboard](https://app.shotgun.sh/dashboard)**"
+                )
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=warning_message)
+                )
+        except Exception as e:
+            # Silently log and continue - don't block user workflow
+            logger.debug(f"Failed to check low balance warning: {e}")
 
     async def _check_and_load_conversation(self) -> None:
         """Check if conversation exists and load it if it does."""
