@@ -13,9 +13,6 @@ permissions:
 jobs:
   run-tests:
     runs-on: ubuntu-latest
-    env:
-      # Skip build validation during tests (telemetry keys not needed for testing)
-      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     steps:
       - uses: actions/checkout@v5
@@ -102,6 +99,8 @@ jobs:
 
       - name: Build package
         env:
+          # Require validation for production builds - fail if secrets are missing
+          SHOTGUN_BUILD_REQUIRE_VALIDATION: "true"
           # Map GitHub secrets to SHOTGUN_ prefixed environment variables for build
           SHOTGUN_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SHOTGUN_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
@@ -334,6 +333,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
+            SHOTGUN_BUILD_REQUIRE_VALIDATION=true
             SHOTGUN_SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             SHOTGUN_POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
             SHOTGUN_POSTHOG_PROJECT_ID=${{ secrets.POSTHOG_PROJECT_ID }}

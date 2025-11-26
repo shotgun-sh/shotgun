@@ -7,6 +7,19 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 from packaging.version import InvalidVersion, Version
 
 
+def _require_validation() -> bool:
+    """Check if build validation is explicitly required.
+
+    Validation is skipped by default (for local dev and CI test jobs).
+    Set SHOTGUN_BUILD_REQUIRE_VALIDATION=true in production builds to enforce.
+    """
+    return os.environ.get("SHOTGUN_BUILD_REQUIRE_VALIDATION", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
 class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
     """Custom build hook to generate build constants from environment variables."""
 
@@ -48,14 +61,14 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
             for marker in ["dev", "rc", "alpha", "beta", "a", "b"]
         )
 
-        # Check if validation should be skipped (for test/development environments)
-        skip_validation = os.environ.get(
-            "SHOTGUN_BUILD_SKIP_VALIDATION", ""
-        ).lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        # Validation is skipped by default (for local dev and CI test jobs)
+        # Set SHOTGUN_BUILD_REQUIRE_VALIDATION=true in production builds to enforce
+        skip_validation = not _require_validation()
+
+        if skip_validation:
+            print("ℹ️  Build validation skipped (default behavior)")
+        else:
+            print("ℹ️  Build validation required (SHOTGUN_BUILD_REQUIRE_VALIDATION=true)")
 
         # Get Sentry configuration from environment (SHOTGUN_ prefix for production builds)
         sentry_dsn = os.environ.get("SHOTGUN_SENTRY_DSN", "")
