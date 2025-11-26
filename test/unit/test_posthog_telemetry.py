@@ -29,7 +29,10 @@ def test_setup_posthog_no_api_key():
 
     try:
         with patch.dict(os.environ, {}, clear=True):
-            with patch("shotgun.build_constants.POSTHOG_API_KEY", ""):
+            # Patch settings.telemetry.posthog_api_key since that's what the code reads
+            with patch.object(
+                posthog_telemetry.settings.telemetry, "posthog_api_key", ""
+            ):
                 # PostHog should not initialize without API key
                 result = posthog_telemetry.setup_posthog_observability()
                 assert result is False

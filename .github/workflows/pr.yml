@@ -48,9 +48,6 @@ jobs:
 
   basic-pr-check:
     runs-on: ubuntu-latest
-    env:
-      # Skip build validation during tests (telemetry keys not needed for testing)
-      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     steps:
       - uses: actions/checkout@v5
@@ -115,9 +112,6 @@ jobs:
 
   test-cli-basics:
     runs-on: ubuntu-latest
-    env:
-      # Skip build validation during tests (telemetry keys not needed for testing)
-      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     steps:
       - uses: actions/checkout@v5
@@ -195,8 +189,6 @@ jobs:
     if: needs.check-permissions.outputs.is-maintainer == 'true'
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      # Skip build validation during tests (telemetry keys not needed for testing)
-      SHOTGUN_BUILD_SKIP_VALIDATION: "true"
 
     strategy:
       matrix:
@@ -272,8 +264,6 @@ jobs:
           tags: shotgun:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            SHOTGUN_BUILD_SKIP_VALIDATION=true
 
   notify-slack-on-secret-found:
     runs-on: ubuntu-latest
