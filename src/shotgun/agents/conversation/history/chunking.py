@@ -85,10 +85,7 @@ def identify_message_groups(messages: list[ModelMessage]) -> list[MessageGroup]:
     # Maps tool_call_id -> group index
     pending_tool_calls: dict[str, int] = {}
 
-    i = 0
-    while i < len(messages):
-        msg = messages[i]
-
+    for i, msg in enumerate(messages):
         if isinstance(msg, ModelResponse):
             # Check for tool calls in response
             tool_calls = [p for p in msg.parts if isinstance(p, ToolCallPart)]
@@ -144,8 +141,6 @@ def identify_message_groups(messages: list[ModelMessage]) -> list[MessageGroup]:
                     )
                 )
             # Note: System prompts are handled separately by compaction
-
-        i += 1
 
     logger.debug(
         f"Identified {len(groups)} message groups "
