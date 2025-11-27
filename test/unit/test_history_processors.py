@@ -133,17 +133,31 @@ class TestTokenLimitCompactor:
             ModelResponse(parts=[TextPart(content=large_content)]),
         ]
 
-        # Token counting now based on actual message content, not mock usage
-
         # Mock the shotgun_model_request to return a summary
         mock_summary_response = MagicMock()
         mock_summary_response.parts = [TextPart(content="Summarized conversation")]
         mock_summary_response.usage.output_tokens = 500
 
-        with patch(
-            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
-            return_value=mock_summary_response,
-        ) as mock_model_request:
+        # Mock estimate_tokens_from_messages to return values that:
+        # 1. Exceed 80% threshold when checking total (to trigger compaction)
+        # 2. Stay below 70% threshold for context (to use regular, not chunked compaction)
+        async def mock_estimate_tokens(msgs, model_config):
+            # Return 3500 for full messages (exceeds 80% of 4096 = 3276)
+            # Return 2500 for context request (below 70% of 4096 = 2867)
+            if len(msgs) > 1:
+                return 3500  # Full message list
+            return 2500  # Context request for _full_compaction
+
+        with (
+            patch(
+                "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
+                return_value=mock_summary_response,
+            ) as mock_model_request,
+            patch(
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_estimate_tokens,
+            ),
+        ):
             result = await token_limit_compactor(mock_run_context, messages)
 
             # Verify shotgun_model_request was called for summarization
@@ -212,15 +226,25 @@ class TestTokenLimitCompactor:
             ),
         ]
 
-        # Token counting now based on actual message content
-
         mock_summary_response = MagicMock()
         mock_summary_response.parts = [TextPart(content="Summary")]
         mock_summary_response.usage.output_tokens = 100
 
-        with patch(
-            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
-            return_value=mock_summary_response,
+        # Mock estimate_tokens_from_messages to return values that trigger regular compaction
+        async def mock_estimate_tokens(msgs, model_config):
+            if len(msgs) > 1:
+                return 3500  # Full message list (exceeds 80% threshold)
+            return 2500  # Context request (below 70% threshold)
+
+        with (
+            patch(
+                "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
+                return_value=mock_summary_response,
+            ),
+            patch(
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_estimate_tokens,
+            ),
         ):
             result = await token_limit_compactor(mock_run_context, messages)
 
@@ -520,15 +544,25 @@ class TestTokenLimitCompactorEdgeCases:
             ModelResponse(parts=[TextPart(content=large_content)]),
         ]
 
-        # Token counting now based on actual message content
-
         mock_summary_response = MagicMock()
         mock_summary_response.parts = [TextPart(content="Summary")]
         mock_summary_response.usage.output_tokens = 100
 
-        with patch(
-            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
-            return_value=mock_summary_response,
+        # Mock estimate_tokens_from_messages to return values that trigger regular compaction
+        async def mock_estimate_tokens(msgs, model_config):
+            if len(msgs) > 1:
+                return 3500  # Full message list (exceeds 80% threshold)
+            return 2500  # Context request (below 70% threshold)
+
+        with (
+            patch(
+                "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
+                return_value=mock_summary_response,
+            ),
+            patch(
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_estimate_tokens,
+            ),
         ):
             result = await token_limit_compactor(mock_run_context, messages)
 
@@ -564,15 +598,25 @@ class TestTokenLimitCompactorEdgeCases:
             ModelRequest(parts=[UserPromptPart(content="Final user message")]),
         ]
 
-        # Token counting now based on actual message content
-
         mock_summary_response = MagicMock()
         mock_summary_response.parts = [TextPart(content="Summary")]
         mock_summary_response.usage.output_tokens = 100
 
-        with patch(
-            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
-            return_value=mock_summary_response,
+        # Mock estimate_tokens_from_messages to return values that trigger regular compaction
+        async def mock_estimate_tokens(msgs, model_config):
+            if len(msgs) > 1:
+                return 3500  # Full message list (exceeds 80% threshold)
+            return 2500  # Context request (below 70% threshold)
+
+        with (
+            patch(
+                "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
+                return_value=mock_summary_response,
+            ),
+            patch(
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_estimate_tokens,
+            ),
         ):
             result = await token_limit_compactor(mock_run_context, messages)
 
@@ -617,15 +661,25 @@ class TestTokenLimitCompactorEdgeCases:
             ModelResponse(parts=[TextPart(content=large_content)]),
         ]
 
-        # Token counting now based on actual message content
-
         mock_summary_response = MagicMock()
         mock_summary_response.parts = [TextPart(content="Summary")]
         mock_summary_response.usage.output_tokens = 100
 
-        with patch(
-            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
-            return_value=mock_summary_response,
+        # Mock estimate_tokens_from_messages to return values that trigger regular compaction
+        async def mock_estimate_tokens(msgs, model_config):
+            if len(msgs) > 1:
+                return 3500  # Full message list (exceeds 80% threshold)
+            return 2500  # Context request (below 70% threshold)
+
+        with (
+            patch(
+                "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
+                return_value=mock_summary_response,
+            ),
+            patch(
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_estimate_tokens,
+            ),
         ):
             result = await token_limit_compactor(mock_run_context, messages)
 
@@ -717,15 +771,25 @@ class TestIncrementalCompaction:
             ModelResponse(parts=[TextPart(content=large_content)]),
         ]
 
-        # Token counting now based on actual message content
-
         mock_summary_response = MagicMock()
         mock_summary_response.parts = [TextPart(content="This is the summary")]
         mock_summary_response.usage.output_tokens = 100
 
-        with patch(
-            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
-            return_value=mock_summary_response,
+        # Mock estimate_tokens_from_messages to return values that trigger regular compaction
+        async def mock_estimate_tokens(msgs, model_config):
+            if len(msgs) > 1:
+                return 3500  # Full message list (exceeds 80% threshold)
+            return 2500  # Context request (below 70% threshold)
+
+        with (
+            patch(
+                "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
+                return_value=mock_summary_response,
+            ),
+            patch(
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                side_effect=mock_estimate_tokens,
+            ),
         ):
             result = await token_limit_compactor(mock_run_context, messages)
 
