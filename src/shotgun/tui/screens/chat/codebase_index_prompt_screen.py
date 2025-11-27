@@ -1,14 +1,25 @@
 """Modal dialog for codebase indexing prompts."""
 
+import os
 from pathlib import Path
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown
+from textual.widgets import Button, Label, Markdown, Static
 
 from shotgun.utils.file_system_utils import get_shotgun_home
+
+
+def _is_home_directory() -> bool:
+    """Check if cwd is user's home directory.
+
+    Can be simulated with HOME_DIRECTORY_SIMULATE=true env var for testing.
+    """
+    if os.environ.get("HOME_DIRECTORY_SIMULATE", "").lower() == "true":
+        return True
+    return Path.cwd() == Path.home()
 
 
 class CodebaseIndexPromptScreen(ModalScreen[bool]):
@@ -58,14 +69,39 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
             margin: 0 1;
             min-width: 12;
         }
+
+        #index-prompt-warning {
+            background: $error;
+            color: white;
+            padding: 1 2;
+            margin-bottom: 1;
+            text-align: center;
+        }
     """
 
     def compose(self) -> ComposeResult:
         storage_path = get_shotgun_home() / "codebases"
         cwd = Path.cwd()
+        is_home = _is_home_directory()
 
-        # Build the markdown content with privacy-first messaging
-        content = f"""
+        with Container(id="index-prompt-dialog"):
+            if is_home:
+                # Show warning for home directory
+                yield Label(
+                    "⚠️ Cannot index home directory",
+                    id="index-prompt-title",
+                )
+                yield Static(
+                    "You're running Shotgun from your home directory.\n"
+                    "This would index your entire home folder which will take forever!\n\n"
+                    "Please quit and restart Shotgun from inside a repository.",
+                    id="index-prompt-warning",
+                )
+                with Container(id="index-prompt-buttons"):
+                    yield Button("Quit", id="index-prompt-quit", variant="error")
+            else:
+                # Normal indexing prompt
+                content = f"""
 ## 🔒 Your code never leaves your computer
 
 Shotgun will index the codebase at:
@@ -85,24 +121,22 @@ If you're curious, you can review how Shotgun indexes/queries code by taking a l
 
 We take your privacy seriously. You can read our full [privacy policy](https://app.shotgun.sh/privacy) for more details.
 """
-
-        with Container(id="index-prompt-dialog"):
-            yield Label(
-                "Want to index your codebase so Shotgun can understand it?",
-                id="index-prompt-title",
-            )
-            with VerticalScroll(id="index-prompt-content"):
-                yield Markdown(content, id="index-prompt-info")
-            with Container(id="index-prompt-buttons"):
-                yield Button(
-                    "Not now",
-                    id="index-prompt-cancel",
+                yield Label(
+                    "Want to index your codebase so Shotgun can understand it?",
+                    id="index-prompt-title",
                 )
-                yield Button(
-                    "Index now",
-                    id="index-prompt-confirm",
-                    variant="primary",
-                )
+                with VerticalScroll(id="index-prompt-content"):
+                    yield Markdown(content, id="index-prompt-info")
+                with Container(id="index-prompt-buttons"):
+                    yield Button(
+                        "Not now",
+                        id="index-prompt-cancel",
+                    )
+                    yield Button(
+                        "Index now",
+                        id="index-prompt-confirm",
+                        variant="primary",
+                    )
 
     @on(Button.Pressed, "#index-prompt-cancel")
     def handle_cancel(self, event: Button.Pressed) -> None:
@@ -113,3 +147,8 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
     def handle_confirm(self, event: Button.Pressed) -> None:
         event.stop()
         self.dismiss(True)
+
+    @on(Button.Pressed, "#index-prompt-quit")
+    def handle_quit(self, event: Button.Pressed) -> None:
+        event.stop()
+        self.app.exit()
