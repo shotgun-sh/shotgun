@@ -94,7 +94,7 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
                 yield Static(
                     "You're running Shotgun from your home directory.\n"
                     "This would index your entire home folder which will take forever!\n\n"
-                    "Please quit and restart Shotgun from inside a repository.",
+                    "Please quit and restart Shotgun from inside a repository or project folder.",
                     id="index-prompt-warning",
                 )
                 with Container(id="index-prompt-buttons"):
