@@ -22,6 +22,13 @@ def _is_home_directory() -> bool:
     return Path.cwd() == Path.home()
 
 
+def _track_event(event_name: str) -> None:
+    """Track an event to PostHog."""
+    from shotgun.posthog_telemetry import track_event
+
+    track_event(event_name)
+
+
 class CodebaseIndexPromptScreen(ModalScreen[bool]):
     """Modal dialog asking whether to index the detected codebase."""
 
@@ -98,6 +105,10 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
                     id="index-prompt-warning",
                 )
                 with Container(id="index-prompt-buttons"):
+                    yield Button(
+                        "Continue without indexing",
+                        id="index-prompt-continue",
+                    )
                     yield Button("Quit", id="index-prompt-quit", variant="error")
             else:
                 # Normal indexing prompt
@@ -138,6 +149,11 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
                         variant="primary",
                     )
 
+    def on_mount(self) -> None:
+        """Track when the home directory warning screen is shown."""
+        if _is_home_directory():
+            _track_event("home_directory_warning_shown")
+
     @on(Button.Pressed, "#index-prompt-cancel")
     def handle_cancel(self, event: Button.Pressed) -> None:
         event.stop()
@@ -148,7 +164,15 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
         event.stop()
         self.dismiss(True)
 
+    @on(Button.Pressed, "#index-prompt-continue")
+    def handle_continue(self, event: Button.Pressed) -> None:
+        """Continue without indexing when in home directory."""
+        event.stop()
+        _track_event("home_directory_warning_continue")
+        self.dismiss(False)
+
     @on(Button.Pressed, "#index-prompt-quit")
     def handle_quit(self, event: Button.Pressed) -> None:
         event.stop()
+        _track_event("home_directory_warning_quit")
         self.app.exit()
