@@ -7,7 +7,7 @@ tool returns before LLM-based compaction. Files are still accessible via
 
 import copy
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -16,9 +16,6 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.logging_config import get_logger
-
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger(__name__)
 
