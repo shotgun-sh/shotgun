@@ -95,6 +95,33 @@ from shotgun.utils.marketing import MarketingManager
 logger = logging.getLogger(__name__)
 
 
+def _format_duration(seconds: float) -> str:
+    """Format duration in natural language."""
+    if seconds < 60:
+        return f"{int(seconds)} seconds"
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    if secs == 0:
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+    return f"{minutes} minute{'s' if minutes != 1 else ''} {secs} seconds"
+
+
+def _format_count(count: int) -> str:
+    """Format count in natural language (e.g., '5 thousand')."""
+    if count < 1000:
+        return str(count)
+    elif count < 1_000_000:
+        thousands = count / 1000
+        if thousands == int(thousands):
+            return f"{int(thousands)} thousand"
+        return f"{thousands:.1f} thousand"
+    else:
+        millions = count / 1_000_000
+        if millions == int(millions):
+            return f"{int(millions)} million"
+        return f"{millions:.1f} million"
+
+
 class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
 
@@ -1082,6 +1109,8 @@ class ChatScreen(Screen[None]):
 
     @work
     async def index_codebase(self, selection: CodebaseIndexSelection) -> None:
+        index_start_time = time.time()
+
         label = self.query_one("#indexing-job-display", Static)
         label.update(
             f"[$foreground-muted]Indexing codebase: [bold $text-accent]{selection.name}[/][/]"
@@ -1121,24 +1150,40 @@ class ChatScreen(Screen[None]):
 
         def progress_callback(progress_info: IndexProgress) -> None:
             """Update progress state (timer renders it independently)."""
-            # Calculate overall percentage (0-95%, reserve 95-100% for finalization)
+            # Calculate overall percentage with weights based on actual timing:
+            # Structure: 0-2%, Definitions: 2-18%, Relationships: 18-20%
+            # Flush nodes: 20-28%, Flush relationships: 28-100%
             if progress_info.phase == ProgressPhase.STRUCTURE:
-                # Phase 1: 0-10%, always show 5% while running, 10% when complete
-                overall_pct = 10.0 if progress_info.phase_complete else 5.0
+                # Phase 1: 0-2% (actual: ~0%)
+                overall_pct = 2.0 if progress_info.phase_complete else 1.0
             elif progress_info.phase == ProgressPhase.DEFINITIONS:
-                # Phase 2: 10-80% based on files processed
+                # Phase 2: 2-18% based on files processed (actual: ~16%)
                 if progress_info.total and progress_info.total > 0:
-                    phase_pct = (progress_info.current / progress_info.total) * 70.0
-                    overall_pct = 10.0 + phase_pct
+                    phase_pct = (progress_info.current / progress_info.total) * 16.0
+                    overall_pct = 2.0 + phase_pct
                 else:
-                    overall_pct = 10.0
+                    overall_pct = 2.0
             elif progress_info.phase == ProgressPhase.RELATIONSHIPS:
-                # Phase 3: 80-95% based on relationships processed (cap at 95%)
+                # Phase 3: 18-20% based on relationships processed (actual: ~0.3%)
                 if progress_info.total and progress_info.total > 0:
-                    phase_pct = (progress_info.current / progress_info.total) * 15.0
-                    overall_pct = 80.0 + phase_pct
+                    phase_pct = (progress_info.current / progress_info.total) * 2.0
+                    overall_pct = 18.0 + phase_pct
                 else:
-                    overall_pct = 80.0
+                    overall_pct = 18.0
+            elif progress_info.phase == ProgressPhase.FLUSH_NODES:
+                # Phase 4: 20-28% based on nodes flushed (actual: ~7.5%)
+                if progress_info.total and progress_info.total > 0:
+                    phase_pct = (progress_info.current / progress_info.total) * 8.0
+                    overall_pct = 20.0 + phase_pct
+                else:
+                    overall_pct = 20.0
+            elif progress_info.phase == ProgressPhase.FLUSH_RELATIONSHIPS:
+                # Phase 5: 28-100% based on relationships flushed (actual: ~76%)
+                if progress_info.total and progress_info.total > 0:
+                    phase_pct = (progress_info.current / progress_info.total) * 72.0
+                    overall_pct = 28.0 + phase_pct
+                else:
+                    overall_pct = 28.0
             else:
                 overall_pct = 0.0
 
@@ -1191,12 +1236,19 @@ class ChatScreen(Screen[None]):
                 )
                 label.refresh()
 
+                # Calculate duration and format message
+                duration = time.time() - index_start_time
+                duration_str = _format_duration(duration)
+                entity_count = result.node_count + result.relationship_count
+                entity_str = _format_count(entity_count)
+
                 logger.info(
-                    f"Successfully indexed codebase '{result.name}' (ID: {result.graph_id})"
+                    f"Successfully indexed codebase '{result.name}' in {duration_str} "
+                    f"({entity_count} entities)"
                 )
                 self.agent_manager.add_hint_message(
                     HintMessage(
-                        message=f"✓ Indexed codebase '{result.name}' (ID: {result.graph_id})"
+                        message=f"✓ Indexed '{result.name}' in {duration_str} ({entity_str} entities)"
                     )
                 )
                 break  # Success - exit retry loop
