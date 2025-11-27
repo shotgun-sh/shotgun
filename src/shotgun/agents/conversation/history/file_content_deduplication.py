@@ -27,6 +27,7 @@ class FileReadTool(StrEnum):
     CODEBASE = "file_read"  # Reads from indexed codebase (Kuzu graph)
     SHOTGUN_FOLDER = "read_file"  # Reads from .shotgun/ folder
 
+
 # Minimum content length to bother deduplicating (skip tiny files)
 MIN_CONTENT_LENGTH = 500
 
