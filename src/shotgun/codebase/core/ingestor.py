@@ -684,10 +684,29 @@ class SimpleGraphBuilder:
 
         track_event("codebase_index_phase_completed", properties)
 
-    async def run(self) -> None:
-        """Run the three-pass graph building process."""
+    def _log_summary(
+        self,
+        total_duration: float,
+        total_files: int,
+        total_nodes: int,
+        total_relationships: int,
+    ) -> None:
+        """Log indexing summary event to PostHog."""
         from shotgun.posthog_telemetry import track_event
 
+        track_event(
+            "codebase_index_completed",
+            {
+                "session_id": self._index_session_id,
+                "total_duration_seconds": round(total_duration, 3),
+                "total_files": total_files,
+                "total_nodes": total_nodes,
+                "total_relationships": total_relationships,
+            },
+        )
+
+    async def run(self) -> None:
+        """Run the three-pass graph building process."""
         logger.info(f"Building graph for project: {self.project_name}")
 
         # Pass 1: Structure
@@ -760,15 +779,11 @@ class SimpleGraphBuilder:
 
         # Track summary event with totals (no PII - only numeric metadata)
         total_duration = t8 - t0
-        track_event(
-            "codebase_index_completed",
-            {
-                "session_id": self._index_session_id,
-                "total_duration_seconds": round(total_duration, 3),
-                "total_files": len(self.ast_cache),
-                "total_nodes": node_count,
-                "total_relationships": rel_count,
-            },
+        self._log_summary(
+            total_duration=total_duration,
+            total_files=len(self.ast_cache),
+            total_nodes=node_count,
+            total_relationships=rel_count,
         )
 
         logger.info("Graph building complete!")
