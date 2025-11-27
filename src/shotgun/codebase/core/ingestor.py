@@ -6,6 +6,7 @@ import os
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -198,10 +199,20 @@ class Ingestor:
                     return True
         return False
 
-    def flush_nodes(self) -> None:
-        """Flush pending node insertions to the database."""
+    def flush_nodes(
+        self,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> None:
+        """Flush pending node insertions to the database.
+
+        Args:
+            progress_callback: Optional callback(current, total) for progress reporting
+        """
         if not self.node_buffer:
             return
+
+        total_nodes = len(self.node_buffer)
+        processed = 0
 
         # Group nodes by label
         nodes_by_label: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -239,8 +250,17 @@ class Ingestor:
                     params = dict(zip(prop_names, prop_values, strict=False))
                     self.conn.execute(query, params)
 
+                    # Report progress
+                    processed += 1
+                    if progress_callback and processed % 10 == 0:
+                        progress_callback(processed, total_nodes)
+
             except Exception as e:
                 logger.error(f"Failed to insert {label} nodes: {e}")
+
+        # Final progress report
+        if progress_callback:
+            progress_callback(total_nodes, total_nodes)
 
         # Log node counts by type
         node_type_counts: dict[str, int] = {}
@@ -280,10 +300,20 @@ class Ingestor:
 
         # Don't auto-flush relationships - wait for explicit flush_all() to ensure nodes exist first
 
-    def flush_relationships(self) -> None:
-        """Flush pending relationship insertions to the database."""
+    def flush_relationships(
+        self,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> None:
+        """Flush pending relationship insertions to the database.
+
+        Args:
+            progress_callback: Optional callback(current, total) for progress reporting
+        """
         if not self.relationship_buffer:
             return
+
+        total_rels = len(self.relationship_buffer)
+        processed = 0
 
         # Group relationships by type
         rels_by_type: dict[
@@ -299,7 +329,7 @@ class Ingestor:
                 to_label,
                 to_key,
                 to_value,
-                properties,
+                _properties,
             ) = rel_data
 
             # Determine actual table name
@@ -323,7 +353,7 @@ class Ingestor:
                         to_label,
                         to_key,
                         to_value,
-                        properties,
+                        _properties,
                     ) = rel_data
 
                     # Build MATCH and MERGE query (use MERGE to avoid duplicate relationships)
@@ -337,6 +367,11 @@ class Ingestor:
                     try:
                         self.conn.execute(query, params)
                         success_count += 1
+
+                        # Report progress
+                        processed += 1
+                        if progress_callback and processed % 10 == 0:
+                            progress_callback(processed, total_rels)
                     except Exception as e:
                         logger.error(
                             f"Failed to create single relationship {table_name}: {from_label}({from_value}) -> {to_label}({to_value})"
@@ -359,6 +394,10 @@ class Ingestor:
                 logger.error(f"Params were: {params}")
                 # Don't swallow the exception - let it propagate
                 raise
+
+        # Final progress report
+        if progress_callback:
+            progress_callback(total_rels, total_rels)
 
         # Log summary of flushed relationships
         logger.info(
@@ -586,6 +625,9 @@ class SimpleGraphBuilder:
             self.ignore_dirs = self.ignore_dirs.union(set(exclude_patterns))
         self.progress_callback = progress_callback
 
+        # Generate unique session ID for correlating timing events in PostHog
+        self._index_session_id = str(uuid.uuid4())[:8]
+
         # Caches
         self.structural_elements: dict[Path, str | None] = {}
         self.ast_cache: dict[Path, tuple[Node, str]] = {}
@@ -621,25 +663,129 @@ class SimpleGraphBuilder:
             # Don't let progress callback errors crash the build
             logger.debug(f"Progress callback error: {e}")
 
+    def _log_timing(
+        self,
+        phase: str,
+        duration: float,
+        items: int,
+        extra_props: dict[str, Any] | None = None,
+    ) -> None:
+        """Log timing data to PostHog for analysis."""
+        from shotgun.posthog_telemetry import track_event
+
+        properties: dict[str, Any] = {
+            "session_id": self._index_session_id,
+            "phase": phase,
+            "duration_seconds": round(duration, 3),
+            "item_count": items,
+        }
+        if extra_props:
+            properties.update(extra_props)
+
+        track_event("codebase_index_phase_completed", properties)
+
+    def _log_summary(
+        self,
+        total_duration: float,
+        total_files: int,
+        total_nodes: int,
+        total_relationships: int,
+    ) -> None:
+        """Log indexing summary event to PostHog."""
+        from shotgun.posthog_telemetry import track_event
+
+        track_event(
+            "codebase_index_completed",
+            {
+                "session_id": self._index_session_id,
+                "total_duration_seconds": round(total_duration, 3),
+                "total_files": total_files,
+                "total_nodes": total_nodes,
+                "total_relationships": total_relationships,
+            },
+        )
+
     async def run(self) -> None:
         """Run the three-pass graph building process."""
         logger.info(f"Building graph for project: {self.project_name}")
 
         # Pass 1: Structure
         logger.info("Pass 1: Identifying packages and folders...")
+        t0 = time.time()
         self._identify_structure()
+        t1 = time.time()
+        self._log_timing("structure", t1 - t0, len(self.structural_elements))
 
         # Pass 2: Definitions
         logger.info("Pass 2: Processing files and extracting definitions...")
+        t2 = time.time()
         await self._process_files()
+        t3 = time.time()
+        self._log_timing(
+            "definitions",
+            t3 - t2,
+            len(self.ast_cache),
+            {"file_count": len(self.ast_cache)},
+        )
 
         # Pass 3: Relationships
         logger.info("Pass 3: Processing relationships (calls, imports)...")
+        t4 = time.time()
         self._process_relationships()
+        t5 = time.time()
+        self._log_timing("relationships", t5 - t4, len(self.ast_cache))
 
         # Flush all pending operations
         logger.info("Flushing all data to database...")
-        self.ingestor.flush_all()
+        t6 = time.time()
+        node_count = len(self.ingestor.node_buffer)
+
+        # Create progress callback for flush_nodes
+        def node_progress(current: int, total: int) -> None:
+            self._report_progress(
+                "flush_nodes", "Flushing nodes to database", current, total
+            )
+
+        self.ingestor.flush_nodes(progress_callback=node_progress)
+        self._report_progress(
+            "flush_nodes", "Flushing nodes to database", node_count, node_count, True
+        )
+        t7 = time.time()
+        self._log_timing("flush_nodes", t7 - t6, node_count, {"node_count": node_count})
+
+        rel_count = len(self.ingestor.relationship_buffer)
+
+        # Create progress callback for flush_relationships
+        def rel_progress(current: int, total: int) -> None:
+            self._report_progress(
+                "flush_relationships",
+                "Flushing relationships to database",
+                current,
+                total,
+            )
+
+        self.ingestor.flush_relationships(progress_callback=rel_progress)
+        self._report_progress(
+            "flush_relationships",
+            "Flushing relationships to database",
+            rel_count,
+            rel_count,
+            True,
+        )
+        t8 = time.time()
+        self._log_timing(
+            "flush_relationships", t8 - t7, rel_count, {"relationship_count": rel_count}
+        )
+
+        # Track summary event with totals (no PII - only numeric metadata)
+        total_duration = t8 - t0
+        self._log_summary(
+            total_duration=total_duration,
+            total_files=len(self.ast_cache),
+            total_nodes=node_count,
+            total_relationships=rel_count,
+        )
+
         logger.info("Graph building complete!")
 
     def _identify_structure(self) -> None:

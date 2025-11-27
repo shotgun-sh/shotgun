@@ -29,6 +29,8 @@ class ProgressPhase(StrEnum):
     STRUCTURE = "structure"  # Identifying packages and folders
     DEFINITIONS = "definitions"  # Processing files and extracting definitions
     RELATIONSHIPS = "relationships"  # Processing relationships (calls, imports)
+    FLUSH_NODES = "flush_nodes"  # Flushing nodes to database
+    FLUSH_RELATIONSHIPS = "flush_relationships"  # Flushing relationships to database
 
 
 class IndexProgress(BaseModel):
