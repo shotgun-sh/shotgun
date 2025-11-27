@@ -7,6 +7,7 @@ tool returns before LLM-based compaction. Files are still accessible via
 
 import copy
 import re
+from enum import StrEnum
 from typing import Any
 
 from pydantic_ai.messages import (
@@ -19,9 +20,12 @@ from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Tools that read file content
-CODEBASE_FILE_TOOL = "file_read"  # Reads from indexed codebase (Kuzu graph)
-SHOTGUN_FILE_TOOLS = {"read_file"}  # Reads from .shotgun/ folder
+
+class FileReadTool(StrEnum):
+    """Tool names that read file content."""
+
+    CODEBASE = "file_read"  # Reads from indexed codebase (Kuzu graph)
+    SHOTGUN_FOLDER = "read_file"  # Reads from .shotgun/ folder
 
 # Minimum content length to bother deduplicating (skip tiny files)
 MIN_CONTENT_LENGTH = 500
@@ -153,7 +157,7 @@ def deduplicate_file_content(
             original_content = content
 
             # Handle codebase file reads (file_read)
-            if tool_name == CODEBASE_FILE_TOOL:
+            if tool_name == FileReadTool.CODEBASE:
                 parsed = _parse_codebase_file_content(content)
                 if parsed:
                     file_path, size_bytes, language, actual_content = parsed
@@ -168,7 +172,7 @@ def deduplicate_file_content(
                         )
 
             # Handle .shotgun/ file reads (read_file)
-            elif tool_name in SHOTGUN_FILE_TOOLS:
+            elif tool_name == FileReadTool.SHOTGUN_FOLDER:
                 # For read_file, content is raw - we need to figure out filename
                 # from the tool call args (but we only have the return here)
                 # Use a generic placeholder since we don't have the filename
