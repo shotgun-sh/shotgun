@@ -24,8 +24,8 @@ from shotgun.tui.screens.chat_screen.history.chat_history import ChatHistory
 
 if TYPE_CHECKING:
     from shotgun.agents.context_analyzer.models import ContextAnalysis
-    from shotgun.agents.conversation_history import HintMessage
     from shotgun.tui.screens.chat import ChatScreen
+    from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationManager
 from shotgun.logging_config import get_logger
 
 app = typer.Typer(

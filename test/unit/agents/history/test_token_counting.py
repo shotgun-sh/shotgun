@@ -6,9 +6,11 @@ import pytest
 from anthropic import APIStatusError, AuthenticationError
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 
-from shotgun.agents.history.token_counting.anthropic import AnthropicTokenCounter
-from shotgun.agents.history.token_counting.openai import OpenAITokenCounter
-from shotgun.agents.history.token_counting.sentencepiece_counter import (
+from shotgun.agents.conversation.history.token_counting.anthropic import (
+    AnthropicTokenCounter,
+)
+from shotgun.agents.conversation.history.token_counting.openai import OpenAITokenCounter
+from shotgun.agents.conversation.history.token_counting.sentencepiece_counter import (
     SentencePieceTokenCounter,
 )
 
@@ -178,7 +180,13 @@ async def test_anthropic_authentication_error_propagates():
         auth_error = AuthenticationError(
             "invalid x-api-key",
             response=MagicMock(status_code=401),
-            body={"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}},
+            body={
+                "type": "error",
+                "error": {
+                    "type": "authentication_error",
+                    "message": "invalid x-api-key",
+                },
+            },
         )
         counter.client.messages.count_tokens.side_effect = auth_error
 
@@ -202,7 +210,10 @@ async def test_anthropic_api_status_error_propagates():
         rate_limit_error = APIStatusError(
             "rate limit exceeded",
             response=MagicMock(status_code=429),
-            body={"type": "error", "error": {"type": "rate_limit_error", "message": "rate limit exceeded"}},
+            body={
+                "type": "error",
+                "error": {"type": "rate_limit_error", "message": "rate limit exceeded"},
+            },
         )
         counter.client.messages.count_tokens.side_effect = rate_limit_error
 
@@ -223,7 +234,9 @@ async def test_anthropic_non_api_error_wrapped_in_runtime_error():
         counter.client = mock_client
 
         # Simulate a library-level error (not an API error)
-        counter.client.messages.count_tokens.side_effect = ValueError("Invalid input format")
+        counter.client.messages.count_tokens.side_effect = ValueError(
+            "Invalid input format"
+        )
 
         # Non-API errors should be wrapped in RuntimeError
         with pytest.raises(RuntimeError) as exc_info:

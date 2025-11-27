@@ -12,7 +12,7 @@ from shotgun.agents.config.models import (
     ModelName,
     ProviderType,
 )
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.models import AgentDeps, AgentType
 from shotgun.codebase.service import CodebaseService
 from shotgun.sdk.codebase import CodebaseSDK

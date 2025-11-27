@@ -10,9 +10,11 @@ from pydantic_ai.usage import RequestUsage
 from rich.console import Console
 
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.conversation_manager import ConversationManager
-from shotgun.agents.history.history_processors import token_limit_compactor
-from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
+from shotgun.agents.conversation import ConversationManager
+from shotgun.agents.conversation.history.history_processors import token_limit_compactor
+from shotgun.agents.conversation.history.token_estimation import (
+    estimate_tokens_from_messages,
+)
 from shotgun.cli.models import OutputFormat
 from shotgun.logging_config import get_logger
 

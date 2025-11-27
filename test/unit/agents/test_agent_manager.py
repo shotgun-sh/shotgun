@@ -22,7 +22,7 @@ from shotgun.agents.agent_manager import (
     ModelConfigUpdated,
 )
 from shotgun.agents.config.models import KeyProvider, ModelName, ProviderType
-from shotgun.agents.conversation_history import ConversationState
+from shotgun.agents.conversation import ConversationState
 from shotgun.agents.models import AgentDeps, AgentResponse
 from shotgun.agents.usage_manager import SessionUsageManager
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage

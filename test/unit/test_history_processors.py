@@ -26,11 +26,11 @@ from shotgun.agents.config.models import (
     ModelName,
     ProviderType,
 )
-from shotgun.agents.history.constants import SUMMARY_MARKER
-from shotgun.agents.history.context_extraction import (
+from shotgun.agents.conversation.history.constants import SUMMARY_MARKER
+from shotgun.agents.conversation.history.context_extraction import (
     extract_context_from_part as get_context_from_message,
 )
-from shotgun.agents.history.history_processors import (
+from shotgun.agents.conversation.history.history_processors import (
     extract_summary_content,
     find_last_summary_index,
     is_summary_part,
@@ -38,12 +38,12 @@ from shotgun.agents.history.history_processors import (
     log_summarization_response,
     token_limit_compactor,
 )
-from shotgun.agents.history.message_utils import (
+from shotgun.agents.conversation.history.message_utils import (
     get_first_user_request,
     get_last_user_request,
     get_system_prompt,
 )
-from shotgun.agents.history.token_estimation import (
+from shotgun.agents.conversation.history.token_estimation import (
     calculate_max_summarization_tokens,
     estimate_tokens_from_message_parts,
     estimate_tokens_from_messages,
@@ -141,7 +141,7 @@ class TestTokenLimitCompactor:
         mock_summary_response.usage.output_tokens = 500
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ) as mock_model_request:
             result = await token_limit_compactor(mock_run_context, messages)
@@ -219,7 +219,7 @@ class TestTokenLimitCompactor:
         mock_summary_response.usage.output_tokens = 100
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -492,7 +492,7 @@ class TestTokenLimitCompactorEdgeCases:
         mock_summary_response.usage.output_tokens = 100
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -527,7 +527,7 @@ class TestTokenLimitCompactorEdgeCases:
         mock_summary_response.usage.output_tokens = 100
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -571,7 +571,7 @@ class TestTokenLimitCompactorEdgeCases:
         mock_summary_response.usage.output_tokens = 100
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -624,7 +624,7 @@ class TestTokenLimitCompactorEdgeCases:
         mock_summary_response.usage.output_tokens = 100
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -724,7 +724,7 @@ class TestIncrementalCompaction:
         mock_summary_response.usage.output_tokens = 100
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -783,7 +783,7 @@ class TestIncrementalCompaction:
         mock_incremental_summary.usage.output_tokens = 150
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_incremental_summary,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -850,7 +850,7 @@ class TestIncrementalCompaction:
         mock_second_summary.usage.output_tokens = 200
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_second_summary,
         ) as mock_request:
             result = await token_limit_compactor(mock_run_context, messages)
@@ -952,12 +952,12 @@ class TestIncrementalCompaction:
             return "Default prompt"
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_summary_response,
         ):
             # Mock the prompt loader render method
             with patch(
-                "shotgun.agents.history.history_processors.prompt_loader.render",
+                "shotgun.agents.conversation.history.history_processors.prompt_loader.render",
                 side_effect=mock_render,
             ):
                 result = await token_limit_compactor(mock_run_context, messages)
@@ -1133,7 +1133,7 @@ class TestMaxTokensCalculation:
         mock_incremental_summary.usage.output_tokens = 150
 
         with patch(
-            "shotgun.agents.history.history_processors.shotgun_model_request",
+            "shotgun.agents.conversation.history.history_processors.shotgun_model_request",
             return_value=mock_incremental_summary,
         ):
             result = await token_limit_compactor(mock_run_context, messages)
@@ -1181,7 +1181,7 @@ class TestMaxTokensCalculation:
 
         # Mock estimate_tokens_from_messages to raise an exception
         with patch(
-            "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+            "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
             side_effect=RuntimeError("Token counting API failed"),
         ):
             with pytest.raises(ContextSizeLimitExceeded) as exc_info:
@@ -1213,7 +1213,7 @@ class TestMaxTokensCalculation:
 
         # Mock estimate_post_summary_tokens to fail
         with patch(
-            "shotgun.agents.history.history_processors.estimate_post_summary_tokens",
+            "shotgun.agents.conversation.history.history_processors.estimate_post_summary_tokens",
             side_effect=RuntimeError("Token counting failed"),
         ):
             with pytest.raises(ContextSizeLimitExceeded) as exc_info:
@@ -1249,7 +1249,7 @@ class TestMaxTokensCalculation:
 
             # Mock estimate_tokens_from_messages to raise the 413 error
             with patch(
-                "shotgun.agents.history.history_processors.estimate_tokens_from_messages",
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
                 side_effect=mock_error,
             ):
                 with pytest.raises(ContextSizeLimitExceeded) as exc_info:

@@ -36,9 +36,11 @@ from shotgun.agents.agent_manager import (
 )
 from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS
-from shotgun.agents.conversation_manager import ConversationManager
-from shotgun.agents.history.compaction import apply_persistent_compaction
-from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
+from shotgun.agents.conversation import ConversationManager
+from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
+from shotgun.agents.conversation.history.token_estimation import (
+    estimate_tokens_from_messages,
+)
 from shotgun.agents.models import (
     AgentDeps,
     AgentType,

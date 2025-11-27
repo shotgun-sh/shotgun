@@ -13,7 +13,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from shotgun.agents.conversation_history import filter_orphaned_tool_responses
+from shotgun.agents.conversation.filters import filter_orphaned_tool_responses
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps

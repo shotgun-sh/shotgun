@@ -13,12 +13,12 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from shotgun.agents.conversation_history import (
+from shotgun.agents.conversation import (
     ConversationHistory,
+    ConversationManager,
     ConversationState,
     filter_orphaned_tool_responses,
 )
-from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
 

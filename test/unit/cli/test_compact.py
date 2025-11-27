@@ -11,7 +11,7 @@ from shotgun.agents.config.models import (
     ModelName,
     ProviderType,
 )
-from shotgun.agents.conversation_history import ConversationHistory
+from shotgun.agents.conversation import ConversationHistory, ConversationManager
 from shotgun.cli.compact import compact_conversation, format_markdown
 
 
@@ -38,8 +38,6 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
     conversation_file.parent.mkdir(parents=True)
 
     # Save mock conversation
-    from shotgun.agents.conversation_manager import ConversationManager
-
     manager = ConversationManager(conversation_file)
     await manager.save(mock_conversation_history)
 
@@ -105,8 +103,6 @@ async def test_compact_conversation_empty_history(tmp_path):
 
     # Create empty conversation
     history = ConversationHistory()
-    from shotgun.agents.conversation_manager import ConversationManager
-
     manager = ConversationManager(conversation_file)
     await manager.save(history)
 
@@ -120,8 +116,6 @@ async def test_compact_conversation_no_reduction(tmp_path, mock_conversation_his
     """Test compaction when no reduction occurs."""
     conversation_file = tmp_path / ".shotgun-sh" / "conversation.json"
     conversation_file.parent.mkdir(parents=True)
-
-    from shotgun.agents.conversation_manager import ConversationManager
 
     manager = ConversationManager(conversation_file)
     await manager.save(mock_conversation_history)
