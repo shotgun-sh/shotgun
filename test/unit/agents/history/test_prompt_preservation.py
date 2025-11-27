@@ -11,7 +11,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from shotgun.agents.history.message_utils import (
+from shotgun.agents.conversation.history.message_utils import (
     get_agent_system_prompt,
     get_latest_system_status,
 )

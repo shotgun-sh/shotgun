@@ -10,8 +10,11 @@ from typing import TYPE_CHECKING
 
 import aiofiles.os
 
-from shotgun.agents.conversation_history import ConversationHistory, ConversationState
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import (
+    ConversationHistory,
+    ConversationManager,
+    ConversationState,
+)
 from shotgun.agents.models import AgentType
 
 if TYPE_CHECKING:

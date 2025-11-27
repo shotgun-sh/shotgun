@@ -13,7 +13,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from shotgun.agents.conversation_history import filter_orphaned_tool_responses
+from shotgun.agents.conversation.filters import filter_orphaned_tool_responses
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
@@ -22,7 +22,7 @@ from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 from shotgun.prompts import PromptLoader
 
-from .constants import SUMMARY_MARKER, TOKEN_LIMIT_RATIO
+from .constants import CHUNK_SAFE_RATIO, SUMMARY_MARKER, TOKEN_LIMIT_RATIO
 from .context_extraction import extract_context_from_messages
 from .history_building import ensure_ends_with_model_request
 from .message_utils import (
@@ -39,7 +39,7 @@ from .token_estimation import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from . import chunking
 
 
 class ContextProtocol(Protocol):
@@ -493,9 +493,31 @@ async def _full_compaction(
     deps: AgentDeps,
     messages: list[ModelMessage],
 ) -> list[ModelMessage]:
-    """Perform full compaction for first-time summarization."""
+    """Perform full compaction for first-time summarization.
+
+    If the conversation is too large for single-pass compaction, delegates
+    to chunked compaction which breaks the conversation into logical chunks.
+    """
     # Extract context from all messages
     context = extract_context_from_messages(messages)
+
+    # Check if context would exceed model limit for compaction request
+    # We use CHUNK_SAFE_RATIO (70%) to leave room for prompt overhead
+    max_safe_input = int(deps.llm_model.max_input_tokens * CHUNK_SAFE_RATIO)
+
+    # Estimate context tokens
+    context_request: list[ModelMessage] = [ModelRequest.user_text_prompt(context)]
+    context_tokens = await estimate_tokens_from_messages(
+        context_request, deps.llm_model
+    )
+
+    if context_tokens > max_safe_input:
+        # Context too large for single-pass compaction - use chunked approach
+        logger.info(
+            f"Context ({context_tokens:,} tokens) exceeds safe limit "
+            f"({max_safe_input:,} tokens), using chunked compaction"
+        )
+        return await _chunked_compaction(deps, messages)
 
     # Use regular summarization prompt
     summarization_prompt = prompt_loader.render("history/summarization.j2")
@@ -599,3 +621,238 @@ async def _full_compaction(
     )
 
     return compacted_messages
+
+
+async def _chunked_compaction(
+    deps: AgentDeps,
+    messages: list[ModelMessage],
+) -> list[ModelMessage]:
+    """Perform chunked compaction for oversized conversations.
+
+    Breaks the conversation into logical chunks, summarizes each sequentially,
+    then combines the summaries into a master summary.
+    """
+    from .chunking import chunk_messages_for_compaction
+
+    # Split into chunks and retention window
+    chunks, retained_messages = await chunk_messages_for_compaction(
+        messages, deps.llm_model
+    )
+
+    if not chunks:
+        # No chunks to summarize (conversation too small), return retained messages
+        logger.debug("No chunks to summarize, returning retained messages")
+        return retained_messages
+
+    # Track chunked compaction
+    total_chunks = len(chunks)
+    logger.info(f"Starting chunked compaction: {total_chunks} chunks to process")
+
+    # Summarize each chunk sequentially
+    chunk_summaries: list[str] = []
+    for chunk in chunks:
+        try:
+            summary = await _summarize_chunk(chunk, total_chunks, deps)
+            chunk_summaries.append(summary)
+            logger.debug(
+                f"Chunk {chunk.chunk_index + 1}/{total_chunks} summarized successfully"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to summarize chunk {chunk.chunk_index + 1}/{total_chunks}: {e}"
+            )
+            # Continue with other chunks - we'll note the gap in fusion
+            chunk_summaries.append(
+                f"[Chunk {chunk.chunk_index + 1} summary unavailable]"
+            )
+
+    # Combine summaries into master summary
+    if len(chunk_summaries) == 1:
+        final_summary = chunk_summaries[0]
+    else:
+        final_summary = await _combine_chunk_summaries(chunk_summaries, deps)
+
+    # Build final compacted history
+    compacted = _build_chunked_compaction_result(
+        final_summary, messages, retained_messages, deps
+    )
+
+    # Track chunked compaction event
+    track_event(
+        "chunked_compaction_triggered",
+        {
+            "num_chunks": total_chunks,
+            "chunks_succeeded": sum(
+                1 for s in chunk_summaries if not s.startswith("[Chunk")
+            ),
+            "retention_window_size": len(retained_messages),
+            "model_name": deps.llm_model.name.value,
+            "provider": deps.llm_model.provider.value,
+        },
+    )
+
+    return compacted
+
+
+async def _summarize_chunk(
+    chunk: "chunking.Chunk",
+    total_chunks: int,
+    deps: AgentDeps,
+) -> str:
+    """Summarize a single chunk of messages."""
+    chunk_messages = chunk.get_all_messages()
+    context = extract_context_from_messages(chunk_messages)
+
+    # Use chunk summarization template
+    chunk_prompt = prompt_loader.render(
+        "history/chunk_summarization.j2",
+        chunk_index=chunk.chunk_index + 1,
+        total_chunks=total_chunks,
+        chunk_content=context,
+    )
+
+    request_messages: list[ModelMessage] = [
+        ModelRequest.user_text_prompt(context, instructions=chunk_prompt)
+    ]
+
+    max_tokens = await calculate_max_summarization_tokens(
+        deps.llm_model, request_messages
+    )
+
+    log_summarization_request(
+        deps.llm_model,
+        max_tokens,
+        chunk_prompt,
+        context[:500] + "..." if len(context) > 500 else context,
+        f"CHUNK_{chunk.chunk_index + 1}",
+    )
+
+    response = await shotgun_model_request(
+        model_config=deps.llm_model,
+        messages=request_messages,
+        model_settings=ModelSettings(max_tokens=max_tokens),
+    )
+
+    log_summarization_response(response, f"CHUNK_{chunk.chunk_index + 1}")
+
+    if response.parts and isinstance(response.parts[0], TextPart):
+        return response.parts[0].content
+    return ""
+
+
+async def _combine_chunk_summaries(
+    summaries: list[str],
+    deps: AgentDeps,
+) -> str:
+    """Combine multiple chunk summaries into a unified summary."""
+    # Check if combined summaries exceed limit (may need recursive combination)
+    combined_text = "\n\n".join(summaries)
+    combined_request: list[ModelMessage] = [
+        ModelRequest.user_text_prompt(combined_text)
+    ]
+    combined_tokens = await estimate_tokens_from_messages(
+        combined_request, deps.llm_model
+    )
+
+    max_safe_input = int(deps.llm_model.max_input_tokens * CHUNK_SAFE_RATIO)
+
+    if combined_tokens > max_safe_input:
+        # Recursive: split summaries in half and combine each half first
+        logger.warning(
+            f"Combined summaries too large ({combined_tokens:,} tokens), "
+            f"applying recursive combination"
+        )
+        mid = len(summaries) // 2
+        first_half = await _combine_chunk_summaries(summaries[:mid], deps)
+        second_half = await _combine_chunk_summaries(summaries[mid:], deps)
+        summaries = [first_half, second_half]
+
+    # Use combination template
+    combine_prompt = prompt_loader.render(
+        "history/combine_summaries.j2",
+        num_summaries=len(summaries),
+        chunk_summaries=summaries,
+    )
+
+    request_messages: list[ModelMessage] = [
+        ModelRequest.user_text_prompt(
+            "\n\n---\n\n".join(summaries), instructions=combine_prompt
+        )
+    ]
+
+    max_tokens = await calculate_max_summarization_tokens(
+        deps.llm_model, request_messages
+    )
+
+    log_summarization_request(
+        deps.llm_model,
+        max_tokens,
+        combine_prompt,
+        f"[{len(summaries)} summaries to combine]",
+        "COMBINE",
+    )
+
+    response = await shotgun_model_request(
+        model_config=deps.llm_model,
+        messages=request_messages,
+        model_settings=ModelSettings(max_tokens=max_tokens),
+    )
+
+    log_summarization_response(response, "COMBINE")
+
+    if response.parts and isinstance(response.parts[0], TextPart):
+        return response.parts[0].content
+    return ""
+
+
+def _build_chunked_compaction_result(
+    final_summary: str,
+    original_messages: list[ModelMessage],
+    retained_messages: list[ModelMessage],
+    deps: AgentDeps,
+) -> list[ModelMessage]:
+    """Build the final compacted history from chunked compaction."""
+    from pydantic_ai.messages import ModelRequestPart
+
+    # Extract system context from original messages
+    agent_prompt = get_agent_system_prompt(original_messages) or ""
+    system_status = get_latest_system_status(original_messages) or ""
+    first_user = get_first_user_request(original_messages) or ""
+
+    # Create marked summary
+    summary_part = TextPart(content=f"{SUMMARY_MARKER} {final_summary}")
+    summary_message = ModelResponse(parts=[summary_part])
+
+    # Build compacted structure
+    compacted: list[ModelMessage] = []
+
+    # Initial request with system context
+    parts: list[ModelRequestPart] = []
+    if agent_prompt:
+        parts.append(AgentSystemPrompt(content=agent_prompt))
+    if system_status:
+        parts.append(SystemStatusPrompt(content=system_status))
+    if first_user:
+        parts.append(UserPromptPart(content=first_user))
+
+    if parts:
+        compacted.append(ModelRequest(parts=parts))
+
+    # Add summary
+    compacted.append(summary_message)
+
+    # Add retained messages (recent context)
+    compacted.extend(retained_messages)
+
+    # Ensure ends with ModelRequest for PydanticAI compatibility
+    compacted = ensure_ends_with_model_request(compacted, original_messages)
+
+    # Filter orphaned tool responses
+    compacted = filter_orphaned_tool_responses(compacted)
+
+    logger.info(
+        f"Chunked compaction complete: {len(original_messages)} messages -> "
+        f"{len(compacted)} messages (retained {len(retained_messages)} recent)"
+    )
+
+    return compacted

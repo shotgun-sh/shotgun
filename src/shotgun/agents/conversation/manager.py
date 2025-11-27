@@ -11,7 +11,7 @@ from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
 from shotgun.utils.file_system_utils import async_copy_file
 
-from .conversation_history import ConversationHistory
+from .models import ConversationHistory
 
 logger = get_logger(__name__)
 

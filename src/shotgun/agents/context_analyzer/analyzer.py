@@ -15,8 +15,12 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config.models import ModelConfig
-from shotgun.agents.history.token_counting.utils import count_tokens_from_messages
-from shotgun.agents.history.token_estimation import estimate_tokens_from_messages
+from shotgun.agents.conversation.history.token_counting.utils import (
+    count_tokens_from_messages,
+)
+from shotgun.agents.conversation.history.token_estimation import (
+    estimate_tokens_from_messages,
+)
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage

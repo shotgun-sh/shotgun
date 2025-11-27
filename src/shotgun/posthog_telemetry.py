@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationManager
 from shotgun.logging_config import get_early_logger
 from shotgun.settings import settings
 

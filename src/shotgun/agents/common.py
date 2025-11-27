@@ -25,7 +25,7 @@ from shotgun.utils import ensure_shotgun_directory_exists
 from shotgun.utils.datetime_utils import get_datetime_context
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
-from .history import token_limit_compactor
+from .conversation.history import token_limit_compactor
 from .messages import AgentSystemPrompt, SystemStatusPrompt
 from .models import AgentDeps, AgentRuntimeOptions, PipelineConfigEntry
 from .tools import (

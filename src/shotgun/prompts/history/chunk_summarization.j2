@@ -1,0 +1,34 @@
+You are summarizing chunk {{ chunk_index }} of {{ total_chunks }} from a conversation that is too large to summarize at once.
+
+Focus on preserving:
+1. ALL file paths, function names, variable names, URLs, and identifiers VERBATIM
+2. Key decisions and their rationale
+3. Tool call results (summarize large outputs, keep critical data)
+4. Important errors or issues encountered
+5. User requests and how they were addressed
+
+<CHUNK_CONTENT>
+{{ chunk_content }}
+</CHUNK_CONTENT>
+
+<OUTPUT_FORMAT>
+## Topics Covered
+Brief bullet points of main topics discussed in this chunk.
+
+## Entities & References
+- Files: [list all file paths mentioned, verbatim]
+- Functions/Classes: [list all function/method/class names, verbatim]
+- Variables/Keys: [configuration keys, env vars, etc., verbatim]
+- Links/IDs: [any URLs, ticket IDs, etc., verbatim]
+
+## Actions & Results
+Summarized tool calls and their outcomes. Preserve important data verbatim.
+
+## Important Decisions
+Key decisions made and their rationale.
+
+## Status at Chunk End
+Current active task or objective at the end of this chunk (if any), or "N/A" if this chunk completes without active work.
+</OUTPUT_FORMAT>
+
+Be concise but preserve all critical information. This summary will be combined with others to create a complete conversation summary.

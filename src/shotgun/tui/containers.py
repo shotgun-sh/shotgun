@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from dependency_injector import containers, providers
 from pydantic_ai import RunContext
 
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.models import AgentDeps
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.tui.commands import CommandHandler

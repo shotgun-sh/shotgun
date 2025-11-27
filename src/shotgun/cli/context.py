@@ -15,7 +15,7 @@ from shotgun.agents.context_analyzer import (
     ContextAnalyzer,
     ContextFormatter,
 )
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationManager
 from shotgun.cli.models import OutputFormat
 from shotgun.llm_proxy import BudgetInfo, LiteLLMProxyClient
 from shotgun.logging_config import get_logger

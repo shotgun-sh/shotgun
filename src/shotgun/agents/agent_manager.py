@@ -17,7 +17,7 @@ from tenacity import (
 )
 
 if TYPE_CHECKING:
-    from shotgun.agents.conversation_history import ConversationState
+    from shotgun.agents.conversation import ConversationState
 
 from pydantic_ai import (
     Agent,
@@ -68,8 +68,8 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
 
+from .conversation.history.compaction import apply_persistent_compaction
 from .export import create_export_agent
-from .history.compaction import apply_persistent_compaction
 from .messages import AgentSystemPrompt
 from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
@@ -1314,7 +1314,7 @@ class AgentManager(Widget):
         Returns:
             ConversationState object containing UI and agent messages and current type
         """
-        from shotgun.agents.conversation_history import ConversationState
+        from shotgun.agents.conversation import ConversationState
 
         return ConversationState(
             agent_messages=self.message_history.copy(),

@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, patch
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from typer.testing import CliRunner
 
-from shotgun.agents.conversation_history import ConversationHistory
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationHistory, ConversationManager
 from shotgun.cli.clear import app
 
 runner = CliRunner()
