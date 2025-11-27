@@ -13,6 +13,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from shotgun.agents.conversation_history import filter_orphaned_tool_responses
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.agents.models import AgentDeps
@@ -416,6 +417,9 @@ async def token_limit_compactor(
             compacted_messages, messages
         )
 
+        # Filter out orphaned tool responses (tool responses without tool calls)
+        compacted_messages = filter_orphaned_tool_responses(compacted_messages)
+
         logger.debug(
             f"Incremental compaction complete: {len(messages)} -> {len(compacted_messages)} messages"
         )
@@ -564,6 +568,9 @@ async def _full_compaction(
 
     # Ensure history ends with ModelRequest for PydanticAI compatibility
     compacted_messages = ensure_ends_with_model_request(compacted_messages, messages)
+
+    # Filter out orphaned tool responses (tool responses without tool calls)
+    compacted_messages = filter_orphaned_tool_responses(compacted_messages)
 
     # Track full compaction event
     messages_before = len(messages)

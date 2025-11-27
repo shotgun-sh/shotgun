@@ -9,8 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.messages import (
     ModelMessage,
     ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelRequestPart,
     ModelResponse,
     ToolCallPart,
+    ToolReturnPart,
 )
 from pydantic_core import to_jsonable_python
 
@@ -111,6 +114,67 @@ def filter_incomplete_messages(messages: list[ModelMessage]) -> list[ModelMessag
     return filtered
 
 
+def filter_orphaned_tool_responses(messages: list[ModelMessage]) -> list[ModelMessage]:
+    """Filter out tool responses without corresponding tool calls.
+
+    This ensures message history is valid for OpenAI API which requires
+    tool responses to follow their corresponding tool calls.
+
+    Args:
+        messages: List of messages to filter
+
+    Returns:
+        List of messages with orphaned tool responses removed
+    """
+    # Collect all tool_call_ids from ToolCallPart in ModelResponse
+    valid_tool_call_ids: set[str] = set()
+    for msg in messages:
+        if isinstance(msg, ModelResponse):
+            for part in msg.parts:
+                if isinstance(part, ToolCallPart) and part.tool_call_id:
+                    valid_tool_call_ids.add(part.tool_call_id)
+
+    # Filter out orphaned ToolReturnPart from ModelRequest
+    filtered: list[ModelMessage] = []
+    orphaned_count = 0
+    orphaned_tool_names: list[str] = []
+
+    for msg in messages:
+        if isinstance(msg, ModelRequest):
+            # Filter parts, removing orphaned ToolReturnPart
+            filtered_parts: list[ModelRequestPart] = []
+            request_part: ModelRequestPart
+            for request_part in msg.parts:
+                if isinstance(request_part, ToolReturnPart):
+                    if request_part.tool_call_id in valid_tool_call_ids:
+                        filtered_parts.append(request_part)
+                    else:
+                        # Skip orphaned tool response
+                        orphaned_count += 1
+                        orphaned_tool_names.append(request_part.tool_name or "unknown")
+                else:
+                    filtered_parts.append(request_part)
+
+            # Only add if there are remaining parts
+            if filtered_parts:
+                filtered.append(ModelRequest(parts=filtered_parts))
+        else:
+            filtered.append(msg)
+
+    # Log if any tool responses were filtered
+    if orphaned_count > 0:
+        logger.info(
+            "Filtered orphaned tool responses",
+            extra={
+                "orphaned_count": orphaned_count,
+                "total_messages": len(messages),
+                "orphaned_tool_names": orphaned_tool_names,
+            },
+        )
+
+    return filtered
+
+
 class ConversationState(BaseModel):
     """Represents the complete state of a conversation in memory."""
 
@@ -144,6 +208,8 @@ class ConversationHistory(BaseModel):
         """
         # Filter out messages with incomplete tool calls to prevent corruption
         filtered_messages = filter_incomplete_messages(messages)
+        # Filter out orphaned tool responses (tool responses without tool calls)
+        filtered_messages = filter_orphaned_tool_responses(filtered_messages)
 
         # Serialize ModelMessage list to JSON-serializable format
         self.agent_history = to_jsonable_python(

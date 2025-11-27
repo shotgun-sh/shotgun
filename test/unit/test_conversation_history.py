@@ -8,12 +8,15 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     TextPart,
+    ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 
 from shotgun.agents.conversation_history import (
     ConversationHistory,
     ConversationState,
+    filter_orphaned_tool_responses,
 )
 from shotgun.agents.conversation_manager import ConversationManager
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -253,3 +256,155 @@ def test_conversation_history_ui_messages_with_hints():
     assert isinstance(retrieved[0], ModelRequest)
     assert isinstance(retrieved[1], ModelResponse)
     assert isinstance(retrieved[2], HintMessage)
+
+
+def test_filter_orphaned_tool_responses_removes_orphans():
+    """Test that orphaned tool responses are filtered out."""
+    # Create messages with orphaned tool response (no matching tool call)
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Read a file")]),
+        # Note: No ModelResponse with ToolCallPart for "orphan-id"
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="file_read",
+                    content="file contents",
+                    tool_call_id="orphan-id",
+                )
+            ]
+        ),
+    ]
+
+    filtered = filter_orphaned_tool_responses(messages)
+
+    # The orphaned tool response should be removed entirely
+    # since ModelRequest only had the ToolReturnPart
+    assert len(filtered) == 1
+    assert isinstance(filtered[0], ModelRequest)
+    assert isinstance(filtered[0].parts[0], UserPromptPart)
+
+
+def test_filter_orphaned_tool_responses_preserves_valid_pairs():
+    """Test that valid tool call/response pairs are preserved."""
+    tool_call_id = "valid-id-123"
+
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Read a file")]),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="file_read",
+                    args={"path": "/test.txt"},
+                    tool_call_id=tool_call_id,
+                )
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="file_read",
+                    content="file contents",
+                    tool_call_id=tool_call_id,
+                )
+            ]
+        ),
+    ]
+
+    filtered = filter_orphaned_tool_responses(messages)
+
+    # All messages should be preserved
+    assert len(filtered) == 3
+    assert isinstance(filtered[2], ModelRequest)
+    assert isinstance(filtered[2].parts[0], ToolReturnPart)
+
+
+def test_filter_orphaned_tool_responses_mixed_scenario():
+    """Test filtering with mix of valid and orphaned tool responses."""
+    valid_id = "valid-id"
+    orphan_id = "orphan-id"
+
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Do things")]),
+        # Valid tool call
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="valid_tool",
+                    args={},
+                    tool_call_id=valid_id,
+                )
+            ]
+        ),
+        # Request with both valid and orphaned tool responses
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="valid_tool",
+                    content="valid result",
+                    tool_call_id=valid_id,
+                ),
+                ToolReturnPart(
+                    tool_name="orphan_tool",
+                    content="orphan result",
+                    tool_call_id=orphan_id,
+                ),
+            ]
+        ),
+    ]
+
+    filtered = filter_orphaned_tool_responses(messages)
+
+    # All 3 messages should exist, but last one should only have valid tool return
+    assert len(filtered) == 3
+    last_request = filtered[2]
+    assert isinstance(last_request, ModelRequest)
+    assert len(last_request.parts) == 1
+    tool_return = last_request.parts[0]
+    assert isinstance(tool_return, ToolReturnPart)
+    assert tool_return.tool_call_id == valid_id
+
+
+def test_filter_orphaned_tool_responses_preserves_other_parts():
+    """Test that non-tool parts in ModelRequest are preserved."""
+    orphan_id = "orphan-id"
+
+    messages = [
+        ModelRequest(
+            parts=[
+                UserPromptPart(content="User message"),
+                ToolReturnPart(
+                    tool_name="orphan_tool",
+                    content="orphan result",
+                    tool_call_id=orphan_id,
+                ),
+            ]
+        ),
+    ]
+
+    filtered = filter_orphaned_tool_responses(messages)
+
+    # Message should still exist with just the UserPromptPart
+    assert len(filtered) == 1
+    assert isinstance(filtered[0], ModelRequest)
+    assert len(filtered[0].parts) == 1
+    assert isinstance(filtered[0].parts[0], UserPromptPart)
+
+
+def test_filter_orphaned_tool_responses_empty_list():
+    """Test filtering with empty message list."""
+    filtered = filter_orphaned_tool_responses([])
+    assert filtered == []
+
+
+def test_filter_orphaned_tool_responses_no_tool_messages():
+    """Test filtering when there are no tool-related messages."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Hello")]),
+        ModelResponse(parts=[TextPart(content="Hi there!")]),
+    ]
+
+    filtered = filter_orphaned_tool_responses(messages)
+
+    # All messages should be unchanged
+    assert len(filtered) == 2
+    assert filtered == messages
