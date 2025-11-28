@@ -1064,6 +1064,125 @@ class ChatScreen(Screen[None]):
             )
         )
 
+    def share_specs_command(self) -> None:
+        """Launch the share specs workflow."""
+        self.call_later(lambda: self._start_share_specs_flow())
+
+    @work
+    async def _start_share_specs_flow(self) -> None:
+        """Main workflow for sharing specs to workspace."""
+        from shotgun.shotgun_web.exceptions import ForbiddenError, UnauthorizedError
+        from shotgun.shotgun_web.specs_client import SpecsClient
+        from shotgun.tui.screens.shared_specs import (
+            CreateSpecDialog,
+            ShareSpecsDialog,
+            UploadProgressScreen,
+        )
+
+        # 1. Check preconditions
+        shotgun_dir = Path.cwd() / ".shotgun"
+        if not shotgun_dir.exists():
+            self.mount_hint("No .shotgun/ directory found in current directory")
+            return
+
+        # 2. Get workspace and check authentication
+        config = await get_config_manager().load()
+        if config.shotgun.supabase_jwt is None:
+            self.mount_hint("Not authenticated. Run 'shotgun auth' to login.")
+            return
+
+        workspace_id = config.shotgun.workspace_id
+        if not workspace_id:
+            self.mount_hint("No workspace configured. Run 'shotgun auth' to login.")
+            return
+
+        # 3. Check permissions
+        client = SpecsClient()
+        try:
+            permissions = await client.check_permissions(workspace_id)
+            if not permissions.can_create_specs:
+                self.mount_hint("You need editor access to share specs")
+                return
+        except UnauthorizedError:
+            self.mount_hint("Not authenticated. Run 'shotgun auth' to login.")
+            return
+        except ForbiddenError:
+            self.mount_hint("You don't have access to this workspace")
+            return
+        except Exception as e:
+            logger.error(f"Failed to check permissions: {e}")
+            self.mount_hint(f"Failed to check permissions: {e}")
+            return
+
+        # 4. Show spec selection dialog
+        result = await self.app.push_screen_wait(ShareSpecsDialog(workspace_id))
+        if result is None or result.action is None:
+            return  # User cancelled
+
+        spec_id: str | None = None
+        version_id: str | None = None
+
+        # 5. Handle create vs add version
+        if result.action == "create":
+            # Show create spec dialog
+            create_result = await self.app.push_screen_wait(CreateSpecDialog())
+            if create_result is None:
+                return  # User cancelled
+
+            # Create the spec with initial version
+            try:
+                create_response = await client.create_spec(
+                    workspace_id,
+                    name=create_result.name,
+                    description=create_result.description,
+                )
+                spec_id = create_response.spec.id
+                version_id = create_response.version.id
+
+                # If user wants public, update the spec
+                if create_result.is_public:
+                    await client.update_spec(workspace_id, spec_id, is_public=True)
+            except Exception as e:
+                logger.error(f"Failed to create spec: {e}")
+                self.mount_hint(f"Failed to create spec: {e}")
+                return
+
+        else:  # add_version
+            spec_id = result.spec_id
+            if not spec_id:
+                self.mount_hint("No spec selected")
+                return
+
+            # Create new version for existing spec
+            try:
+                version_response = await client.create_version(workspace_id, spec_id)
+                version_id = version_response.version.id
+            except Exception as e:
+                logger.error(f"Failed to create version: {e}")
+                self.mount_hint(f"Failed to create version: {e}")
+                return
+
+        if not spec_id or not version_id:
+            self.mount_hint("Failed to create spec or version")
+            return
+
+        # 6. Show upload progress screen
+        upload_result = await self.app.push_screen_wait(
+            UploadProgressScreen(workspace_id, spec_id, version_id)
+        )
+
+        # 7. Show result
+        if upload_result and upload_result.success:
+            if upload_result.web_url:
+                self.mount_hint(
+                    f"Specs shared successfully!\n\nView at: {upload_result.web_url}"
+                )
+            else:
+                self.mount_hint("Specs shared successfully!")
+        elif upload_result and upload_result.cancelled:
+            self.mount_hint("Upload cancelled")
+        # Error case is handled by the upload screen
+
     def delete_codebase_from_palette(self, graph_id: str) -> None:
         stack = getattr(self.app, "screen_stack", None)
         if stack and isinstance(stack[-1], CommandPalette):

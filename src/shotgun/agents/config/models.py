@@ -213,6 +213,9 @@ class ShotgunAccountConfig(BaseModel):
     supabase_jwt: SecretStr | None = Field(
         default=None, description="Supabase authentication JWT"
     )
+    workspace_id: str | None = Field(
+        default=None, description="Default workspace ID for shared specs"
+    )
 
 
 class MarketingMessageRecord(BaseModel):

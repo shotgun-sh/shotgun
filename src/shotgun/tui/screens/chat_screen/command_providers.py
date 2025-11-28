@@ -361,6 +361,11 @@ class UnifiedCommandProvider(Provider):
             help="🤖 Choose which AI model to use",
         )
         yield DiscoveryHit(
+            "Share specs to workspace",
+            self.chat_screen.share_specs_command,
+            help="📤 Upload .shotgun/ files to share with your team",
+        )
+        yield DiscoveryHit(
             "Show context",
             self.chat_screen.action_show_context,
             help="Display conversation context composition and statistics",
@@ -411,6 +416,11 @@ class UnifiedCommandProvider(Provider):
                 "Select AI Model",
                 self.open_model_picker,
                 "🤖 Choose which AI model to use",
+            ),
+            (
+                "Share specs to workspace",
+                self.chat_screen.share_specs_command,
+                "📤 Upload .shotgun/ files to share with your team",
             ),
             (
                 "Show context",
