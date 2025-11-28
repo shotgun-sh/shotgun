@@ -10,6 +10,7 @@ from shotgun.shotgun_web.shared_specs.file_scanner import (
     _should_ignore,
     get_shotgun_directory,
     scan_shotgun_directory,
+    scan_shotgun_directory_with_counts,
 )
 
 
@@ -185,3 +186,58 @@ def test_ignore_patterns_list():
     assert "*.pyc" in IGNORE_PATTERNS
     assert ".vscode" in IGNORE_PATTERNS
     assert ".idea" in IGNORE_PATTERNS
+
+
+@pytest.mark.asyncio
+async def test_scan_with_counts_returns_total_before_filter(tmp_path: Path):
+    """Test scan_shotgun_directory_with_counts returns total files before filtering."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+
+    # Create valid files
+    (shotgun_dir / "spec.md").write_text("# Spec")
+    (shotgun_dir / "research.md").write_text("# Research")
+
+    # Create ignored files
+    (shotgun_dir / ".DS_Store").write_text("ignored")
+    (shotgun_dir / "backup.bak").write_text("backup")
+
+    result = await scan_shotgun_directory_with_counts(tmp_path)
+
+    # Should have 2 valid files
+    assert len(result.files) == 2
+    # Total before filter should be 4 (2 valid + 2 ignored)
+    assert result.total_files_before_filter == 4
+
+
+@pytest.mark.asyncio
+async def test_scan_with_counts_empty_directory(tmp_path: Path):
+    """Test scan_shotgun_directory_with_counts with empty directory."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+
+    result = await scan_shotgun_directory_with_counts(tmp_path)
+
+    assert len(result.files) == 0
+    assert result.total_files_before_filter == 0
+
+
+@pytest.mark.asyncio
+async def test_scan_with_counts_all_filtered(tmp_path: Path):
+    """Test scan_shotgun_directory_with_counts when all files are filtered."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+
+    # Create only ignored files
+    (shotgun_dir / ".DS_Store").write_text("ignored")
+    (shotgun_dir / "backup.bak").write_text("backup")
+    pycache = shotgun_dir / "__pycache__"
+    pycache.mkdir()
+    (pycache / "module.pyc").write_bytes(b"compiled")
+
+    result = await scan_shotgun_directory_with_counts(tmp_path)
+
+    # No valid files
+    assert len(result.files) == 0
+    # Total before filter should be 3 (all ignored)
+    assert result.total_files_before_filter == 3

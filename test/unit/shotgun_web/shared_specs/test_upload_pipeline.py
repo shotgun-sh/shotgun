@@ -185,7 +185,7 @@ async def test_run_upload_pipeline_success(temp_shotgun_dir: Path):
 
 @pytest.mark.asyncio
 async def test_run_upload_pipeline_no_files(tmp_path: Path):
-    """Test pipeline with empty .shotgun directory."""
+    """Test pipeline fails with empty .shotgun directory."""
     shotgun_dir = tmp_path / ".shotgun"
     shotgun_dir.mkdir()
 
@@ -202,9 +202,13 @@ async def test_run_upload_pipeline_no_files(tmp_path: Path):
         on_progress=on_progress,
     )
 
-    assert result.success is True
+    assert result.success is False
     assert result.files_uploaded == 0
-    assert result.error == "No files found"
+    assert "No files to share" in result.error
+
+    # Should have error phase
+    error_events = [p for p in progress_events if p.phase == "error"]
+    assert len(error_events) == 1
 
 
 @pytest.mark.asyncio
@@ -274,3 +278,75 @@ async def test_run_upload_pipeline_no_progress_callback(temp_shotgun_dir: Path):
         )
 
     assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_run_upload_pipeline_all_files_filtered(tmp_path: Path):
+    """Test pipeline fails when all files match ignore patterns."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+
+    # Create only ignored files
+    (shotgun_dir / ".DS_Store").write_text("ignored")
+    pycache_dir = shotgun_dir / "__pycache__"
+    pycache_dir.mkdir()
+    (pycache_dir / "test.pyc").write_bytes(b"compiled")
+    (shotgun_dir / "backup.bak").write_text("backup file")
+
+    progress_events: list[UploadProgress] = []
+
+    def on_progress(progress: UploadProgress) -> None:
+        progress_events.append(progress)
+
+    result = await run_upload_pipeline(
+        workspace_id="ws-123",
+        spec_id="spec-123",
+        version_id="version-123",
+        project_root=tmp_path,
+        on_progress=on_progress,
+    )
+
+    assert result.success is False
+    assert result.files_uploaded == 0
+    assert "ignore patterns" in result.error
+
+    # Should have error phase
+    error_events = [p for p in progress_events if p.phase == "error"]
+    assert len(error_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_run_upload_pipeline_large_file(tmp_path: Path):
+    """Test pipeline handles large files without memory exhaustion."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+
+    # Create a 50MB file (writes in chunks to avoid memory issues during test)
+    large_file = shotgun_dir / "large.bin"
+    chunk = b"x" * (1024 * 1024)  # 1MB chunk
+    with open(large_file, "wb") as f:
+        for _ in range(50):
+            f.write(chunk)
+
+    mock_client = AsyncMock()
+    mock_client.initiate_file_upload = AsyncMock(
+        side_effect=lambda *args, **kwargs: _mock_file_upload_response(args[3])
+    )
+    mock_client.upload_file_to_presigned_url = AsyncMock()
+    mock_client.close_version = AsyncMock(return_value=_mock_version_close_response())
+
+    with patch(
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient",
+        return_value=mock_client,
+    ):
+        result = await run_upload_pipeline(
+            workspace_id="ws-123",
+            spec_id="spec-123",
+            version_id="version-123",
+            project_root=tmp_path,
+        )
+
+    assert result.success is True
+    assert result.files_uploaded == 1
+    # 50MB = 50 * 1024 * 1024 bytes
+    assert result.total_bytes == 50 * 1024 * 1024
