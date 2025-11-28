@@ -3,6 +3,8 @@
 import fnmatch
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.models import FileMetadata
 
@@ -65,14 +67,11 @@ def _is_in_ignored_directory(path: Path, base_path: Path) -> bool:
     return False
 
 
-class ScanResult:
+class ScanResult(BaseModel):
     """Result of scanning .shotgun/ directory."""
 
-    def __init__(
-        self, files: list[FileMetadata], total_files_before_filter: int
-    ) -> None:
-        self.files = files
-        self.total_files_before_filter = total_files_before_filter
+    files: list[FileMetadata]
+    total_files_before_filter: int
 
 
 async def scan_shotgun_directory(project_root: Path) -> list[FileMetadata]:
