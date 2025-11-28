@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, cast
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.events import Resize
 from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import Button, Input, Label, ListItem, ListView, Markdown, Static
@@ -85,6 +86,30 @@ class ProviderConfigScreen(Screen[None]):
         #provider-status.error {
             color: $error;
         }
+
+        /* Compact styles for short terminals < 20 rows */
+        ProviderConfigScreen.compact #titlebox {
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        ProviderConfigScreen.compact #provider-config-summary {
+            display: none;
+        }
+
+        ProviderConfigScreen.compact #provider-links {
+            display: none;
+        }
+
+        ProviderConfigScreen.compact #provider-list {
+            margin: 0;
+            padding: 0;
+        }
+
+        ProviderConfigScreen.compact #provider-actions {
+            padding: 0;
+        }
     """
 
     BINDINGS = [
@@ -130,6 +155,21 @@ class ProviderConfigScreen(Screen[None]):
 
         # Refresh UI asynchronously
         self.run_worker(self._refresh_ui(), exclusive=False)
+
+        # Apply layout based on terminal height
+        self._apply_layout_for_height(self.app.size.height)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_layout_for_height(event.size.height)
+
+    def _apply_layout_for_height(self, height: int) -> None:
+        """Apply appropriate layout based on terminal height."""
+        if height < 20:
+            self.add_class("compact")
+        else:
+            self.remove_class("compact")
 
     def on_screenresume(self) -> None:
         """Refresh provider status when screen is resumed.
