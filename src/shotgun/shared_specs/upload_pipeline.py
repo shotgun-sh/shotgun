@@ -2,14 +2,18 @@
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
 from shotgun.logging_config import get_logger
 from shotgun.shared_specs.file_scanner import scan_shotgun_directory
 from shotgun.shared_specs.hasher import calculate_sha256
-from shotgun.shared_specs.utils import format_bytes
+from shotgun.shared_specs.models import (
+    FileWithHash,
+    UploadProgress,
+    UploadResult,
+    UploadState,
+)
+from shotgun.shared_specs.utils import UploadPhase, format_bytes
 from shotgun.shotgun_web.models import FileMetadata
 from shotgun.shotgun_web.specs_client import SpecsClient
 
@@ -20,80 +24,6 @@ MAX_CONCURRENT_HASHES = 10
 
 # Maximum concurrent file uploads
 MAX_CONCURRENT_UPLOADS = 5
-
-
-class UploadPhase(StrEnum):
-    """Upload pipeline phases."""
-
-    SCANNING = "scanning"
-    HASHING = "hashing"
-    UPLOADING = "uploading"
-    CLOSING = "closing"
-    COMPLETE = "complete"
-    ERROR = "error"
-
-
-@dataclass
-class UploadProgress:
-    """Progress information for the upload pipeline.
-
-    Attributes:
-        phase: Current phase of the pipeline
-        current: Current item number in the phase
-        total: Total items in the phase
-        current_file: Name of the file currently being processed
-        bytes_uploaded: Total bytes uploaded so far
-        total_bytes: Total bytes to upload
-        message: Human-readable status message
-    """
-
-    phase: UploadPhase
-    current: int = 0
-    total: int = 0
-    current_file: str | None = None
-    bytes_uploaded: int = 0
-    total_bytes: int = 0
-    message: str = ""
-
-
-@dataclass
-class UploadResult:
-    """Result of the upload pipeline.
-
-    Attributes:
-        success: Whether the upload completed successfully
-        web_url: URL to view the spec version (on success)
-        error: Error message (on failure)
-        files_uploaded: Number of files uploaded
-        total_bytes: Total bytes uploaded
-    """
-
-    success: bool
-    web_url: str | None = None
-    error: str | None = None
-    files_uploaded: int = 0
-    total_bytes: int = 0
-
-
-@dataclass
-class _FileWithHash:
-    """File metadata with computed hash."""
-
-    metadata: FileMetadata
-    content_hash: str = ""
-
-
-@dataclass
-class _UploadState:
-    """Internal state for upload progress tracking."""
-
-    files_uploaded: int = 0
-    bytes_uploaded: int = 0
-    total_bytes: int = 0
-    current_file: str | None = None
-    # Track completed hashes for progress
-    hashes_completed: int = 0
-    total_files: int = 0
 
 
 async def run_upload_pipeline(
@@ -121,7 +51,7 @@ async def run_upload_pipeline(
     if project_root is None:
         project_root = Path.cwd()
 
-    state = _UploadState()
+    state = UploadState()
 
     def report_progress(progress: UploadProgress) -> None:
         """Report progress to callback if provided."""
@@ -255,18 +185,18 @@ async def run_upload_pipeline(
 
 async def _calculate_hashes(
     files: list[FileMetadata],
-    state: _UploadState,
+    state: UploadState,
     report_progress: Callable[[UploadProgress], None],
-) -> list[_FileWithHash]:
+) -> list[FileWithHash]:
     """Calculate hashes for all files with progress reporting.
 
     Uses semaphore to limit concurrent hash operations.
     """
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_HASHES)
-    files_with_hashes: list[_FileWithHash] = []
+    files_with_hashes: list[FileWithHash] = []
     lock = asyncio.Lock()
 
-    async def hash_file(file_meta: FileMetadata) -> _FileWithHash:
+    async def hash_file(file_meta: FileMetadata) -> FileWithHash:
         async with semaphore:
             content_hash = await calculate_sha256(file_meta.absolute_path)
 
@@ -283,7 +213,7 @@ async def _calculate_hashes(
                     )
                 )
 
-            return _FileWithHash(metadata=file_meta, content_hash=content_hash)
+            return FileWithHash(metadata=file_meta, content_hash=content_hash)
 
     # Run hash calculations concurrently
     results = await asyncio.gather(*[hash_file(f) for f in files])
@@ -297,8 +227,8 @@ async def _upload_files(
     workspace_id: str,
     spec_id: str,
     version_id: str,
-    files: list[_FileWithHash],
-    state: _UploadState,
+    files: list[FileWithHash],
+    state: UploadState,
     report_progress: Callable[[UploadProgress], None],
 ) -> None:
     """Upload all files with progress reporting.
@@ -308,7 +238,7 @@ async def _upload_files(
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_UPLOADS)
     lock = asyncio.Lock()
 
-    async def upload_file(file: _FileWithHash) -> None:
+    async def upload_file(file: FileWithHash) -> None:
         async with semaphore:
             # Initiate upload to get presigned URL
             response = await client.initiate_file_upload(

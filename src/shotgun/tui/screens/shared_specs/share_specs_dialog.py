@@ -1,8 +1,6 @@
 """Dialog for selecting an existing spec or creating a new one."""
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from enum import StrEnum
 
 from textual import on, work
 from textual.app import ComposeResult
@@ -15,30 +13,12 @@ from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.models import SpecResponse
 from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.screens.shared_specs.models import (
+    ShareSpecsAction,
+    ShareSpecsResult,
+)
 
 logger = get_logger(__name__)
-
-
-class ShareSpecsAction(StrEnum):
-    """Actions from share specs dialog."""
-
-    CREATE = "create"
-    ADD_VERSION = "add_version"
-
-
-@dataclass
-class ShareSpecsResult:
-    """Result from ShareSpecsDialog.
-
-    Attributes:
-        action: CREATE to create new spec, ADD_VERSION to add to existing, None if cancelled
-        spec_id: Spec ID if adding version to existing spec
-        spec_name: Spec name if adding version to existing spec
-    """
-
-    action: ShareSpecsAction | None = None
-    spec_id: str | None = None
-    spec_name: str | None = None
 
 
 def _relative_time(dt: datetime) -> str:

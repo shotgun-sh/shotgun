@@ -12,13 +12,12 @@ from shotgun.shared_specs.hasher import (
     calculate_sha256,
     calculate_sha256_with_size,
 )
-from shotgun.shared_specs.upload_pipeline import (
-    UploadPhase,
+from shotgun.shared_specs.models import (
     UploadProgress,
     UploadResult,
-    run_upload_pipeline,
 )
-from shotgun.shared_specs.utils import format_bytes
+from shotgun.shared_specs.upload_pipeline import run_upload_pipeline
+from shotgun.shared_specs.utils import UploadPhase, format_bytes
 
 __all__ = [
     "UploadPhase",

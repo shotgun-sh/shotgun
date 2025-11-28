@@ -1,7 +1,5 @@
 """Dialog for creating a new spec."""
 
-from dataclasses import dataclass
-
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
@@ -11,23 +9,9 @@ from textual.widgets import Button, Input, Label, Static, Switch, TextArea
 
 from shotgun.logging_config import get_logger
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.screens.shared_specs.models import CreateSpecResult
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class CreateSpecResult:
-    """Result from CreateSpecDialog.
-
-    Attributes:
-        name: Spec name (required)
-        description: Optional description
-        is_public: Whether spec should be public (default: False)
-    """
-
-    name: str
-    description: str | None = None
-    is_public: bool = False
 
 
 class CreateSpecDialog(ModalScreen[CreateSpecResult | None]):

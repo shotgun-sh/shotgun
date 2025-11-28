@@ -1,6 +1,5 @@
 """Screen showing upload progress for sharing specs."""
 
-from dataclasses import dataclass
 from pathlib import Path
 
 from textual import on, work
@@ -12,31 +11,13 @@ from textual.widgets import Button, Label, ProgressBar, Static
 from textual.worker import Worker, WorkerCancelled, get_current_worker
 
 from shotgun.logging_config import get_logger
-from shotgun.shared_specs.upload_pipeline import (
-    UploadPhase,
-    UploadProgress,
-    UploadResult,
-    run_upload_pipeline,
-)
-from shotgun.shared_specs.utils import format_bytes
+from shotgun.shared_specs.models import UploadProgress, UploadResult
+from shotgun.shared_specs.upload_pipeline import run_upload_pipeline
+from shotgun.shared_specs.utils import UploadPhase, format_bytes
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.screens.shared_specs.models import UploadScreenResult
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class UploadScreenResult:
-    """Result from UploadProgressScreen.
-
-    Attributes:
-        success: Whether the upload completed successfully
-        web_url: URL to view the spec version (on success)
-        cancelled: Whether the upload was cancelled
-    """
-
-    success: bool
-    web_url: str | None = None
-    cancelled: bool = False
 
 
 class UploadProgressScreen(ModalScreen[UploadScreenResult]):

@@ -5,11 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from shotgun.shared_specs.upload_pipeline import (
-    UploadProgress,
-    UploadResult,
-    run_upload_pipeline,
-)
+from shotgun.shared_specs.models import UploadProgress, UploadResult
+from shotgun.shared_specs.upload_pipeline import run_upload_pipeline
 from shotgun.shared_specs.utils import format_bytes
 from shotgun.shotgun_web.models import (
     FileUploadResponse,
