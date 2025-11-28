@@ -91,7 +91,7 @@ class ConfirmationDialog(ModalScreen[bool]):
             margin-left: 1;
         }
 
-        /* Compact styles for short terminals < 30 rows */
+        /* Compact styles for short terminals */
         #dialog-container.compact {
             padding: 0 2;
             max-height: 98%;

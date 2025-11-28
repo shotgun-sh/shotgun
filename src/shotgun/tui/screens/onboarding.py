@@ -143,7 +143,7 @@ class OnboardingModal(ModalScreen[None]):
             color: $accent;
         }
 
-        /* Compact styles for short terminals < 30 rows */
+        /* Compact styles for short terminals */
         #onboarding-container.compact {
             padding: 1;
             max-height: 98%;

@@ -79,7 +79,7 @@ class ShotgunAuthScreen(Screen[bool]):
             align: center middle;
         }
 
-        /* Compact styles for short terminals < 20 rows */
+        /* Compact styles for short terminals */
         ShotgunAuthScreen.compact #titlebox {
             margin: 0;
             padding: 0;

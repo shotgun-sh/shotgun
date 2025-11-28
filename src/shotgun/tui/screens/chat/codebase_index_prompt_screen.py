@@ -94,7 +94,7 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
             display: none;
         }
 
-        /* Compact styles for short terminals < 30 rows */
+        /* Compact styles for short terminals */
         #index-prompt-dialog.compact {
             padding: 0 1;
             border: none;

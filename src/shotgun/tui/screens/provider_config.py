@@ -88,7 +88,7 @@ class ProviderConfigScreen(Screen[None]):
             color: $error;
         }
 
-        /* Compact styles for short terminals < 20 rows */
+        /* Compact styles for short terminals */
         ProviderConfigScreen.compact #titlebox {
             margin: 0;
             padding: 0;

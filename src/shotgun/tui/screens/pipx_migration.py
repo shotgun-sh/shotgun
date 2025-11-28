@@ -62,7 +62,7 @@ class PipxMigrationScreen(ModalScreen[None]):
             text-align: center;
         }
 
-        /* Compact styles for short terminals < 30 rows */
+        /* Compact styles for short terminals */
         #migration-container.compact {
             padding: 1;
             max-height: 98%;
