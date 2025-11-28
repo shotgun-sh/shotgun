@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from shotgun.shared_specs.hasher import (
+from shotgun.shotgun_web.shared_specs.hasher import (
     LARGE_FILE_CHUNK_SIZE,
     LARGE_FILE_THRESHOLD,
     SMALL_FILE_CHUNK_SIZE,
