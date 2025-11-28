@@ -13,10 +13,12 @@ from textual.worker import Worker, WorkerCancelled, get_current_worker
 
 from shotgun.logging_config import get_logger
 from shotgun.shared_specs.upload_pipeline import (
+    UploadPhase,
     UploadProgress,
     UploadResult,
     run_upload_pipeline,
 )
+from shotgun.shared_specs.utils import format_bytes
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 
 logger = get_logger(__name__)
@@ -35,18 +37,6 @@ class UploadScreenResult:
     success: bool
     web_url: str | None = None
     cancelled: bool = False
-
-
-def _format_bytes(size: int) -> str:
-    """Format bytes as human-readable string."""
-    if size < 1024:
-        return f"{size} B"
-    elif size < 1024 * 1024:
-        return f"{size / 1024:.1f} KB"
-    elif size < 1024 * 1024 * 1024:
-        return f"{size / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size / (1024 * 1024 * 1024):.1f} GB"
 
 
 class UploadProgressScreen(ModalScreen[UploadScreenResult]):
@@ -282,12 +272,12 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
     def _update_progress(self, progress: UploadProgress) -> None:
         """Update the UI with progress information."""
         phase_names = {
-            "scanning": "Phase 1/4: Scanning files...",
-            "hashing": "Phase 2/4: Calculating hashes...",
-            "uploading": "Phase 3/4: Uploading files...",
-            "closing": "Phase 4/4: Finalizing version...",
-            "complete": "Complete!",
-            "error": "Error",
+            UploadPhase.SCANNING: "Phase 1/4: Scanning files...",
+            UploadPhase.HASHING: "Phase 2/4: Calculating hashes...",
+            UploadPhase.UPLOADING: "Phase 3/4: Uploading files...",
+            UploadPhase.CLOSING: "Phase 4/4: Finalizing version...",
+            UploadPhase.COMPLETE: "Complete!",
+            UploadPhase.ERROR: "Error",
         }
 
         phase_label = self.query_one("#phase-label", Static)
@@ -317,7 +307,7 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         # Update bytes label
         if progress.total_bytes > 0:
             bytes_label.update(
-                f"Uploaded: {_format_bytes(progress.bytes_uploaded)} / {_format_bytes(progress.total_bytes)}"
+                f"Uploaded: {format_bytes(progress.bytes_uploaded)} / {format_bytes(progress.total_bytes)}"
             )
         else:
             bytes_label.update("")

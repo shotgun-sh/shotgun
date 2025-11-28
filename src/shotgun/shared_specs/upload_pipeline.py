@@ -3,12 +3,13 @@
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
 from shotgun.logging_config import get_logger
 from shotgun.shared_specs.file_scanner import scan_shotgun_directory
 from shotgun.shared_specs.hasher import calculate_sha256
+from shotgun.shared_specs.utils import format_bytes
 from shotgun.shotgun_web.models import FileMetadata
 from shotgun.shotgun_web.specs_client import SpecsClient
 
@@ -19,6 +20,17 @@ MAX_CONCURRENT_HASHES = 10
 
 # Maximum concurrent file uploads
 MAX_CONCURRENT_UPLOADS = 5
+
+
+class UploadPhase(StrEnum):
+    """Upload pipeline phases."""
+
+    SCANNING = "scanning"
+    HASHING = "hashing"
+    UPLOADING = "uploading"
+    CLOSING = "closing"
+    COMPLETE = "complete"
+    ERROR = "error"
 
 
 @dataclass
@@ -35,7 +47,7 @@ class UploadProgress:
         message: Human-readable status message
     """
 
-    phase: Literal["scanning", "hashing", "uploading", "closing", "complete", "error"]
+    phase: UploadPhase
     current: int = 0
     total: int = 0
     current_file: str | None = None
@@ -120,7 +132,7 @@ async def run_upload_pipeline(
         # Phase 1: Scan files
         report_progress(
             UploadProgress(
-                phase="scanning",
+                phase=UploadPhase.SCANNING,
                 message="Scanning .shotgun/ directory...",
             )
         )
@@ -131,7 +143,7 @@ async def run_upload_pipeline(
         if not files:
             report_progress(
                 UploadProgress(
-                    phase="complete",
+                    phase=UploadPhase.COMPLETE,
                     message="No files found in .shotgun/ directory",
                 )
             )
@@ -147,17 +159,17 @@ async def run_upload_pipeline(
 
         report_progress(
             UploadProgress(
-                phase="scanning",
+                phase=UploadPhase.SCANNING,
                 total=state.total_files,
                 total_bytes=state.total_bytes,
-                message=f"Found {state.total_files} files ({_format_bytes(state.total_bytes)})",
+                message=f"Found {state.total_files} files ({format_bytes(state.total_bytes)})",
             )
         )
 
         # Phase 2: Calculate hashes
         report_progress(
             UploadProgress(
-                phase="hashing",
+                phase=UploadPhase.HASHING,
                 current=0,
                 total=state.total_files,
                 message="Calculating file hashes...",
@@ -169,7 +181,7 @@ async def run_upload_pipeline(
         # Phase 3: Upload files
         report_progress(
             UploadProgress(
-                phase="uploading",
+                phase=UploadPhase.UPLOADING,
                 current=0,
                 total=state.total_files,
                 total_bytes=state.total_bytes,
@@ -191,7 +203,7 @@ async def run_upload_pipeline(
         # Phase 4: Close version
         report_progress(
             UploadProgress(
-                phase="closing",
+                phase=UploadPhase.CLOSING,
                 current=state.files_uploaded,
                 total=state.total_files,
                 bytes_uploaded=state.bytes_uploaded,
@@ -205,7 +217,7 @@ async def run_upload_pipeline(
         # Complete
         report_progress(
             UploadProgress(
-                phase="complete",
+                phase=UploadPhase.COMPLETE,
                 current=state.files_uploaded,
                 total=state.total_files,
                 bytes_uploaded=state.bytes_uploaded,
@@ -225,7 +237,7 @@ async def run_upload_pipeline(
         logger.error(f"Upload pipeline failed: {e}", exc_info=True)
         report_progress(
             UploadProgress(
-                phase="error",
+                phase=UploadPhase.ERROR,
                 current=state.files_uploaded,
                 total=state.total_files,
                 bytes_uploaded=state.bytes_uploaded,
@@ -263,7 +275,7 @@ async def _calculate_hashes(
                 state.hashes_completed += 1
                 report_progress(
                     UploadProgress(
-                        phase="hashing",
+                        phase=UploadPhase.HASHING,
                         current=state.hashes_completed,
                         total=state.total_files,
                         current_file=file_meta.relative_path,
@@ -322,7 +334,7 @@ async def _upload_files(
 
                 report_progress(
                     UploadProgress(
-                        phase="uploading",
+                        phase=UploadPhase.UPLOADING,
                         current=state.files_uploaded,
                         total=state.total_files,
                         current_file=file.metadata.relative_path,
@@ -334,15 +346,3 @@ async def _upload_files(
 
     # Run uploads concurrently
     await asyncio.gather(*[upload_file(f) for f in files])
-
-
-def _format_bytes(size: int) -> str:
-    """Format bytes as human-readable string."""
-    if size < 1024:
-        return f"{size} B"
-    elif size < 1024 * 1024:
-        return f"{size / 1024:.1f} KB"
-    elif size < 1024 * 1024 * 1024:
-        return f"{size / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size / (1024 * 1024 * 1024):.1f} GB"

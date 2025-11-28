@@ -8,9 +8,9 @@ import pytest
 from shotgun.shared_specs.upload_pipeline import (
     UploadProgress,
     UploadResult,
-    _format_bytes,
     run_upload_pipeline,
 )
+from shotgun.shared_specs.utils import format_bytes
 from shotgun.shotgun_web.models import (
     FileUploadResponse,
     SpecFileResponse,
@@ -22,24 +22,24 @@ from shotgun.shotgun_web.models import (
 
 def test_format_bytes_bytes():
     """Test formatting bytes."""
-    assert _format_bytes(500) == "500 B"
+    assert format_bytes(500) == "500 B"
 
 
 def test_format_bytes_kilobytes():
     """Test formatting kilobytes."""
-    assert _format_bytes(1024) == "1.0 KB"
-    assert _format_bytes(2048) == "2.0 KB"
+    assert format_bytes(1024) == "1.0 KB"
+    assert format_bytes(2048) == "2.0 KB"
 
 
 def test_format_bytes_megabytes():
     """Test formatting megabytes."""
-    assert _format_bytes(1024 * 1024) == "1.0 MB"
-    assert _format_bytes(5 * 1024 * 1024) == "5.0 MB"
+    assert format_bytes(1024 * 1024) == "1.0 MB"
+    assert format_bytes(5 * 1024 * 1024) == "5.0 MB"
 
 
 def test_format_bytes_gigabytes():
     """Test formatting gigabytes."""
-    assert _format_bytes(1024 * 1024 * 1024) == "1.0 GB"
+    assert format_bytes(1024 * 1024 * 1024) == "1.0 GB"
 
 
 def test_upload_progress_dataclass():

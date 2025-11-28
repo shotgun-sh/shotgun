@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Literal
+from enum import StrEnum
 
 from textual import on, work
 from textual.app import ComposeResult
@@ -19,17 +19,24 @@ from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 logger = get_logger(__name__)
 
 
+class ShareSpecsAction(StrEnum):
+    """Actions from share specs dialog."""
+
+    CREATE = "create"
+    ADD_VERSION = "add_version"
+
+
 @dataclass
 class ShareSpecsResult:
     """Result from ShareSpecsDialog.
 
     Attributes:
-        action: "create" to create new spec, "add_version" to add to existing, None if cancelled
+        action: CREATE to create new spec, ADD_VERSION to add to existing, None if cancelled
         spec_id: Spec ID if adding version to existing spec
         spec_name: Spec name if adding version to existing spec
     """
 
-    action: Literal["create", "add_version"] | None = None
+    action: ShareSpecsAction | None = None
     spec_id: str | None = None
     spec_name: str | None = None
 
@@ -332,7 +339,7 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
             return
 
         if item.id == "create-new":
-            self.dismiss(ShareSpecsResult(action="create"))
+            self.dismiss(ShareSpecsResult(action=ShareSpecsAction.CREATE))
         elif item.id.startswith("spec-"):
             spec_id = item.id.removeprefix("spec-")
             # Find the spec to get the name
@@ -343,7 +350,7 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
                     break
             self.dismiss(
                 ShareSpecsResult(
-                    action="add_version",
+                    action=ShareSpecsAction.ADD_VERSION,
                     spec_id=spec_id,
                     spec_name=spec_name,
                 )

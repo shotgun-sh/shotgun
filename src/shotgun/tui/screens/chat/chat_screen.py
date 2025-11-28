@@ -60,6 +60,8 @@ from shotgun.exceptions import (
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
+from shotgun.shotgun_web.exceptions import ForbiddenError, UnauthorizedError
+from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.components.context_indicator import ContextIndicator
 from shotgun.tui.components.mode_indicator import ModeIndicator
@@ -85,6 +87,12 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.onboarding import OnboardingModal
+from shotgun.tui.screens.shared_specs import (
+    CreateSpecDialog,
+    ShareSpecsAction,
+    ShareSpecsDialog,
+    UploadProgressScreen,
+)
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
@@ -1071,14 +1079,6 @@ class ChatScreen(Screen[None]):
     @work
     async def _start_share_specs_flow(self) -> None:
         """Main workflow for sharing specs to workspace."""
-        from shotgun.shotgun_web.exceptions import ForbiddenError, UnauthorizedError
-        from shotgun.shotgun_web.specs_client import SpecsClient
-        from shotgun.tui.screens.shared_specs import (
-            CreateSpecDialog,
-            ShareSpecsDialog,
-            UploadProgressScreen,
-        )
-
         # 1. Check preconditions
         shotgun_dir = Path.cwd() / ".shotgun"
         if not shotgun_dir.exists():
@@ -1123,7 +1123,7 @@ class ChatScreen(Screen[None]):
         version_id: str | None = None
 
         # 5. Handle create vs add version
-        if result.action == "create":
+        if result.action == ShareSpecsAction.CREATE:
             # Show create spec dialog
             create_result = await self.app.push_screen_wait(CreateSpecDialog())
             if create_result is None:

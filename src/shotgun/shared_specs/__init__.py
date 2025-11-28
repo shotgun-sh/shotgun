@@ -13,16 +13,20 @@ from shotgun.shared_specs.hasher import (
     calculate_sha256_with_size,
 )
 from shotgun.shared_specs.upload_pipeline import (
+    UploadPhase,
     UploadProgress,
     UploadResult,
     run_upload_pipeline,
 )
+from shotgun.shared_specs.utils import format_bytes
 
 __all__ = [
+    "UploadPhase",
     "UploadProgress",
     "UploadResult",
     "calculate_sha256",
     "calculate_sha256_with_size",
+    "format_bytes",
     "get_shotgun_directory",
     "run_upload_pipeline",
     "scan_shotgun_directory",
