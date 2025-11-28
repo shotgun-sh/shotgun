@@ -68,7 +68,9 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
         if skip_validation:
             print("ℹ️  Build validation skipped (default behavior)")
         else:
-            print("ℹ️  Build validation required (SHOTGUN_BUILD_REQUIRE_VALIDATION=true)")
+            print(
+                "ℹ️  Build validation required (SHOTGUN_BUILD_REQUIRE_VALIDATION=true)"
+            )
 
         # Get Sentry configuration from environment (SHOTGUN_ prefix for production builds)
         sentry_dsn = os.environ.get("SHOTGUN_SENTRY_DSN", "")
