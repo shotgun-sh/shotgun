@@ -1,11 +1,13 @@
 """Modal dialog for codebase indexing prompts."""
 
 import os
+import webbrowser
 from pathlib import Path
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
+from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Markdown, Static
 
@@ -78,11 +80,46 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
         }
 
         #index-prompt-warning {
-            background: $error;
-            color: white;
+            background: $surface-lighten-1;
+            color: $text;
             padding: 1 2;
             margin-bottom: 1;
             text-align: center;
+        }
+
+        #compact-link {
+            text-align: center;
+            padding: 1 0;
+            display: none;
+        }
+
+        /* Compact styles for short terminals < 30 rows */
+        #index-prompt-dialog.compact {
+            padding: 0 1;
+            border: none;
+            max-height: 100%;
+        }
+
+        #index-prompt-dialog.compact #index-prompt-content {
+            display: none;
+        }
+
+        #index-prompt-dialog.compact #compact-link {
+            display: block;
+        }
+
+        #index-prompt-dialog.compact #index-prompt-warning {
+            padding: 0;
+            margin-bottom: 0;
+            background: transparent;
+        }
+
+        #index-prompt-dialog.compact #index-prompt-title {
+            padding-bottom: 0;
+        }
+
+        #index-prompt-dialog.compact #index-prompt-buttons {
+            padding-top: 0;
         }
     """
 
@@ -95,21 +132,22 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
             if is_home:
                 # Show warning for home directory
                 yield Label(
-                    "⚠️ Cannot index home directory",
+                    "Home directory detected",
                     id="index-prompt-title",
                 )
                 yield Static(
-                    "You're running Shotgun from your home directory.\n"
-                    "This would index your entire home folder which will take forever!\n\n"
-                    "Please quit and restart Shotgun from inside a repository or project folder.",
+                    "Running from home directory isn't recommended.",
                     id="index-prompt-warning",
                 )
                 with Container(id="index-prompt-buttons"):
                     yield Button(
+                        "Quit",
+                        id="index-prompt-quit",
+                    )
+                    yield Button(
                         "Continue without indexing",
                         id="index-prompt-continue",
                     )
-                    yield Button("Quit", id="index-prompt-quit", variant="error")
             else:
                 # Normal indexing prompt
                 content = f"""
@@ -133,9 +171,16 @@ If you're curious, you can review how Shotgun indexes/queries code by taking a l
 We take your privacy seriously. You can read our full [privacy policy](https://app.shotgun.sh/privacy) for more details.
 """
                 yield Label(
-                    "Want to index your codebase so Shotgun can understand it?",
+                    "Want to index your codebase?",
                     id="index-prompt-title",
                 )
+                # Compact mode: show only a link
+                yield Static(
+                    "[@click=screen.open_faq]Learn more about indexing[/]",
+                    id="compact-link",
+                    markup=True,
+                )
+                # Full mode: show detailed content
                 with VerticalScroll(id="index-prompt-content"):
                     yield Markdown(content, id="index-prompt-info")
                 with Container(id="index-prompt-buttons"):
@@ -150,9 +195,28 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
                     )
 
     def on_mount(self) -> None:
-        """Track when the home directory warning screen is shown."""
+        """Track when the home directory warning screen is shown and apply compact layout."""
         if _is_home_directory():
             _track_event("home_directory_warning_shown")
+        # Apply compact layout if starting in a short terminal
+        self._apply_compact_layout(self.app.size.height < 30)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_compact_layout(event.size.height < 30)
+
+    def _apply_compact_layout(self, compact: bool) -> None:
+        """Apply or remove compact layout classes for short terminals."""
+        dialog = self.query_one("#index-prompt-dialog")
+        if compact:
+            dialog.add_class("compact")
+        else:
+            dialog.remove_class("compact")
+
+    def action_open_faq(self) -> None:
+        """Open the FAQ page in a browser."""
+        webbrowser.open("https://github.com/shotgun-sh/shotgun?tab=readme-ov-file#faq")
 
     @on(Button.Pressed, "#index-prompt-cancel")
     def handle_cancel(self, event: Button.Pressed) -> None:

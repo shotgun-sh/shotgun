@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import webbrowser
 from typing import TYPE_CHECKING, cast
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
+from textual.events import Resize
 from textual.screen import Screen
 from textual.widgets import Button, Markdown, Static
 
@@ -100,6 +102,54 @@ class WelcomeScreen(Screen[None]):
             color: $warning;
             padding: 0 0 1 0;
         }
+
+        /* Tiny screen fallback */
+        #tiny-welcome-container {
+            display: none;
+            width: 100%;
+            height: auto;
+            padding: 1;
+            align: center middle;
+        }
+
+        #tiny-welcome-message {
+            text-align: center;
+            padding: 1 0;
+        }
+
+        #tiny-welcome-link {
+            text-align: center;
+            padding: 1 0;
+            color: $accent;
+        }
+
+        #tiny-welcome-buttons {
+            width: auto;
+            height: auto;
+            padding: 1 0;
+            align: center middle;
+        }
+
+        #tiny-welcome-buttons Button {
+            margin: 0 1;
+        }
+
+        /* Tiny mode - hide full welcome, show minimal */
+        WelcomeScreen.tiny #titlebox {
+            display: none;
+        }
+
+        WelcomeScreen.tiny #options-container {
+            display: none;
+        }
+
+        WelcomeScreen.tiny #migration-warning {
+            display: none;
+        }
+
+        WelcomeScreen.tiny #tiny-welcome-container {
+            display: block;
+        }
     """
 
     BINDINGS = [
@@ -107,6 +157,24 @@ class WelcomeScreen(Screen[None]):
     ]
 
     def compose(self) -> ComposeResult:
+        # Tiny screen fallback
+        with Container(id="tiny-welcome-container"):
+            yield Static(
+                "Welcome to Shotgun",
+                id="tiny-welcome-message",
+            )
+            yield Static(
+                "[@click=screen.open_usage_guide]View setup instructions[/]",
+                id="tiny-welcome-link",
+                markup=True,
+            )
+            with Horizontal(id="tiny-welcome-buttons"):
+                yield Button(
+                    "Shotgun Account", id="tiny-shotgun-button", variant="primary"
+                )
+                yield Button("BYOK", id="tiny-byok-button", variant="success")
+
+        # Full welcome screen
         with Vertical(id="titlebox"):
             yield Static("Welcome to Shotgun", id="welcome-title")
             yield Static(
@@ -168,9 +236,28 @@ class WelcomeScreen(Screen[None]):
 
     def on_mount(self) -> None:
         """Focus the first button on mount."""
+        self._apply_layout_for_height(self.app.size.height)
         self.query_one("#shotgun-button", Button).focus()
         # Update BYOK button text asynchronously
         self.run_worker(self._update_byok_button_text(), exclusive=False)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_layout_for_height(event.size.height)
+
+    def _apply_layout_for_height(self, height: int) -> None:
+        """Apply appropriate layout based on terminal height."""
+        if height < 15:
+            self.add_class("tiny")
+        else:
+            self.remove_class("tiny")
+
+    def action_open_usage_guide(self) -> None:
+        """Open the usage guide in browser."""
+        webbrowser.open(
+            "https://github.com/shotgun-sh/shotgun?tab=readme-ov-file#-usage"
+        )
 
     async def _update_byok_button_text(self) -> None:
         """Update BYOK button text based on whether user has existing providers."""
@@ -180,11 +267,13 @@ class WelcomeScreen(Screen[None]):
             byok_button.label = "I'll stick with my BYOK setup"
 
     @on(Button.Pressed, "#shotgun-button")
+    @on(Button.Pressed, "#tiny-shotgun-button")
     def _on_shotgun_pressed(self) -> None:
         """Handle Shotgun Account button press."""
         self.run_worker(self._start_shotgun_auth(), exclusive=True)
 
     @on(Button.Pressed, "#byok-button")
+    @on(Button.Pressed, "#tiny-byok-button")
     def _on_byok_pressed(self) -> None:
         """Handle BYOK button press."""
         self.run_worker(self._start_byok_config(), exclusive=True)
