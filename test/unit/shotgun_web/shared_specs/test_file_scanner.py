@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shotgun.shared_specs.file_scanner import (
+from shotgun.shotgun_web.shared_specs.file_scanner import (
     IGNORE_PATTERNS,
     _is_in_ignored_directory,
     _should_ignore,

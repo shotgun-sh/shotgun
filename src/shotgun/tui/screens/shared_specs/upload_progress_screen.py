@@ -11,9 +11,9 @@ from textual.widgets import Button, Label, ProgressBar, Static
 from textual.worker import Worker, WorkerCancelled, get_current_worker
 
 from shotgun.logging_config import get_logger
-from shotgun.shared_specs.models import UploadProgress, UploadResult
-from shotgun.shared_specs.upload_pipeline import run_upload_pipeline
-from shotgun.shared_specs.utils import UploadPhase, format_bytes
+from shotgun.shotgun_web.shared_specs.models import UploadProgress, UploadResult
+from shotgun.shotgun_web.shared_specs.upload_pipeline import run_upload_pipeline
+from shotgun.shotgun_web.shared_specs.utils import UploadPhase, format_bytes
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.screens.shared_specs.models import UploadScreenResult
 
@@ -113,20 +113,20 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         }
 
         /* Compact styles for short terminals */
-        #dialog-container.compact {
+        UploadProgressScreen.compact #dialog-container {
             padding: 0 2;
             max-height: 98%;
         }
 
-        #dialog-title.compact {
+        UploadProgressScreen.compact #dialog-title {
             padding-bottom: 0;
         }
 
-        #phase-label.compact {
+        UploadProgressScreen.compact #phase-label {
             padding: 0;
         }
 
-        #progress-bar.compact {
+        UploadProgressScreen.compact #progress-bar {
             padding: 0;
         }
     """
@@ -204,22 +204,11 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
 
     def _apply_compact_layout(self, compact: bool) -> None:
-        """Apply or remove compact layout classes for short terminals."""
-        container = self.query_one("#dialog-container")
-        title = self.query_one("#dialog-title")
-        phase_label = self.query_one("#phase-label")
-        progress_bar = self.query_one("#progress-bar")
-
+        """Apply or remove compact layout class for short terminals."""
         if compact:
-            container.add_class("compact")
-            title.add_class("compact")
-            phase_label.add_class("compact")
-            progress_bar.add_class("compact")
+            self.add_class("compact")
         else:
-            container.remove_class("compact")
-            title.remove_class("compact")
-            phase_label.remove_class("compact")
-            progress_bar.remove_class("compact")
+            self.remove_class("compact")
 
     @work(exclusive=True)
     async def _start_upload(self) -> None:

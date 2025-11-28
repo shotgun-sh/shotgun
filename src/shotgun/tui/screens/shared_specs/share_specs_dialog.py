@@ -153,20 +153,20 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
         }
 
         /* Compact styles for short terminals */
-        #dialog-container.compact {
+        ShareSpecsDialog.compact #dialog-container {
             padding: 0 2;
             max-height: 98%;
         }
 
-        #dialog-title.compact {
+        ShareSpecsDialog.compact #dialog-title {
             padding-bottom: 0;
         }
 
-        #dialog-subtitle.compact {
+        ShareSpecsDialog.compact #dialog-subtitle {
             padding-bottom: 0;
         }
 
-        #spec-list.compact {
+        ShareSpecsDialog.compact #spec-list {
             max-height: 10;
         }
     """
@@ -219,22 +219,11 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
         self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
 
     def _apply_compact_layout(self, compact: bool) -> None:
-        """Apply or remove compact layout classes for short terminals."""
-        container = self.query_one("#dialog-container")
-        title = self.query_one("#dialog-title")
-        subtitle = self.query_one("#dialog-subtitle")
-        spec_list = self.query_one("#spec-list")
-
+        """Apply or remove compact layout class for short terminals."""
         if compact:
-            container.add_class("compact")
-            title.add_class("compact")
-            subtitle.add_class("compact")
-            spec_list.add_class("compact")
+            self.add_class("compact")
         else:
-            container.remove_class("compact")
-            title.remove_class("compact")
-            subtitle.remove_class("compact")
-            spec_list.remove_class("compact")
+            self.remove_class("compact")
 
     @work
     async def _load_specs(self) -> None:

@@ -5,9 +5,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from shotgun.shared_specs.models import UploadProgress, UploadResult
-from shotgun.shared_specs.upload_pipeline import run_upload_pipeline
-from shotgun.shared_specs.utils import format_bytes
 from shotgun.shotgun_web.models import (
     FileUploadResponse,
     SpecFileResponse,
@@ -15,6 +12,9 @@ from shotgun.shotgun_web.models import (
     SpecVersionState,
     VersionCloseResponse,
 )
+from shotgun.shotgun_web.shared_specs.models import UploadProgress, UploadResult
+from shotgun.shotgun_web.shared_specs.upload_pipeline import run_upload_pipeline
+from shotgun.shotgun_web.shared_specs.utils import format_bytes
 
 
 def test_format_bytes_bytes():
@@ -150,7 +150,7 @@ async def test_run_upload_pipeline_success(temp_shotgun_dir: Path):
     mock_client.close_version = AsyncMock(return_value=_mock_version_close_response())
 
     with patch(
-        "shotgun.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
     ):
         result = await run_upload_pipeline(
             workspace_id="ws-123",
@@ -238,7 +238,7 @@ async def test_run_upload_pipeline_upload_error(temp_shotgun_dir: Path):
     mock_client.initiate_file_upload = AsyncMock(side_effect=Exception("Upload failed"))
 
     with patch(
-        "shotgun.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
     ):
         result = await run_upload_pipeline(
             workspace_id="ws-123",
@@ -262,7 +262,7 @@ async def test_run_upload_pipeline_no_progress_callback(temp_shotgun_dir: Path):
     mock_client.close_version = AsyncMock(return_value=_mock_version_close_response())
 
     with patch(
-        "shotgun.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
     ):
         # Should not raise even without callback
         result = await run_upload_pipeline(

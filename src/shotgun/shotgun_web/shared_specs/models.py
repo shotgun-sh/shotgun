@@ -2,8 +2,8 @@
 
 from pydantic import BaseModel
 
-from shotgun.shared_specs.utils import UploadPhase
 from shotgun.shotgun_web.models import FileMetadata
+from shotgun.shotgun_web.shared_specs.utils import UploadPhase
 
 
 class UploadProgress(BaseModel):

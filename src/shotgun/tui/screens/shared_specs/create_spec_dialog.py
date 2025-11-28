@@ -108,24 +108,24 @@ class CreateSpecDialog(ModalScreen[CreateSpecResult | None]):
         }
 
         /* Compact styles for short terminals */
-        #dialog-container.compact {
+        CreateSpecDialog.compact #dialog-container {
             padding: 0 2;
             max-height: 98%;
         }
 
-        #dialog-title.compact {
+        CreateSpecDialog.compact #dialog-title {
             padding-bottom: 0;
         }
 
-        .form-row.compact {
+        CreateSpecDialog.compact .form-row {
             padding: 0;
         }
 
-        .form-hint.compact {
+        CreateSpecDialog.compact .form-hint {
             display: none;
         }
 
-        #description-input.compact {
+        CreateSpecDialog.compact #description-input {
             height: 3;
         }
     """
@@ -197,27 +197,11 @@ class CreateSpecDialog(ModalScreen[CreateSpecResult | None]):
         self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
 
     def _apply_compact_layout(self, compact: bool) -> None:
-        """Apply or remove compact layout classes for short terminals."""
-        container = self.query_one("#dialog-container")
-        title = self.query_one("#dialog-title")
-        description_input = self.query_one("#description-input")
-
+        """Apply or remove compact layout class for short terminals."""
         if compact:
-            container.add_class("compact")
-            title.add_class("compact")
-            description_input.add_class("compact")
-            for row in self.query(".form-row"):
-                row.add_class("compact")
-            for hint in self.query(".form-hint"):
-                hint.add_class("compact")
+            self.add_class("compact")
         else:
-            container.remove_class("compact")
-            title.remove_class("compact")
-            description_input.remove_class("compact")
-            for row in self.query(".form-row"):
-                row.remove_class("compact")
-            for hint in self.query(".form-hint"):
-                hint.remove_class("compact")
+            self.remove_class("compact")
 
     def _validate(self) -> str | None:
         """Validate the form.

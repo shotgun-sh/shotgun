@@ -5,16 +5,16 @@ from collections.abc import Callable
 from pathlib import Path
 
 from shotgun.logging_config import get_logger
-from shotgun.shared_specs.file_scanner import scan_shotgun_directory
-from shotgun.shared_specs.hasher import calculate_sha256
-from shotgun.shared_specs.models import (
+from shotgun.shotgun_web.models import FileMetadata
+from shotgun.shotgun_web.shared_specs.file_scanner import scan_shotgun_directory
+from shotgun.shotgun_web.shared_specs.hasher import calculate_sha256
+from shotgun.shotgun_web.shared_specs.models import (
     FileWithHash,
     UploadProgress,
     UploadResult,
     UploadState,
 )
-from shotgun.shared_specs.utils import UploadPhase, format_bytes
-from shotgun.shotgun_web.models import FileMetadata
+from shotgun.shotgun_web.shared_specs.utils import UploadPhase, format_bytes
 from shotgun.shotgun_web.specs_client import SpecsClient
 
 logger = get_logger(__name__)
