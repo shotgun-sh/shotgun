@@ -77,6 +77,8 @@ class ShotgunApp(App[None]):
             "tui_started",
             {
                 "installation_method": detect_installation_method(),
+                "terminal_width": self.size.width,
+                "terminal_height": self.size.height,
             },
         )
 

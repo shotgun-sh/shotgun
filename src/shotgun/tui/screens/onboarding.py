@@ -5,8 +5,11 @@ import webbrowser
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
+from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Markdown, Static
+
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD, TINY_HEIGHT_THRESHOLD
 
 
 class OnboardingModal(ModalScreen[None]):
@@ -120,6 +123,80 @@ class OnboardingModal(ModalScreen[None]):
             padding: 0;
             margin: 2 0 1 0;
         }
+
+        /* Tiny screen fallback */
+        #tiny-screen-container {
+            display: none;
+            width: auto;
+            height: auto;
+            padding: 1 2;
+            background: $surface;
+            text-align: center;
+        }
+
+        #tiny-screen-message {
+            padding: 1 0;
+        }
+
+        #tiny-screen-link {
+            padding: 1 0;
+            color: $accent;
+        }
+
+        /* Compact styles for short terminals */
+        #onboarding-container.compact {
+            padding: 1;
+            max-height: 98%;
+        }
+
+        #progress-sidebar.compact {
+            padding: 0;
+        }
+
+        .progress-item.compact {
+            padding: 0;
+        }
+
+        #onboarding-header.compact {
+            padding-bottom: 0;
+        }
+
+        #onboarding-content.compact {
+            padding: 0;
+        }
+
+        #page-indicator.compact {
+            padding: 0;
+        }
+
+        #buttons-container.compact {
+            padding: 0;
+        }
+
+        #resource-sections.compact {
+            padding: 0;
+        }
+
+        #resource-sections.compact Button {
+            margin: 0 0 1 0;
+        }
+
+        #video-section.compact {
+            margin: 0;
+        }
+
+        #docs-section.compact {
+            margin: 1 0 0 0;
+        }
+
+        /* Tiny mode - hide full onboarding, show minimal message */
+        OnboardingModal.tiny #onboarding-container {
+            display: none;
+        }
+
+        OnboardingModal.tiny #tiny-screen-container {
+            display: block;
+        }
     """
 
     BINDINGS = [
@@ -143,6 +220,20 @@ class OnboardingModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         """Compose the onboarding modal."""
+        # Tiny screen fallback - shown when terminal is too small
+        with Container(id="tiny-screen-container"):
+            yield Static(
+                "Your screen is too small for the onboarding wizard.",
+                id="tiny-screen-message",
+            )
+            yield Static(
+                "[@click=screen.open_usage_guide]View usage instructions[/]",
+                id="tiny-screen-link",
+                markup=True,
+            )
+            yield Button("Start Shotgunning", id="tiny-close-button")
+
+        # Full onboarding container
         with Container(id="onboarding-container"):
             # Left sidebar for progress tracking
             with Container(id="progress-sidebar"):
@@ -192,6 +283,63 @@ class OnboardingModal(ModalScreen[None]):
     def on_mount(self) -> None:
         """Set up the modal after mounting."""
         self.update_page()
+        # Apply layout based on terminal height
+        self._apply_layout_for_height(self.app.size.height)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_layout_for_height(event.size.height)
+
+    def _apply_layout_for_height(self, height: int) -> None:
+        """Apply appropriate layout based on terminal height."""
+        if height < TINY_HEIGHT_THRESHOLD:
+            self.add_class("tiny")
+            self.remove_class("compact")
+        elif height < COMPACT_HEIGHT_THRESHOLD:
+            self.remove_class("tiny")
+            self._apply_compact_classes(True)
+        else:
+            self.remove_class("tiny")
+            self._apply_compact_classes(False)
+
+    def _apply_compact_classes(self, compact: bool) -> None:
+        """Apply or remove compact layout classes."""
+        container = self.query_one("#onboarding-container")
+        sidebar = self.query_one("#progress-sidebar")
+        header = self.query_one("#onboarding-header")
+        content = self.query_one("#onboarding-content")
+        page_indicator = self.query_one("#page-indicator")
+        buttons_container = self.query_one("#buttons-container")
+        resource_sections = self.query_one("#resource-sections")
+        progress_items = self.query(".progress-item")
+
+        if compact:
+            container.add_class("compact")
+            sidebar.add_class("compact")
+            header.add_class("compact")
+            content.add_class("compact")
+            page_indicator.add_class("compact")
+            buttons_container.add_class("compact")
+            resource_sections.add_class("compact")
+            for item in progress_items:
+                item.add_class("compact")
+        else:
+            container.remove_class("compact")
+            sidebar.remove_class("compact")
+            header.remove_class("compact")
+            content.remove_class("compact")
+            page_indicator.remove_class("compact")
+            buttons_container.remove_class("compact")
+            resource_sections.remove_class("compact")
+            for item in progress_items:
+                item.remove_class("compact")
+
+    def action_open_usage_guide(self) -> None:
+        """Open the usage guide in browser."""
+        webbrowser.open(
+            "https://github.com/shotgun-sh/shotgun?tab=readme-ov-file#-usage"
+        )
 
     def update_page(self) -> None:
         """Update the displayed page content and navigation buttons."""
@@ -412,6 +560,7 @@ Intelligently compress the conversation history while preserving important conte
             self.dismiss()
 
     @on(Button.Pressed, "#close-button")
+    @on(Button.Pressed, "#tiny-close-button")
     def handle_close(self) -> None:
         """Handle close button press."""
         self.dismiss()

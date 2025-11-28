@@ -7,8 +7,11 @@ from typing import TYPE_CHECKING
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
+from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Markdown
+
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 
 if TYPE_CHECKING:
     pass
@@ -57,6 +60,24 @@ class PipxMigrationScreen(ModalScreen[None]):
             padding: 1;
             min-height: 1;
             text-align: center;
+        }
+
+        /* Compact styles for short terminals */
+        #migration-container.compact {
+            padding: 1;
+            max-height: 98%;
+        }
+
+        #migration-content.compact {
+            padding: 0;
+        }
+
+        #buttons-container.compact {
+            padding: 1 0 0 0;
+        }
+
+        #migration-status.compact {
+            padding: 0;
         }
     """
 
@@ -132,6 +153,31 @@ Or install permanently: `uv tool install shotgun-sh`
         """Focus the continue button and ensure scroll starts at top."""
         self.query_one("#continue", Button).focus()
         self.query_one("#migration-content", VerticalScroll).scroll_home(animate=False)
+        # Apply compact layout if starting in a short terminal
+        self._apply_compact_layout(self.app.size.height < COMPACT_HEIGHT_THRESHOLD)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
+
+    def _apply_compact_layout(self, compact: bool) -> None:
+        """Apply or remove compact layout classes for short terminals."""
+        container = self.query_one("#migration-container")
+        content = self.query_one("#migration-content")
+        buttons_container = self.query_one("#buttons-container")
+        status = self.query_one("#migration-status")
+
+        if compact:
+            container.add_class("compact")
+            content.add_class("compact")
+            buttons_container.add_class("compact")
+            status.add_class("compact")
+        else:
+            container.remove_class("compact")
+            content.remove_class("compact")
+            buttons_container.remove_class("compact")
+            status.remove_class("compact")
 
     @on(Button.Pressed, "#copy-instructions")
     def _copy_instructions(self) -> None:

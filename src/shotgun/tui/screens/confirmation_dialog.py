@@ -5,8 +5,11 @@ from typing import Literal
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container
+from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
+
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 
 ButtonVariant = Literal["default", "primary", "success", "warning", "error"]
 
@@ -87,6 +90,20 @@ class ConfirmationDialog(ModalScreen[bool]):
         #dialog-buttons Button {
             margin-left: 1;
         }
+
+        /* Compact styles for short terminals */
+        #dialog-container.compact {
+            padding: 0 2;
+            max-height: 98%;
+        }
+
+        #dialog-title.compact {
+            padding-bottom: 0;
+        }
+
+        #dialog-message.compact {
+            padding-bottom: 0;
+        }
     """
 
     def __init__(
@@ -137,6 +154,29 @@ class ConfirmationDialog(ModalScreen[bool]):
 
         # Focus cancel button by default for safety
         self.query_one("#cancel", Button).focus()
+
+        # Apply compact layout if starting in a short terminal
+        self._apply_compact_layout(self.app.size.height < COMPACT_HEIGHT_THRESHOLD)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
+
+    def _apply_compact_layout(self, compact: bool) -> None:
+        """Apply or remove compact layout classes for short terminals."""
+        container = self.query_one("#dialog-container")
+        title = self.query_one("#dialog-title")
+        message = self.query_one("#dialog-message")
+
+        if compact:
+            container.add_class("compact")
+            title.add_class("compact")
+            message.add_class("compact")
+        else:
+            container.remove_class("compact")
+            title.remove_class("compact")
+            message.remove_class("compact")
 
     @on(Button.Pressed, "#cancel")
     def handle_cancel(self, event: Button.Pressed) -> None:
