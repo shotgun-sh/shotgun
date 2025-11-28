@@ -291,11 +291,11 @@ class OnboardingModal(ModalScreen[None]):
 
     def _apply_layout_for_height(self, height: int) -> None:
         """Apply appropriate layout based on terminal height."""
-        # Tiny mode: < 15 rows - show minimal fallback
-        if height < 15:
+        # Tiny mode: < 20 rows - show minimal fallback
+        if height < 20:
             self.add_class("tiny")
             self.remove_class("compact")
-        # Compact mode: 15-29 rows - reduced padding
+        # Compact mode: 20-29 rows - reduced padding
         elif height < 30:
             self.remove_class("tiny")
             self._apply_compact_classes(True)

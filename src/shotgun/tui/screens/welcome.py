@@ -108,25 +108,25 @@ class WelcomeScreen(Screen[None]):
             display: none;
             width: 100%;
             height: auto;
-            padding: 1;
+            padding: 0;
             align: center middle;
         }
 
         #tiny-welcome-message {
             text-align: center;
-            padding: 1 0;
+            padding: 0;
         }
 
         #tiny-welcome-link {
             text-align: center;
-            padding: 1 0;
+            padding: 0;
             color: $accent;
         }
 
         #tiny-welcome-buttons {
             width: auto;
             height: auto;
-            padding: 1 0;
+            padding: 0;
             align: center middle;
         }
 
@@ -248,7 +248,7 @@ class WelcomeScreen(Screen[None]):
 
     def _apply_layout_for_height(self, height: int) -> None:
         """Apply appropriate layout based on terminal height."""
-        if height < 15:
+        if height < 20:
             self.add_class("tiny")
         else:
             self.remove_class("tiny")
