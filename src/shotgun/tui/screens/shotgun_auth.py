@@ -8,6 +8,7 @@ import httpx
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.events import Resize
 from textual.screen import Screen
 from textual.widgets import Button, Label, Markdown, Static
 from textual.worker import Worker, WorkerState
@@ -76,6 +77,29 @@ class ShotgunAuthScreen(Screen[bool]):
             padding: 1;
             align: center middle;
         }
+
+        /* Compact styles for short terminals < 20 rows */
+        ShotgunAuthScreen.compact #titlebox {
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        ShotgunAuthScreen.compact #auth-subtitle {
+            display: none;
+        }
+
+        ShotgunAuthScreen.compact #content {
+            padding: 0;
+        }
+
+        ShotgunAuthScreen.compact #instructions {
+            display: none;
+        }
+
+        ShotgunAuthScreen.compact #actions {
+            padding: 0;
+        }
     """
 
     BINDINGS = [
@@ -113,7 +137,20 @@ class ShotgunAuthScreen(Screen[bool]):
 
     def on_mount(self) -> None:
         """Start authentication flow when screen is mounted."""
+        self._apply_layout_for_height(self.app.size.height)
         self.run_worker(self._start_auth_flow(), exclusive=True)
+
+    @on(Resize)
+    def handle_resize(self, event: Resize) -> None:
+        """Adjust layout based on terminal height."""
+        self._apply_layout_for_height(event.size.height)
+
+    def _apply_layout_for_height(self, height: int) -> None:
+        """Apply appropriate layout based on terminal height."""
+        if height < 20:
+            self.add_class("compact")
+        else:
+            self.remove_class("compact")
 
     def action_cancel(self) -> None:
         """Cancel authentication and close screen."""
