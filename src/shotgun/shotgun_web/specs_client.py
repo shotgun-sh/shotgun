@@ -13,6 +13,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from shotgun.agents.config import get_config_manager
 from shotgun.logging_config import get_logger
 
 from .constants import (
@@ -82,8 +83,6 @@ class SpecsClient:
         Raises:
             UnauthorizedError: If user is not authenticated
         """
-        from shotgun.agents.config import get_config_manager
-
         config_manager = get_config_manager()
         config = await config_manager.load()
         jwt = config.shotgun.supabase_jwt

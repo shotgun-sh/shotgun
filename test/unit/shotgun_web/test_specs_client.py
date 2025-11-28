@@ -62,7 +62,7 @@ async def test_get_auth_token_success(specs_client: SpecsClient, mock_config):
     mock_manager.load.return_value = mock_config
 
     with patch(
-        "shotgun.agents.config.get_config_manager",
+        "shotgun.shotgun_web.specs_client.get_config_manager",
         return_value=mock_manager,
     ):
         token = await specs_client._get_auth_token()
@@ -78,7 +78,7 @@ async def test_get_auth_token_not_authenticated(
     mock_manager.load.return_value = mock_config_no_jwt
 
     with patch(
-        "shotgun.agents.config.get_config_manager",
+        "shotgun.shotgun_web.specs_client.get_config_manager",
         return_value=mock_manager,
     ):
         with pytest.raises(UnauthorizedError, match="Not authenticated"):
@@ -279,7 +279,7 @@ async def test_check_permissions(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -314,7 +314,7 @@ async def test_list_specs(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -343,7 +343,7 @@ async def test_get_spec(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -376,7 +376,7 @@ async def test_create_spec(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -407,7 +407,7 @@ async def test_update_spec(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -443,7 +443,7 @@ async def test_list_versions(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -477,7 +477,7 @@ async def test_create_version(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -510,7 +510,7 @@ async def test_close_version(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -540,7 +540,7 @@ async def test_set_latest_version(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -573,7 +573,7 @@ async def test_list_files(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
@@ -607,7 +607,7 @@ async def test_initiate_file_upload(specs_client: SpecsClient, mock_config):
 
     with (
         patch(
-            "shotgun.agents.config.get_config_manager",
+            "shotgun.shotgun_web.specs_client.get_config_manager",
             return_value=mock_manager,
         ),
         patch(
