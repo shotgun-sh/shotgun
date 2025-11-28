@@ -3,6 +3,8 @@
 import fnmatch
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.models import FileMetadata
 
@@ -65,6 +67,13 @@ def _is_in_ignored_directory(path: Path, base_path: Path) -> bool:
     return False
 
 
+class ScanResult(BaseModel):
+    """Result of scanning .shotgun/ directory."""
+
+    files: list[FileMetadata]
+    total_files_before_filter: int
+
+
 async def scan_shotgun_directory(project_root: Path) -> list[FileMetadata]:
     """Recursively scan .shotgun/ directory and return file metadata.
 
@@ -83,6 +92,27 @@ async def scan_shotgun_directory(project_root: Path) -> list[FileMetadata]:
     Raises:
         FileNotFoundError: If .shotgun/ directory does not exist
     """
+    result = await scan_shotgun_directory_with_counts(project_root)
+    return result.files
+
+
+async def scan_shotgun_directory_with_counts(project_root: Path) -> ScanResult:
+    """Recursively scan .shotgun/ directory and return file metadata with counts.
+
+    Like scan_shotgun_directory, but also returns the total number of files
+    found before filtering. This helps distinguish between:
+    - Empty directory (no files at all)
+    - All files filtered by ignore patterns
+
+    Args:
+        project_root: Path to project root containing .shotgun/ directory
+
+    Returns:
+        ScanResult with files list and total_files_before_filter count
+
+    Raises:
+        FileNotFoundError: If .shotgun/ directory does not exist
+    """
     shotgun_dir = project_root / ".shotgun"
 
     if not shotgun_dir.exists():
@@ -92,6 +122,7 @@ async def scan_shotgun_directory(project_root: Path) -> list[FileMetadata]:
         raise NotADirectoryError(f"{shotgun_dir} is not a directory")
 
     files: list[FileMetadata] = []
+    total_before_filter = 0
 
     logger.debug("Scanning directory: %s", shotgun_dir)
 
@@ -99,6 +130,9 @@ async def scan_shotgun_directory(project_root: Path) -> list[FileMetadata]:
         # Skip directories
         if path.is_dir():
             continue
+
+        # Count all files before filtering
+        total_before_filter += 1
 
         # Skip ignored files
         if _should_ignore(path):
@@ -121,12 +155,16 @@ async def scan_shotgun_directory(project_root: Path) -> list[FileMetadata]:
             )
         )
 
-    logger.info("Found %d files in .shotgun/", len(files))
+    logger.info(
+        "Found %d files in .shotgun/ (%d before filtering)",
+        len(files),
+        total_before_filter,
+    )
 
     # Sort by relative path for consistent ordering
     files.sort(key=lambda f: f.relative_path)
 
-    return files
+    return ScanResult(files=files, total_files_before_filter=total_before_filter)
 
 
 def get_shotgun_directory(project_root: Path | None = None) -> Path:

@@ -6,7 +6,9 @@ from pathlib import Path
 
 from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.models import FileMetadata
-from shotgun.shotgun_web.shared_specs.file_scanner import scan_shotgun_directory
+from shotgun.shotgun_web.shared_specs.file_scanner import (
+    scan_shotgun_directory_with_counts,
+)
 from shotgun.shotgun_web.shared_specs.hasher import calculate_sha256
 from shotgun.shotgun_web.shared_specs.models import (
     FileWithHash,
@@ -67,21 +69,32 @@ async def run_upload_pipeline(
             )
         )
 
-        files = await scan_shotgun_directory(project_root)
+        scan_result = await scan_shotgun_directory_with_counts(project_root)
+        files = scan_result.files
         state.total_files = len(files)
 
         if not files:
+            # Distinguish between empty directory and all files filtered
+            if scan_result.total_files_before_filter > 0:
+                error_message = (
+                    "No shareable files found. All files matched ignore patterns."
+                )
+            else:
+                error_message = (
+                    "No files to share. Add specifications to .shotgun/ first."
+                )
+
             report_progress(
                 UploadProgress(
-                    phase=UploadPhase.COMPLETE,
-                    message="No files found in .shotgun/ directory",
+                    phase=UploadPhase.ERROR,
+                    message=error_message,
                 )
             )
             return UploadResult(
-                success=True,
+                success=False,
                 files_uploaded=0,
                 total_bytes=0,
-                error="No files found",
+                error=error_message,
             )
 
         # Calculate total size
