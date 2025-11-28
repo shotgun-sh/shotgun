@@ -9,6 +9,8 @@ from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Markdown, Static
 
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD, TINY_HEIGHT_THRESHOLD
+
 
 class OnboardingModal(ModalScreen[None]):
     """Multi-page onboarding modal for new users.
@@ -291,15 +293,12 @@ class OnboardingModal(ModalScreen[None]):
 
     def _apply_layout_for_height(self, height: int) -> None:
         """Apply appropriate layout based on terminal height."""
-        # Tiny mode: < 20 rows - show minimal fallback
-        if height < 20:
+        if height < TINY_HEIGHT_THRESHOLD:
             self.add_class("tiny")
             self.remove_class("compact")
-        # Compact mode: 20-29 rows - reduced padding
-        elif height < 30:
+        elif height < COMPACT_HEIGHT_THRESHOLD:
             self.remove_class("tiny")
             self._apply_compact_classes(True)
-        # Normal mode: >= 30 rows
         else:
             self.remove_class("tiny")
             self._apply_compact_classes(False)

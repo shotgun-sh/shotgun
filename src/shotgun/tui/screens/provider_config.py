@@ -13,6 +13,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Input, Label, ListItem, ListView, Markdown, Static
 
 from shotgun.agents.config import ConfigManager, ProviderType
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -166,7 +167,7 @@ class ProviderConfigScreen(Screen[None]):
 
     def _apply_layout_for_height(self, height: int) -> None:
         """Apply appropriate layout based on terminal height."""
-        if height < 20:
+        if height < COMPACT_HEIGHT_THRESHOLD:
             self.add_class("compact")
         else:
             self.remove_class("compact")

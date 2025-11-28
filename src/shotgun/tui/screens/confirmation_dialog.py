@@ -9,6 +9,8 @@ from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
 
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+
 ButtonVariant = Literal["default", "primary", "success", "warning", "error"]
 
 
@@ -154,12 +156,12 @@ class ConfirmationDialog(ModalScreen[bool]):
         self.query_one("#cancel", Button).focus()
 
         # Apply compact layout if starting in a short terminal
-        self._apply_compact_layout(self.app.size.height < 30)
+        self._apply_compact_layout(self.app.size.height < COMPACT_HEIGHT_THRESHOLD)
 
     @on(Resize)
     def handle_resize(self, event: Resize) -> None:
         """Adjust layout based on terminal height."""
-        self._apply_compact_layout(event.size.height < 30)
+        self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
 
     def _apply_compact_layout(self, compact: bool) -> None:
         """Apply or remove compact layout classes for short terminals."""

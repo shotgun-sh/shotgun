@@ -12,6 +12,8 @@ from textual.events import Resize
 from textual.screen import Screen
 from textual.widgets import Button, Markdown, Static
 
+from shotgun.tui.layout import TINY_HEIGHT_THRESHOLD
+
 if TYPE_CHECKING:
     from ..app import ShotgunApp
 
@@ -248,7 +250,7 @@ class WelcomeScreen(Screen[None]):
 
     def _apply_layout_for_height(self, height: int) -> None:
         """Apply appropriate layout based on terminal height."""
-        if height < 20:
+        if height < TINY_HEIGHT_THRESHOLD:
             self.add_class("tiny")
         else:
             self.remove_class("tiny")

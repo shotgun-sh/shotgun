@@ -20,6 +20,7 @@ from shotgun.shotgun_web import (
     TokenStatus,
 )
 from shotgun.shotgun_web.constants import DEFAULT_POLL_INTERVAL_SECONDS
+from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -147,7 +148,7 @@ class ShotgunAuthScreen(Screen[bool]):
 
     def _apply_layout_for_height(self, height: int) -> None:
         """Apply appropriate layout based on terminal height."""
-        if height < 20:
+        if height < COMPACT_HEIGHT_THRESHOLD:
             self.add_class("compact")
         else:
             self.remove_class("compact")
