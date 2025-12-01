@@ -156,6 +156,7 @@ testpaths = ["test"]
 [tool.coverage.run]
 source = ["src"]
 branch = true
+omit = ["**/dependency_injector/*"]
 
 [tool.coverage.report]
 exclude_lines = [
