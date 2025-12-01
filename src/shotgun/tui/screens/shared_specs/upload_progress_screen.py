@@ -14,6 +14,7 @@ from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.shared_specs.models import UploadProgress, UploadResult
 from shotgun.shotgun_web.shared_specs.upload_pipeline import run_upload_pipeline
 from shotgun.shotgun_web.shared_specs.utils import UploadPhase, format_bytes
+from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.screens.shared_specs.models import UploadScreenResult
 
@@ -138,22 +139,43 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
     def __init__(
         self,
         workspace_id: str,
-        spec_id: str,
-        version_id: str,
+        # For existing spec - add version (spec_id required, version_id optional)
+        spec_id: str | None = None,
+        version_id: str | None = None,
+        # For new spec - create spec + version
+        spec_name: str | None = None,
+        spec_description: str | None = None,
+        spec_is_public: bool = False,
         project_root: Path | None = None,
     ) -> None:
         """Initialize the screen.
 
         Args:
             workspace_id: Workspace UUID
-            spec_id: Spec UUID
-            version_id: Version UUID
+            spec_id: Spec UUID (for existing spec) or None (for new spec)
+            version_id: Version UUID (if already created) or None
+            spec_name: Name for new spec (triggers spec creation)
+            spec_description: Description for new spec
+            spec_is_public: Whether new spec should be public
             project_root: Project root containing .shotgun/ (defaults to cwd)
+
+        Usage:
+            # Add version to existing spec (creates version)
+            UploadProgressScreen(workspace_id="...", spec_id="...")
+
+            # Create new spec and version
+            UploadProgressScreen(workspace_id="...", spec_name="My Spec")
+
+            # Use pre-created version (legacy mode)
+            UploadProgressScreen(workspace_id="...", spec_id="...", version_id="...")
         """
         super().__init__()
         self.workspace_id = workspace_id
         self.spec_id = spec_id
         self.version_id = version_id
+        self.spec_name = spec_name
+        self.spec_description = spec_description
+        self.spec_is_public = spec_is_public
         self.project_root = project_root
         self._result: UploadResult | None = None
         self._upload_worker: Worker[UploadResult] | None = None
@@ -226,6 +248,49 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
             self._update_progress(progress)
 
         try:
+            # Phase 0: Create spec/version if needed
+            client = SpecsClient()
+
+            if self.spec_name:
+                # Creating a new spec
+                self._show_creating_phase("Creating spec...")
+                if worker.is_cancelled:
+                    raise WorkerCancelled()
+
+                create_response = await client.create_spec(
+                    self.workspace_id,
+                    name=self.spec_name,
+                    description=self.spec_description,
+                )
+                self.spec_id = create_response.spec.id
+                self.version_id = create_response.version.id
+
+                # Set public if requested
+                if self.spec_is_public:
+                    self._show_creating_phase("Setting visibility...")
+                    if worker.is_cancelled:
+                        raise WorkerCancelled()
+                    await client.update_spec(
+                        self.workspace_id, self.spec_id, is_public=True
+                    )
+
+            elif self.spec_id and not self.version_id:
+                # Adding version to existing spec
+                self._show_creating_phase("Creating version...")
+                if worker.is_cancelled:
+                    raise WorkerCancelled()
+
+                version_response = await client.create_version(
+                    self.workspace_id, self.spec_id
+                )
+                self.version_id = version_response.version.id
+
+            # Validate we have spec_id and version_id
+            if not self.spec_id or not self.version_id:
+                self._show_error("Missing spec or version ID")
+                return
+
+            # Run upload pipeline
             result = await run_upload_pipeline(
                 self.workspace_id,
                 self.spec_id,
@@ -238,10 +303,26 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         except WorkerCancelled:
             self._cancelled = True
             self._show_cancelled()
+        except Exception as e:
+            logger.exception(f"Upload failed: {type(e).__name__}: {e}")
+            error_msg = str(e) if str(e) else type(e).__name__
+            self._show_error(error_msg)
+
+    def _show_creating_phase(self, message: str) -> None:
+        """Update UI to show creating phase."""
+        phase_label = self.query_one("#phase-label", Static)
+        phase_label.update(message)
+        # Keep progress bar at 0 during creation
+        progress_bar = self.query_one("#progress-bar", ProgressBar)
+        progress_bar.update(progress=0)
+        # Clear file/bytes labels
+        self.query_one("#file-label", Static).update("")
+        self.query_one("#bytes-label", Static).update("")
 
     def _update_progress(self, progress: UploadProgress) -> None:
         """Update the UI with progress information."""
         phase_names = {
+            UploadPhase.CREATING: "Creating spec...",
             UploadPhase.SCANNING: "Phase 1/4: Scanning files...",
             UploadPhase.HASHING: "Phase 2/4: Calculating hashes...",
             UploadPhase.UPLOADING: "Phase 3/4: Uploading files...",

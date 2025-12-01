@@ -62,3 +62,10 @@ class UploadState(BaseModel):
     current_file: str | None = None
     hashes_completed: int = 0
     total_files: int = 0
+
+
+class ScanResult(BaseModel):
+    """Result of scanning .shotgun/ directory."""
+
+    files: list[FileMetadata]
+    total_files_before_filter: int

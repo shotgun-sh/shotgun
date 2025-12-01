@@ -515,6 +515,12 @@ class SpecsClient:
             self._raise_for_status(response)
             return FileListResponse.model_validate(response.json())
 
+    @retry(
+        retry=retry_if_exception_type((httpx.HTTPError, ShotgunWebError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
     async def initiate_file_upload(
         self,
         workspace_id: str,
@@ -525,6 +531,8 @@ class SpecsClient:
         content_hash: str,
     ) -> FileUploadResponse:
         """Initiate file upload to a version.
+
+        Retries on transient failures with exponential backoff.
 
         Args:
             workspace_id: Workspace UUID

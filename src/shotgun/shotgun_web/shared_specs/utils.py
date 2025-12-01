@@ -6,6 +6,7 @@ from enum import StrEnum
 class UploadPhase(StrEnum):
     """Upload pipeline phases."""
 
+    CREATING = "creating"  # Creating spec/version via API
     SCANNING = "scanning"
     HASHING = "hashing"
     UPLOADING = "uploading"

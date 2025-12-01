@@ -60,9 +60,6 @@ from shotgun.exceptions import (
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
-from shotgun.shotgun_web.exceptions import ForbiddenError, UnauthorizedError
-from shotgun.shotgun_web.models import WorkspaceNotFoundError
-from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.components.context_indicator import ContextIndicator
 from shotgun.tui.components.mode_indicator import ModeIndicator
@@ -1080,77 +1077,39 @@ class ChatScreen(Screen[None]):
     @work
     async def _start_share_specs_flow(self) -> None:
         """Main workflow for sharing specs to workspace."""
-        # 1. Check preconditions
+        # 1. Check preconditions (instant check, no API call)
         shotgun_dir = Path.cwd() / ".shotgun"
         if not shotgun_dir.exists():
             self.mount_hint("No .shotgun/ directory found in current directory")
             return
 
-        # 2. Get workspace and check authentication
-        client = SpecsClient()
-
-        try:
-            workspace_id = await client.get_or_fetch_workspace_id()
-        except UnauthorizedError:
-            self.mount_hint("Not authenticated. Run 'shotgun auth' to login.")
-            return
-        except WorkspaceNotFoundError:
-            self.mount_hint("No workspaces available. Please create one at shotgun.sh")
-            return
-        except Exception as e:
-            logger.error(f"Failed to fetch workspaces: {e}")
-            self.mount_hint(f"Failed to fetch workspaces: {e}")
-            return
-
-        # 3. Check permissions
-        try:
-            permissions = await client.check_permissions(workspace_id)
-            if not permissions.can_create_specs:
-                self.mount_hint("You need editor access to share specs")
-                return
-        except UnauthorizedError:
-            self.mount_hint("Not authenticated. Run 'shotgun auth' to login.")
-            return
-        except ForbiddenError:
-            self.mount_hint("You don't have access to this workspace")
-            return
-        except Exception as e:
-            logger.error(f"Failed to check permissions: {e}")
-            self.mount_hint(f"Failed to check permissions: {e}")
-            return
-
-        # 4. Show spec selection dialog
-        result = await self.app.push_screen_wait(ShareSpecsDialog(workspace_id))
+        # 2. Show spec selection dialog (handles workspace fetch, permissions, and spec loading)
+        result = await self.app.push_screen_wait(ShareSpecsDialog())
         if result is None or result.action is None:
-            return  # User cancelled
+            return  # User cancelled or error
 
-        spec_id: str | None = None
-        version_id: str | None = None
+        workspace_id = result.workspace_id
+        if not workspace_id:
+            self.mount_hint("Failed to get workspace")
+            return
 
-        # 5. Handle create vs add version
+        # 3. Handle create vs add version
         if result.action == ShareSpecsAction.CREATE:
             # Show create spec dialog
             create_result = await self.app.push_screen_wait(CreateSpecDialog())
             if create_result is None:
                 return  # User cancelled
 
-            # Create the spec with initial version
-            try:
-                create_response = await client.create_spec(
+            # Pass spec creation info to UploadProgressScreen
+            # It will create the spec/version and then upload
+            upload_result = await self.app.push_screen_wait(
+                UploadProgressScreen(
                     workspace_id,
-                    name=create_result.name,
-                    description=create_result.description,
+                    spec_name=create_result.name,
+                    spec_description=create_result.description,
+                    spec_is_public=create_result.is_public,
                 )
-                spec_id = create_response.spec.id
-                version_id = create_response.version.id
-
-                # If user wants public, update the spec
-                if create_result.is_public:
-                    await client.update_spec(workspace_id, spec_id, is_public=True)
-            except Exception as e:
-                logger.error(f"Failed to create spec: {e}")
-                self.mount_hint(f"Failed to create spec: {e}")
-                return
+            )
 
         else:  # add_version
             spec_id = result.spec_id
@@ -1158,23 +1117,11 @@ class ChatScreen(Screen[None]):
                 self.mount_hint("No spec selected")
                 return
 
-            # Create new version for existing spec
-            try:
-                version_response = await client.create_version(workspace_id, spec_id)
-                version_id = version_response.version.id
-            except Exception as e:
-                logger.error(f"Failed to create version: {e}")
-                self.mount_hint(f"Failed to create version: {e}")
-                return
-
-        if not spec_id or not version_id:
-            self.mount_hint("Failed to create spec or version")
-            return
-
-        # 6. Show upload progress screen
-        upload_result = await self.app.push_screen_wait(
-            UploadProgressScreen(workspace_id, spec_id, version_id)
-        )
+            # Pass spec_id to UploadProgressScreen
+            # It will create the version and then upload
+            upload_result = await self.app.push_screen_wait(
+                UploadProgressScreen(workspace_id, spec_id=spec_id)
+            )
 
         # 7. Show result
         if upload_result and upload_result.success:

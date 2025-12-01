@@ -31,11 +31,13 @@ class ShareSpecsResult(BaseModel):
 
     Attributes:
         action: CREATE to create new spec, ADD_VERSION to add to existing, None if cancelled
+        workspace_id: Workspace ID (fetched by dialog)
         spec_id: Spec ID if adding version to existing spec
         spec_name: Spec name if adding version to existing spec
     """
 
     action: ShareSpecsAction | None = None
+    workspace_id: str | None = None
     spec_id: str | None = None
     spec_name: str | None = None
 

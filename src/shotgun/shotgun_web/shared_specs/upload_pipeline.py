@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 MAX_CONCURRENT_HASHES = 10
 
 # Maximum concurrent file uploads
-MAX_CONCURRENT_UPLOADS = 5
+MAX_CONCURRENT_UPLOADS = 3
 
 
 async def run_upload_pipeline(

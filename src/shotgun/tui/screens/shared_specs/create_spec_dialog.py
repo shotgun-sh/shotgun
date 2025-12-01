@@ -5,7 +5,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.events import Resize
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Static, Switch, TextArea
+from textual.widgets import Button, Input, Label, Static, TextArea
 
 from shotgun.logging_config import get_logger
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
@@ -166,14 +166,14 @@ class CreateSpecDialog(ModalScreen[CreateSpecResult | None]):
                     classes="form-hint",
                 )
 
-            # Public toggle
-            with Container(classes="switch-row"):
-                yield Switch(value=False, id="public-switch")
-                yield Label("Make public", classes="switch-label")
-            yield Static(
-                "Public specs can be viewed by anyone with the link",
-                classes="switch-hint",
-            )
+            # Public toggle - hidden for now
+            # with Container(classes="switch-row"):
+            #     yield Switch(value=False, id="public-switch")
+            #     yield Label("Make public", classes="switch-label")
+            # yield Static(
+            #     "Public specs can be viewed by anyone with the link",
+            #     classes="switch-hint",
+            # )
 
             # Error label
             yield Static("", id="error-label")
@@ -245,7 +245,8 @@ class CreateSpecDialog(ModalScreen[CreateSpecResult | None]):
         # Get values
         name = self.query_one("#name-input", Input).value.strip()
         description = self.query_one("#description-input", TextArea).text.strip()
-        is_public = self.query_one("#public-switch", Switch).value
+        # Public toggle is hidden for now - always create as team-only
+        is_public = False
 
         self.dismiss(
             CreateSpecResult(
