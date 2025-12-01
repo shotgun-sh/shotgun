@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from shotgun.cli.spec.backup import BACKUP_DIR, clear_shotgun_dir, create_backup
+from shotgun.cli.spec.backup import clear_shotgun_dir, create_backup
 
 
 @pytest.fixture

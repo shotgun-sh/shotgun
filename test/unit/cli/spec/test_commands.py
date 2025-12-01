@@ -1,5 +1,6 @@
 """Tests for CLI spec commands module."""
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,6 +16,14 @@ from shotgun.shotgun_web.exceptions import (
     UnauthorizedError,
 )
 from shotgun.shotgun_web.models import SpecFileResponse, SpecVersionResponse
+
+# Pattern to strip ANSI escape codes from output
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    return ANSI_ESCAPE.sub("", text)
 
 
 @pytest.fixture
@@ -82,9 +91,7 @@ async def test_async_pull_success(tmp_path: Path, mock_version_response):
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -111,7 +118,9 @@ async def test_async_pull_success(tmp_path: Path, mock_version_response):
 
 
 @pytest.mark.asyncio
-async def test_async_pull_returns_true_on_success(tmp_path: Path, mock_version_response):
+async def test_async_pull_returns_true_on_success(
+    tmp_path: Path, mock_version_response
+):
     """Test _async_pull returns True on success (TUI handled by sync pull())."""
     shotgun_dir = tmp_path / ".shotgun"
 
@@ -119,9 +128,7 @@ async def test_async_pull_returns_true_on_success(tmp_path: Path, mock_version_r
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -151,9 +158,7 @@ async def test_async_pull_backs_up_existing_content(
     mock_backup_path = str(tmp_path / "backup.zip")
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -165,9 +170,7 @@ async def test_async_pull_backs_up_existing_content(
             "shotgun.cli.spec.commands.create_backup",
             return_value=mock_backup_path,
         ) as mock_backup,
-        patch(
-            "shotgun.cli.spec.commands.clear_shotgun_dir"
-        ) as mock_clear,
+        patch("shotgun.cli.spec.commands.clear_shotgun_dir") as mock_clear,
     ):
         await _async_pull("version-123")
 
@@ -187,9 +190,7 @@ async def test_async_pull_unauthorized_error(tmp_path: Path):
     )
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -209,9 +210,7 @@ async def test_async_pull_not_found_error(tmp_path: Path):
     mock_client.get_version_with_files.side_effect = NotFoundError("Version not found")
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -231,9 +230,7 @@ async def test_async_pull_forbidden_error(tmp_path: Path):
     mock_client.get_version_with_files.side_effect = ForbiddenError("Access denied")
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -261,9 +258,7 @@ async def test_async_pull_empty_version(tmp_path: Path):
     mock_client.get_version_with_files.return_value = mock_response
 
     with (
-        patch(
-            "shotgun.cli.spec.commands.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -277,15 +272,17 @@ async def test_async_pull_empty_version(tmp_path: Path):
 def test_pull_command_help(runner):
     """Test pull command displays help."""
     result = runner.invoke(app, ["pull", "--help"])
+    output = strip_ansi(result.output)
     assert result.exit_code == 0
-    assert "Pull a spec version" in result.output
-    assert "--no-tui" in result.output
+    assert "Pull a spec version" in output
+    assert "--no-tui" in output
 
 
 def test_spec_app_no_args_shows_help(runner):
     """Test spec app shows help when no args provided."""
     result = runner.invoke(app, [])
+    output = strip_ansi(result.output)
     # The app is configured with no_args_is_help=True, which returns exit code 2
     assert result.exit_code == 2
     # The app shows commands when invoked with no args
-    assert "pull" in result.output
+    assert "pull" in output
