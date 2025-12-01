@@ -68,6 +68,8 @@ def mock_version_response():
         spec_id="spec-456",
         workspace_id="workspace-789",
         files=files,
+        web_url="https://app.shotgun.sh/workspaces/workspace-789/specs/spec-456/versions/version-123",
+        download_urls_expire_at=datetime(2024, 1, 1, 0, 15, tzinfo=timezone.utc),
     )
 
 
@@ -90,9 +92,8 @@ async def test_async_pull_success(tmp_path: Path, mock_version_response):
             "shotgun.cli.spec.commands.download_file_from_url",
             return_value=b"# Test Content",
         ),
-        patch("shotgun.cli.spec.commands.tui_app") as mock_tui,
     ):
-        await _async_pull("version-123", no_tui=True)
+        result = await _async_pull("version-123")
 
         # Verify files were created
         assert (shotgun_dir / "spec.md").exists()
@@ -105,13 +106,13 @@ async def test_async_pull_success(tmp_path: Path, mock_version_response):
         assert "spec-456" in meta_content
         assert "Test Spec" in meta_content
 
-        # Verify TUI was not launched
-        mock_tui.run.assert_not_called()
+        # Verify function returned success
+        assert result is True
 
 
 @pytest.mark.asyncio
-async def test_async_pull_launches_tui(tmp_path: Path, mock_version_response):
-    """Test spec pull launches TUI by default."""
+async def test_async_pull_returns_true_on_success(tmp_path: Path, mock_version_response):
+    """Test _async_pull returns True on success (TUI handled by sync pull())."""
     shotgun_dir = tmp_path / ".shotgun"
 
     mock_client = AsyncMock()
@@ -128,12 +129,11 @@ async def test_async_pull_launches_tui(tmp_path: Path, mock_version_response):
             "shotgun.cli.spec.commands.download_file_from_url",
             return_value=b"# Test Content",
         ),
-        patch("shotgun.cli.spec.commands.tui_app") as mock_tui,
     ):
-        await _async_pull("version-123", no_tui=False)
+        result = await _async_pull("version-123")
 
-        # Verify TUI was launched
-        mock_tui.run.assert_called_once()
+        # Verify async function returned success (sync pull() handles TUI)
+        assert result is True
 
 
 @pytest.mark.asyncio
@@ -168,9 +168,8 @@ async def test_async_pull_backs_up_existing_content(
         patch(
             "shotgun.cli.spec.commands.clear_shotgun_dir"
         ) as mock_clear,
-        patch("shotgun.cli.spec.commands.tui_app"),
     ):
-        await _async_pull("version-123", no_tui=True)
+        await _async_pull("version-123")
 
         # Verify backup was created and directory was cleared
         mock_backup.assert_called_once_with(shotgun_dir)
@@ -196,7 +195,7 @@ async def test_async_pull_unauthorized_error(tmp_path: Path):
         ),
         pytest.raises(typer.Exit) as exc_info,
     ):
-        await _async_pull("version-123", no_tui=True)
+        await _async_pull("version-123")
 
     assert exc_info.value.exit_code == 1
 
@@ -218,7 +217,7 @@ async def test_async_pull_not_found_error(tmp_path: Path):
         ),
         pytest.raises(typer.Exit) as exc_info,
     ):
-        await _async_pull("version-123", no_tui=True)
+        await _async_pull("version-123")
 
     assert exc_info.value.exit_code == 1
 
@@ -240,7 +239,7 @@ async def test_async_pull_forbidden_error(tmp_path: Path):
         ),
         pytest.raises(typer.Exit) as exc_info,
     ):
-        await _async_pull("version-123", no_tui=True)
+        await _async_pull("version-123")
 
     assert exc_info.value.exit_code == 1
 
@@ -270,7 +269,7 @@ async def test_async_pull_empty_version(tmp_path: Path):
         ),
         pytest.raises(typer.Exit) as exc_info,
     ):
-        await _async_pull("version-123", no_tui=True)
+        await _async_pull("version-123")
 
     assert exc_info.value.exit_code == 1
 

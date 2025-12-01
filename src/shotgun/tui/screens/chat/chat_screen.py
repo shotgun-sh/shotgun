@@ -173,6 +173,7 @@ class ChatScreen(Screen[None]):
         deps: AgentDeps,
         continue_session: bool = False,
         force_reindex: bool = False,
+        show_pull_hint: bool = False,
     ) -> None:
         """Initialize the ChatScreen.
 
@@ -191,6 +192,7 @@ class ChatScreen(Screen[None]):
             deps: AgentDeps configuration for agent dependencies
             continue_session: Whether to continue a previous session
             force_reindex: Whether to force reindexing of codebases
+            show_pull_hint: Whether to show hint about recently pulled spec
         """
         super().__init__()
 
@@ -206,6 +208,7 @@ class ChatScreen(Screen[None]):
         self.processing_state = processing_state
         self.continue_session = continue_session
         self.force_reindex = force_reindex
+        self.show_pull_hint = show_pull_hint
 
     def on_mount(self) -> None:
         # Use widget coordinator to focus input
@@ -220,6 +223,10 @@ class ChatScreen(Screen[None]):
         # Use call_later to handle async exists() check
         if self.continue_session:
             self.call_later(self._check_and_load_conversation)
+
+        # Show pull hint if launching after spec pull
+        if self.show_pull_hint:
+            self.call_later(self._show_pull_hint)
 
         self.call_later(self.check_if_codebase_is_indexed)
         # Initial update of context indicator
@@ -689,6 +696,32 @@ class ChatScreen(Screen[None]):
     def mount_hint(self, markdown: str) -> None:
         hint = HintMessage(message=markdown)
         self.agent_manager.add_hint_message(hint)
+
+    def _show_pull_hint(self) -> None:
+        """Show hint about recently pulled spec from meta.json."""
+        from shotgun.cli.spec.models import SpecMeta
+        from shotgun.utils.file_system_utils import get_shotgun_base_path
+
+        meta_path = get_shotgun_base_path() / "meta.json"
+        if not meta_path.exists():
+            return
+
+        try:
+            meta = SpecMeta.model_validate_json(meta_path.read_text())
+            # Only show if pulled within last 60 seconds
+            age_seconds = (datetime.now(timezone.utc) - meta.pulled_at).total_seconds()
+            if age_seconds > 60:
+                return
+
+            hint_parts = [f"✓ Pulled spec: **{meta.spec_name}**"]
+            if meta.backup_path:
+                hint_parts.append(f"Previous files backed up to: `{meta.backup_path}`")
+            if meta.web_url:
+                hint_parts.append(f"[View in browser]({meta.web_url})")
+            self.mount_hint("\n\n".join(hint_parts))
+        except Exception:
+            # Ignore errors reading meta.json - this is optional UI feedback
+            logger.debug("Failed to read meta.json for pull hint", exc_info=True)
 
     def mount_hint_with_email(
         self, markdown_before: str, email: str, markdown_after: str = ""

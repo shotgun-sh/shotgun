@@ -20,3 +20,11 @@ class SpecMeta(BaseModel):
         description="Whether this was the latest version when pulled"
     )
     pulled_at: datetime = Field(description="Timestamp when spec was pulled (UTC)")
+    backup_path: str | None = Field(
+        default=None,
+        description="Path where previous .shotgun/ files were backed up",
+    )
+    web_url: str | None = Field(
+        default=None,
+        description="URL to view this version in the web UI",
+    )

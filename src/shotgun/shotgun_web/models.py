@@ -353,6 +353,14 @@ class VersionWithFilesResponse(BaseModel):
     spec_id: str = Field(description="Parent spec ID")
     workspace_id: str = Field(description="Workspace ID")
     files: list[SpecFileResponse] = Field(description="Files in this version")
+    download_urls_expire_at: datetime | None = Field(
+        default=None,
+        description="When presigned download URLs expire (UTC)",
+    )
+    web_url: str | None = Field(
+        default=None,
+        description="URL to view this version in the web UI",
+    )
 
 
 class PermissionCheckResponse(BaseModel):

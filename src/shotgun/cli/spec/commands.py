@@ -54,7 +54,7 @@ def pull(
     if success and not no_tui:
         console.print()
         console.print("[dim]Launching TUI...[/dim]")
-        tui_app.run()
+        tui_app.run(show_pull_hint=True)
 
 
 async def _async_pull(version_id: str) -> bool:
@@ -98,7 +98,9 @@ async def _async_pull(version_id: str) -> bool:
                 backup_path = await create_backup(shotgun_dir)
 
             if backup_path:
-                console.print(f"[dim]Backed up to: {backup_path}[/dim]")
+                console.print(
+                    f"[yellow]Existing files backed up to:[/yellow] {backup_path}"
+                )
                 # Clear existing content after successful backup
                 clear_shotgun_dir(shotgun_dir)
 
@@ -142,6 +144,8 @@ async def _async_pull(version_id: str) -> bool:
             workspace_id=response.workspace_id,
             is_latest=response.version.is_latest,
             pulled_at=datetime.now(timezone.utc),
+            backup_path=backup_path,
+            web_url=response.web_url,
         )
         meta_path = shotgun_dir / "meta.json"
         meta_path.write_text(meta.model_dump_json(indent=2))
@@ -152,6 +156,8 @@ async def _async_pull(version_id: str) -> bool:
         console.print(f"  [dim]Files downloaded:[/dim] {len(files)}")
         if backup_path:
             console.print(f"  [dim]Previous backup:[/dim] {backup_path}")
+        if response.web_url:
+            console.print(f"  [blue]View in browser:[/blue] {response.web_url}")
 
         return True
 

@@ -54,12 +54,14 @@ class ShotgunApp(App[None]):
         no_update_check: bool = False,
         continue_session: bool = False,
         force_reindex: bool = False,
+        show_pull_hint: bool = False,
     ) -> None:
         super().__init__()
         self.config_manager: ConfigManager = get_config_manager()
         self.no_update_check = no_update_check
         self.continue_session = continue_session
         self.force_reindex = force_reindex
+        self.show_pull_hint = show_pull_hint
 
         # Initialize dependency injection container
         self.container = TUIContainer()
@@ -182,6 +184,7 @@ class ShotgunApp(App[None]):
                 deps=agent_deps,
                 continue_session=self.continue_session,
                 force_reindex=self.force_reindex,
+                show_pull_hint=self.show_pull_hint,
             )
 
             # Update the ProcessingStateManager and WidgetCoordinator with the actual ChatScreen instance
@@ -223,6 +226,7 @@ def run(
     no_update_check: bool = False,
     continue_session: bool = False,
     force_reindex: bool = False,
+    show_pull_hint: bool = False,
 ) -> None:
     """Run the TUI application.
 
@@ -230,6 +234,7 @@ def run(
         no_update_check: If True, disable automatic update checks.
         continue_session: If True, continue from previous conversation.
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
+        show_pull_hint: If True, show hint about recently pulled spec.
     """
     # Clean up any corrupted databases BEFORE starting the TUI
     # This prevents crashes from corrupted databases during initialization
@@ -255,6 +260,7 @@ def run(
         no_update_check=no_update_check,
         continue_session=continue_session,
         force_reindex=force_reindex,
+        show_pull_hint=show_pull_hint,
     )
     app.run(inline_no_clear=True)
 
