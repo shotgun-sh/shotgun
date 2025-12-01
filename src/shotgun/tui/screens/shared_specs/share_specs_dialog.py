@@ -10,7 +10,12 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Label, ListItem, ListView, Static
 
 from shotgun.logging_config import get_logger
-from shotgun.shotgun_web.models import SpecResponse
+from shotgun.shotgun_web.exceptions import (
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+)
+from shotgun.shotgun_web.models import SpecResponse, WorkspaceNotFoundError
 from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.screens.shared_specs.models import (
@@ -21,8 +26,10 @@ from shotgun.tui.screens.shared_specs.models import (
 logger = get_logger(__name__)
 
 
-def _relative_time(dt: datetime) -> str:
+def _relative_time(dt: datetime | None) -> str:
     """Convert datetime to relative time string (e.g., '2 days ago')."""
+    if dt is None:
+        return "unknown"
     now = datetime.now(timezone.utc)
     # Make sure dt is timezone-aware
     if dt.tzinfo is None:
@@ -175,14 +182,10 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, workspace_id: str) -> None:
-        """Initialize the dialog.
-
-        Args:
-            workspace_id: Workspace ID to list specs from
-        """
+    def __init__(self) -> None:
+        """Initialize the dialog."""
         super().__init__()
-        self.workspace_id = workspace_id
+        self.workspace_id: str | None = None
         self._specs: list[SpecResponse] = []
         self._loading = True
         self._error: str | None = None
@@ -225,19 +228,64 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
         else:
             self.remove_class("compact")
 
+    def _update_loading_message(self, message: str) -> None:
+        """Update the loading label message."""
+        self.query_one("#loading-label", Static).update(message)
+
     @work
     async def _load_specs(self) -> None:
-        """Load specs from the API."""
+        """Fetch workspace, check permissions, and load specs."""
         try:
             client = SpecsClient()
+
+            # Step 1: Get workspace
+            self._update_loading_message("Connecting to workspace...")
+            try:
+                self.workspace_id = await client.get_or_fetch_workspace_id()
+            except UnauthorizedError:
+                self._loading = False
+                self._error = "Not authenticated. Run 'shotgun auth' to login."
+                self._show_error()
+                return
+            except WorkspaceNotFoundError:
+                self._loading = False
+                self._error = "No workspaces available. Please create one at shotgun.sh"
+                self._show_error()
+                return
+
+            # Step 2: Check permissions
+            self._update_loading_message("Checking permissions...")
+            try:
+                permissions = await client.check_permissions(self.workspace_id)
+                if not permissions.can_create_specs:
+                    self._loading = False
+                    self._error = "You need editor access to share specs"
+                    self._show_error()
+                    return
+            except NotFoundError:
+                # Permissions endpoint not available yet - skip check
+                logger.debug("Permissions endpoint not available, skipping check")
+            except UnauthorizedError:
+                self._loading = False
+                self._error = "Not authenticated. Run 'shotgun auth' to login."
+                self._show_error()
+                return
+            except ForbiddenError:
+                self._loading = False
+                self._error = "You don't have access to this workspace"
+                self._show_error()
+                return
+
+            # Step 3: Load specs
+            self._update_loading_message("Loading specs...")
             response = await client.list_specs(self.workspace_id)
             self._specs = response.specs
             self._loading = False
             self._populate_list()
         except Exception as e:
-            logger.error(f"Failed to load specs: {e}")
+            logger.exception(f"Failed to load specs: {type(e).__name__}: {e}")
             self._loading = False
-            self._error = str(e)
+            self._error = str(e) if str(e) else type(e).__name__
             self._show_error()
 
     def _populate_list(self) -> None:
@@ -287,7 +335,7 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
             visibility = "[yellow]Team[/]"
 
         # Relative time
-        time_ago = _relative_time(spec.created_at)
+        time_ago = _relative_time(spec.created_on)
 
         # Format the label
         text = f"[bold]{name}[/] · {visibility}\n{version_info} · {time_ago}"
@@ -308,7 +356,12 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
             return
 
         if item.id == "create-new":
-            self.dismiss(ShareSpecsResult(action=ShareSpecsAction.CREATE))
+            self.dismiss(
+                ShareSpecsResult(
+                    action=ShareSpecsAction.CREATE,
+                    workspace_id=self.workspace_id,
+                )
+            )
         elif item.id.startswith("spec-"):
             spec_id = item.id.removeprefix("spec-")
             # Find the spec to get the name
@@ -320,6 +373,7 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
             self.dismiss(
                 ShareSpecsResult(
                     action=ShareSpecsAction.ADD_VERSION,
+                    workspace_id=self.workspace_id,
                     spec_id=spec_id,
                     spec_name=spec_name,
                 )

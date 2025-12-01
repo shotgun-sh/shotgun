@@ -16,6 +16,7 @@ from shotgun.shotgun_web.exceptions import (
     ShotgunWebError,
     UnauthorizedError,
 )
+from shotgun.shotgun_web.models import WorkspaceNotFoundError
 from shotgun.shotgun_web.specs_client import SpecsClient
 
 
@@ -38,6 +39,24 @@ def mock_config_no_jwt():
     """Mock the ConfigManager without JWT for auth tests."""
     mock_config_obj = MagicMock()
     mock_config_obj.shotgun.supabase_jwt = None
+    return mock_config_obj
+
+
+@pytest.fixture
+def mock_config_with_workspace():
+    """Mock the ConfigManager with JWT and workspace_id."""
+    mock_config_obj = MagicMock()
+    mock_config_obj.shotgun.supabase_jwt = SecretStr("test-jwt-token")
+    mock_config_obj.shotgun.workspace_id = "workspace-123"
+    return mock_config_obj
+
+
+@pytest.fixture
+def mock_config_without_workspace():
+    """Mock the ConfigManager with JWT but no workspace_id."""
+    mock_config_obj = MagicMock()
+    mock_config_obj.shotgun.supabase_jwt = SecretStr("test-jwt-token")
+    mock_config_obj.shotgun.workspace_id = None
     return mock_config_obj
 
 
@@ -211,7 +230,7 @@ def _version_data(
         "notes": None,
         "created_by": "user-123",
         "created_by_email": "user@example.com",
-        "created_at": "2024-01-01T00:00:00Z",
+        "created_on": "2024-01-01T00:00:00Z",
         "file_count": 4,
         "total_size_bytes": 10000,
     }
@@ -232,8 +251,8 @@ def _spec_data(
         "is_public": is_public,
         "created_by": "user-123",
         "created_by_email": "user@example.com",
-        "created_at": "2024-01-01T00:00:00Z",
-        "updated_at": "2024-01-01T00:00:00Z",
+        "created_on": "2024-01-01T00:00:00Z",
+        "updated_on": "2024-01-01T00:00:00Z",
         "updated_by_email": "user@example.com",
         "latest_version": None,
         "version_count": 1,
@@ -253,7 +272,7 @@ def _file_data(
         "size_bytes": size_bytes,
         "content_hash": "a" * 64,
         "content_type": "text/markdown",
-        "uploaded_at": "2024-01-01T00:00:00Z",
+        "created_on": "2024-01-01T00:00:00Z",
         "download_url": f"https://storage.example.com/download/{file_id}",
     }
 
@@ -694,8 +713,8 @@ async def test_get_public_spec(specs_client: SpecsClient):
         "id": "spec-123",
         "name": "Public Spec",
         "description": "A public spec",
-        "created_at": "2024-01-01T00:00:00Z",
-        "updated_at": "2024-01-01T00:00:00Z",
+        "created_on": "2024-01-01T00:00:00Z",
+        "updated_on": "2024-01-01T00:00:00Z",
         "latest_version": _version_data(),
     }
 
@@ -750,3 +769,101 @@ async def test_get_public_file(specs_client: SpecsClient):
 
         assert result.relative_path == "research.md"
         assert result.download_url is not None
+
+
+@pytest.mark.asyncio
+async def test_get_or_fetch_workspace_id_cached(
+    specs_client: SpecsClient, mock_config_with_workspace
+):
+    """Test get_or_fetch_workspace_id returns cached workspace_id."""
+    mock_manager = AsyncMock()
+    mock_manager.load.return_value = mock_config_with_workspace
+
+    with patch(
+        "shotgun.shotgun_web.specs_client.get_config_manager",
+        return_value=mock_manager,
+    ):
+        result = await specs_client.get_or_fetch_workspace_id()
+
+        assert result == "workspace-123"
+        # Ensure update_shotgun_account was not called since already cached
+        mock_manager.update_shotgun_account.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_or_fetch_workspace_id_fetches_and_caches(
+    specs_client: SpecsClient, mock_config_without_workspace
+):
+    """Test get_or_fetch_workspace_id fetches from API and caches result."""
+    mock_manager = AsyncMock()
+    mock_manager.load.return_value = mock_config_without_workspace
+
+    mock_response = MagicMock()
+    mock_response.is_success = True
+    mock_response.json.return_value = {
+        "workspaces": [{"id": "workspace-456", "name": "My Workspace"}]
+    }
+
+    mock_client = _create_mock_async_client(mock_response)
+
+    with (
+        patch(
+            "shotgun.shotgun_web.specs_client.get_config_manager",
+            return_value=mock_manager,
+        ),
+        patch(
+            "httpx.AsyncClient",
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_client)),
+        ),
+    ):
+        result = await specs_client.get_or_fetch_workspace_id()
+
+        assert result == "workspace-456"
+        mock_manager.update_shotgun_account.assert_called_once_with(
+            workspace_id="workspace-456"
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_or_fetch_workspace_id_no_workspaces(
+    specs_client: SpecsClient, mock_config_without_workspace
+):
+    """Test get_or_fetch_workspace_id raises WorkspaceNotFoundError when no workspaces."""
+    mock_manager = AsyncMock()
+    mock_manager.load.return_value = mock_config_without_workspace
+
+    mock_response = MagicMock()
+    mock_response.is_success = True
+    mock_response.json.return_value = {"workspaces": []}
+
+    mock_client = _create_mock_async_client(mock_response)
+
+    with (
+        patch(
+            "shotgun.shotgun_web.specs_client.get_config_manager",
+            return_value=mock_manager,
+        ),
+        patch(
+            "httpx.AsyncClient",
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_client)),
+        ),
+    ):
+        with pytest.raises(WorkspaceNotFoundError, match="No workspaces found"):
+            await specs_client.get_or_fetch_workspace_id()
+
+
+@pytest.mark.asyncio
+async def test_get_or_fetch_workspace_id_not_authenticated(
+    specs_client: SpecsClient, mock_config_no_jwt
+):
+    """Test get_or_fetch_workspace_id raises UnauthorizedError when not authenticated."""
+    mock_config_no_jwt.shotgun.workspace_id = None
+    mock_manager = AsyncMock()
+    mock_manager.load.return_value = mock_config_no_jwt
+
+    with patch(
+        "shotgun.shotgun_web.specs_client.get_config_manager",
+        return_value=mock_manager,
+    ):
+        with pytest.raises(UnauthorizedError, match="Not authenticated"):
+            await specs_client.get_or_fetch_workspace_id()

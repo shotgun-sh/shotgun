@@ -66,7 +66,7 @@ class ShotgunWebClient:
             return result
 
         except httpx.HTTPError as e:
-            logger.error("Failed to create unification token: %s", e)
+            logger.error("Failed to create unification token at %s: %s", url, e)
             raise
 
     def check_token_status(self, token: str) -> TokenStatusResponse:

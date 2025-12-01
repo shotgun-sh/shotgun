@@ -28,6 +28,7 @@ from .constants import (
     VERSION_CLOSE_PATH,
     VERSION_SET_LATEST_PATH,
     VERSIONS_PATH,
+    WORKSPACES_PATH,
 )
 from .exceptions import (
     ConflictError,
@@ -53,6 +54,8 @@ from .models import (
     VersionCloseResponse,
     VersionCreateResponse,
     VersionListResponse,
+    WorkspaceListResponse,
+    WorkspaceNotFoundError,
 )
 
 logger = get_logger(__name__)
@@ -131,6 +134,60 @@ class SpecsClient:
             raise ShotgunWebError(f"HTTP {status}: {message}")
 
     # =========================================================================
+    # Workspace Methods
+    # =========================================================================
+
+    async def list_workspaces(self) -> WorkspaceListResponse:
+        """List workspaces the current user has access to.
+
+        Returns:
+            WorkspaceListResponse with list of workspaces
+        """
+        token = await self._get_auth_token()
+        url = f"{self.base_url}{WORKSPACES_PATH}"
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            self._raise_for_status(response)
+            data = response.json()
+            # Handle both formats: raw list or {"workspaces": [...]}
+            if isinstance(data, list):
+                data = {"workspaces": data}
+            return WorkspaceListResponse.model_validate(data)
+
+    async def get_or_fetch_workspace_id(self) -> str:
+        """Get workspace_id from config or fetch it using current JWT.
+
+        Returns:
+            workspace_id string
+
+        Raises:
+            UnauthorizedError: If not authenticated
+            WorkspaceNotFoundError: If user has no workspaces
+        """
+        config_manager = get_config_manager()
+        config = await config_manager.load()
+
+        # Check if already cached
+        if config.shotgun.workspace_id:
+            return config.shotgun.workspace_id
+
+        # Fetch using existing JWT
+        response = await self.list_workspaces()
+        if not response.workspaces:
+            raise WorkspaceNotFoundError("No workspaces found for user")
+
+        workspace_id = response.workspaces[0].id
+
+        # Cache for future use
+        await config_manager.update_shotgun_account(workspace_id=workspace_id)
+
+        return workspace_id
+
+    # =========================================================================
     # Permission Methods
     # =========================================================================
 
@@ -163,7 +220,7 @@ class SpecsClient:
         workspace_id: str,
         page: int = 1,
         page_size: int = 50,
-        sort: Literal["name", "created_at", "updated_at"] = "updated_at",
+        sort: Literal["name", "created_on", "updated_on"] = "updated_on",
         order: Literal["asc", "desc"] = "desc",
     ) -> SpecListResponse:
         """List specs in workspace.
@@ -235,13 +292,27 @@ class SpecsClient:
         token = await self._get_auth_token()
         url = f"{self.base_url}{SPECS_BASE_PATH.format(workspace_id=workspace_id)}"
         request_data = SpecCreateRequest(name=name, description=description)
+        request_body = request_data.model_dump(exclude_none=True)
+
+        logger.debug(
+            "Creating spec: POST %s with body=%s",
+            url,
+            request_body,
+        )
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 url,
-                json=request_data.model_dump(exclude_none=True),
+                json=request_body,
                 headers={"Authorization": f"Bearer {token}"},
             )
+            if not response.is_success:
+                logger.error(
+                    "create_spec failed: POST %s returned %d - %s",
+                    url,
+                    response.status_code,
+                    response.text,
+                )
             self._raise_for_status(response)
             return SpecCreateResponse.model_validate(response.json())
 
@@ -444,6 +515,12 @@ class SpecsClient:
             self._raise_for_status(response)
             return FileListResponse.model_validate(response.json())
 
+    @retry(
+        retry=retry_if_exception_type((httpx.HTTPError, ShotgunWebError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=4),
+        reraise=True,
+    )
     async def initiate_file_upload(
         self,
         workspace_id: str,
@@ -454,6 +531,8 @@ class SpecsClient:
         content_hash: str,
     ) -> FileUploadResponse:
         """Initiate file upload to a version.
+
+        Retries on transient failures with exponential backoff.
 
         Args:
             workspace_id: Workspace UUID

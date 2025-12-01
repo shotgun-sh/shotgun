@@ -744,13 +744,17 @@ class ConfigManager:
         return config.shotgun_instance_id
 
     async def update_shotgun_account(
-        self, api_key: str | None = None, supabase_jwt: str | None = None
+        self,
+        api_key: str | None = None,
+        supabase_jwt: str | None = None,
+        workspace_id: str | None = None,
     ) -> None:
         """Update Shotgun Account configuration.
 
         Args:
             api_key: LiteLLM proxy API key (optional)
             supabase_jwt: Supabase authentication JWT (optional)
+            workspace_id: Default workspace ID for shared specs (optional)
         """
         config = await self.load()
 
@@ -761,6 +765,9 @@ class ConfigManager:
             config.shotgun.supabase_jwt = (
                 SecretStr(supabase_jwt) if supabase_jwt else None
             )
+
+        if workspace_id is not None:
+            config.shotgun.workspace_id = workspace_id
 
         await self.save(config)
         logger.info("Updated Shotgun Account configuration")
