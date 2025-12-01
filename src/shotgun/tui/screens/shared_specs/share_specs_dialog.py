@@ -10,7 +10,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Label, ListItem, ListView, Static
 
 from shotgun.logging_config import get_logger
-from shotgun.shotgun_web.exceptions import ForbiddenError, UnauthorizedError
+from shotgun.shotgun_web.exceptions import (
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+)
 from shotgun.shotgun_web.models import SpecResponse, WorkspaceNotFoundError
 from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
@@ -258,6 +262,9 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
                     self._error = "You need editor access to share specs"
                     self._show_error()
                     return
+            except NotFoundError:
+                # Permissions endpoint not available yet - skip check
+                logger.debug("Permissions endpoint not available, skipping check")
             except UnauthorizedError:
                 self._loading = False
                 self._error = "Not authenticated. Run 'shotgun auth' to login."
