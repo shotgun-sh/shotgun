@@ -11,6 +11,8 @@ logger = get_logger(__name__)
 
 # Patterns to ignore when scanning .shotgun/ directory
 IGNORE_PATTERNS = [
+    # Shotgun metadata (created by `shotgun spec pull`)
+    "meta.json",
     # OS-generated files
     ".DS_Store",
     "Thumbs.db",

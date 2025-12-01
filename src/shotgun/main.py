@@ -32,6 +32,7 @@ from shotgun.cli import (
     feedback,
     plan,
     research,
+    spec,
     specify,
     tasks,
     update,
@@ -95,6 +96,7 @@ app.add_typer(tasks.app, name="tasks", help="Generate task lists with agentic ap
 app.add_typer(export.app, name="export", help="Export artifacts to various formats")
 app.add_typer(update.app, name="update", help="Check for and install updates")
 app.add_typer(feedback.app, name="feedback", help="Send us feedback")
+app.add_typer(spec.app, name="spec", help="Manage shared specifications")
 
 
 def version_callback(value: bool) -> None:

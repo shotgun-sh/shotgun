@@ -341,6 +341,20 @@ class VersionCloseResponse(BaseModel):
     web_url: str = Field(description="Web URL to view this version")
 
 
+class VersionWithFilesResponse(BaseModel):
+    """Response for GET /api/versions/{version_id} endpoint.
+
+    This is a convenience endpoint for CLI that returns version info
+    plus all files without requiring workspace_id/spec_id in the path.
+    """
+
+    version: SpecVersionResponse = Field(description="Version details")
+    spec_name: str = Field(description="Name of the parent spec")
+    spec_id: str = Field(description="Parent spec ID")
+    workspace_id: str = Field(description="Workspace ID")
+    files: list[SpecFileResponse] = Field(description="Files in this version")
+
+
 class PermissionCheckResponse(BaseModel):
     """Response for permission check."""
 

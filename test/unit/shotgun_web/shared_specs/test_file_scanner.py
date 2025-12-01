@@ -41,6 +41,12 @@ def test_should_ignore_editor_files():
     assert _should_ignore(Path("file.bak")) is True
 
 
+def test_should_ignore_meta_json():
+    """Test meta.json is ignored (created by shotgun spec pull)."""
+    assert _should_ignore(Path("meta.json")) is True
+    assert _should_ignore(Path("some/path/meta.json")) is True
+
+
 def test_should_not_ignore_valid_files():
     """Test valid files are not ignored."""
     assert _should_ignore(Path("research.md")) is False
@@ -180,6 +186,7 @@ def test_get_shotgun_directory_without_path(tmp_path: Path, monkeypatch):
 
 def test_ignore_patterns_list():
     """Test that IGNORE_PATTERNS contains expected patterns."""
+    assert "meta.json" in IGNORE_PATTERNS
     assert ".DS_Store" in IGNORE_PATTERNS
     assert "Thumbs.db" in IGNORE_PATTERNS
     assert "__pycache__" in IGNORE_PATTERNS

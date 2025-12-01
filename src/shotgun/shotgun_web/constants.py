@@ -36,6 +36,9 @@ PUBLIC_SPEC_PATH = "/api/public/specs/{spec_id}"
 PUBLIC_SPEC_FILES_PATH = "/api/public/specs/{spec_id}/files"
 PUBLIC_FILE_PATH = "/api/public/specs/{spec_id}/files/{file_id}"
 
+# CLI convenience endpoint (version lookup by ID only)
+VERSION_BY_ID_PATH = "/api/versions/{version_id}"
+
 # Re-export for backward compatibility
 __all__ = [
     "SHOTGUN_WEB_BASE_URL",
@@ -58,4 +61,5 @@ __all__ = [
     "PUBLIC_SPEC_PATH",
     "PUBLIC_SPEC_FILES_PATH",
     "PUBLIC_FILE_PATH",
+    "VERSION_BY_ID_PATH",
 ]
