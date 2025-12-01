@@ -110,7 +110,7 @@ def _mock_file_upload_response(relative_path: str) -> FileUploadResponse:
             bucket_key=f"specs/123/{relative_path}",
             size_bytes=100,
             content_hash="abc123",
-            uploaded_at=datetime.now(timezone.utc),
+            created_on=datetime.now(timezone.utc),
         ),
         upload_url="https://storage.example.com/upload",
     )
@@ -128,7 +128,7 @@ def _mock_version_close_response() -> VersionCloseResponse:
             state=SpecVersionState.READY,
             is_latest=True,
             created_by="user-123",
-            created_at=datetime.now(timezone.utc),
+            created_on=datetime.now(timezone.utc),
         ),
         web_url="https://shotgun.sh/specs/123/versions/123",
     )
@@ -150,7 +150,8 @@ async def test_run_upload_pipeline_success(temp_shotgun_dir: Path):
     mock_client.close_version = AsyncMock(return_value=_mock_version_close_response())
 
     with patch(
-        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient",
+        return_value=mock_client,
     ):
         result = await run_upload_pipeline(
             workspace_id="ws-123",
@@ -242,7 +243,8 @@ async def test_run_upload_pipeline_upload_error(temp_shotgun_dir: Path):
     mock_client.initiate_file_upload = AsyncMock(side_effect=Exception("Upload failed"))
 
     with patch(
-        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient",
+        return_value=mock_client,
     ):
         result = await run_upload_pipeline(
             workspace_id="ws-123",
@@ -266,7 +268,8 @@ async def test_run_upload_pipeline_no_progress_callback(temp_shotgun_dir: Path):
     mock_client.close_version = AsyncMock(return_value=_mock_version_close_response())
 
     with patch(
-        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient", return_value=mock_client
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient",
+        return_value=mock_client,
     ):
         # Should not raise even without callback
         result = await run_upload_pipeline(

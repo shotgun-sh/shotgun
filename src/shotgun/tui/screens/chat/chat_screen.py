@@ -61,6 +61,7 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.shotgun_web.exceptions import ForbiddenError, UnauthorizedError
+from shotgun.shotgun_web.models import WorkspaceNotFoundError
 from shotgun.shotgun_web.specs_client import SpecsClient
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.components.context_indicator import ContextIndicator
@@ -1086,18 +1087,22 @@ class ChatScreen(Screen[None]):
             return
 
         # 2. Get workspace and check authentication
-        config = await get_config_manager().load()
-        if config.shotgun.supabase_jwt is None:
+        client = SpecsClient()
+
+        try:
+            workspace_id = await client.get_or_fetch_workspace_id()
+        except UnauthorizedError:
             self.mount_hint("Not authenticated. Run 'shotgun auth' to login.")
             return
-
-        workspace_id = config.shotgun.workspace_id
-        if not workspace_id:
-            self.mount_hint("No workspace configured. Run 'shotgun auth' to login.")
+        except WorkspaceNotFoundError:
+            self.mount_hint("No workspaces available. Please create one at shotgun.sh")
+            return
+        except Exception as e:
+            logger.error(f"Failed to fetch workspaces: {e}")
+            self.mount_hint(f"Failed to fetch workspaces: {e}")
             return
 
         # 3. Check permissions
-        client = SpecsClient()
         try:
             permissions = await client.check_permissions(workspace_id)
             if not permissions.can_create_specs:

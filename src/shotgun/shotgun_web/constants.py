@@ -11,6 +11,9 @@ UNIFICATION_TOKEN_STATUS_PATH = "/api/unification/token/{token}/status"  # noqa:
 DEFAULT_POLL_INTERVAL_SECONDS = 3
 DEFAULT_TOKEN_TIMEOUT_SECONDS = 1800  # 30 minutes
 
+# Workspaces API endpoint
+WORKSPACES_PATH = "/api/workspaces"
+
 # Specs API endpoints
 PERMISSIONS_PATH = "/api/workspaces/{workspace_id}/permissions"
 SPECS_BASE_PATH = "/api/workspaces/{workspace_id}/specs"
@@ -40,6 +43,8 @@ __all__ = [
     "UNIFICATION_TOKEN_STATUS_PATH",
     "DEFAULT_POLL_INTERVAL_SECONDS",
     "DEFAULT_TOKEN_TIMEOUT_SECONDS",
+    # Workspaces endpoint
+    "WORKSPACES_PATH",
     # Specs endpoints
     "PERMISSIONS_PATH",
     "SPECS_BASE_PATH",

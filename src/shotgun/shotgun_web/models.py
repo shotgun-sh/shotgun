@@ -71,6 +71,26 @@ class WorkspaceRole(StrEnum):
 
 
 # ============================================================================
+# Workspace Models
+# ============================================================================
+
+
+class WorkspaceResponse(BaseModel):
+    """Workspace details."""
+
+    id: str = Field(description="Workspace UUID")
+    name: str = Field(description="Workspace name")
+
+
+class WorkspaceListResponse(BaseModel):
+    """Response for listing user's workspaces."""
+
+    workspaces: list[WorkspaceResponse] = Field(
+        description="List of workspaces the user has access to"
+    )
+
+
+# ============================================================================
 # File Metadata (for file scanner)
 # ============================================================================
 
@@ -173,7 +193,9 @@ class SpecFileResponse(BaseModel):
         default=None,
         description="MIME type (e.g., text/markdown, application/json)",
     )
-    uploaded_at: datetime = Field(description="Upload timestamp")
+    created_on: datetime | None = Field(
+        default=None, description="Upload timestamp (None until upload completes)"
+    )
     download_url: str | None = Field(
         default=None,
         description="Pre-signed download URL (temporary)",
@@ -185,7 +207,7 @@ class SpecVersionResponse(BaseModel):
 
     id: str = Field(description="Version ID")
     spec_id: str = Field(description="Parent spec ID")
-    workspace_id: str = Field(description="Workspace ID")
+    workspace_id: str | None = Field(default=None, description="Workspace ID")
     state: SpecVersionState = Field(description="Version state")
     is_latest: bool = Field(description="Whether this is the latest version")
     label: str | None = Field(default=None, description="Version label")
@@ -195,7 +217,7 @@ class SpecVersionResponse(BaseModel):
         default=None,
         description="Email of user who created version (hidden for anonymous viewers)",
     )
-    created_at: datetime = Field(description="Creation timestamp")
+    created_on: datetime | None = Field(default=None, description="Creation timestamp")
     file_count: int | None = Field(
         default=None,
         description="Number of files in this version",
@@ -203,6 +225,10 @@ class SpecVersionResponse(BaseModel):
     total_size_bytes: int | None = Field(
         default=None,
         description="Total size of all files",
+    )
+    web_url: str | None = Field(
+        default=None,
+        description="URL to view this version in the web UI",
     )
 
 
@@ -222,8 +248,10 @@ class SpecResponse(BaseModel):
         default=None,
         description="Email of original creator (hidden for anonymous viewers)",
     )
-    created_at: datetime = Field(description="Creation timestamp")
-    updated_at: datetime = Field(description="Last update timestamp")
+    created_on: datetime | None = Field(default=None, description="Creation timestamp")
+    updated_on: datetime | None = Field(
+        default=None, description="Last update timestamp"
+    )
     updated_by_email: str | None = Field(
         default=None,
         description="Email of user who last updated (hidden for anonymous viewers)",
@@ -241,8 +269,8 @@ class PublicSpecResponse(BaseModel):
     id: str = Field(description="Spec ID")
     name: str = Field(description="Spec name")
     description: str | None = Field(default=None, description="Spec description")
-    created_at: datetime = Field(description="Creation timestamp")
-    updated_at: datetime = Field(description="Last update timestamp")
+    created_on: datetime = Field(description="Creation timestamp")
+    updated_on: datetime = Field(description="Last update timestamp")
     latest_version: SpecVersionResponse | None = Field(
         default=None,
         description="Latest version details (without sensitive user info)",
@@ -283,7 +311,9 @@ class SpecCreateResponse(BaseModel):
     version: SpecVersionResponse = Field(
         description="Initial version in uploading state"
     )
-    upload_url: str = Field(description="Base URL for file uploads")
+    upload_url: str | None = Field(
+        default=None, description="Base URL for file uploads"
+    )
 
 
 class VersionCreateResponse(BaseModel):
@@ -292,7 +322,9 @@ class VersionCreateResponse(BaseModel):
     version: SpecVersionResponse = Field(
         description="Created version in uploading state"
     )
-    upload_url: str = Field(description="Base URL for file uploads")
+    upload_url: str | None = Field(
+        default=None, description="Base URL for file uploads"
+    )
 
 
 class FileUploadResponse(BaseModel):
@@ -348,3 +380,12 @@ class ErrorResponse(BaseModel):
         default=None,
         description="Request ID for debugging",
     )
+
+
+# ============================================================================
+# Custom Exceptions
+# ============================================================================
+
+
+class WorkspaceNotFoundError(Exception):
+    """Raised when user has no workspaces."""

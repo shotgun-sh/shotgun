@@ -21,8 +21,10 @@ from shotgun.tui.screens.shared_specs.models import (
 logger = get_logger(__name__)
 
 
-def _relative_time(dt: datetime) -> str:
+def _relative_time(dt: datetime | None) -> str:
     """Convert datetime to relative time string (e.g., '2 days ago')."""
+    if dt is None:
+        return "unknown"
     now = datetime.now(timezone.utc)
     # Make sure dt is timezone-aware
     if dt.tzinfo is None:
@@ -287,7 +289,7 @@ class ShareSpecsDialog(ModalScreen[ShareSpecsResult | None]):
             visibility = "[yellow]Team[/]"
 
         # Relative time
-        time_ago = _relative_time(spec.created_at)
+        time_ago = _relative_time(spec.created_on)
 
         # Format the label
         text = f"[bold]{name}[/] · {visibility}\n{version_info} · {time_ago}"
