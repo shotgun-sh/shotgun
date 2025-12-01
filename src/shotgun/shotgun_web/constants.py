@@ -15,7 +15,7 @@ DEFAULT_TOKEN_TIMEOUT_SECONDS = 1800  # 30 minutes
 WORKSPACES_PATH = "/api/workspaces"
 
 # Specs API endpoints
-PERMISSIONS_PATH = "/api/workspaces/{workspace_id}/permissions"
+PERMISSIONS_PATH = "/api/workspaces/{workspace_id}/specs/permissions"
 SPECS_BASE_PATH = "/api/workspaces/{workspace_id}/specs"
 SPECS_DETAIL_PATH = "/api/workspaces/{workspace_id}/specs/{spec_id}"
 VERSIONS_PATH = "/api/workspaces/{workspace_id}/specs/{spec_id}/versions"
