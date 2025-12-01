@@ -165,33 +165,6 @@ class ApiSettings(BaseSettings):
     )
 
 
-class SupabaseSettings(BaseSettings):
-    """Supabase configuration settings.
-
-    Settings for Supabase Storage access (shared specs).
-    """
-
-    url: str = Field(
-        default="https://hhpbuzfsgljnwfukmulj.supabase.co",
-        description="Supabase project URL",
-    )
-    anon_key: str = Field(
-        default_factory=lambda: _get_build_constant("SUPABASE_ANON_KEY", ""),
-        description="Supabase anonymous key for public access",
-    )
-    storage_bucket: str = Field(
-        default="shared-specs",
-        description="Supabase Storage bucket for shared specs",
-    )
-
-    model_config = SettingsConfigDict(
-        env_prefix="SHOTGUN_SUPABASE_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-
 class DevelopmentSettings(BaseSettings):
     """Development and testing settings.
 
@@ -255,7 +228,6 @@ class Settings(BaseSettings):
     telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
-    supabase: SupabaseSettings = Field(default_factory=SupabaseSettings)
     dev: DevelopmentSettings = Field(default_factory=DevelopmentSettings)
 
     model_config = SettingsConfigDict(

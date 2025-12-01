@@ -96,6 +96,7 @@ from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.file_system_utils import get_shotgun_base_path
 from shotgun.utils.marketing import MarketingManager
 
 logger = logging.getLogger(__name__)
@@ -699,21 +700,21 @@ class ChatScreen(Screen[None]):
 
     def _show_pull_hint(self) -> None:
         """Show hint about recently pulled spec from meta.json."""
+        # Import at runtime to avoid circular import (CLI -> TUI dependency)
         from shotgun.cli.spec.models import SpecMeta
-        from shotgun.utils.file_system_utils import get_shotgun_base_path
 
-        meta_path = get_shotgun_base_path() / "meta.json"
+        shotgun_dir = get_shotgun_base_path()
+        meta_path = shotgun_dir / "meta.json"
         if not meta_path.exists():
             return
 
         try:
-            meta = SpecMeta.model_validate_json(meta_path.read_text())
+            meta: SpecMeta = SpecMeta.model_validate_json(meta_path.read_text())
             # Only show if pulled within last 60 seconds
             age_seconds = (datetime.now(timezone.utc) - meta.pulled_at).total_seconds()
             if age_seconds > 60:
                 return
 
-            shotgun_dir = get_shotgun_base_path()
             hint_parts = [f"You just pulled **{meta.spec_name}** from the cloud."]
             if meta.web_url:
                 hint_parts.append(f"[View in browser]({meta.web_url})")
