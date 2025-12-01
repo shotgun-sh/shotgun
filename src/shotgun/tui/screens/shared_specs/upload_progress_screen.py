@@ -57,12 +57,12 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         }
 
         #phase-label {
-            padding: 1 0;
+            padding: 0;
         }
 
         #progress-bar {
             width: 100%;
-            padding: 1 0;
+            padding: 0;
         }
 
         #file-label {
@@ -71,33 +71,21 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
 
         #bytes-label {
             color: $text-muted;
-            padding-bottom: 1;
         }
 
         #error-label {
             color: $error;
-            padding: 1 0;
-        }
-
-        #success-container {
-            padding: 1 0;
         }
 
         #success-label {
             color: $success;
             text-style: bold;
-            padding-bottom: 1;
-        }
-
-        #url-label {
-            padding-bottom: 1;
         }
 
         #dialog-buttons {
             layout: horizontal;
             align-horizontal: center;
             height: auto;
-            padding-top: 1;
         }
 
         #dialog-buttons Button {
@@ -105,7 +93,7 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         }
 
         /* Hide elements initially */
-        #success-container {
+        #success-label {
             display: none;
         }
 
@@ -196,9 +184,7 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
             yield Static("", id="error-label")
 
             # Success section (hidden by default)
-            with Container(id="success-container"):
-                yield Static("Specs shared successfully!", id="success-label")
-                yield Static("", id="url-label")
+            yield Static("Specs shared successfully!", id="success-label")
 
             # Buttons
             with Horizontal(id="dialog-buttons"):
@@ -376,13 +362,8 @@ class UploadProgressScreen(ModalScreen[UploadScreenResult]):
         self.query_one("#phase-label", Static).update("Upload complete!")
         self.query_one("#progress-bar", ProgressBar).update(progress=100)
 
-        # Show success container
-        success_container = self.query_one("#success-container")
-        success_container.display = True
-
-        # Update URL
-        if web_url:
-            self.query_one("#url-label", Static).update(f"View at: {web_url}")
+        # Show success label
+        self.query_one("#success-label", Static).display = True
 
         # Hide cancel, show success buttons
         self.query_one("#cancel-btn", Button).display = False
