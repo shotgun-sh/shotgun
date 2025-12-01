@@ -867,3 +867,72 @@ async def test_get_or_fetch_workspace_id_not_authenticated(
     ):
         with pytest.raises(UnauthorizedError, match="Not authenticated"):
             await specs_client.get_or_fetch_workspace_id()
+
+
+@pytest.mark.asyncio
+async def test_get_version_with_files(specs_client: SpecsClient, mock_config):
+    """Test get_version_with_files API call."""
+    mock_manager = AsyncMock()
+    mock_manager.load.return_value = mock_config
+
+    mock_response = MagicMock()
+    mock_response.is_success = True
+    mock_response.json.return_value = {
+        "version": _version_data(),
+        "spec_name": "Test Spec",
+        "spec_id": "spec-123",
+        "workspace_id": "workspace-123",
+        "files": [
+            _file_data(file_id="file-1", relative_path="spec.md"),
+            _file_data(file_id="file-2", relative_path="plan.md"),
+        ],
+    }
+
+    mock_client = _create_mock_async_client(mock_response)
+
+    with (
+        patch(
+            "shotgun.shotgun_web.specs_client.get_config_manager",
+            return_value=mock_manager,
+        ),
+        patch(
+            "httpx.AsyncClient",
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_client)),
+        ),
+    ):
+        result = await specs_client.get_version_with_files("version-123")
+
+        assert result.spec_name == "Test Spec"
+        assert result.spec_id == "spec-123"
+        assert result.workspace_id == "workspace-123"
+        assert result.version.id == "version-123"
+        assert len(result.files) == 2
+        assert result.files[0].relative_path == "spec.md"
+        assert result.files[1].relative_path == "plan.md"
+
+
+@pytest.mark.asyncio
+async def test_get_version_with_files_not_found(specs_client: SpecsClient, mock_config):
+    """Test get_version_with_files raises NotFoundError for missing version."""
+    mock_manager = AsyncMock()
+    mock_manager.load.return_value = mock_config
+
+    mock_response = MagicMock()
+    mock_response.is_success = False
+    mock_response.status_code = 404
+    mock_response.json.return_value = {"message": "Version not found"}
+
+    mock_client = _create_mock_async_client(mock_response)
+
+    with (
+        patch(
+            "shotgun.shotgun_web.specs_client.get_config_manager",
+            return_value=mock_manager,
+        ),
+        patch(
+            "httpx.AsyncClient",
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_client)),
+        ),
+    ):
+        with pytest.raises(NotFoundError, match="Version not found"):
+            await specs_client.get_version_with_files("nonexistent-version")

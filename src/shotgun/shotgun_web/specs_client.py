@@ -25,6 +25,7 @@ from .constants import (
     SHOTGUN_WEB_BASE_URL,
     SPECS_BASE_PATH,
     SPECS_DETAIL_PATH,
+    VERSION_BY_ID_PATH,
     VERSION_CLOSE_PATH,
     VERSION_SET_LATEST_PATH,
     VERSIONS_PATH,
@@ -54,6 +55,7 @@ from .models import (
     VersionCloseResponse,
     VersionCreateResponse,
     VersionListResponse,
+    VersionWithFilesResponse,
     WorkspaceListResponse,
     WorkspaceNotFoundError,
 )
@@ -480,6 +482,34 @@ class SpecsClient:
             )
             self._raise_for_status(response)
             return SpecVersionResponse.model_validate(response.json())
+
+    async def get_version_with_files(self, version_id: str) -> VersionWithFilesResponse:
+        """Get version metadata and files by version ID only.
+
+        This is a convenience endpoint for CLI that doesn't require
+        workspace_id or spec_id in the request path.
+
+        Args:
+            version_id: Version UUID
+
+        Returns:
+            VersionWithFilesResponse with version details, spec info, and files
+
+        Raises:
+            UnauthorizedError: If not authenticated
+            NotFoundError: If version not found
+            ForbiddenError: If user lacks access to the spec
+        """
+        token = await self._get_auth_token()
+        url = f"{self.base_url}{VERSION_BY_ID_PATH.format(version_id=version_id)}"
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            self._raise_for_status(response)
+            return VersionWithFilesResponse.model_validate(response.json())
 
     # =========================================================================
     # File Methods
