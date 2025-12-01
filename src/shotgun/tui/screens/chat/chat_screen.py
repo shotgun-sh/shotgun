@@ -713,11 +713,17 @@ class ChatScreen(Screen[None]):
             if age_seconds > 60:
                 return
 
-            hint_parts = [f"✓ Pulled spec: **{meta.spec_name}**"]
-            if meta.backup_path:
-                hint_parts.append(f"Previous files backed up to: `{meta.backup_path}`")
+            shotgun_dir = get_shotgun_base_path()
+            hint_parts = [f"You just pulled **{meta.spec_name}** from the cloud."]
             if meta.web_url:
                 hint_parts.append(f"[View in browser]({meta.web_url})")
+            hint_parts.append(
+                f"The specs are now located at `{shotgun_dir}` so Shotgun has access to them."
+            )
+            if meta.backup_path:
+                hint_parts.append(
+                    f"Previous files were backed up to: `{meta.backup_path}`"
+                )
             self.mount_hint("\n\n".join(hint_parts))
         except Exception:
             # Ignore errors reading meta.json - this is optional UI feedback
