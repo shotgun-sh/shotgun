@@ -1,25 +1,24 @@
 """Screen showing download progress for pulling specs."""
 
-from datetime import datetime, timezone
-
 from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, ProgressBar, Static
-from textual.worker import Worker, WorkerCancelled, get_current_worker
+from textual.worker import Worker, get_current_worker
 
-from shotgun.cli.spec.backup import clear_shotgun_dir, create_backup
-from shotgun.cli.spec.models import SpecMeta
+from shotgun.cli.spec.pull_service import (
+    CancelledError,
+    PullProgress,
+    SpecPullService,
+)
 from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.exceptions import (
     ForbiddenError,
     NotFoundError,
     UnauthorizedError,
 )
-from shotgun.shotgun_web.specs_client import SpecsClient
-from shotgun.shotgun_web.supabase_client import download_file_from_url
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
@@ -173,90 +172,31 @@ class SpecPullScreen(ModalScreen[bool]):
         worker = get_current_worker()
         self._download_worker = worker
 
-        client = SpecsClient()
         shotgun_dir = get_shotgun_base_path()
+        service = SpecPullService()
+
+        def on_progress(p: PullProgress) -> None:
+            pct = 0.0
+            if p.total_files and p.file_index is not None:
+                pct = ((p.file_index + 1) / p.total_files) * 100
+            self._update_phase(p.phase, progress=pct, current_file=p.current_file)
 
         try:
-            # Phase 1: Fetch version metadata
-            self._update_phase("Fetching version info...")
-            if worker.is_cancelled:
-                raise WorkerCancelled()
-
-            response = await client.get_version_with_files(self.version_id)
-            spec_name = response.spec_name
-            files = response.files
-
-            self._update_title(f"Pulling: {spec_name}")
-
-            if not files:
-                self._show_error("No files in this version.")
-                return
-
-            # Phase 2: Backup existing .shotgun/ if it exists
-            backup_path: str | None = None
-            if shotgun_dir.exists():
-                self._update_phase("Backing up existing files...")
-                if worker.is_cancelled:
-                    raise WorkerCancelled()
-
-                backup_path = await create_backup(shotgun_dir)
-                if backup_path:
-                    clear_shotgun_dir(shotgun_dir)
-
-            # Ensure .shotgun/ directory exists
-            shotgun_dir.mkdir(parents=True, exist_ok=True)
-
-            # Phase 3: Download files
-            total_files = len(files)
-            for idx, file_info in enumerate(files):
-                if worker.is_cancelled:
-                    raise WorkerCancelled()
-
-                progress_pct = ((idx + 1) / total_files) * 100
-                self._update_phase(
-                    f"Downloading files ({idx + 1}/{total_files})...",
-                    progress=progress_pct,
-                    current_file=file_info.relative_path,
-                )
-
-                if not file_info.download_url:
-                    logger.warning(
-                        "Skipping file without download URL: %s",
-                        file_info.relative_path,
-                    )
-                    continue
-
-                # Download file content
-                content = await download_file_from_url(file_info.download_url)
-
-                # Write to local path
-                local_path = shotgun_dir / file_info.relative_path
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                local_path.write_bytes(content)
-
-            # Phase 4: Write meta.json
-            self._update_phase("Finalizing...", progress=100)
-            if worker.is_cancelled:
-                raise WorkerCancelled()
-
-            meta = SpecMeta(
-                version_id=response.version.id,
-                spec_id=response.spec_id,
-                spec_name=response.spec_name,
-                workspace_id=response.workspace_id,
-                is_latest=response.version.is_latest,
-                pulled_at=datetime.now(timezone.utc),
-                backup_path=backup_path,
-                web_url=response.web_url,
+            result = await service.pull_version(
+                version_id=self.version_id,
+                shotgun_dir=shotgun_dir,
+                on_progress=on_progress,
+                is_cancelled=lambda: worker.is_cancelled,
             )
-            meta_path = shotgun_dir / "meta.json"
-            meta_path.write_text(meta.model_dump_json(indent=2))
 
-            # Success!
-            self._success = True
-            self._show_success()
+            if result.success:
+                self._update_title(f"Pulled: {result.spec_name}")
+                self._success = True
+                self._show_success()
+            else:
+                self._show_error(result.error or "Unknown error")
 
-        except WorkerCancelled:
+        except CancelledError:
             self._cancelled = True
             self._show_cancelled()
         except UnauthorizedError:

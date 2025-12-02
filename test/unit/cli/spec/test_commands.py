@@ -91,12 +91,12 @@ async def test_async_pull_success(tmp_path: Path, mock_version_response):
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
         patch(
-            "shotgun.cli.spec.commands.download_file_from_url",
+            "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
         ),
     ):
@@ -128,12 +128,12 @@ async def test_async_pull_returns_true_on_success(
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
         patch(
-            "shotgun.cli.spec.commands.download_file_from_url",
+            "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
         ),
     ):
@@ -158,19 +158,19 @@ async def test_async_pull_backs_up_existing_content(
     mock_backup_path = str(tmp_path / "backup.zip")
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
         patch(
-            "shotgun.cli.spec.commands.download_file_from_url",
+            "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
         ),
         patch(
-            "shotgun.cli.spec.commands.create_backup",
+            "shotgun.cli.spec.pull_service.create_backup",
             return_value=mock_backup_path,
         ) as mock_backup,
-        patch("shotgun.cli.spec.commands.clear_shotgun_dir") as mock_clear,
+        patch("shotgun.cli.spec.pull_service.clear_shotgun_dir") as mock_clear,
     ):
         await _async_pull("version-123")
 
@@ -190,7 +190,7 @@ async def test_async_pull_unauthorized_error(tmp_path: Path):
     )
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -210,7 +210,7 @@ async def test_async_pull_not_found_error(tmp_path: Path):
     mock_client.get_version_with_files.side_effect = NotFoundError("Version not found")
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -230,7 +230,7 @@ async def test_async_pull_forbidden_error(tmp_path: Path):
     mock_client.get_version_with_files.side_effect = ForbiddenError("Access denied")
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
@@ -258,15 +258,14 @@ async def test_async_pull_empty_version(tmp_path: Path):
     mock_client.get_version_with_files.return_value = mock_response
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
-        pytest.raises(typer.Exit) as exc_info,
     ):
-        await _async_pull("version-123")
-
-    assert exc_info.value.exit_code == 1
+        # Empty version now returns False instead of raising Exit
+        result = await _async_pull("version-123")
+        assert result is False
 
 
 def test_pull_command_help(runner):
@@ -306,12 +305,12 @@ def test_pull_command_no_tui_mode(runner, tmp_path, mock_version_response):
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
         ),
         patch(
-            "shotgun.cli.spec.commands.download_file_from_url",
+            "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
         ),
     ):

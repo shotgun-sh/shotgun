@@ -1,12 +1,11 @@
 """Spec management commands for shotgun CLI."""
 
 import asyncio
-from datetime import datetime, timezone
 from typing import Annotated
 
 import typer
 from rich.console import Console
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn
 
 from shotgun.logging_config import get_logger
 from shotgun.shotgun_web.exceptions import (
@@ -14,13 +13,10 @@ from shotgun.shotgun_web.exceptions import (
     NotFoundError,
     UnauthorizedError,
 )
-from shotgun.shotgun_web.specs_client import SpecsClient
-from shotgun.shotgun_web.supabase_client import download_file_from_url
 from shotgun.tui import app as tui_app
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
-from .backup import clear_shotgun_dir, create_backup
-from .models import SpecMeta
+from .pull_service import CancelledError, PullProgress, SpecPullService
 
 app = typer.Typer(
     name="spec",
@@ -68,103 +64,50 @@ async def _async_pull(version_id: str) -> bool:
     Returns:
         True if pull was successful, False otherwise.
     """
-    client = SpecsClient()
     shotgun_dir = get_shotgun_base_path()
+    service = SpecPullService()
+
+    # Track current progress state for rich display
+    current_task_id: TaskID | None = None
+    progress_ctx: Progress | None = None
+
+    def on_progress(p: PullProgress) -> None:
+        nonlocal current_task_id, progress_ctx
+        # For CLI, we just update the description - progress bar handled by result
+        if progress_ctx and current_task_id is not None:
+            progress_ctx.update(current_task_id, description=p.phase)
+            if p.total_files and p.file_index is not None:
+                pct = ((p.file_index + 1) / p.total_files) * 100
+                progress_ctx.update(current_task_id, completed=pct)
 
     try:
-        # Fetch version metadata and files
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            transient=True,
-        ) as progress:
-            progress.add_task("Fetching version info...", total=None)
-            response = await client.get_version_with_files(version_id)
-
-        spec_name = response.spec_name
-        files = response.files
-        console.print(f"[bold]Pulling spec:[/bold] {spec_name}")
-        console.print(f"[dim]Version: {version_id}[/dim]")
-        console.print(f"[dim]Files: {len(files)}[/dim]")
-
-        if not files:
-            console.print("[yellow]No files in this version.[/yellow]")
-            raise typer.Exit(1)
-
-        # Backup existing .shotgun/ if it has content
-        backup_path: str | None = None
-        if shotgun_dir.exists():
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                transient=True,
-            ) as progress:
-                progress.add_task("Backing up existing .shotgun/...", total=None)
-                backup_path = await create_backup(shotgun_dir)
-
-            if backup_path:
-                console.print(
-                    f"[yellow]Existing files backed up to:[/yellow] {backup_path}"
-                )
-                # Clear existing content after successful backup
-                clear_shotgun_dir(shotgun_dir)
-
-        # Ensure .shotgun/ directory exists
-        shotgun_dir.mkdir(parents=True, exist_ok=True)
-
-        # Download files with progress
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         ) as progress:
-            task = progress.add_task("Downloading files...", total=len(files))
+            progress_ctx = progress
+            current_task_id = progress.add_task("Starting...", total=100)
 
-            for file_info in files:
-                if not file_info.download_url:
-                    logger.warning(
-                        "Skipping file without download URL: %s",
-                        file_info.relative_path,
-                    )
-                    progress.advance(task)
-                    continue
+            result = await service.pull_version(
+                version_id=version_id,
+                shotgun_dir=shotgun_dir,
+                on_progress=on_progress,
+            )
 
-                # Download file content
-                content = await download_file_from_url(file_info.download_url)
-
-                # Write to local path
-                local_path = shotgun_dir / file_info.relative_path
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                local_path.write_bytes(content)
-                logger.debug("Downloaded: %s", file_info.relative_path)
-
-                progress.advance(task)
-
-        # Write meta.json
-        meta = SpecMeta(
-            version_id=response.version.id,
-            spec_id=response.spec_id,
-            spec_name=response.spec_name,
-            workspace_id=response.workspace_id,
-            is_latest=response.version.is_latest,
-            pulled_at=datetime.now(timezone.utc),
-            backup_path=backup_path,
-            web_url=response.web_url,
-        )
-        meta_path = shotgun_dir / "meta.json"
-        meta_path.write_text(meta.model_dump_json(indent=2))
-
-        # Success message
-        console.print()
-        console.print(f"[green]Successfully pulled '{spec_name}'[/green]")
-        console.print(f"  [dim]Files downloaded:[/dim] {len(files)}")
-        if backup_path:
-            console.print(f"  [dim]Previous backup:[/dim] {backup_path}")
-        if response.web_url:
-            console.print(f"  [blue]View in browser:[/blue] {response.web_url}")
-
-        return True
+        if result.success:
+            console.print()
+            console.print(f"[green]Successfully pulled '{result.spec_name}'[/green]")
+            console.print(f"  [dim]Files downloaded:[/dim] {result.file_count}")
+            if result.backup_path:
+                console.print(f"  [dim]Previous backup:[/dim] {result.backup_path}")
+            if result.web_url:
+                console.print(f"  [blue]View in browser:[/blue] {result.web_url}")
+            return True
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+            return False
 
     except UnauthorizedError:
         console.print(
@@ -177,6 +120,9 @@ async def _async_pull(version_id: str) -> bool:
         raise typer.Exit(1) from None
     except ForbiddenError:
         console.print("[red]You don't have access to this spec.[/red]")
+        raise typer.Exit(1) from None
+    except CancelledError:
+        console.print("[yellow]Pull cancelled.[/yellow]")
         raise typer.Exit(1) from None
     except Exception as e:
         logger.exception("Unexpected error in spec pull")
