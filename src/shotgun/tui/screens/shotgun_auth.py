@@ -251,9 +251,22 @@ class ShotgunAuthScreen(Screen[bool]):
                     logger.info("Authentication completed successfully")
 
                     if status_response.litellm_key and status_response.supabase_key:
+                        # Fetch user info to get workspace_id
+                        workspace_id: str | None = None
+                        try:
+                            me_response = client.get_me(status_response.supabase_key)
+                            workspace_id = me_response.workspace.id
+                            logger.info("Fetched workspace_id: %s", workspace_id)
+                        except Exception as e:
+                            # Log warning but continue - workspace_id can be fetched later
+                            logger.warning(
+                                "Failed to fetch workspace_id from /api/me: %s", e
+                            )
+
                         await self.config_manager.update_shotgun_account(
                             api_key=status_response.litellm_key,
                             supabase_jwt=status_response.supabase_key,
+                            workspace_id=workspace_id,
                         )
 
                         self.query_one("#status", Label).update(

@@ -5,11 +5,13 @@ import httpx
 from shotgun.logging_config import get_logger
 
 from .constants import (
+    ME_PATH,
     SHOTGUN_WEB_BASE_URL,
     UNIFICATION_TOKEN_CREATE_PATH,
     UNIFICATION_TOKEN_STATUS_PATH,
 )
 from .models import (
+    MeResponse,
     TokenCreateRequest,
     TokenCreateResponse,
     TokenStatusResponse,
@@ -104,6 +106,45 @@ class ShotgunWebClient:
             raise
         except httpx.HTTPError as e:
             logger.error("Failed to check token status: %s", e)
+            raise
+
+    def get_me(self, jwt: str) -> MeResponse:
+        """Get current user info including workspace.
+
+        Args:
+            jwt: Supabase JWT for authentication
+
+        Returns:
+            User info including workspace details
+
+        Raises:
+            httpx.HTTPStatusError: If authentication fails (401) or other HTTP errors
+            httpx.HTTPError: For other request failures
+        """
+        url = f"{self.base_url}{ME_PATH}"
+
+        logger.debug("Fetching user info from /api/me")
+
+        try:
+            response = httpx.get(
+                url,
+                headers={"Authorization": f"Bearer {jwt}"},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            result = MeResponse.model_validate(data)
+
+            logger.info("Successfully fetched user info for %s", result.email)
+            return result
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                logger.error("Authentication failed for /api/me")
+            raise
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch user info: %s", e)
             raise
 
 

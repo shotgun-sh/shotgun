@@ -244,3 +244,104 @@ def test_check_token_status_convenience_function(mock_httpx_get):
     # Assertions
     assert result.status == TokenStatus.PENDING
     mock_httpx_get.assert_called_once()
+
+
+def test_get_me_success(mock_httpx_get):
+    """Test successful get_me call."""
+    # Setup mock response
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "id": "user-uuid-123",
+        "email": "test@example.com",
+        "first_name": "Test",
+        "last_name": "User",
+        "workspace": {
+            "id": "workspace-uuid-456",
+            "name": "Test Workspace",
+            "role": "owner",
+        },
+        "has_completed_unification": True,
+        "last_unification_at": "2025-01-15T10:30:00Z",
+    }
+    mock_response.raise_for_status = MagicMock()
+    mock_httpx_get.return_value = mock_response
+
+    # Create client and call method
+    client = ShotgunWebClient()
+    result = client.get_me("test-jwt-token")
+
+    # Assertions
+    assert result.id == "user-uuid-123"
+    assert result.email == "test@example.com"
+    assert result.first_name == "Test"
+    assert result.last_name == "User"
+    assert result.workspace.id == "workspace-uuid-456"
+    assert result.workspace.name == "Test Workspace"
+    assert result.workspace.role == "owner"
+    assert result.has_completed_unification is True
+
+    # Verify HTTP call with auth header
+    mock_httpx_get.assert_called_once()
+    call_args = mock_httpx_get.call_args
+    assert call_args[1]["headers"] == {"Authorization": "Bearer test-jwt-token"}
+    assert call_args[1]["timeout"] == 10.0
+
+
+def test_get_me_success_with_null_names(mock_httpx_get):
+    """Test successful get_me call with null first_name and last_name."""
+    # Setup mock response with null names (as returned by real API)
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "id": "user-uuid-123",
+        "email": "test@example.com",
+        "first_name": None,
+        "last_name": None,
+        "workspace": {
+            "id": "workspace-uuid-456",
+            "name": "Test Workspace",
+            "role": "owner",
+        },
+        "has_completed_unification": True,
+        "last_unification_at": "2025-01-15T10:30:00Z",
+    }
+    mock_response.raise_for_status = MagicMock()
+    mock_httpx_get.return_value = mock_response
+
+    # Create client and call method
+    client = ShotgunWebClient()
+    result = client.get_me("test-jwt-token")
+
+    # Assertions
+    assert result.id == "user-uuid-123"
+    assert result.email == "test@example.com"
+    assert result.first_name is None
+    assert result.last_name is None
+    assert result.workspace.id == "workspace-uuid-456"
+
+
+def test_get_me_401_error(mock_httpx_get):
+    """Test get_me with 401 unauthorized error."""
+    # Setup mock to raise 401 error
+    mock_response = MagicMock()
+    mock_response.status_code = 401
+    mock_httpx_get.side_effect = httpx.HTTPStatusError(
+        "Unauthorized", request=MagicMock(), response=mock_response
+    )
+
+    # Create client and expect exception
+    client = ShotgunWebClient()
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+        client.get_me("invalid-jwt-token")
+
+    assert exc_info.value.response.status_code == 401
+
+
+def test_get_me_http_error(mock_httpx_get):
+    """Test get_me with generic HTTP error."""
+    # Setup mock to raise HTTP error
+    mock_httpx_get.side_effect = httpx.HTTPError("Connection error")
+
+    # Create client and expect exception
+    client = ShotgunWebClient()
+    with pytest.raises(httpx.HTTPError):
+        client.get_me("test-jwt-token")

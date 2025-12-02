@@ -82,6 +82,30 @@ class WorkspaceResponse(BaseModel):
     name: str = Field(description="Workspace name")
 
 
+class MeWorkspaceResponse(BaseModel):
+    """Workspace info from /api/me endpoint."""
+
+    id: str = Field(description="Workspace UUID")
+    name: str = Field(description="Workspace name")
+    role: str = Field(description="User's role in workspace")
+
+
+class MeResponse(BaseModel):
+    """Response from /api/me endpoint."""
+
+    id: str = Field(description="User UUID")
+    email: str = Field(description="User email")
+    first_name: str | None = Field(default=None, description="User's first name")
+    last_name: str | None = Field(default=None, description="User's last name")
+    workspace: MeWorkspaceResponse = Field(description="User's workspace info")
+    has_completed_unification: bool = Field(
+        description="Whether unification is complete"
+    )
+    last_unification_at: datetime | None = Field(
+        default=None, description="Last unification timestamp"
+    )
+
+
 class WorkspaceListResponse(BaseModel):
     """Response for listing user's workspaces."""
 
