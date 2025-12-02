@@ -107,19 +107,22 @@ class ShotgunAuthScreen(Screen[bool]):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        title: str = "Shotgun Account Setup",
+        subtitle: str = "Authenticate with your Shotgun Account to get started",
+    ) -> None:
         super().__init__()
+        self._title = title
+        self._subtitle = subtitle
         self.token: str | None = None
         self.auth_url: str | None = None
         self.poll_worker: Worker[None] | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
-            yield Static("Shotgun Account Setup", id="auth-title")
-            yield Static(
-                "Authenticate with your Shotgun Account to get started",
-                id="auth-subtitle",
-            )
+            yield Static(self._title, id="auth-title")
+            yield Static(self._subtitle, id="auth-subtitle")
 
         with Vertical(id="content"):
             yield Label("Initializing...", id="status")
@@ -251,9 +254,22 @@ class ShotgunAuthScreen(Screen[bool]):
                     logger.info("Authentication completed successfully")
 
                     if status_response.litellm_key and status_response.supabase_key:
+                        # Fetch user info to get workspace_id
+                        workspace_id: str | None = None
+                        try:
+                            me_response = client.get_me(status_response.supabase_key)
+                            workspace_id = me_response.workspace.id
+                            logger.info("Fetched workspace_id: %s", workspace_id)
+                        except Exception as e:
+                            # Log warning but continue - workspace_id can be fetched later
+                            logger.warning(
+                                "Failed to fetch workspace_id from /api/me: %s", e
+                            )
+
                         await self.config_manager.update_shotgun_account(
                             api_key=status_response.litellm_key,
                             supabase_jwt=status_response.supabase_key,
+                            workspace_id=workspace_id,
                         )
 
                         self.query_one("#status", Label).update(

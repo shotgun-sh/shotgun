@@ -55,6 +55,7 @@ class ShotgunApp(App[None]):
         continue_session: bool = False,
         force_reindex: bool = False,
         show_pull_hint: bool = False,
+        pull_version_id: str | None = None,
     ) -> None:
         super().__init__()
         self.config_manager: ConfigManager = get_config_manager()
@@ -62,6 +63,7 @@ class ShotgunApp(App[None]):
         self.continue_session = continue_session
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
+        self.pull_version_id = pull_version_id
 
         # Initialize dependency injection container
         self.container = TUIContainer()
@@ -153,6 +155,16 @@ class ShotgunApp(App[None]):
             if isinstance(self.screen, ChatScreen):
                 return
 
+            # If we have a version to pull, show pull screen first
+            if self.pull_version_id:
+                from .screens.spec_pull import SpecPullScreen
+
+                self.push_screen(
+                    SpecPullScreen(self.pull_version_id),
+                    callback=self._handle_pull_complete,
+                )
+                return
+
             # Create ChatScreen with all dependencies injected from container
             # Get the default agent mode (RESEARCH)
             agent_mode = AgentType.RESEARCH
@@ -200,6 +212,22 @@ class ShotgunApp(App[None]):
         shotgun_dir = get_shotgun_base_path()
         return shotgun_dir.exists() and shotgun_dir.is_dir()
 
+    def _handle_pull_complete(self, success: bool | None) -> None:
+        """Handle completion of spec pull screen.
+
+        Args:
+            success: Whether the pull was successful, or None if dismissed.
+        """
+        # Clear version_id so we don't pull again on next refresh
+        self.pull_version_id = None
+
+        if success:
+            # Enable hint for ChatScreen
+            self.show_pull_hint = True
+
+        # Continue to ChatScreen
+        self.refresh_startup_screen()
+
     async def action_quit(self) -> None:
         """Quit the application."""
         # Shut down PostHog client to prevent threading errors
@@ -227,6 +255,7 @@ def run(
     continue_session: bool = False,
     force_reindex: bool = False,
     show_pull_hint: bool = False,
+    pull_version_id: str | None = None,
 ) -> None:
     """Run the TUI application.
 
@@ -235,6 +264,7 @@ def run(
         continue_session: If True, continue from previous conversation.
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
         show_pull_hint: If True, show hint about recently pulled spec.
+        pull_version_id: If provided, pull this spec version before showing ChatScreen.
     """
     # Clean up any corrupted databases BEFORE starting the TUI
     # This prevents crashes from corrupted databases during initialization
@@ -261,6 +291,7 @@ def run(
         continue_session=continue_session,
         force_reindex=force_reindex,
         show_pull_hint=show_pull_hint,
+        pull_version_id=pull_version_id,
     )
     app.run(inline_no_clear=True)
 
