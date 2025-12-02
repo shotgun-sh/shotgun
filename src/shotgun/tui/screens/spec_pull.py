@@ -268,7 +268,11 @@ class SpecPullScreen(ModalScreen[bool]):
 
     def action_cancel(self) -> None:
         """Handle escape key."""
-        if self._success or self._cancelled or self.query_one("#error-label", Static).display:
+        if (
+            self._success
+            or self._cancelled
+            or self.query_one("#error-label", Static).display
+        ):
             # Already finished, just dismiss
             self.dismiss(self._success)
         else:
