@@ -36,7 +36,7 @@ def pull(
     version_id: Annotated[str, typer.Argument(help="Version ID to pull")],
     no_tui: Annotated[
         bool,
-        typer.Option("--no-tui", help="Skip launching TUI after pull"),
+        typer.Option("--no-tui", help="Run in CLI-only mode (requires existing auth)"),
     ] = False,
 ) -> None:
     """Pull a spec version from the cloud to local .shotgun/ directory.
@@ -45,16 +45,21 @@ def pull(
     local .shotgun/ directory. If the directory already has content, it
     will be backed up to ~/.shotgun-sh/backups/ before being replaced.
 
+    By default, launches the TUI which handles authentication and shows
+    the pull progress. Use --no-tui for scripted/headless use (requires
+    existing authentication).
+
     Example:
         shotgun spec pull 2532e1c7-7068-4d23-9379-58ea439c592f
     """
-    success = asyncio.run(_async_pull(version_id))
-
-    # Launch TUI after async operations complete (outside event loop)
-    if success and not no_tui:
-        console.print()
-        console.print("[dim]Launching TUI...[/dim]")
-        tui_app.run(show_pull_hint=True)
+    if no_tui:
+        # CLI-only mode: do pull directly (requires existing auth)
+        success = asyncio.run(_async_pull(version_id))
+        if not success:
+            raise typer.Exit(1)
+    else:
+        # TUI mode: launch TUI which handles auth and pull
+        tui_app.run(pull_version_id=version_id)
 
 
 async def _async_pull(version_id: str) -> bool:
@@ -163,7 +168,7 @@ async def _async_pull(version_id: str) -> bool:
 
     except UnauthorizedError:
         console.print(
-            "[red]Not authenticated. Run 'shotgun config auth' to login.[/red]"
+            "[red]Not authenticated. Please re-run the command to login.[/red]"
         )
         raise typer.Exit(1) from None
     except NotFoundError:

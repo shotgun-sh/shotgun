@@ -286,3 +286,39 @@ def test_spec_app_no_args_shows_help(runner):
     assert result.exit_code == 2
     # The app shows commands when invoked with no args
     assert "pull" in output
+
+
+def test_pull_command_launches_tui_by_default(runner):
+    """Test pull command launches TUI by default (not --no-tui mode)."""
+    with patch("shotgun.cli.spec.commands.tui_app.run") as mock_run:
+        # Note: For single-command typer apps, don't include command name
+        result = runner.invoke(app, ["version-123"])
+
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(pull_version_id="version-123")
+
+
+def test_pull_command_no_tui_mode(runner, tmp_path, mock_version_response):
+    """Test pull command with --no-tui flag runs CLI-only mode."""
+    shotgun_dir = tmp_path / ".shotgun"
+
+    mock_client = AsyncMock()
+    mock_client.get_version_with_files.return_value = mock_version_response
+
+    with (
+        patch("shotgun.cli.spec.commands.SpecsClient", return_value=mock_client),
+        patch(
+            "shotgun.cli.spec.commands.get_shotgun_base_path", return_value=shotgun_dir
+        ),
+        patch(
+            "shotgun.cli.spec.commands.download_file_from_url",
+            return_value=b"# Test Content",
+        ),
+    ):
+        # Note: For single-command typer apps, don't include command name
+        result = runner.invoke(app, ["version-123", "--no-tui"])
+
+    assert result.exit_code == 0
+    # Verify files were created
+    assert (shotgun_dir / "spec.md").exists()
+    assert (shotgun_dir / "meta.json").exists()

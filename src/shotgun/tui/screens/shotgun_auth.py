@@ -107,19 +107,22 @@ class ShotgunAuthScreen(Screen[bool]):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        title: str = "Shotgun Account Setup",
+        subtitle: str = "Authenticate with your Shotgun Account to get started",
+    ) -> None:
         super().__init__()
+        self._title = title
+        self._subtitle = subtitle
         self.token: str | None = None
         self.auth_url: str | None = None
         self.poll_worker: Worker[None] | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
-            yield Static("Shotgun Account Setup", id="auth-title")
-            yield Static(
-                "Authenticate with your Shotgun Account to get started",
-                id="auth-subtitle",
-            )
+            yield Static(self._title, id="auth-title")
+            yield Static(self._subtitle, id="auth-subtitle")
 
         with Vertical(id="content"):
             yield Label("Initializing...", id="status")
