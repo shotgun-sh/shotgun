@@ -31,10 +31,14 @@ class ModelName(StrEnum):
     GPT_5_1_CODEX = "gpt-5.1-codex"
     GPT_5_1_CODEX_MINI = "gpt-5.1-codex-mini"
     CLAUDE_OPUS_4_1 = "claude-opus-4-1"
+    CLAUDE_OPUS_4_5 = "claude-opus-4-5"
+    CLAUDE_SONNET_4 = "claude-sonnet-4"
     CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
     GEMINI_2_5_PRO = "gemini-2.5-pro"
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
+    GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
+    GEMINI_3_PRO_PREVIEW = "gemini-3-pro-preview"
 
 
 class ModelSpec(BaseModel):
@@ -180,6 +184,38 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_output_tokens=64_000,
         litellm_proxy_model_name="gemini/gemini-2.5-flash",
         short_name="Gemini 2.5 Flash",
+    ),
+    ModelName.CLAUDE_OPUS_4_5: ModelSpec(
+        name=ModelName.CLAUDE_OPUS_4_5,
+        provider=ProviderType.ANTHROPIC,
+        max_input_tokens=200_000,
+        max_output_tokens=64_000,
+        litellm_proxy_model_name="anthropic/claude-opus-4-5",
+        short_name="Opus 4.5",
+    ),
+    ModelName.CLAUDE_SONNET_4: ModelSpec(
+        name=ModelName.CLAUDE_SONNET_4,
+        provider=ProviderType.ANTHROPIC,
+        max_input_tokens=200_000,
+        max_output_tokens=64_000,
+        litellm_proxy_model_name="anthropic/claude-sonnet-4",
+        short_name="Sonnet 4",
+    ),
+    ModelName.GEMINI_3_PRO_PREVIEW: ModelSpec(
+        name=ModelName.GEMINI_3_PRO_PREVIEW,
+        provider=ProviderType.GOOGLE,
+        max_input_tokens=1_048_576,
+        max_output_tokens=65_536,
+        litellm_proxy_model_name="gemini/gemini-3-pro-preview",
+        short_name="Gemini 3 Pro",
+    ),
+    ModelName.GEMINI_2_5_FLASH_LITE: ModelSpec(
+        name=ModelName.GEMINI_2_5_FLASH_LITE,
+        provider=ProviderType.GOOGLE,
+        max_input_tokens=1_048_576,
+        max_output_tokens=65_536,
+        litellm_proxy_model_name="gemini/gemini-2.5-flash-lite",
+        short_name="Gemini 2.5 Flash Lite",
     ),
 }
 
