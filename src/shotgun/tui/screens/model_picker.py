@@ -293,6 +293,12 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         )
         return has_key
 
+    def _format_tokens(self, tokens: int) -> str:
+        """Format token count for display (K for thousands, M for millions)."""
+        if tokens >= 1_000_000:
+            return f"{tokens / 1_000_000:.1f}M"
+        return f"{tokens // 1000}K"
+
     def _model_label(self, model_name: ModelName, is_current: bool) -> str:
         """Generate label for model with specs and current indicator."""
         if model_name not in MODEL_SPECS:
@@ -302,10 +308,10 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         display_name = self._model_display_name(model_name)
 
         # Format context/output tokens in readable format
-        input_k = spec.max_input_tokens // 1000
-        output_k = spec.max_output_tokens // 1000
+        input_fmt = self._format_tokens(spec.max_input_tokens)
+        output_fmt = self._format_tokens(spec.max_output_tokens)
 
-        label = f"{display_name} · {input_k}K context · {output_k}K output"
+        label = f"{display_name} · {input_fmt} context · {output_fmt} output"
 
         # Add cost indicator for expensive models
         if model_name == ModelName.CLAUDE_OPUS_4_5:
