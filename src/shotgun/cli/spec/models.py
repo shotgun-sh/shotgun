@@ -1,8 +1,26 @@
 """Pydantic models for spec CLI commands."""
 
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
+
+
+class PullSource(StrEnum):
+    """Source of spec pull operation for analytics."""
+
+    CLI = "cli"
+    TUI = "tui"
+
+
+class PullPhase(StrEnum):
+    """Phases during spec pull operation for analytics."""
+
+    STARTING = "starting"
+    FETCHING = "fetching"
+    BACKUP = "backup"
+    DOWNLOADING = "downloading"
+    FINALIZING = "finalizing"
 
 
 class SpecMeta(BaseModel):

@@ -207,6 +207,23 @@ PostHog tracks:
 - Update checks
 - Errors and exceptions
 
+### Spec Operations Events
+
+- `spec_pull_started` - Spec download initiated (properties: source)
+- `spec_pull_completed` - Spec download successful (properties: source, file_count, total_bytes, duration_seconds, had_backup)
+- `spec_pull_failed` - Spec download failed (properties: source, error_type, phase)
+- `spec_pull_cancelled` - Spec download cancelled by user (properties: source, phase)
+- `spec_upload_started` - Spec upload initiated
+- `spec_upload_completed` - Spec upload successful (properties: file_count, total_bytes, duration_seconds)
+- `spec_upload_failed` - Spec upload failed (properties: error_type, phase, files_uploaded, bytes_uploaded)
+
+### Authentication Events
+
+- `auth_started` - Authentication flow initiated
+- `auth_completed` - Authentication successful (properties: duration_seconds)
+- `auth_failed` - Authentication failed (properties: phase, error_type)
+- `auth_cancelled` - Authentication cancelled by user
+
 ### Viewing Analytics
 
 1. Log into PostHog dashboard

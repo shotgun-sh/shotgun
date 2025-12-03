@@ -16,6 +16,7 @@ from shotgun.shotgun_web.exceptions import (
 from shotgun.tui import app as tui_app
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 
+from .models import PullSource
 from .pull_service import CancelledError, PullProgress, SpecPullService
 
 app = typer.Typer(
@@ -94,6 +95,7 @@ async def _async_pull(version_id: str) -> bool:
                 version_id=version_id,
                 shotgun_dir=shotgun_dir,
                 on_progress=on_progress,
+                source=PullSource.CLI,
             )
 
         if result.success:

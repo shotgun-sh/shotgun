@@ -1,10 +1,12 @@
 """Upload pipeline for .shotgun/ directory to Specs API."""
 
 import asyncio
+import time
 from collections.abc import Callable
 from pathlib import Path
 
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 from shotgun.shotgun_web.models import FileMetadata
 from shotgun.shotgun_web.shared_specs.file_scanner import (
     scan_shotgun_directory_with_counts,
@@ -54,6 +56,9 @@ async def run_upload_pipeline(
         project_root = Path.cwd()
 
     state = UploadState()
+    start_time = time.time()
+    current_phase: UploadPhase = UploadPhase.CREATING
+    track_event("spec_upload_started")
 
     def report_progress(progress: UploadProgress) -> None:
         """Report progress to callback if provided."""
@@ -62,6 +67,7 @@ async def run_upload_pipeline(
 
     try:
         # Phase 1: Scan files
+        current_phase = UploadPhase.SCANNING
         report_progress(
             UploadProgress(
                 phase=UploadPhase.SCANNING,
@@ -84,6 +90,15 @@ async def run_upload_pipeline(
                     "No files to share. Add specifications to .shotgun/ first."
                 )
 
+            track_event(
+                "spec_upload_failed",
+                {
+                    "error_type": "EmptyDirectory",
+                    "phase": current_phase.value,
+                    "files_uploaded": 0,
+                    "bytes_uploaded": 0,
+                },
+            )
             report_progress(
                 UploadProgress(
                     phase=UploadPhase.ERROR,
@@ -110,6 +125,7 @@ async def run_upload_pipeline(
         )
 
         # Phase 2: Calculate hashes
+        current_phase = UploadPhase.HASHING
         report_progress(
             UploadProgress(
                 phase=UploadPhase.HASHING,
@@ -122,6 +138,7 @@ async def run_upload_pipeline(
         files_with_hashes = await _calculate_hashes(files, state, report_progress)
 
         # Phase 3: Upload files
+        current_phase = UploadPhase.UPLOADING
         report_progress(
             UploadProgress(
                 phase=UploadPhase.UPLOADING,
@@ -144,6 +161,7 @@ async def run_upload_pipeline(
         )
 
         # Phase 4: Close version
+        current_phase = UploadPhase.CLOSING
         report_progress(
             UploadProgress(
                 phase=UploadPhase.CLOSING,
@@ -169,6 +187,17 @@ async def run_upload_pipeline(
             )
         )
 
+        # Track successful completion
+        duration = time.time() - start_time
+        track_event(
+            "spec_upload_completed",
+            {
+                "file_count": state.files_uploaded,
+                "total_bytes": state.bytes_uploaded,
+                "duration_seconds": round(duration, 2),
+            },
+        )
+
         return UploadResult(
             success=True,
             web_url=close_response.web_url,
@@ -178,6 +207,15 @@ async def run_upload_pipeline(
 
     except Exception as e:
         logger.error(f"Upload pipeline failed: {e}", exc_info=True)
+        track_event(
+            "spec_upload_failed",
+            {
+                "error_type": type(e).__name__,
+                "phase": current_phase.value,
+                "files_uploaded": state.files_uploaded,
+                "bytes_uploaded": state.bytes_uploaded,
+            },
+        )
         report_progress(
             UploadProgress(
                 phase=UploadPhase.ERROR,

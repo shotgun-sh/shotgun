@@ -8,6 +8,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Label, ProgressBar, Static
 from textual.worker import Worker, get_current_worker
 
+from shotgun.cli.spec.models import PullSource
 from shotgun.cli.spec.pull_service import (
     CancelledError,
     PullProgress,
@@ -187,6 +188,7 @@ class SpecPullScreen(ModalScreen[bool]):
                 shotgun_dir=shotgun_dir,
                 on_progress=on_progress,
                 is_cancelled=lambda: worker.is_cancelled,
+                source=PullSource.TUI,
             )
 
             if result.success:

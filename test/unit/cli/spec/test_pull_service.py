@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from shotgun.cli.spec.models import PullSource
 from shotgun.cli.spec.pull_service import (
     CancelledError,
     PullProgress,
-    PullResult,
     SpecPullService,
 )
 from shotgun.shotgun_web.models import SpecFileResponse, SpecVersionResponse
@@ -74,9 +74,7 @@ async def test_pull_version_success(tmp_path: Path, mock_version_response):
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch(
-            "shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
@@ -112,9 +110,7 @@ async def test_pull_version_with_progress_callback(
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch(
-            "shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
@@ -155,9 +151,7 @@ async def test_pull_version_cancellation(tmp_path: Path, mock_version_response):
     mock_client.get_version_with_files.return_value = mock_version_response
 
     with (
-        patch(
-            "shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
@@ -188,9 +182,7 @@ async def test_pull_version_empty_files(tmp_path: Path):
     mock_client = AsyncMock()
     mock_client.get_version_with_files.return_value = mock_response
 
-    with patch(
-        "shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client
-    ):
+    with patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client):
         service = SpecPullService()
         result = await service.pull_version(
             version_id="version-123",
@@ -215,9 +207,7 @@ async def test_pull_version_backs_up_existing(tmp_path: Path, mock_version_respo
     mock_backup_path = str(tmp_path / "backup.zip")
 
     with (
-        patch(
-            "shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
@@ -294,9 +284,7 @@ async def test_pull_version_skips_file_without_url(tmp_path: Path):
     mock_client.get_version_with_files.return_value = mock_response
 
     with (
-        patch(
-            "shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client
-        ),
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
         patch(
             "shotgun.cli.spec.pull_service.download_file_from_url",
             return_value=b"# Test Content",
@@ -313,3 +301,136 @@ async def test_pull_version_skips_file_without_url(tmp_path: Path):
     mock_download.assert_called_once()
     assert (shotgun_dir / "spec.md").exists()
     assert not (shotgun_dir / "missing.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_pull_version_tracks_posthog_events(
+    tmp_path: Path, mock_version_response
+):
+    """Test PostHog events are tracked during successful pull."""
+    shotgun_dir = tmp_path / ".shotgun"
+
+    mock_client = AsyncMock()
+    mock_client.get_version_with_files.return_value = mock_version_response
+
+    with (
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
+        patch(
+            "shotgun.cli.spec.pull_service.download_file_from_url",
+            return_value=b"# Test Content",
+        ),
+        patch("shotgun.cli.spec.pull_service.track_event") as mock_track,
+    ):
+        service = SpecPullService()
+        result = await service.pull_version(
+            version_id="version-123",
+            shotgun_dir=shotgun_dir,
+            source=PullSource.TUI,
+        )
+
+    assert result.success is True
+
+    # Verify started event was tracked
+    mock_track.assert_any_call("spec_pull_started", {"source": "tui"})
+
+    # Verify completed event was tracked with correct properties
+    completed_calls = [
+        c for c in mock_track.call_args_list if c[0][0] == "spec_pull_completed"
+    ]
+    assert len(completed_calls) == 1
+    props = completed_calls[0][0][1]
+    assert props["source"] == "tui"
+    assert props["file_count"] == 2
+    assert "total_bytes" in props
+    assert "duration_seconds" in props
+    assert "had_backup" in props
+
+
+@pytest.mark.asyncio
+async def test_pull_version_tracks_failure_event(tmp_path: Path):
+    """Test PostHog failure event is tracked for empty version."""
+    shotgun_dir = tmp_path / ".shotgun"
+
+    mock_response = MagicMock(
+        version=MagicMock(id="version-123", is_latest=True),
+        spec_name="Empty Spec",
+        spec_id="spec-456",
+        workspace_id="workspace-789",
+        files=[],
+    )
+
+    mock_client = AsyncMock()
+    mock_client.get_version_with_files.return_value = mock_response
+
+    with (
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
+        patch("shotgun.cli.spec.pull_service.track_event") as mock_track,
+    ):
+        service = SpecPullService()
+        result = await service.pull_version(
+            version_id="version-123",
+            shotgun_dir=shotgun_dir,
+            source=PullSource.CLI,
+        )
+
+    assert result.success is False
+
+    # Verify started event was tracked
+    mock_track.assert_any_call("spec_pull_started", {"source": "cli"})
+
+    # Verify failed event was tracked
+    failed_calls = [
+        c for c in mock_track.call_args_list if c[0][0] == "spec_pull_failed"
+    ]
+    assert len(failed_calls) == 1
+    props = failed_calls[0][0][1]
+    assert props["source"] == "cli"
+    assert props["error_type"] == "EmptyVersion"
+    assert props["phase"] == "fetching"
+
+
+@pytest.mark.asyncio
+async def test_pull_version_tracks_cancelled_event(
+    tmp_path: Path, mock_version_response
+):
+    """Test PostHog cancelled event is tracked when pull is cancelled."""
+    shotgun_dir = tmp_path / ".shotgun"
+    cancel_after = 1
+    cancel_count = 0
+
+    def is_cancelled() -> bool:
+        nonlocal cancel_count
+        cancel_count += 1
+        return cancel_count > cancel_after
+
+    mock_client = AsyncMock()
+    mock_client.get_version_with_files.return_value = mock_version_response
+
+    with (
+        patch("shotgun.cli.spec.pull_service.SpecsClient", return_value=mock_client),
+        patch(
+            "shotgun.cli.spec.pull_service.download_file_from_url",
+            return_value=b"# Test Content",
+        ),
+        patch("shotgun.cli.spec.pull_service.track_event") as mock_track,
+        pytest.raises(CancelledError),
+    ):
+        service = SpecPullService()
+        await service.pull_version(
+            version_id="version-123",
+            shotgun_dir=shotgun_dir,
+            is_cancelled=is_cancelled,
+            source=PullSource.TUI,
+        )
+
+    # Verify started event was tracked
+    mock_track.assert_any_call("spec_pull_started", {"source": "tui"})
+
+    # Verify cancelled event was tracked
+    cancelled_calls = [
+        c for c in mock_track.call_args_list if c[0][0] == "spec_pull_cancelled"
+    ]
+    assert len(cancelled_calls) == 1
+    props = cancelled_calls[0][0][1]
+    assert props["source"] == "tui"
+    assert "phase" in props
