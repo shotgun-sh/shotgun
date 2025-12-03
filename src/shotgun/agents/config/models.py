@@ -174,14 +174,6 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         litellm_proxy_model_name="anthropic/claude-sonnet-4",
         short_name="Sonnet 4",
     ),
-    ModelName.GEMINI_3_PRO_PREVIEW: ModelSpec(
-        name=ModelName.GEMINI_3_PRO_PREVIEW,
-        provider=ProviderType.GOOGLE,
-        max_input_tokens=1_048_576,
-        max_output_tokens=65_536,
-        litellm_proxy_model_name="gemini/gemini-3-pro-preview",
-        short_name="Gemini 3 Pro",
-    ),
     ModelName.GEMINI_2_5_FLASH_LITE: ModelSpec(
         name=ModelName.GEMINI_2_5_FLASH_LITE,
         provider=ProviderType.GOOGLE,
@@ -189,6 +181,14 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_output_tokens=65_536,
         litellm_proxy_model_name="gemini/gemini-2.5-flash-lite",
         short_name="Gemini 2.5 Flash Lite",
+    ),
+    ModelName.GEMINI_3_PRO_PREVIEW: ModelSpec(
+        name=ModelName.GEMINI_3_PRO_PREVIEW,
+        provider=ProviderType.GOOGLE,
+        max_input_tokens=1_048_576,
+        max_output_tokens=65_536,
+        litellm_proxy_model_name="gemini/gemini-3-pro-preview",
+        short_name="Gemini 3 Pro",
     ),
 }
 
