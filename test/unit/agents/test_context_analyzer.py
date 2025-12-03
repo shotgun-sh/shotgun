@@ -30,10 +30,10 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 def model_config() -> ModelConfig:
     """Create a test model configuration."""
     return ModelConfig(
-        name=ModelName.GPT_5_MINI,
+        name=ModelName.GPT_5_1,
         provider=ProviderType.OPENAI,
         key_provider=KeyProvider.BYOK,
-        max_input_tokens=400_000,
+        max_input_tokens=272_000,
         max_output_tokens=128_000,
         api_key="test-key",
     )

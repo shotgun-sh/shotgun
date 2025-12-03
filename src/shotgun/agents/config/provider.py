@@ -271,8 +271,6 @@ async def get_provider_model(
         # Check and test streaming capability for GPT-5 family models
         supports_streaming = True  # Default to True for all models
         if model_name in (
-            ModelName.GPT_5,
-            ModelName.GPT_5_MINI,
             ModelName.GPT_5_1,
             ModelName.GPT_5_1_CODEX,
             ModelName.GPT_5_1_CODEX_MINI,

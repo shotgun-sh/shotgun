@@ -34,7 +34,7 @@ from shotgun.agents.conversation.history.chunking import (
 def mock_model_config() -> ModelConfig:
     """Create a mock ModelConfig for testing."""
     return ModelConfig(
-        name=ModelName.GPT_5,
+        name=ModelName.GPT_5_1,
         provider=ProviderType.OPENAI,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=10000,

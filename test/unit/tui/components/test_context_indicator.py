@@ -170,8 +170,8 @@ def test_context_indicator_display_with_different_models():
     # Test with different models
     for model_name in [
         ModelName.CLAUDE_SONNET_4_5,
-        ModelName.CLAUDE_OPUS_4_1,
-        ModelName.GPT_5,
+        ModelName.CLAUDE_OPUS_4_5,
+        ModelName.GPT_5_1,
         ModelName.GEMINI_2_5_PRO,
     ]:
         indicator.update_context(analysis, model_name)

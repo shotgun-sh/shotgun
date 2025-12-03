@@ -47,7 +47,7 @@ def mock_agent_deps(mock_codebase_service):
 
     # Create a real ModelConfig instead of a mock
     model_config = ModelConfig(
-        name=ModelName.GPT_5,
+        name=ModelName.GPT_5_1,
         provider=ProviderType.OPENAI,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=4096,

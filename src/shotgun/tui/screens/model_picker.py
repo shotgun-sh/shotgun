@@ -293,6 +293,12 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         )
         return has_key
 
+    def _format_tokens(self, tokens: int) -> str:
+        """Format token count for display (K for thousands, M for millions)."""
+        if tokens >= 1_000_000:
+            return f"{tokens / 1_000_000:.1f}M"
+        return f"{tokens // 1000}K"
+
     def _model_label(self, model_name: ModelName, is_current: bool) -> str:
         """Generate label for model with specs and current indicator."""
         if model_name not in MODEL_SPECS:
@@ -302,13 +308,13 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         display_name = self._model_display_name(model_name)
 
         # Format context/output tokens in readable format
-        input_k = spec.max_input_tokens // 1000
-        output_k = spec.max_output_tokens // 1000
+        input_fmt = self._format_tokens(spec.max_input_tokens)
+        output_fmt = self._format_tokens(spec.max_output_tokens)
 
-        label = f"{display_name} · {input_k}K context · {output_k}K output"
+        label = f"{display_name} · {input_fmt} context · {output_fmt} output"
 
         # Add cost indicator for expensive models
-        if model_name == ModelName.CLAUDE_OPUS_4_1:
+        if model_name == ModelName.CLAUDE_OPUS_4_5:
             label += " · Expensive"
 
         if is_current:
@@ -319,16 +325,17 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     def _model_display_name(self, model_name: ModelName) -> str:
         """Get human-readable model name."""
         names = {
-            ModelName.GPT_5: "GPT-5 (OpenAI)",
-            ModelName.GPT_5_MINI: "GPT-5 Mini (OpenAI)",
             ModelName.GPT_5_1: "GPT-5.1 (OpenAI)",
             ModelName.GPT_5_1_CODEX: "GPT-5.1 Codex (OpenAI)",
             ModelName.GPT_5_1_CODEX_MINI: "GPT-5.1 Codex Mini (OpenAI)",
-            ModelName.CLAUDE_OPUS_4_1: "Claude Opus 4.1 (Anthropic)",
+            ModelName.CLAUDE_OPUS_4_5: "Claude Opus 4.5 (Anthropic)",
+            ModelName.CLAUDE_SONNET_4: "Claude Sonnet 4 (Anthropic)",
             ModelName.CLAUDE_SONNET_4_5: "Claude Sonnet 4.5 (Anthropic)",
             ModelName.CLAUDE_HAIKU_4_5: "Claude Haiku 4.5 (Anthropic)",
             ModelName.GEMINI_2_5_PRO: "Gemini 2.5 Pro (Google)",
             ModelName.GEMINI_2_5_FLASH: "Gemini 2.5 Flash (Google)",
+            ModelName.GEMINI_2_5_FLASH_LITE: "Gemini 2.5 Flash Lite (Google)",
+            ModelName.GEMINI_3_PRO_PREVIEW: "Gemini 3 Pro Preview (Google)",
         }
         return names.get(model_name, model_name.value)
 
