@@ -243,11 +243,11 @@ def agent_deps(codebase_service: CodebaseService, temp_storage_dir: Path) -> Age
 
     # Create ModelConfig for testing
     model_config = ModelConfig(
-        name=ModelName.CLAUDE_OPUS_4_1,
+        name=ModelName.CLAUDE_OPUS_4_5,
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200_000,
-        max_output_tokens=20_000,
+        max_output_tokens=64_000,
         api_key=os.getenv("ANTHROPIC_API_KEY", "test-api-key"),
     )
 

@@ -143,13 +143,13 @@ async def test_get_provider_model_gpt5_byok_not_tested():
                 mock_test.return_value = True
 
                 # Get the model config
-                model_config = await get_provider_model(ModelName.GPT_5)
+                model_config = await get_provider_model(ModelName.GPT_5_1)
 
                 # Verify streaming test was called
-                mock_test.assert_called_once_with("test-key", "gpt-5")
+                mock_test.assert_called_once_with("test-key", "gpt-5.1")
 
                 # Verify ModelConfig has correct settings
-                assert model_config.name == ModelName.GPT_5
+                assert model_config.name == ModelName.GPT_5_1
                 assert model_config.provider == ProviderType.OPENAI
                 assert model_config.key_provider == KeyProvider.BYOK
                 assert model_config.supports_streaming is True
@@ -160,8 +160,8 @@ async def test_get_provider_model_gpt5_byok_not_tested():
 
 
 @pytest.mark.asyncio
-async def test_get_provider_model_gpt5_mini_byok_not_tested():
-    """Test get_provider_model with GPT-5-Mini BYOK when streaming not tested yet."""
+async def test_get_provider_model_gpt5_1_codex_byok_not_tested():
+    """Test get_provider_model with GPT-5.1-Codex BYOK when streaming not tested yet."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
@@ -184,13 +184,13 @@ async def test_get_provider_model_gpt5_mini_byok_not_tested():
                 mock_test.return_value = False
 
                 # Get the model config
-                model_config = await get_provider_model(ModelName.GPT_5_MINI)
+                model_config = await get_provider_model(ModelName.GPT_5_1_CODEX)
 
                 # Verify streaming test was called
-                mock_test.assert_called_once_with("test-key", "gpt-5-mini")
+                mock_test.assert_called_once_with("test-key", "gpt-5.1-codex")
 
                 # Verify ModelConfig has correct settings
-                assert model_config.name == ModelName.GPT_5_MINI
+                assert model_config.name == ModelName.GPT_5_1_CODEX
                 assert model_config.provider == ProviderType.OPENAI
                 assert model_config.key_provider == KeyProvider.BYOK
                 assert model_config.supports_streaming is False
@@ -201,8 +201,8 @@ async def test_get_provider_model_gpt5_mini_byok_not_tested():
 
 
 @pytest.mark.asyncio
-async def test_get_provider_model_gpt5_byok_already_tested():
-    """Test get_provider_model with GPT-5 BYOK when streaming already tested."""
+async def test_get_provider_model_gpt5_1_byok_already_tested():
+    """Test get_provider_model with GPT-5.1 BYOK when streaming already tested."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
@@ -225,7 +225,7 @@ async def test_get_provider_model_gpt5_byok_already_tested():
                 "shotgun.agents.config.provider.check_streaming_capability"
             ) as mock_test:
                 # Get the model config
-                model_config = await get_provider_model(ModelName.GPT_5)
+                model_config = await get_provider_model(ModelName.GPT_5_1)
 
                 # Verify streaming test was NOT called (already tested)
                 mock_test.assert_not_called()
@@ -254,8 +254,8 @@ async def test_get_provider_model_shotgun_always_streaming():
             await manager.save(config)
             mock_get_mgr.return_value = manager
 
-            # Get the model config for GPT-5
-            model_config = await get_provider_model(ModelName.GPT_5)
+            # Get the model config for GPT-5.1
+            model_config = await get_provider_model(ModelName.GPT_5_1)
 
             # Verify ModelConfig has streaming enabled
             assert model_config.key_provider == KeyProvider.SHOTGUN

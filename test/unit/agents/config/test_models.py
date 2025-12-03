@@ -10,9 +10,9 @@ def test_model_spec_short_name_claude_sonnet():
 
 
 def test_model_spec_short_name_claude_opus():
-    """Test ModelSpec short_name for Claude Opus 4.1."""
-    spec = MODEL_SPECS[ModelName.CLAUDE_OPUS_4_1]
-    assert spec.short_name == "Opus 4.1"
+    """Test ModelSpec short_name for Claude Opus 4.5."""
+    spec = MODEL_SPECS[ModelName.CLAUDE_OPUS_4_5]
+    assert spec.short_name == "Opus 4.5"
 
 
 def test_model_spec_short_name_claude_haiku():
@@ -21,16 +21,16 @@ def test_model_spec_short_name_claude_haiku():
     assert spec.short_name == "Haiku 4.5"
 
 
-def test_model_spec_short_name_gpt_5():
-    """Test ModelSpec short_name for GPT-5."""
-    spec = MODEL_SPECS[ModelName.GPT_5]
-    assert spec.short_name == "GPT-5"
+def test_model_spec_short_name_gpt_5_1():
+    """Test ModelSpec short_name for GPT-5.1."""
+    spec = MODEL_SPECS[ModelName.GPT_5_1]
+    assert spec.short_name == "GPT-5.1"
 
 
-def test_model_spec_short_name_gpt_5_mini():
-    """Test ModelSpec short_name for GPT-5 Mini."""
-    spec = MODEL_SPECS[ModelName.GPT_5_MINI]
-    assert spec.short_name == "GPT-5 Mini"
+def test_model_spec_short_name_gpt_5_1_codex():
+    """Test ModelSpec short_name for GPT-5.1 Codex."""
+    spec = MODEL_SPECS[ModelName.GPT_5_1_CODEX]
+    assert spec.short_name == "GPT-5.1 Codex"
 
 
 def test_model_spec_short_name_gemini_pro():
