@@ -353,3 +353,117 @@ async def test_run_upload_pipeline_large_file(tmp_path: Path):
     assert result.files_uploaded == 1
     # 50MB = 50 * 1024 * 1024 bytes
     assert result.total_bytes == 50 * 1024 * 1024
+
+
+@pytest.mark.asyncio
+async def test_run_upload_pipeline_tracks_posthog_events(temp_shotgun_dir: Path):
+    """Test PostHog events are tracked during successful upload."""
+    mock_client = AsyncMock()
+    mock_client.initiate_file_upload = AsyncMock(
+        side_effect=lambda *args, **kwargs: _mock_file_upload_response(args[3])
+    )
+    mock_client.upload_file_to_presigned_url = AsyncMock()
+    mock_client.close_version = AsyncMock(return_value=_mock_version_close_response())
+
+    with (
+        patch(
+            "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "shotgun.shotgun_web.shared_specs.upload_pipeline.track_event"
+        ) as mock_track,
+    ):
+        result = await run_upload_pipeline(
+            workspace_id="ws-123",
+            spec_id="spec-123",
+            version_id="version-123",
+            project_root=temp_shotgun_dir,
+        )
+
+    assert result.success is True
+
+    # Verify started event was tracked
+    mock_track.assert_any_call("spec_upload_started")
+
+    # Verify completed event was tracked with correct properties
+    completed_calls = [
+        c for c in mock_track.call_args_list if c[0][0] == "spec_upload_completed"
+    ]
+    assert len(completed_calls) == 1
+    props = completed_calls[0][0][1]
+    assert props["file_count"] == 3
+    assert "total_bytes" in props
+    assert "duration_seconds" in props
+
+
+@pytest.mark.asyncio
+async def test_run_upload_pipeline_tracks_failure_event_empty_dir(tmp_path: Path):
+    """Test PostHog failure event is tracked for empty directory."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+
+    with patch(
+        "shotgun.shotgun_web.shared_specs.upload_pipeline.track_event"
+    ) as mock_track:
+        result = await run_upload_pipeline(
+            workspace_id="ws-123",
+            spec_id="spec-123",
+            version_id="version-123",
+            project_root=tmp_path,
+        )
+
+    assert result.success is False
+
+    # Verify started event was tracked
+    mock_track.assert_any_call("spec_upload_started")
+
+    # Verify failed event was tracked
+    failed_calls = [
+        c for c in mock_track.call_args_list if c[0][0] == "spec_upload_failed"
+    ]
+    assert len(failed_calls) == 1
+    props = failed_calls[0][0][1]
+    assert props["error_type"] == "EmptyDirectory"
+    assert props["phase"] == "scanning"
+
+
+@pytest.mark.asyncio
+async def test_run_upload_pipeline_tracks_failure_event_upload_error(
+    temp_shotgun_dir: Path,
+):
+    """Test PostHog failure event is tracked for upload errors."""
+    mock_client = AsyncMock()
+    mock_client.initiate_file_upload = AsyncMock(
+        side_effect=RuntimeError("Network error")
+    )
+
+    with (
+        patch(
+            "shotgun.shotgun_web.shared_specs.upload_pipeline.SpecsClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "shotgun.shotgun_web.shared_specs.upload_pipeline.track_event"
+        ) as mock_track,
+    ):
+        result = await run_upload_pipeline(
+            workspace_id="ws-123",
+            spec_id="spec-123",
+            version_id="version-123",
+            project_root=temp_shotgun_dir,
+        )
+
+    assert result.success is False
+
+    # Verify started event was tracked
+    mock_track.assert_any_call("spec_upload_started")
+
+    # Verify failed event was tracked
+    failed_calls = [
+        c for c in mock_track.call_args_list if c[0][0] == "spec_upload_failed"
+    ]
+    assert len(failed_calls) == 1
+    props = failed_calls[0][0][1]
+    assert props["error_type"] == "RuntimeError"
+    assert props["phase"] == "uploading"

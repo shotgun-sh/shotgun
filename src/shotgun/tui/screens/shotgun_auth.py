@@ -1,6 +1,7 @@
 """Shotgun Account authentication screen."""
 
 import asyncio
+import time
 import webbrowser
 from typing import TYPE_CHECKING, cast
 
@@ -15,6 +16,7 @@ from textual.worker import Worker, WorkerState
 
 from shotgun.agents.config import ConfigManager
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 from shotgun.shotgun_web import (
     ShotgunWebClient,
     TokenStatus,
@@ -118,6 +120,7 @@ class ShotgunAuthScreen(Screen[bool]):
         self.token: str | None = None
         self.auth_url: str | None = None
         self.poll_worker: Worker[None] | None = None
+        self._auth_start_time: float | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
@@ -158,6 +161,7 @@ class ShotgunAuthScreen(Screen[bool]):
 
     def action_cancel(self) -> None:
         """Cancel authentication and close screen."""
+        track_event("auth_cancelled")
         if self.poll_worker and self.poll_worker.state == WorkerState.RUNNING:
             self.poll_worker.cancel()
         self.dismiss(False)
@@ -174,6 +178,9 @@ class ShotgunAuthScreen(Screen[bool]):
 
     async def _start_auth_flow(self) -> None:
         """Start the authentication flow."""
+        self._auth_start_time = time.time()
+        track_event("auth_started")
+
         try:
             # Get shotgun instance ID from config
             shotgun_instance_id = await self.config_manager.get_shotgun_instance_id()
@@ -220,12 +227,20 @@ class ShotgunAuthScreen(Screen[bool]):
 
         except httpx.HTTPError as e:
             logger.error("Failed to create auth token: %s", e)
+            track_event(
+                "auth_failed",
+                {"phase": "token_creation", "error_type": type(e).__name__},
+            )
             self.query_one("#status", Label).update(
                 f"❌ Error: Failed to create authentication token\n{e}"
             )
 
         except Exception as e:
             logger.error("Unexpected error during auth flow: %s", e)
+            track_event(
+                "auth_failed",
+                {"phase": "token_creation", "error_type": type(e).__name__},
+            )
             self.query_one("#status", Label).update(f"❌ Unexpected error: {e}")
 
     async def _poll_token_status(self) -> None:
@@ -272,6 +287,17 @@ class ShotgunAuthScreen(Screen[bool]):
                             workspace_id=workspace_id,
                         )
 
+                        # Track successful auth
+                        duration = (
+                            time.time() - self._auth_start_time
+                            if self._auth_start_time
+                            else 0
+                        )
+                        track_event(
+                            "auth_completed",
+                            {"duration_seconds": round(duration, 2)},
+                        )
+
                         self.query_one("#status", Label).update(
                             "✅ Authentication successful! Saving credentials..."
                         )
@@ -279,6 +305,10 @@ class ShotgunAuthScreen(Screen[bool]):
                         self.dismiss(True)
                     else:
                         logger.error("Completed but missing keys")
+                        track_event(
+                            "auth_failed",
+                            {"phase": "polling", "error_type": "MissingKeys"},
+                        )
                         self.query_one("#status", Label).update(
                             "❌ Error: Authentication completed but keys are missing"
                         )
@@ -293,6 +323,10 @@ class ShotgunAuthScreen(Screen[bool]):
 
                 elif status_response.status == TokenStatus.EXPIRED:
                     logger.error("Token expired")
+                    track_event(
+                        "auth_failed",
+                        {"phase": "token_expired", "error_type": "TokenExpired"},
+                    )
                     self.query_one("#status", Label).update(
                         "❌ Authentication token expired (30 minutes)\n"
                         "Please try again."
@@ -312,6 +346,10 @@ class ShotgunAuthScreen(Screen[bool]):
                 if e.response.status_code == 410:
                     # Token expired
                     logger.error("Token expired (410)")
+                    track_event(
+                        "auth_failed",
+                        {"phase": "token_expired", "error_type": "TokenExpired"},
+                    )
                     self.query_one("#status", Label).update(
                         "❌ Authentication token expired"
                     )
@@ -320,6 +358,10 @@ class ShotgunAuthScreen(Screen[bool]):
                     return
                 else:
                     logger.error("HTTP error polling status: %s", e)
+                    track_event(
+                        "auth_failed",
+                        {"phase": "polling_error", "error_type": type(e).__name__},
+                    )
                     self.query_one("#status", Label).update(
                         f"❌ Error checking status: {e}"
                     )
@@ -327,11 +369,19 @@ class ShotgunAuthScreen(Screen[bool]):
 
             except Exception as e:
                 logger.error("Error polling token status: %s", e)
+                track_event(
+                    "auth_failed",
+                    {"phase": "polling_error", "error_type": type(e).__name__},
+                )
                 self.query_one("#status", Label).update(f"⚠️ Error checking status: {e}")
                 await asyncio.sleep(5)  # Wait a bit longer on error
 
         # Timeout reached
         logger.error("Polling timeout reached")
+        track_event(
+            "auth_failed",
+            {"phase": "timeout", "error_type": "Timeout"},
+        )
         self.query_one("#status", Label).update(
             "❌ Authentication timeout (30 minutes)\nPlease try again."
         )
