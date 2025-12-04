@@ -174,6 +174,43 @@ class CompactionCompletedMessage(Message):
     """Event posted when conversation compaction completes."""
 
 
+class ToolExecutionStartedMessage(Message):
+    """Event posted when a tool starts executing.
+
+    This allows the UI to update the spinner text to provide feedback
+    during long-running tool executions.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the tool execution started message."""
+        super().__init__()
+
+
+# Fun spinner messages to show during tool execution
+SPINNER_MESSAGES = [
+    "Pontificating...",
+    "Ruminating...",
+    "Cogitating...",
+    "Deliberating...",
+    "Contemplating...",
+    "Reticulating splines...",
+    "Consulting the oracle...",
+    "Gathering thoughts...",
+    "Processing neurons...",
+    "Summoning wisdom...",
+    "Brewing ideas...",
+    "Polishing pixels...",
+    "Herding electrons...",
+    "Warming up the flux capacitor...",
+    "Consulting ancient tomes...",
+    "Channeling the muses...",
+    "Percolating possibilities...",
+    "Untangling complexity...",
+    "Shuffling priorities...",
+    "Aligning the stars...",
+]
+
+
 class AgentStreamingStarted(Message):
     """Event posted when agent starts streaming responses."""
 
@@ -1087,6 +1124,11 @@ class AgentManager(Widget):
                     if partial_message is not None:
                         state.current_response = partial_message
                         self._post_partial_message(False)
+
+                    # Notify UI that a tool is about to execute
+                    # This updates the spinner with a fun message during tool execution
+                    self.post_message(ToolExecutionStartedMessage())
+
                 elif isinstance(event, FunctionToolResultEvent):
                     # Track tool completion event
 
