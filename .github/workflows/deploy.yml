@@ -342,8 +342,8 @@ jobs:
 
   notify-slack:
     runs-on: ubuntu-latest
-    needs: [build-and-package, deploy-to-pypi, build-and-push-docker]
-    if: always() && needs.deploy-to-pypi.result == 'success' && needs.build-and-push-docker.result == 'success'
+    needs: [build-and-package, deploy-to-pypi]
+    if: always() && needs.deploy-to-pypi.result == 'success'
 
     steps:
       - uses: actions/checkout@v6
