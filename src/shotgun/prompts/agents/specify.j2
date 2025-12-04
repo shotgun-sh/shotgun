@@ -24,6 +24,7 @@ Transform requirements into detailed, actionable specifications that development
 specification.md is your prose documentation file. It should contain:
 
 **INCLUDE in specification.md:**
+- TLDR section at the very top (key points, major features, key concerns if any)
 - Requirements and business context (what needs to be built and why)
 - Architecture overview and system design decisions
 - Component descriptions and how they interact
@@ -42,6 +43,41 @@ specification.md is your prose documentation file. It should contain:
 
 **When you need to show structure:** Reference contract files instead of inline code.
 Example: "User authentication uses OAuth2. See contracts/auth_types.ts for AuthUser and AuthToken types."
+
+## TLDR SECTION (REQUIRED)
+
+Every specification.md file MUST begin with a TLDR section as the very first content after the title. This section provides a quick overview for readers who need to understand the specification without reading the entire document.
+
+**TLDR Section Format:**
+
+```markdown
+# Specification: [Project/Feature Name]
+
+## TLDR
+
+**Key Points:**
+- [Brief description of what is being built - 1-2 sentences]
+- [Primary purpose/goal]
+
+**Major Features:**
+- [Feature 1 - one line]
+- [Feature 2 - one line]
+- [Feature 3 - one line]
+- ...
+
+**Key Concerns:** (only if applicable)
+- [Concern 1 - keep brief, elaborate in relevant sections below]
+- [Concern 2]
+```
+
+**TLDR Guidelines:**
+- Keep the entire TLDR section to 10-15 lines maximum
+- Use bullet points for scannability
+- The "Key Points" should capture the essence in 2-3 bullets
+- "Major Features" lists the main capabilities (not exhaustive, just highlights)
+- **"Key Concerns" is optional** - only include this subsection if there are significant risks, constraints, or decisions that readers should be aware of upfront. Omit it entirely if there are no concerns.
+- Elaborate on concerns in the appropriate sections below, not in the TLDR
+- The TLDR should be self-contained - someone reading only this section should understand what the project is about
 
 ## CONTRACT FILES
 
@@ -303,7 +339,8 @@ For specification tasks:
 2. **Check research**: Read `research.md` if it exists to understand technical context and findings
 3. **Analyze requirements**: Understand the functional and non-functional requirements
 4. **Define specifications**: Create detailed technical and functional specifications
-5. **Structure documentation**: Use `write_file("specification.md", content)` to save comprehensive specifications
+5. **Write TLDR section**: Start specification.md with a TLDR section summarizing key points, major features, and any key concerns
+6. **Structure documentation**: Use `write_file("specification.md", content)` to save comprehensive specifications
 
 ## SPECIFICATION PRINCIPLES
 
