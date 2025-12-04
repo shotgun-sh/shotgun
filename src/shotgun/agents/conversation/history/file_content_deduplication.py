@@ -5,8 +5,6 @@ tool returns before LLM-based compaction. Files are still accessible via
 `retrieve_code` (codebase) or `read_file` (.shotgun/ folder).
 """
 
-import copy
-import re
 from enum import StrEnum
 from typing import Any
 
@@ -43,40 +41,46 @@ SHOTGUN_PLACEHOLDER = (
     "**Content**: [Removed for compaction - file persisted in .shotgun/ folder]"
 )
 
-# Pattern for parsing file_read output (codebase files)
-# Format: **File**: `path`\n**Size**: N bytes\n[optional encoding]\n\n**Content**:\n```lang\ncontent```
-CODEBASE_FILE_PATTERN = re.compile(
-    r"\*\*File\*\*:\s*`([^`]+)`\s*\n"  # File path
-    r"\*\*Size\*\*:\s*(\d+)\s*bytes\s*\n"  # Size in bytes
-    r"(?:\*\*Encoding\*\*:.*?\n)?"  # Optional encoding line
-    r"\n\*\*Content\*\*:\s*\n"  # Blank line + Content header
-    r"```(\w*)\n"  # Language tag
-    r"(.*?)```",  # Actual content
-    re.DOTALL,
-)
+# Simple prefix for detecting file_read output format
+# Instead of using regex, we just check for the expected prefix and extract the file path
+CODEBASE_FILE_PREFIX = "**File**: `"
 
 
-def _parse_codebase_file_content(
-    content: str,
-) -> tuple[str, int, str, str] | None:
-    """Parse file_read tool return content.
+def _extract_file_path(content: str) -> str | None:
+    """Extract file path from file_read tool return content.
+
+    Uses simple string operations instead of regex for maximum performance.
+    The file_read tool output format is: **File**: `path`\\n...
 
     Args:
         content: The tool return content string
 
     Returns:
-        Tuple of (file_path, size_bytes, language, actual_content) or None if not parseable
+        The file path or None if format doesn't match
     """
-    match = CODEBASE_FILE_PATTERN.search(content)
-    if not match:
+    # Fast check: content must start with expected prefix
+    if not content.startswith(CODEBASE_FILE_PREFIX):
         return None
 
-    file_path = match.group(1)
-    size_bytes = int(match.group(2))
-    language = match.group(3) or ""
-    actual_content = match.group(4)
+    # Find the closing backtick after the prefix
+    prefix_len = len(CODEBASE_FILE_PREFIX)
+    backtick_pos = content.find("`", prefix_len)
 
-    return file_path, size_bytes, language, actual_content
+    if backtick_pos == -1:
+        return None
+
+    return content[prefix_len:backtick_pos]
+
+
+def _get_language_from_path(file_path: str) -> str:
+    """Infer programming language from file extension."""
+    from pathlib import Path
+
+    from shotgun.codebase.core.language_config import get_language_config
+
+    ext = Path(file_path).suffix
+    config = get_language_config(ext)
+    return config.name if config else "unknown"
 
 
 def _create_codebase_placeholder(file_path: str, size_bytes: int, language: str) -> str:
@@ -110,6 +114,11 @@ def deduplicate_file_content(
     This is a deterministic pre-compaction pass that reduces tokens without
     requiring an LLM. Files remain accessible via their respective tools.
 
+    This function uses copy-on-write semantics: only messages that need
+    modification are copied, while unmodified messages are reused by reference.
+    This significantly reduces memory allocation and processing time for large
+    conversations where only a subset of messages contain file content.
+
     Args:
         messages: Conversation history
         retention_window: Keep full content in last N messages (for recent context)
@@ -120,15 +129,17 @@ def deduplicate_file_content(
     if not messages:
         return messages, 0
 
-    # Deep copy to avoid modifying original
-    modified_messages = copy.deepcopy(messages)
     total_tokens_saved = 0
     files_deduplicated = 0
 
     # Calculate retention boundary (keep last N messages intact)
-    retention_start = max(0, len(modified_messages) - retention_window)
+    retention_start = max(0, len(messages) - retention_window)
 
-    for msg_idx, message in enumerate(modified_messages):
+    # Track which message indices need replacement
+    # We use a dict to store index -> new_message mappings
+    replacements: dict[int, ModelMessage] = {}
+
+    for msg_idx, message in enumerate(messages):
         # Skip messages in retention window
         if msg_idx >= retention_start:
             continue
@@ -159,18 +170,18 @@ def deduplicate_file_content(
 
             # Handle codebase file reads (file_read)
             if tool_name == FileReadTool.CODEBASE:
-                parsed = _parse_codebase_file_content(content)
-                if parsed:
-                    file_path, size_bytes, language, actual_content = parsed
-                    # Only replace if actual content is substantial
-                    if len(actual_content) >= MIN_CONTENT_LENGTH:
-                        replacement = _create_codebase_placeholder(
-                            file_path, size_bytes, language
-                        )
-                        logger.debug(
-                            f"Deduplicating codebase file: {file_path} "
-                            f"({size_bytes} bytes)"
-                        )
+                file_path = _extract_file_path(content)
+                if file_path:
+                    # Use content length as size estimate (includes formatting overhead
+                    # but close enough for deduplication purposes)
+                    size_bytes = len(content)
+                    language = _get_language_from_path(file_path)
+                    replacement = _create_codebase_placeholder(
+                        file_path, size_bytes, language
+                    )
+                    logger.debug(
+                        f"Deduplicating codebase file: {file_path} ({size_bytes} bytes)"
+                    )
 
             # Handle .shotgun/ file reads (read_file)
             elif tool_name == FileReadTool.SHOTGUN_FOLDER:
@@ -203,9 +214,21 @@ def deduplicate_file_content(
             else:
                 new_parts.append(part)
 
-        # Replace message with new parts if modified
+        # Only create a new message if parts were actually modified
         if message_modified:
-            modified_messages[msg_idx] = ModelRequest(parts=new_parts)
+            replacements[msg_idx] = ModelRequest(parts=new_parts)
+
+    # If no modifications were made, return original list (no allocation needed)
+    if not replacements:
+        return messages, 0
+
+    # Build result list with copy-on-write: reuse unmodified messages
+    modified_messages: list[ModelMessage] = []
+    for idx, msg in enumerate(messages):
+        if idx in replacements:
+            modified_messages.append(replacements[idx])
+        else:
+            modified_messages.append(msg)
 
     if files_deduplicated > 0:
         logger.info(

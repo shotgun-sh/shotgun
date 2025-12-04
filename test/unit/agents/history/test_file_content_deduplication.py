@@ -14,16 +14,16 @@ from pydantic_ai.messages import (
 from shotgun.agents.conversation.history.file_content_deduplication import (
     _create_codebase_placeholder,
     _create_shotgun_placeholder,
-    _parse_codebase_file_content,
+    _extract_file_path,
     deduplicate_file_content,
 )
 
 
-class TestParseCodebaseFileContent:
-    """Tests for _parse_codebase_file_content function."""
+class TestExtractFilePath:
+    """Tests for _extract_file_path function."""
 
-    def test_parses_standard_file_read_output(self):
-        """Test parsing of standard file_read output format."""
+    def test_extracts_file_path_from_standard_output(self):
+        """Test extraction from standard file_read output format."""
         content = """**File**: `src/main.py`
 **Size**: 1234 bytes
 
@@ -32,17 +32,11 @@ class TestParseCodebaseFileContent:
 def main():
     print("Hello, World!")
 ```"""
-        result = _parse_codebase_file_content(content)
+        result = _extract_file_path(content)
+        assert result == "src/main.py"
 
-        assert result is not None
-        file_path, size_bytes, language, actual_content = result
-        assert file_path == "src/main.py"
-        assert size_bytes == 1234
-        assert language == "python"
-        assert "def main():" in actual_content
-
-    def test_parses_file_with_encoding(self):
-        """Test parsing file read output with encoding line."""
+    def test_extracts_file_path_with_encoding(self):
+        """Test extraction from file read output with encoding line."""
         content = """**File**: `data/config.json`
 **Size**: 500 bytes
 **Encoding**: utf-8
@@ -51,16 +45,11 @@ def main():
 ```json
 {"key": "value"}
 ```"""
-        result = _parse_codebase_file_content(content)
+        result = _extract_file_path(content)
+        assert result == "data/config.json"
 
-        assert result is not None
-        file_path, size_bytes, language, actual_content = result
-        assert file_path == "data/config.json"
-        assert size_bytes == 500
-        assert language == "json"
-
-    def test_parses_file_without_language_tag(self):
-        """Test parsing file read output without language tag."""
+    def test_extracts_file_path_without_extension(self):
+        """Test extraction from file without extension."""
         content = """**File**: `README`
 **Size**: 100 bytes
 
@@ -68,23 +57,19 @@ def main():
 ```
 Plain text content here
 ```"""
-        result = _parse_codebase_file_content(content)
-
-        assert result is not None
-        file_path, size_bytes, language, actual_content = result
-        assert file_path == "README"
-        assert language == ""
+        result = _extract_file_path(content)
+        assert result == "README"
 
     def test_returns_none_for_invalid_format(self):
         """Test that invalid format returns None."""
         content = "This is not a valid file read output"
-        result = _parse_codebase_file_content(content)
+        result = _extract_file_path(content)
         assert result is None
 
     def test_returns_none_for_error_message(self):
         """Test that error messages are not parsed."""
         content = "**Error reading file `missing.py`**: File not found"
-        result = _parse_codebase_file_content(content)
+        result = _extract_file_path(content)
         assert result is None
 
 
