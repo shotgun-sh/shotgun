@@ -33,6 +33,7 @@ from shotgun.agents.agent_manager import (
     MessageHistoryUpdated,
     ModelConfigUpdated,
     PartialResponseMessage,
+    ToolExecutionStartedMessage,
 )
 from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS
@@ -912,6 +913,17 @@ class ChatScreen(Screen[None]):
         """Reset spinner text when compaction completes."""
         # Use widget coordinator to update spinner text
         self.widget_coordinator.update_spinner_text("Processing...")
+
+    @on(ToolExecutionStartedMessage)
+    def handle_tool_execution_started(
+        self, event: ToolExecutionStartedMessage
+    ) -> None:
+        """Update spinner text when a tool starts executing.
+
+        This provides visual feedback during long-running tool executions
+        like web search, so the UI doesn't appear frozen.
+        """
+        self.widget_coordinator.update_spinner_text(event.display_text)
 
     async def handle_model_selected(self, result: ModelConfigUpdated | None) -> None:
         """Handle model selection from ModelPickerScreen.
