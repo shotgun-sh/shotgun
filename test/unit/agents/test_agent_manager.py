@@ -799,3 +799,48 @@ async def test_qa_mode_hint_ordering_with_file_operations(
     assert file_hint_idx < q1_idx, (
         "File operation hint should appear before first question"
     )
+
+
+def test_tool_execution_started_message():
+    """Test ToolExecutionStartedMessage initialization and attributes."""
+    from shotgun.agents.agent_manager import ToolExecutionStartedMessage
+
+    # Test with default spinner text
+    msg_default = ToolExecutionStartedMessage()
+    assert msg_default.spinner_text == "Processing..."
+
+    # Test with custom spinner text
+    msg_custom = ToolExecutionStartedMessage("Pontificating...")
+    assert msg_custom.spinner_text == "Pontificating..."
+
+
+def test_tool_streaming_progress_message():
+    """Test ToolStreamingProgressMessage initialization and attributes."""
+    from shotgun.agents.agent_manager import ToolStreamingProgressMessage
+
+    msg = ToolStreamingProgressMessage(
+        streamed_tokens=150, spinner_text="Ruminating..."
+    )
+    assert msg.streamed_tokens == 150
+    assert msg.spinner_text == "Ruminating..."
+
+
+def test_partial_stream_state_token_tracking():
+    """Test _PartialStreamState tracks token counts and spinner text."""
+    from shotgun.agents.agent_manager import _PartialStreamState
+
+    state = _PartialStreamState()
+
+    # Check default values
+    assert state.streamed_tokens == 0
+    assert state.current_spinner_text == "Processing..."
+    assert state.last_reported_tokens == 0
+
+    # Test updating values
+    state.streamed_tokens = 100
+    state.current_spinner_text = "Contemplating..."
+    state.last_reported_tokens = 75
+
+    assert state.streamed_tokens == 100
+    assert state.current_spinner_text == "Contemplating..."
+    assert state.last_reported_tokens == 75
