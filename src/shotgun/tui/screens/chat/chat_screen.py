@@ -34,6 +34,7 @@ from shotgun.agents.agent_manager import (
     ModelConfigUpdated,
     PartialResponseMessage,
     ToolExecutionStartedMessage,
+    ToolStreamingProgressMessage,
 )
 from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS
@@ -921,12 +922,21 @@ class ChatScreen(Screen[None]):
         This provides visual feedback during long-running tool executions
         like web search, so the UI doesn't appear frozen.
         """
-        import random
+        self.widget_coordinator.update_spinner_text(event.spinner_text)
 
-        from shotgun.agents.agent_manager import SPINNER_MESSAGES
+    @on(ToolStreamingProgressMessage)
+    def handle_tool_streaming_progress(
+        self, event: ToolStreamingProgressMessage
+    ) -> None:
+        """Update spinner text with token count during tool streaming.
 
-        message = random.choice(SPINNER_MESSAGES)  # noqa: S311
-        self.widget_coordinator.update_spinner_text(message)
+        Shows progress while tool arguments are streaming in,
+        particularly useful for long file writes.
+        """
+        text = f"{event.spinner_text} (~{event.streamed_tokens:,} tokens)"
+        self.widget_coordinator.update_spinner_text(text)
+        # Force immediate refresh to show progress
+        self.refresh()
 
     async def handle_model_selected(self, result: ModelConfigUpdated | None) -> None:
         """Handle model selection from ModelPickerScreen.

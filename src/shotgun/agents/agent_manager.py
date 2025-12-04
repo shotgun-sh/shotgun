@@ -38,6 +38,7 @@ from pydantic_ai.messages import (
     PartDeltaEvent,
     PartStartEvent,
     SystemPromptPart,
+    TextPartDelta,
     ToolCallPart,
     ToolCallPartDelta,
     UserPromptPart,
@@ -181,9 +182,33 @@ class ToolExecutionStartedMessage(Message):
     during long-running tool executions.
     """
 
-    def __init__(self) -> None:
-        """Initialize the tool execution started message."""
+    def __init__(self, spinner_text: str = "Processing...") -> None:
+        """Initialize the tool execution started message.
+
+        Args:
+            spinner_text: The spinner message to display
+        """
         super().__init__()
+        self.spinner_text = spinner_text
+
+
+class ToolStreamingProgressMessage(Message):
+    """Event posted during tool call streaming to show progress.
+
+    This provides visual feedback while tool arguments are streaming,
+    especially useful for long-running writes like file content.
+    """
+
+    def __init__(self, streamed_tokens: int, spinner_text: str) -> None:
+        """Initialize the tool streaming progress message.
+
+        Args:
+            streamed_tokens: Approximate number of tokens streamed so far
+            spinner_text: The current spinner message to preserve
+        """
+        super().__init__()
+        self.streamed_tokens = streamed_tokens
+        self.spinner_text = spinner_text
 
 
 # Fun spinner messages to show during tool execution
@@ -247,6 +272,11 @@ class _PartialStreamState:
 
     messages: list[ModelRequest | ModelResponse] = field(default_factory=list)
     current_response: ModelResponse | None = None
+    # Token counting for tool call streaming progress
+    streamed_tokens: int = 0
+    current_spinner_text: str = "Processing..."
+    # Track last reported tokens to throttle UI updates
+    last_reported_tokens: int = 0
 
 
 class AgentManager(Widget):
@@ -1029,6 +1059,44 @@ class AgentManager(Widget):
                         )
                         continue
 
+                    # Count tokens from the delta for progress indication
+                    delta_len = 0
+                    is_tool_call_delta = False
+                    if isinstance(event.delta, ToolCallPartDelta):
+                        is_tool_call_delta = True
+                        # args_delta can be str or dict depending on provider
+                        args_delta = event.delta.args_delta
+                        if isinstance(args_delta, str):
+                            delta_len = len(args_delta)
+                        elif isinstance(args_delta, dict):
+                            # For dict deltas, estimate from JSON representation
+                            delta_len = len(json.dumps(args_delta))
+                        # Pick a spinner message when tool streaming starts
+                        if state.current_spinner_text == "Processing...":
+                            import random
+
+                            state.current_spinner_text = random.choice(  # noqa: S311
+                                SPINNER_MESSAGES
+                            )
+                    elif isinstance(event.delta, TextPartDelta):
+                        delta_len = len(event.delta.content_delta)
+
+                    if delta_len > 0:
+                        # Approximate tokens: len / 4 is a rough estimate
+                        state.streamed_tokens += delta_len // 4 + 1
+                        # Send progress update for tool call streaming
+                        # Throttle updates to every ~75 tokens to avoid flooding UI
+                        if is_tool_call_delta and (
+                            state.streamed_tokens - state.last_reported_tokens >= 75
+                        ):
+                            state.last_reported_tokens = state.streamed_tokens
+                            self.post_message(
+                                ToolStreamingProgressMessage(
+                                    state.streamed_tokens,
+                                    state.current_spinner_text,
+                                )
+                            )
+
                     try:
                         updated_part = event.delta.apply(
                             cast(ModelResponsePart, partial_parts[index])
@@ -1127,7 +1195,13 @@ class AgentManager(Widget):
 
                     # Notify UI that a tool is about to execute
                     # This updates the spinner with a fun message during tool execution
-                    self.post_message(ToolExecutionStartedMessage())
+                    # Pick a random spinner message and store it for progress updates
+                    import random
+
+                    spinner_text = random.choice(SPINNER_MESSAGES)  # noqa: S311
+                    state.current_spinner_text = spinner_text
+                    state.streamed_tokens = 0  # Reset token count for new tool
+                    self.post_message(ToolExecutionStartedMessage(spinner_text))
 
                 elif isinstance(event, FunctionToolResultEvent):
                     # Track tool completion event
