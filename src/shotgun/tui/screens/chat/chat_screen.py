@@ -915,9 +915,7 @@ class ChatScreen(Screen[None]):
         self.widget_coordinator.update_spinner_text("Processing...")
 
     @on(ToolExecutionStartedMessage)
-    def handle_tool_execution_started(
-        self, event: ToolExecutionStartedMessage
-    ) -> None:
+    def handle_tool_execution_started(self, event: ToolExecutionStartedMessage) -> None:
         """Update spinner text when a tool starts executing.
 
         This provides visual feedback during long-running tool executions
