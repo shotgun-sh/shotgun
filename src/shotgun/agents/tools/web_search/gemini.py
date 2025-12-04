@@ -1,7 +1,7 @@
 """Gemini web search tool implementation."""
 
 from opentelemetry import trace
-from pydantic_ai.messages import ModelMessage, ModelRequest
+from pydantic_ai.messages import ModelMessage, ModelRequest, TextPart
 from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import get_provider_model
@@ -82,8 +82,6 @@ async def gemini_web_search_tool(query: str) -> str:
         )
 
         # Extract text from response
-        from pydantic_ai.messages import TextPart
-
         result_text = "No content returned from search"
         if response.parts:
             for part in response.parts:
