@@ -26,10 +26,10 @@ def mock_context(mock_deps):
 
 
 @pytest.mark.asyncio
-async def test_research_agent_can_only_write_to_research_md(
+async def test_research_agent_can_write_to_research_files(
     mock_context, tmp_path, monkeypatch
 ):
-    """Test that research agent can only write to research.md."""
+    """Test that research agent can write to research.md and research/ folder."""
     # Setup
     mock_context.deps.agent_mode = AgentType.RESEARCH
     monkeypatch.setattr(
@@ -41,10 +41,20 @@ async def test_research_agent_can_only_write_to_research_md(
     assert "Successfully wrote" in result
     assert (tmp_path / "research.md").exists()
 
+    # Research agent should be able to write to research/ folder
+    result = await write_file(mock_context, "research/topic1.md", "Topic 1 research")
+    assert "Successfully wrote" in result
+    assert (tmp_path / "research" / "topic1.md").exists()
+
+    # Research agent should be able to write any file type to research/ folder
+    result = await write_file(mock_context, "research/data.json", '{"key": "value"}')
+    assert "Successfully wrote" in result
+    assert (tmp_path / "research" / "data.json").exists()
+
     # Research agent should NOT be able to write to other files
     result = await write_file(mock_context, "plan.md", "Test content")
     assert "Error" in result
-    assert "Research agent can only write to 'research.md'" in result
+    assert "Research agent can only write to" in result
 
 
 @pytest.mark.asyncio
@@ -92,10 +102,10 @@ async def test_tasks_agent_can_only_write_to_tasks_md(
 
 
 @pytest.mark.asyncio
-async def test_specify_agent_can_only_write_to_specification_md(
+async def test_specify_agent_can_write_to_specification_files(
     mock_context, tmp_path, monkeypatch
 ):
-    """Test that specify agent can only write to specification.md."""
+    """Test that specify agent can write to specification.md and contracts/ folder."""
     # Setup
     mock_context.deps.agent_mode = AgentType.SPECIFY
     monkeypatch.setattr(
@@ -107,10 +117,22 @@ async def test_specify_agent_can_only_write_to_specification_md(
     assert "Successfully wrote" in result
     assert (tmp_path / "specification.md").exists()
 
+    # Specify agent should be able to write to contracts/ folder
+    result = await write_file(mock_context, "contracts/types.ts", "type User = {}")
+    assert "Successfully wrote" in result
+    assert (tmp_path / "contracts" / "types.ts").exists()
+
+    # Specify agent should be able to write any file type to contracts/ folder
+    result = await write_file(
+        mock_context, "contracts/schema.json", '{"type": "object"}'
+    )
+    assert "Successfully wrote" in result
+    assert (tmp_path / "contracts" / "schema.json").exists()
+
     # Specify agent should NOT be able to write to other files
     result = await write_file(mock_context, "tasks.md", "Test content")
     assert "Error" in result
-    assert "Specify agent can only write to 'specification.md'" in result
+    assert "Specify agent can only write to" in result
 
 
 @pytest.mark.asyncio

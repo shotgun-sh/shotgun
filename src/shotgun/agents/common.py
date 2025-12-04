@@ -38,7 +38,6 @@ from .tools import (
     retrieve_code,
     write_file,
 )
-from .tools.file_management import AGENT_DIRECTORIES
 
 logger = get_logger(__name__)
 
@@ -352,86 +351,33 @@ async def extract_markdown_toc(agent_mode: AgentType | None) -> str | None:
 
 
 def get_agent_existing_files(agent_mode: AgentType | None = None) -> list[str]:
-    """Get list of existing files for the given agent mode.
+    """Get list of all existing files in .shotgun directory.
+
+    All agents can read any file in .shotgun/, so we list all files regardless
+    of agent mode. This includes user-added files that agents should be aware of.
 
     Args:
-        agent_mode: The agent mode to check files for. If None, lists all files.
+        agent_mode: Unused, kept for backwards compatibility.
 
     Returns:
         List of existing file paths relative to .shotgun directory
     """
     base_path = get_shotgun_base_path()
-    existing_files = []
+    existing_files: list[str] = []
 
-    # If no agent mode, list all files in base path and first level subdirectories
-    if agent_mode is None:
-        # List files in the root .shotgun directory
-        for item in base_path.iterdir():
-            if item.is_file():
-                existing_files.append(item.name)
-            elif item.is_dir():
-                # List files in first-level subdirectories
-                for subitem in item.iterdir():
-                    if subitem.is_file():
-                        relative_path = subitem.relative_to(base_path)
-                        existing_files.append(str(relative_path))
+    if not base_path.exists():
         return existing_files
 
-    # Handle specific agent modes
-    if agent_mode not in AGENT_DIRECTORIES:
-        return []
-
-    if agent_mode == AgentType.EXPORT:
-        # For export agent, list all files in exports directory
-        exports_dir = base_path / "exports"
-        if exports_dir.exists():
-            for file_path in exports_dir.rglob("*"):
-                if file_path.is_file():
-                    relative_path = file_path.relative_to(base_path)
+    # List all files in .shotgun directory and subdirectories
+    for item in base_path.iterdir():
+        if item.is_file():
+            existing_files.append(item.name)
+        elif item.is_dir():
+            # List files in subdirectories (one level deep to avoid too much noise)
+            for subitem in item.iterdir():
+                if subitem.is_file():
+                    relative_path = subitem.relative_to(base_path)
                     existing_files.append(str(relative_path))
-    else:
-        # For other agents, check files/directories they have access to
-        allowed_paths_raw = AGENT_DIRECTORIES[agent_mode]
-
-        # Convert single Path/string to list of Paths for uniform handling
-        if isinstance(allowed_paths_raw, str):
-            # Special case: "*" means export agent (shouldn't reach here but handle it)
-            allowed_paths = (
-                [Path(allowed_paths_raw)] if allowed_paths_raw != "*" else []
-            )
-        elif isinstance(allowed_paths_raw, Path):
-            allowed_paths = [allowed_paths_raw]
-        else:
-            # Already a list
-            allowed_paths = allowed_paths_raw
-
-        # Check each allowed path
-        for allowed_path in allowed_paths:
-            allowed_str = str(allowed_path)
-
-            # Check if it's a directory (no .md suffix)
-            if not allowed_path.suffix or not allowed_str.endswith(".md"):
-                # It's a directory - list all files within it
-                dir_path = base_path / allowed_str
-                if dir_path.exists() and dir_path.is_dir():
-                    for file_path in dir_path.rglob("*"):
-                        if file_path.is_file():
-                            relative_path = file_path.relative_to(base_path)
-                            existing_files.append(str(relative_path))
-            else:
-                # It's a file - check if it exists
-                file_path = base_path / allowed_str
-                if file_path.exists():
-                    existing_files.append(allowed_str)
-
-                # Also check for associated directory (e.g., research/ for research.md)
-                base_name = allowed_str.replace(".md", "")
-                dir_path = base_path / base_name
-                if dir_path.exists() and dir_path.is_dir():
-                    for file_path in dir_path.rglob("*"):
-                        if file_path.is_file():
-                            relative_path = file_path.relative_to(base_path)
-                            existing_files.append(str(relative_path))
 
     return existing_files
 

@@ -23,7 +23,10 @@ logger = get_logger(__name__)
 # - A list of Paths: multiple allowed files/directories (e.g., [Path("specification.md"), Path("contracts")])
 # - "*": any file except protected files (for export agent)
 AGENT_DIRECTORIES: dict[AgentType, str | Path | list[Path]] = {
-    AgentType.RESEARCH: Path("research.md"),
+    AgentType.RESEARCH: [
+        Path("research.md"),
+        Path("research"),
+    ],  # Research can write main file and research folder
     AgentType.SPECIFY: [
         Path("specification.md"),
         Path("contracts"),
