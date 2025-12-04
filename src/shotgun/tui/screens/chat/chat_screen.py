@@ -921,7 +921,12 @@ class ChatScreen(Screen[None]):
         This provides visual feedback during long-running tool executions
         like web search, so the UI doesn't appear frozen.
         """
-        self.widget_coordinator.update_spinner_text(event.display_text)
+        import random
+
+        from shotgun.agents.agent_manager import SPINNER_MESSAGES
+
+        message = random.choice(SPINNER_MESSAGES)  # noqa: S311
+        self.widget_coordinator.update_spinner_text(message)
 
     async def handle_model_selected(self, result: ModelConfigUpdated | None) -> None:
         """Handle model selection from ModelPickerScreen.

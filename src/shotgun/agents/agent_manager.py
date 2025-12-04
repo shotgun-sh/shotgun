@@ -64,7 +64,6 @@ from shotgun.agents.models import (
     FileOperation,
     FileOperationTracker,
 )
-from shotgun.agents.tools.registry import get_tool_display_config
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
@@ -178,20 +177,38 @@ class CompactionCompletedMessage(Message):
 class ToolExecutionStartedMessage(Message):
     """Event posted when a tool starts executing.
 
-    This allows the UI to update the spinner text to show what tool is running,
-    providing feedback during long-running tool executions like web search.
+    This allows the UI to update the spinner text to provide feedback
+    during long-running tool executions.
     """
 
-    def __init__(self, tool_name: str, display_text: str) -> None:
-        """Initialize the tool execution started message.
-
-        Args:
-            tool_name: The name of the tool being executed
-            display_text: Human-readable text to display (e.g., "Searching web...")
-        """
+    def __init__(self) -> None:
+        """Initialize the tool execution started message."""
         super().__init__()
-        self.tool_name = tool_name
-        self.display_text = display_text
+
+
+# Fun spinner messages to show during tool execution
+SPINNER_MESSAGES = [
+    "Pontificating...",
+    "Ruminating...",
+    "Cogitating...",
+    "Deliberating...",
+    "Contemplating...",
+    "Reticulating splines...",
+    "Consulting the oracle...",
+    "Gathering thoughts...",
+    "Processing neurons...",
+    "Summoning wisdom...",
+    "Brewing ideas...",
+    "Polishing pixels...",
+    "Herding electrons...",
+    "Warming up the flux capacitor...",
+    "Consulting ancient tomes...",
+    "Channeling the muses...",
+    "Percolating possibilities...",
+    "Untangling complexity...",
+    "Shuffling priorities...",
+    "Aligning the stars...",
+]
 
 
 class AgentStreamingStarted(Message):
@@ -1109,15 +1126,8 @@ class AgentManager(Widget):
                         self._post_partial_message(False)
 
                     # Notify UI that a tool is about to execute
-                    # This updates the spinner to show what's happening during tool execution
-                    display_config = get_tool_display_config(event.part.tool_name)
-                    if display_config and display_config.display_text:
-                        display_text = f"{display_config.display_text}..."
-                    else:
-                        display_text = f"Running {event.part.tool_name}..."
-                    self.post_message(
-                        ToolExecutionStartedMessage(event.part.tool_name, display_text)
-                    )
+                    # This updates the spinner with a fun message during tool execution
+                    self.post_message(ToolExecutionStartedMessage())
 
                 elif isinstance(event, FunctionToolResultEvent):
                     # Track tool completion event
