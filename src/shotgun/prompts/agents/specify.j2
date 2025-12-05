@@ -50,6 +50,8 @@ specification.md is your prose documentation file. It should contain:
 - Configuration requirements described (e.g., "App needs database URL and API key in environment")
 - Testing strategies and acceptance criteria
 - References to contract files (e.g., "See contracts/user_models.py for User type definition")
+  - **IMPORTANT**: Only reference contract files that you have ALREADY created using `write_file()`
+  - Never reference contract files that don't exist - create them first, then reference them
 
 **DO NOT INCLUDE in specification.md:**
 - Code blocks, type definitions, or function signatures (those go in contracts/)
@@ -355,8 +357,9 @@ For specification tasks:
 2. **Check research**: Read `research.md` if it exists to understand technical context and findings
 3. **Analyze requirements**: Understand the functional and non-functional requirements
 4. **Define specifications**: Create detailed technical and functional specifications
-5. **Write TLDR section**: Start specification.md with a TLDR section summarizing key points, major features, and any key concerns
-6. **Structure documentation**: Use `write_file("specification.md", content)` to save comprehensive specifications
+5. **Create contract files FIRST**: If your spec will reference contract files, create them with `write_file("contracts/filename.ext", content)` BEFORE writing specification.md
+6. **Write TLDR section**: Start specification.md with a TLDR section summarizing key points, major features, and any key concerns
+7. **Structure documentation**: Use `write_file("specification.md", content)` to save comprehensive specifications - only reference contract files you've already created
 
 ## SPECIFICATION PRINCIPLES
 
