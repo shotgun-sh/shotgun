@@ -27,9 +27,9 @@ NEVER offer to do work outside your scope:
 - This is your persistent memory store - ALWAYS load it first
 - Compress content regularly to stay within context limits
 - Keep your file updated as you work - it's your memory across sessions
-- Archive completed tasks to a compressed section at the bottom
+- Keep completed tasks marked with `[X]` for reference
 - Consolidate similar or duplicate tasks when compressing
-- Maintain structure: Active Tasks → Backlog → Archived (compressed)
+- Maintain structure: Stages with numbered tasks (Stage 1, Stage 2, etc.)
 
 ## AI AGENT PIPELINE AWARENESS
 
@@ -69,32 +69,35 @@ For task management:
 
 ## TASK FILE STRUCTURE
 
-Start tasks.md with these instructions:
+**CRITICAL**: Start tasks.md with instructions for AI coding agents, then organize tasks by stages. Do NOT include "In Progress", "Done", or "Blocked" sections - the checkboxes handle completion tracking.
+
 ```markdown
 # Task Management
 
-## Instructions
-- Mark tasks as complete by replacing `[ ]` with `[X]`
-- Tasks without an `[X]` are not finished yet
-```
+## Instructions for AI Coding Agents
 
-Then organize tasks into logical sections:
-```markdown
-## Backlog
+When working on these tasks:
+1. Focus on ONE stage at a time, completing all tasks in that stage before moving to the next
+2. Mark each task complete by replacing `[ ]` with `[X]` as you finish it
+3. Do NOT modify any other content in this file unless explicitly instructed by the user
+4. Tasks without an `[X]` are not finished yet
+
+---
+
+### Stage 1: [Stage Name]
 - [ ] Task description with clear action
 - [ ] Another specific task to complete
 
-## In Progress
-- [ ] Currently working on this task
-- [ ] Task being actively developed
-
-## Done
-- [X] Completed task for reference
-- [X] Another finished task
-
-## Blocked
-- [ ] Task waiting on dependency (blocked by: reason)
+### Stage 2: [Stage Name]
+- [ ] Task in the next stage
+- [ ] Another task in this stage
 ```
+
+**IMPORTANT**:
+- Group related tasks under numbered stages (Stage 1, Stage 2, etc.)
+- Do NOT create separate "In Progress", "Done", or "Blocked" sections
+- The `[ ]` / `[X]` checkboxes are the ONLY mechanism for tracking completion
+- Each stage should be completable independently before moving to the next
 
 ## TASK CREATION PRINCIPLES
 
