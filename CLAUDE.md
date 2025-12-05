@@ -30,51 +30,14 @@ Use these types for your commit messages:
 - **chore**: Other changes that don't modify src or test files
 - **revert**: Reverts a previous commit
 
-### Examples of Valid Commit Messages
+### Scopes and Breaking Changes
 
-```
-feat: add user authentication system
-fix: resolve memory leak in data processing
-docs: update API documentation for v2.0
-style: format code according to black standards
-refactor: simplify user validation logic
-perf: optimize database queries for user lookup
-test: add unit tests for authentication module
-build: update dependencies to latest versions
-ci: add automated deployment pipeline
-chore: update gitignore for Python cache files
-revert: revert feat: add experimental feature
-```
-
-### Commit Message with Scope
-
-```
-feat(auth): implement OAuth2 integration
-fix(api): handle null responses properly
-docs(readme): add installation instructions
-```
-
-### Breaking Changes
-
-For breaking changes, add `!` after the type/scope:
-
-```
-feat!: remove deprecated API endpoints
-fix(auth)!: change authentication flow
-```
+- Add optional scope in parentheses: `feat(auth): implement OAuth2`
+- For breaking changes, add `!` after the type/scope: `feat!: remove deprecated API endpoints`
 
 ## Pull Request Title Convention
 
 PR titles MUST also follow the Conventional Commits format. When using "Squash and merge", GitHub will use the PR title as the commit message.
-
-### Valid PR Title Examples
-
-```
-feat: implement user dashboard
-fix: resolve login session timeout issue
-docs: add contributing guidelines
-refactor: restructure project components
-```
 
 ### Tests
 
@@ -184,6 +147,24 @@ class ModeIndicator(Widget):
 - ❌ `TYPE_CHECKING` with try-except `isinstance()` - fails at runtime
 - ❌ Moving imports inside functions - hard to maintain
 
+## Logs
+
+Shotgun logs are stored in `~/.shotgun-sh/logs/` with the naming pattern `shotgun-<timestamp>.log`.
+
+- Each TUI session or CLI command creates a new log file
+- Timestamp format: `YYYYMMDDTHHMMSSZ` (UTC)
+- Example: `shotgun-20251205T131500Z.log`
+
+To view the most recent log:
+```bash
+ls -t ~/.shotgun-sh/logs/ | head -1 | xargs -I {} cat ~/.shotgun-sh/logs/{}
+```
+
+To tail logs from the current session:
+```bash
+ls -t ~/.shotgun-sh/logs/ | head -1 | xargs -I {} tail -f ~/.shotgun-sh/logs/{}
+```
+
 ## Conversation History Navigation
 
 ### Overview
@@ -193,8 +174,8 @@ The shotgun TUI persists conversations to `~/.shotgun-sh/conversation.json`. Und
 **Default Location:** `~/.shotgun-sh/conversation.json`
 **IMPORTANT:** This is the default path and is almost always where the conversation file is located. Claude Code should assume this path exists and use it directly without asking the user for confirmation.
 
-**Schema Definition:** `src/shotgun/agents/conversation_history.py:122-227` (`ConversationHistory` model)
-**Persistence Manager:** `src/shotgun/agents/conversation_manager.py` (save/load operations)
+**Schema Definition:** `src/shotgun/agents/conversation/models.py` (`ConversationHistory` model)
+**Persistence Manager:** `src/shotgun/agents/conversation/manager.py` (save/load operations)
 
 ### Built-in Analysis Command
 
@@ -208,7 +189,7 @@ shotgun context --format markdown
 shotgun context --format json
 ```
 
-See implementation: `src/shotgun/cli/context.py:68-111`
+See implementation: `src/shotgun/cli/context.py`
 
 ### JSON Structure
 
@@ -282,7 +263,7 @@ The conversation uses `pydantic_ai` message types. Understanding these helps wit
 
 ### Schema Details
 
-From `ConversationHistory` model (`src/shotgun/agents/conversation_history.py:122-133`):
+From `ConversationHistory` model (`src/shotgun/agents/conversation/models.py`):
 
 - **version** (int): Schema version (currently 1)
 - **agent_history** (list[SerializedMessage]): Core conversation messages sent to/from agent
@@ -301,10 +282,10 @@ The `ConversationHistory` model provides methods to work with messages:
 
 ```python
 # In Python code or tests:
-from shotgun.agents.conversation_manager import ConversationManager
+from shotgun.agents.conversation import ConversationManager
 
 manager = ConversationManager()  # Uses ~/.shotgun-sh/conversation.json
-conversation = manager.load()
+conversation = await manager.load()
 
 if conversation:
     # Get typed message objects
@@ -322,6 +303,37 @@ When asked to analyze or search conversation history:
 
 1. **Start with `shotgun context`** for token/usage analysis
 2. **Use `jq` patterns** for specific message searches
-3. **Read the schema files** (`conversation_history.py`) for understanding structure
+3. **Read the schema files** (`conversation/models.py`) for understanding structure
 4. **Check message kinds first** - distinguishes between requests/responses/parts
 5. **Remember filtering** - `filter_incomplete_messages()` removes corrupted tool calls before saving
+
+## LLM-Friendly Documentation References
+
+Many libraries used in this project provide `llms.txt` or `llms-full.txt` files - condensed documentation optimized for AI coding assistants. Use these when you need to understand how to use a library correctly.
+
+### Core Libraries with llms.txt
+
+- **Pydantic AI** (agent framework - primary AI library)
+  - llms.txt: https://ai.pydantic.dev/llms.txt
+  - llms-full.txt: https://ai.pydantic.dev/llms-full.txt
+
+- **LiteLLM** (multi-provider LLM gateway)
+  - llms.txt: https://docs.litellm.ai/llms.txt
+
+- **Anthropic/Claude** (Claude API documentation)
+  - llms.txt: https://docs.anthropic.com/llms.txt
+
+- **Model Context Protocol** (MCP specification)
+  - llms.txt: https://modelcontextprotocol.io/llms.txt
+  - llms-full.txt: https://modelcontextprotocol.io/llms-full.txt
+
+### Libraries Without llms.txt
+
+These libraries don't have llms.txt files yet. Use their standard documentation:
+
+- **OpenAI SDK**: https://platform.openai.com/docs/api-reference
+- **Textual** (TUI framework): https://textual.textualize.io/
+- **Kuzu** (graph database): https://docs.kuzudb.com/
+- **Logfire** (observability): https://logfire.pydantic.dev/docs/
+- **Typer** (CLI framework): https://typer.tiangolo.com/
+- **HTTPX** (async HTTP client): https://www.python-httpx.org/
