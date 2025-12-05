@@ -225,6 +225,9 @@ def test_path_should_be_ignored():
         ("src/main.py", False),
         ("test/test_file.py", False),
         (".venv/lib/python3.9/site-packages/pkg", True),
+        # .shotgun directory should NOT be ignored (allowlisted)
+        (".shotgun/research.md", False),
+        (".shotgun/spec.md", False),
     ]
 
     for path, should_ignore in test_cases:
@@ -233,10 +236,15 @@ def test_path_should_be_ignored():
 
 
 def test_should_ignore_directory_prefixes():
-    """Directories starting with dot should always be ignored."""
+    """Directories starting with dot should be ignored except allowlisted ones."""
+    # Regular dot directories should be ignored
     assert should_ignore_directory(".cache", IGNORE_PATTERNS)
     assert should_ignore_directory(".storybook", IGNORE_PATTERNS)
     assert should_ignore_directory(".git", IGNORE_PATTERNS)
+    assert should_ignore_directory(".venv", IGNORE_PATTERNS)
+
+    # .shotgun directory should NOT be ignored (allowlisted)
+    assert not should_ignore_directory(".shotgun", IGNORE_PATTERNS)
 
 
 @patch("shotgun.codebase.core.ingestor.os.walk")
