@@ -62,13 +62,20 @@ IGNORE_PATTERNS = BASE_IGNORE_DIRECTORIES | BUILD_ARTIFACT_DIRECTORIES
 # Directory prefixes that should always be ignored
 IGNORED_DIRECTORY_PREFIXES = (".",)
 
+# Directories starting with "." that should NOT be ignored (allowlist)
+# .shotgun/ contains user-generated artifacts that should be indexed
+ALLOWED_DOT_DIRECTORIES = {".shotgun"}
+
 
 def should_ignore_directory(name: str, ignore_patterns: set[str] | None = None) -> bool:
     """Return True if the directory name should be ignored."""
     patterns = IGNORE_PATTERNS if ignore_patterns is None else ignore_patterns
     if name in patterns:
         return True
-    return name.startswith(IGNORED_DIRECTORY_PREFIXES)
+    # Check if directory starts with ignored prefix but is in allowlist
+    if name.startswith(IGNORED_DIRECTORY_PREFIXES):
+        return name not in ALLOWED_DOT_DIRECTORIES
+    return False
 
 
 def is_path_ignored(path: Path, ignore_patterns: set[str] | None = None) -> bool:
