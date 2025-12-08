@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import RunContext
@@ -16,6 +16,8 @@ from shotgun.agents.usage_manager import SessionUsageManager, get_session_usage_
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
+    from pydantic_ai import Agent
+
     from shotgun.codebase.service import CodebaseService
 
 
@@ -358,3 +360,7 @@ try:
 except ImportError:
     # Services may not be available in all contexts
     pass
+
+
+# Type alias for the standard agent type used throughout the codebase
+ShotgunAgent: TypeAlias = "Agent[AgentDeps, AgentResponse]"

@@ -8,15 +8,12 @@ IMPORTANT: All tool inputs/outputs must use Pydantic models - no raw dict/list/t
 """
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Final
+from typing import Final
 
 from pydantic import BaseModel, Field
 
 # Import SubAgentContext from the main models module
-from shotgun.agents.models import AgentResponse, SubAgentContext
-
-if TYPE_CHECKING:
-    from pydantic_ai import Agent
+from shotgun.agents.models import SubAgentContext
 
 # Re-export SubAgentContext for convenience
 __all__ = ["SubAgentContext"]
@@ -268,11 +265,11 @@ def get_dependent_files(file_path: str) -> list[str]:
 # =============================================================================
 
 # Import AgentDeps for inheritance - must be done here to avoid circular imports
-from shotgun.agents.models import AgentDeps, AgentType  # noqa: E402
+from shotgun.agents.models import AgentDeps, AgentType, ShotgunAgent  # noqa: E402
 
 # Type alias for sub-agent cache entries
 # Each entry is a tuple of (Agent instance, AgentDeps instance)
-SubAgentCacheEntry = tuple["Agent[AgentDeps, AgentResponse]", AgentDeps]
+SubAgentCacheEntry = tuple[ShotgunAgent, AgentDeps]
 
 
 class RouterDeps(AgentDeps):
