@@ -37,7 +37,8 @@ def mock_deps():
     deps.queue = AsyncMock()
     deps.tasks = []
     deps.is_tui_context = False
-    deps.agent_mode = None  # Add agent_mode attribute
+    deps.agent_mode = None
+    deps.has_codebase_indexed = False  # Will be set by add_system_prompt_message
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -210,6 +211,7 @@ def test_build_agent_system_prompt_research_agent():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -228,6 +230,7 @@ def test_build_agent_system_prompt_research_agent():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_codebase_indexed=False,
         )
 
 
@@ -243,6 +246,7 @@ def test_build_agent_system_prompt_custom_context():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -261,6 +265,7 @@ def test_build_agent_system_prompt_custom_context():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_codebase_indexed=True,
         )
 
 
@@ -276,6 +281,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -294,6 +300,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_codebase_indexed=False,
         )
 
 

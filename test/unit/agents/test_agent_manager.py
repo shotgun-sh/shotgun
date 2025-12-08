@@ -40,6 +40,7 @@ def mock_agent_deps():
     deps.llm_model = MagicMock()
     deps.llm_model.name = "test-model"
     deps.is_tui_context = False
+    deps.has_codebase_indexed = False  # Add has_codebase_indexed
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -53,7 +54,9 @@ def mock_agent_deps():
         ProviderType.ANTHROPIC
     )  # Set a valid provider for token counting
     deps.llm_model = llm_model_mock
-    deps.codebase_service = MagicMock()
+    # Use AsyncMock for codebase_service with proper async methods
+    deps.codebase_service = AsyncMock()
+    deps.codebase_service.list_graphs_for_directory = AsyncMock(return_value=[])
     deps.artifact_service = MagicMock()
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt")
 
@@ -82,6 +85,7 @@ def mock_agent_deps():
             "system_prompt_fn",
             "usage_manager",
             "is_tui_context",
+            "has_codebase_indexed",
         ]:
             setattr(copy_mock, attr_name, getattr(deps, attr_name))
 
@@ -545,8 +549,9 @@ async def test_agent_manager_run_with_custom_deps(
     custom_deps.file_tracker = file_tracker_mock
     custom_deps.system_prompt_fn = MagicMock(return_value="Custom system prompt")
     custom_deps.is_tui_context = False
+    custom_deps.has_codebase_indexed = False
     custom_deps.codebase_service = AsyncMock()
-    custom_deps.codebase_service.list_graphs.return_value = []
+    custom_deps.codebase_service.list_graphs_for_directory = AsyncMock(return_value=[])
     custom_deps.llm_model = MagicMock()
     custom_deps.llm_model.name = "custom-model"
     custom_deps.llm_model.provider = ProviderType.OPENAI
