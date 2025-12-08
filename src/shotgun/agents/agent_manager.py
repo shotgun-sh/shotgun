@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from shotgun.agents.conversation import ConversationState
 
 from pydantic_ai import (
-    Agent,
     RunContext,
     UsageLimits,
 )
@@ -64,6 +63,7 @@ from shotgun.agents.models import (
     AgentType,
     FileOperation,
     FileOperationTracker,
+    ShotgunAgent,
 )
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -312,15 +312,15 @@ class AgentManager(Widget):
         )
 
         # Lazy initialization - agents created on first access
-        self._research_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._research_agent: ShotgunAgent | None = None
         self._research_deps: AgentDeps | None = None
-        self._plan_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._plan_agent: ShotgunAgent | None = None
         self._plan_deps: AgentDeps | None = None
-        self._tasks_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._tasks_agent: ShotgunAgent | None = None
         self._tasks_deps: AgentDeps | None = None
-        self._specify_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._specify_agent: ShotgunAgent | None = None
         self._specify_deps: AgentDeps | None = None
-        self._export_agent: Agent[AgentDeps, AgentResponse] | None = None
+        self._export_agent: ShotgunAgent | None = None
         self._export_deps: AgentDeps | None = None
         self._agents_initialized = False
 
@@ -361,7 +361,7 @@ class AgentManager(Widget):
         self._agents_initialized = True
 
     @property
-    def research_agent(self) -> Agent[AgentDeps, AgentResponse]:
+    def research_agent(self) -> ShotgunAgent:
         """Get research agent (must call _ensure_agents_initialized first)."""
         if self._research_agent is None:
             raise RuntimeError(
@@ -379,7 +379,7 @@ class AgentManager(Widget):
         return self._research_deps
 
     @property
-    def plan_agent(self) -> Agent[AgentDeps, AgentResponse]:
+    def plan_agent(self) -> ShotgunAgent:
         """Get plan agent (must call _ensure_agents_initialized first)."""
         if self._plan_agent is None:
             raise RuntimeError(
@@ -397,7 +397,7 @@ class AgentManager(Widget):
         return self._plan_deps
 
     @property
-    def tasks_agent(self) -> Agent[AgentDeps, AgentResponse]:
+    def tasks_agent(self) -> ShotgunAgent:
         """Get tasks agent (must call _ensure_agents_initialized first)."""
         if self._tasks_agent is None:
             raise RuntimeError(
@@ -415,7 +415,7 @@ class AgentManager(Widget):
         return self._tasks_deps
 
     @property
-    def specify_agent(self) -> Agent[AgentDeps, AgentResponse]:
+    def specify_agent(self) -> ShotgunAgent:
         """Get specify agent (must call _ensure_agents_initialized first)."""
         if self._specify_agent is None:
             raise RuntimeError(
@@ -433,7 +433,7 @@ class AgentManager(Widget):
         return self._specify_deps
 
     @property
-    def export_agent(self) -> Agent[AgentDeps, AgentResponse]:
+    def export_agent(self) -> ShotgunAgent:
         """Get export agent (must call _ensure_agents_initialized first)."""
         if self._export_agent is None:
             raise RuntimeError(
@@ -451,7 +451,7 @@ class AgentManager(Widget):
         return self._export_deps
 
     @property
-    def current_agent(self) -> Agent[AgentDeps, AgentResponse]:
+    def current_agent(self) -> ShotgunAgent:
         """Get the currently active agent.
 
         Returns:
@@ -459,7 +459,7 @@ class AgentManager(Widget):
         """
         return self._get_agent(self._current_agent_type)
 
-    def _get_agent(self, agent_type: AgentType) -> Agent[AgentDeps, AgentResponse]:
+    def _get_agent(self, agent_type: AgentType) -> ShotgunAgent:
         """Get agent by type.
 
         Args:
@@ -545,7 +545,7 @@ class AgentManager(Widget):
     )
     async def _run_agent_with_retry(
         self,
-        agent: Agent[AgentDeps, AgentResponse],
+        agent: ShotgunAgent,
         prompt: str | None,
         deps: AgentDeps,
         usage_limits: UsageLimits | None,

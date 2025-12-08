@@ -2,15 +2,13 @@
 
 from functools import partial
 
-from pydantic_ai import (
-    Agent,
-)
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     ModelMessage,
 )
 
 from shotgun.agents.config import ProviderType
+from shotgun.agents.models import ShotgunAgent
 from shotgun.logging_config import get_logger
 
 from .common import (
@@ -28,7 +26,7 @@ logger = get_logger(__name__)
 
 async def create_research_agent(
     agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
-) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
+) -> tuple[ShotgunAgent, AgentDeps]:
     """Create a research agent with web search and artifact management capabilities.
 
     Args:
@@ -65,7 +63,7 @@ async def create_research_agent(
 
 
 async def run_research_agent(
-    agent: Agent[AgentDeps, AgentResponse],
+    agent: ShotgunAgent,
     query: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
