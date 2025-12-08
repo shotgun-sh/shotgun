@@ -16,7 +16,6 @@ from shotgun.agents.usage_manager import SessionUsageManager, get_session_usage_
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
-    from shotgun.agents.router.models import SubAgentContext
     from shotgun.codebase.service import CodebaseService
 
 
@@ -296,6 +295,29 @@ class FileOperationTracker(BaseModel):
         return common_path
 
 
+class SubAgentContext(BaseModel):
+    """Context passed to sub-agents so they know they're being orchestrated.
+
+    When sub-agents receive this context, they should:
+    - Be more concise (router handles user communication)
+    - Focus on their specific task
+    - Return structured results
+    """
+
+    is_router_delegated: bool = Field(
+        default=True, description="Always True when passed to sub-agent"
+    )
+    plan_goal: str = Field(
+        default="", description="High-level goal from the execution plan"
+    )
+    current_step_id: str | None = Field(
+        default=None, description="ID of the current execution step"
+    )
+    current_step_title: str | None = Field(
+        default=None, description="Title of the current execution step"
+    )
+
+
 class AgentDeps(AgentRuntimeOptions):
     """Dependencies passed to all agents for configuration and runtime behavior."""
 
@@ -321,7 +343,7 @@ class AgentDeps(AgentRuntimeOptions):
         description="Current agent mode for file scoping",
     )
 
-    sub_agent_context: "SubAgentContext | None" = Field(
+    sub_agent_context: SubAgentContext | None = Field(
         default=None,
         description="Context passed to sub-agents when router-delegated",
     )
@@ -329,7 +351,6 @@ class AgentDeps(AgentRuntimeOptions):
 
 # Rebuild model to resolve forward references after imports are available
 try:
-    from shotgun.agents.router.models import SubAgentContext
     from shotgun.codebase.service import CodebaseService
 
     AgentDeps.model_rebuild()

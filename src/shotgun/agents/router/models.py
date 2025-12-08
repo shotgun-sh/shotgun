@@ -10,8 +10,14 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
+# Import SubAgentContext from main models to avoid duplication
+from shotgun.agents.models import SubAgentContext
+
 if TYPE_CHECKING:
     from shotgun.agents.models import AgentType
+
+# Re-export for backwards compatibility
+__all__ = ["SubAgentContext"]
 
 
 class RouterMode(StrEnum):
@@ -149,30 +155,6 @@ class SubAgentResult(BaseModel):
     files_modified: list[str] = Field(
         default_factory=list,
         description="Files that were modified by this sub-agent",
-    )
-
-
-class SubAgentContext(BaseModel):
-    """
-    Context passed to sub-agents so they know they're being orchestrated.
-
-    When sub-agents receive this context, they should:
-    - Be more concise (router handles user communication)
-    - Focus on their specific task
-    - Return structured results
-    """
-
-    is_router_delegated: bool = Field(
-        default=True, description="Always True when passed to sub-agent"
-    )
-    plan_goal: str = Field(
-        default="", description="High-level goal from the execution plan"
-    )
-    current_step_id: str | None = Field(
-        default=None, description="ID of the current execution step"
-    )
-    current_step_title: str | None = Field(
-        default=None, description="Title of the current execution step"
     )
 
 
