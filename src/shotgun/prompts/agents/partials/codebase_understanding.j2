@@ -93,15 +93,15 @@ If the task you received is about codebase management, follow the codebase manag
 
 **IMPORTANT: Graph queries are cheap, file reads are expensive. Always prefer graph queries.**
 
-1. **Graph First**: Use `query_graph` with natural language to find what you need:
+1. **Graph First**: Use `query_graph` to find code structure before reading files:
    - "Find the UserAuth class" → Get qualified name
    - "What calls process_payment?" → Get callers
-   - Don't explore directories - query the graph instead
+   - Prefer graph queries over directory exploration
 
-2. **Targeted File Reads**: Only read files when you have a specific target:
+2. **Targeted File Reads**: Read files when you have a specific reason:
    - Use `retrieve_code` with qualified names from graph queries
-   - Read specific files only when graph queries point you there
-   - NEVER read files "to understand the codebase" - use graph queries
+   - Read files the user mentions or that you've identified as relevant
+   - Avoid reading many files just to "explore" - use graph queries for discovery
 
 3. **Error Handling**: If entity not found, try alternative names or query variations first
 
