@@ -61,7 +61,9 @@ class ExecutionStep(BaseModel):
     success_criteria: list[str] = Field(
         default_factory=list, description="Completion checklist HIDDEN from user"
     )
-    done: bool = Field(default=False, description="Whether this step has been completed")
+    done: bool = Field(
+        default=False, description="Whether this step has been completed"
+    )
     affects_files: list[str] = Field(
         default_factory=list,
         description="Files this step will modify (e.g., ['specification.md'])",

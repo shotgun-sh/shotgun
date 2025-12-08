@@ -76,7 +76,9 @@ async def create_plan(
             id=str(step_id) if step_id else _generate_step_id(),
             title=str(step_def.get("title", "Untitled step")),
             objective=str(step_def.get("objective", "")),
-            success_criteria=[str(c) for c in step_def.get("success_criteria", []) or []],
+            success_criteria=[
+                str(c) for c in step_def.get("success_criteria", []) or []
+            ],
             affects_files=[str(f) for f in step_def.get("affects_files", []) or []],
             done=False,
         )
@@ -275,10 +277,14 @@ async def update_step(
                 step.objective = str(updates["objective"])
             if "success_criteria" in updates:
                 criteria = updates["success_criteria"]
-                step.success_criteria = [str(c) for c in criteria] if isinstance(criteria, list) else []
+                step.success_criteria = (
+                    [str(c) for c in criteria] if isinstance(criteria, list) else []
+                )
             if "affects_files" in updates:
                 files = updates["affects_files"]
-                step.affects_files = [str(f) for f in files] if isinstance(files, list) else []
+                step.affects_files = (
+                    [str(f) for f in files] if isinstance(files, list) else []
+                )
             if "done" in updates:
                 step.done = bool(updates["done"])
 
