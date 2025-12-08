@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-import kuzu
+import real_ladybug as kuzu
 
 from shotgun.logging_config import get_logger
 

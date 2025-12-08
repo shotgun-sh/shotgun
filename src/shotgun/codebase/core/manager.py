@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import anyio
-import kuzu
+import real_ladybug as kuzu
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
