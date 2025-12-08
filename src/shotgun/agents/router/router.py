@@ -34,7 +34,6 @@ from .tools import (
     clear_plan,
     create_plan,
     get_file_dependencies,
-    get_plan,
     mark_step_done,
     remove_step,
     reorder_steps,
@@ -65,7 +64,6 @@ async def create_router_agent(
     router_tools = [
         # Plan management tools
         create_plan,
-        get_plan,
         mark_step_done,
         add_step,
         remove_step,

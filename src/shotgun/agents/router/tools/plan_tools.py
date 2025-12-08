@@ -9,7 +9,12 @@ import uuid
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
-from shotgun.agents.router.models import ExecutionPlan, ExecutionStep
+from shotgun.agents.router.models import (
+    ExecutionPlan,
+    ExecutionStep,
+    StepInput,
+    StepUpdateInput,
+)
 from shotgun.agents.router.plan_storage import delete_plan, load_plan, save_plan
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
@@ -49,7 +54,7 @@ def _format_plan_for_display(plan: ExecutionPlan) -> str:
 async def create_plan(
     ctx: RunContext[AgentDeps],
     goal: str,
-    steps: list[dict[str, str | list[str]]],
+    steps: list[StepInput],
 ) -> str:
     """Create a new execution plan.
 
@@ -58,11 +63,7 @@ async def create_plan(
 
     Args:
         goal: High-level goal from user request (e.g., "Implement OAuth authentication")
-        steps: List of step definitions, each with:
-            - title: Short title shown to user (e.g., "Research OAuth patterns")
-            - objective: Detailed goal for sub-agent (hidden from user)
-            - success_criteria: Optional list of completion checklist items
-            - affects_files: Optional list of files this step will modify
+        steps: List of step definitions
 
     Returns:
         Confirmation message with plan summary
@@ -70,16 +71,13 @@ async def create_plan(
     logger.debug("Creating plan with goal: %s", goal)
 
     execution_steps = []
-    for step_def in steps:
-        step_id = step_def.get("id")
+    for step_input in steps:
         step = ExecutionStep(
-            id=str(step_id) if step_id else _generate_step_id(),
-            title=str(step_def.get("title", "Untitled step")),
-            objective=str(step_def.get("objective", "")),
-            success_criteria=[
-                str(c) for c in step_def.get("success_criteria", []) or []
-            ],
-            affects_files=[str(f) for f in step_def.get("affects_files", []) or []],
+            id=step_input.id if step_input.id else _generate_step_id(),
+            title=step_input.title,
+            objective=step_input.objective,
+            success_criteria=step_input.success_criteria,
+            affects_files=step_input.affects_files,
             done=False,
         )
         execution_steps.append(step)
@@ -94,26 +92,6 @@ async def create_plan(
     logger.info("Created execution plan with %d steps", len(execution_steps))
 
     return f"Created plan: {goal}\n\n{_format_plan_for_display(plan)}"
-
-
-@register_tool(
-    category=ToolCategory.ARTIFACT_MANAGEMENT,
-    display_text="Getting plan",
-    key_arg="",
-)
-async def get_plan(ctx: RunContext[AgentDeps]) -> str:
-    """Get the current execution plan.
-
-    Returns:
-        Formatted plan summary, or message if no plan exists
-    """
-    logger.debug("Getting current plan")
-
-    plan = await load_plan()
-    if plan is None:
-        return "No execution plan exists. Use create_plan to create one."
-
-    return _format_plan_for_display(plan)
 
 
 @register_tool(
@@ -156,7 +134,7 @@ async def mark_step_done(ctx: RunContext[AgentDeps], step_id: str) -> str:
 )
 async def add_step(
     ctx: RunContext[AgentDeps],
-    step: dict[str, str | list[str]],
+    step: StepInput,
     after_step_id: str | None = None,
 ) -> str:
     """Add a new step to the plan.
@@ -174,13 +152,12 @@ async def add_step(
     if plan is None:
         return "No execution plan exists. Use create_plan first."
 
-    step_id = step.get("id")
     new_step = ExecutionStep(
-        id=str(step_id) if step_id else _generate_step_id(),
-        title=str(step.get("title", "Untitled step")),
-        objective=str(step.get("objective", "")),
-        success_criteria=[str(c) for c in step.get("success_criteria", []) or []],
-        affects_files=[str(f) for f in step.get("affects_files", []) or []],
+        id=step.id if step.id else _generate_step_id(),
+        title=step.title,
+        objective=step.objective,
+        success_criteria=step.success_criteria,
+        affects_files=step.affects_files,
         done=False,
     )
 
@@ -252,13 +229,13 @@ async def remove_step(ctx: RunContext[AgentDeps], step_id: str) -> str:
 async def update_step(
     ctx: RunContext[AgentDeps],
     step_id: str,
-    updates: dict[str, str | list[str] | bool],
+    updates: StepUpdateInput,
 ) -> str:
     """Update fields of an existing step.
 
     Args:
         step_id: The ID of the step to update
-        updates: Dictionary of fields to update (title, objective, success_criteria, affects_files, done)
+        updates: Fields to update (only non-None values are applied)
 
     Returns:
         Confirmation message or error if step not found
@@ -271,22 +248,16 @@ async def update_step(
 
     for step in plan.steps:
         if step.id == step_id:
-            if "title" in updates:
-                step.title = str(updates["title"])
-            if "objective" in updates:
-                step.objective = str(updates["objective"])
-            if "success_criteria" in updates:
-                criteria = updates["success_criteria"]
-                step.success_criteria = (
-                    [str(c) for c in criteria] if isinstance(criteria, list) else []
-                )
-            if "affects_files" in updates:
-                files = updates["affects_files"]
-                step.affects_files = (
-                    [str(f) for f in files] if isinstance(files, list) else []
-                )
-            if "done" in updates:
-                step.done = bool(updates["done"])
+            if updates.title is not None:
+                step.title = updates.title
+            if updates.objective is not None:
+                step.objective = updates.objective
+            if updates.success_criteria is not None:
+                step.success_criteria = updates.success_criteria
+            if updates.affects_files is not None:
+                step.affects_files = updates.affects_files
+            if updates.done is not None:
+                step.done = updates.done
 
             await save_plan(plan)
             logger.info("Updated step '%s'", step.title)

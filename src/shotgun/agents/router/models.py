@@ -55,6 +55,47 @@ class CascadeScope(StrEnum):
     NONE = "none"  # Don't update any dependents
 
 
+class StepInput(BaseModel):
+    """Input model for creating or adding a step to a plan."""
+
+    id: str | None = Field(
+        default=None,
+        description="Optional human-readable identifier. Auto-generated if not provided.",
+    )
+    title: str = Field(
+        default="Untitled step",
+        description="Short title shown to user (e.g., 'Research OAuth patterns')",
+    )
+    objective: str = Field(
+        default="",
+        description="Detailed goal for sub-agent (hidden from user)",
+    )
+    success_criteria: list[str] = Field(
+        default_factory=list,
+        description="Optional list of completion checklist items",
+    )
+    affects_files: list[str] = Field(
+        default_factory=list,
+        description="Optional list of files this step will modify",
+    )
+
+
+class StepUpdateInput(BaseModel):
+    """Input model for updating an existing step."""
+
+    title: str | None = Field(default=None, description="New title for the step")
+    objective: str | None = Field(
+        default=None, description="New objective for the step"
+    )
+    success_criteria: list[str] | None = Field(
+        default=None, description="New success criteria list"
+    )
+    affects_files: list[str] | None = Field(
+        default=None, description="New list of affected files"
+    )
+    done: bool | None = Field(default=None, description="Mark step as done/not done")
+
+
 class ExecutionStep(BaseModel):
     """A single step in an execution plan."""
 

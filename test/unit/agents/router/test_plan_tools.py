@@ -4,12 +4,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shotgun.agents.router.models import ExecutionPlan, ExecutionStep
+from shotgun.agents.router.models import (
+    ExecutionPlan,
+    ExecutionStep,
+    StepInput,
+    StepUpdateInput,
+)
 from shotgun.agents.router.tools.plan_tools import (
     add_step,
     clear_plan,
     create_plan,
-    get_plan,
     mark_step_done,
     remove_step,
     reorder_steps,
@@ -29,18 +33,18 @@ def mock_run_context():
 def sample_steps():
     """Sample step definitions for testing."""
     return [
-        {
-            "id": "step-1",
-            "title": "Research",
-            "objective": "Research the topic",
-            "affects_files": ["research.md"],
-        },
-        {
-            "id": "step-2",
-            "title": "Specify",
-            "objective": "Write specification",
-            "affects_files": ["specification.md"],
-        },
+        StepInput(
+            id="step-1",
+            title="Research",
+            objective="Research the topic",
+            affects_files=["research.md"],
+        ),
+        StepInput(
+            id="step-2",
+            title="Specify",
+            objective="Write specification",
+            affects_files=["specification.md"],
+        ),
     ]
 
 
@@ -86,8 +90,8 @@ async def test_create_plan(mock_run_context, sample_steps):
 async def test_create_plan_generates_ids(mock_run_context):
     """Test that create_plan generates IDs for steps without them."""
     steps = [
-        {"title": "Step 1", "objective": "First"},
-        {"title": "Step 2", "objective": "Second"},
+        StepInput(title="Step 1", objective="First"),
+        StepInput(title="Step 2", objective="Second"),
     ]
 
     with patch(
@@ -101,33 +105,6 @@ async def test_create_plan_generates_ids(mock_run_context):
         assert saved_plan.steps[1].id is not None
         # IDs should be different
         assert saved_plan.steps[0].id != saved_plan.steps[1].id
-
-
-@pytest.mark.asyncio
-async def test_get_plan_exists(mock_run_context, sample_plan):
-    """Test getting an existing plan."""
-    with patch(
-        "shotgun.agents.router.tools.plan_tools.load_plan",
-        return_value=sample_plan,
-    ):
-        result = await get_plan(mock_run_context)
-
-        assert "Test goal" in result
-        assert "Step 1" in result
-        assert "Step 2" in result
-        assert "Step 3" in result
-
-
-@pytest.mark.asyncio
-async def test_get_plan_not_exists(mock_run_context):
-    """Test getting when no plan exists."""
-    with patch(
-        "shotgun.agents.router.tools.plan_tools.load_plan",
-        return_value=None,
-    ):
-        result = await get_plan(mock_run_context)
-
-        assert "No execution plan exists" in result
 
 
 @pytest.mark.asyncio
@@ -205,7 +182,7 @@ async def test_mark_step_done_no_plan(mock_run_context):
 @pytest.mark.asyncio
 async def test_add_step_at_end(mock_run_context, sample_plan):
     """Test adding a step at the end."""
-    new_step = {"id": "new", "title": "New Step", "objective": "New"}
+    new_step = StepInput(id="new", title="New Step", objective="New")
 
     with (
         patch(
@@ -227,7 +204,7 @@ async def test_add_step_at_end(mock_run_context, sample_plan):
 @pytest.mark.asyncio
 async def test_add_step_after_specific(mock_run_context, sample_plan):
     """Test adding a step after a specific step."""
-    new_step = {"id": "new", "title": "New Step", "objective": "New"}
+    new_step = StepInput(id="new", title="New Step", objective="New")
 
     with (
         patch(
@@ -250,7 +227,7 @@ async def test_add_step_after_specific(mock_run_context, sample_plan):
 @pytest.mark.asyncio
 async def test_add_step_after_not_found(mock_run_context, sample_plan):
     """Test adding a step after non-existent step."""
-    new_step = {"id": "new", "title": "New", "objective": "New"}
+    new_step = StepInput(id="new", title="New", objective="New")
 
     with patch(
         "shotgun.agents.router.tools.plan_tools.load_plan",
@@ -296,7 +273,7 @@ async def test_remove_step_not_found(mock_run_context, sample_plan):
 @pytest.mark.asyncio
 async def test_update_step(mock_run_context, sample_plan):
     """Test updating a step."""
-    updates = {"title": "Updated Title", "done": True}
+    updates = StepUpdateInput(title="Updated Title", done=True)
 
     with (
         patch(
@@ -322,7 +299,9 @@ async def test_update_step_not_found(mock_run_context, sample_plan):
         "shotgun.agents.router.tools.plan_tools.load_plan",
         return_value=sample_plan,
     ):
-        result = await update_step(mock_run_context, "nonexistent", {"title": "X"})
+        result = await update_step(
+            mock_run_context, "nonexistent", StepUpdateInput(title="X")
+        )
 
         assert "not found" in result.lower()
 
