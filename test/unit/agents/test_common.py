@@ -96,6 +96,7 @@ async def test_add_system_status_message_empty_history(mock_deps):
                         current_datetime="Monday, October 13, 2025 at 09:00:00 AM",
                         timezone_name="UTC",
                         utc_offset="UTC+00:00",
+                        execution_plan=None,
                     )
 
 

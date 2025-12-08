@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import RunContext
@@ -16,7 +16,33 @@ from shotgun.agents.usage_manager import SessionUsageManager, get_session_usage_
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
+    from pydantic_ai import Agent
+
     from shotgun.codebase.service import CodebaseService
+
+
+class SubAgentContext(BaseModel):
+    """
+    Context passed to sub-agents so they know they're being orchestrated.
+
+    When sub-agents receive this context, they should:
+    - Be more concise (router handles user communication)
+    - Focus on their specific task
+    - Return structured results
+    """
+
+    is_router_delegated: bool = Field(
+        default=True, description="Always True when passed to sub-agent"
+    )
+    plan_goal: str = Field(
+        default="", description="High-level goal from execution plan"
+    )
+    current_step_id: str | None = Field(
+        default=None, description="ID of the current execution step"
+    )
+    current_step_title: str | None = Field(
+        default=None, description="Title of the current execution step"
+    )
 
 
 class AgentResponse(BaseModel):
@@ -51,6 +77,7 @@ class AgentType(StrEnum):
     PLAN = "plan"
     TASKS = "tasks"
     EXPORT = "export"
+    ROUTER = "router"
 
 
 class PipelineConfigEntry(BaseModel):
@@ -319,6 +346,11 @@ class AgentDeps(AgentRuntimeOptions):
         description="Current agent mode for file scoping",
     )
 
+    sub_agent_context: SubAgentContext | None = Field(
+        default=None,
+        description="Context when agent is delegated to by router",
+    )
+
 
 # Rebuild model to resolve forward references after imports are available
 try:
@@ -328,3 +360,7 @@ try:
 except ImportError:
     # Services may not be available in all contexts
     pass
+
+
+# Type alias for the standard agent type used throughout the codebase
+ShotgunAgent: TypeAlias = "Agent[AgentDeps, AgentResponse]"
