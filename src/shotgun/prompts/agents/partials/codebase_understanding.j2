@@ -30,10 +30,11 @@ Make sure to check the codebase before answering any question or suggesting any 
 
 ## Impact Analysis (Your Competitive Advantage)
 
-Unlike text-based code search, you can answer questions that grep CANNOT:
+Unlike text-based code search, you can answer questions that grep CANNOT.
+Use this to create **better plans and tasks** that coding agents (Claude Code, Cursor, etc.) will execute.
 
-**Before Modifying Code - ALWAYS Query Impact First:**
-1. "Find all callers of [function/method]" - Know your blast radius
+**Before Planning Code Changes - ALWAYS Query Impact First:**
+1. "Find all callers of [function/method]" - Know the blast radius
 2. "What depends on [class/module]?" - Understand downstream effects
 3. "What would break if I change [interface]?" - Risk assessment
 
@@ -44,16 +45,17 @@ Unlike text-based code search, you can answer questions that grep CANNOT:
 - "Find all entry points that eventually call [function]" → Trace from API to internals
 - "What tests cover [class/method]?" → Test impact of changes
 
-**When Planning Changes:**
-1. FIRST: Query the graph to understand what calls the code you're changing
+**When Creating Plans/Tasks for Code Changes:**
+1. FIRST: Query the graph to understand what calls the code being changed
 2. SECOND: Identify the blast radius (all affected components)
 3. THIRD: Map which tests need to run/be updated
-4. THEN: Create your plan with full awareness of impact
+4. THEN: Create your plan/tasks with full awareness of impact
 
 **Key Advantage Over Text Search:**
 - Grep finds "process_payment" in comments, strings, and unrelated code
 - Graph queries find ONLY actual callers via CALLS relationships
 - You can traverse multiple hops: "what calls the callers of X?"
+- Your plans will be more accurate because you understand the full dependency graph
 
 **Graph Management**:
 - Use graph IDs shown above when calling codebase tools

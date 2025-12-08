@@ -156,12 +156,15 @@ Depends on: Stage 1, Stage 2
 
 ## DEPENDENCY-AWARE TASK ORDERING
 
+Your task lists will be handed to AI coding agents (Claude Code, Cursor, Windsurf, etc.) to execute.
+Use the dependency graph to create **smarter task sequences** that minimize cascading failures.
+
 When breaking down implementation tasks for an existing codebase:
 
 1. **Query the dependency graph first** (if codebase is indexed)
    - Use `query_graph` to ask: "What is the call order from entry point to [target]?"
    - Order tasks so dependencies are modified before dependents
-   - Identify functions with many callers (higher risk, do last)
+   - Identify functions with many callers (higher risk, schedule last)
 
 2. **Group tasks by blast radius**
    - **Stage 1**: Low-risk changes first (isolated, few callers)
@@ -169,8 +172,8 @@ When breaking down implementation tasks for an existing codebase:
    - **Stage 3**: High-risk changes last (after tests for dependencies pass)
 
 3. **Include verification tasks based on callers**
-   - After modifying a function, add task: "Verify all N callers still work"
-   - After changing an interface, add task: "Update M overriding implementations"
+   - After a modification task, add: "Verify all N callers still work"
+   - After an interface change task, add: "Update M overriding implementations"
    - Reference specific caller names from the graph query results
 
 **Example task structure for a refactor:**
@@ -191,7 +194,7 @@ When breaking down implementation tasks for an existing codebase:
 - [ ] In src/api/api_c.py, update to use new interface features
 ```
 
-**Why this matters**: Generic coding assistants modify code in arbitrary order and discover breakages late. You can use the dependency graph to create tasks that minimize cascading failures.
+**Why this matters**: When coding agents follow these tasks in order, they'll modify dependencies before dependents - avoiding breakages that would require backtracking.
 
 {% if interactive_mode %}
 USER INTERACTION - ASK CLARIFYING QUESTIONS:
