@@ -5,6 +5,7 @@ work across specialized sub-agents while maintaining the Planning/Drafting
 mode system for controlled execution.
 """
 
+import traceback
 from functools import partial
 
 from pydantic_ai import Agent
@@ -129,8 +130,6 @@ async def run_router_agent(
         return result
 
     except Exception as e:
-        import traceback
-
         logger.error("Full traceback:\n%s", traceback.format_exc())
         logger.error("Router agent failed: %s", str(e))
         raise

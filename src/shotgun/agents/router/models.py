@@ -6,7 +6,7 @@ These models define the contracts between router, sub-agents, and UI.
 """
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,9 @@ from pydantic import BaseModel, Field
 from shotgun.agents.models import SubAgentContext
 
 if TYPE_CHECKING:
-    from shotgun.agents.models import AgentType
+    from pydantic_ai import Agent
+
+    from shotgun.agents.models import AgentDeps, AgentResponse, AgentType
 
 # Re-export for backwards compatibility
 __all__ = ["SubAgentContext"]
@@ -235,9 +237,11 @@ class RouterDeps(BaseModel):
         default_factory=list,
         description="User messages received during sub-agent execution",
     )
-    sub_agent_cache: dict[str, tuple[Any, Any]] = Field(
-        default_factory=dict,
-        description="Cache of sub-agent instances (agent, deps) by agent type",
+    sub_agent_cache: "dict[str, tuple[Agent[AgentDeps, AgentResponse], AgentDeps]]" = (
+        Field(
+            default_factory=dict,
+            description="Cache of sub-agent instances (agent, deps) by agent type",
+        )
     )
     current_step_index: int = Field(
         default=0,

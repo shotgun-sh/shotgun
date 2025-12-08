@@ -6,6 +6,7 @@ Handles loading and saving execution plans to .shotgun/execution_plan.json.
 
 import json
 import logging
+import os
 
 import aiofiles
 
@@ -75,8 +76,6 @@ async def delete_plan() -> bool:
     Returns:
         True if file was deleted, False if it didn't exist.
     """
-    import os
-
     plan_path = _get_plan_file_path()
 
     try:
