@@ -17,7 +17,7 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import ProviderType, get_provider_model
-from shotgun.agents.models import AgentResponse, AgentType
+from shotgun.agents.models import AgentResponse, AgentType, ShotgunAgent
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
@@ -111,7 +111,7 @@ async def create_base_agent(
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
-) -> tuple[Agent[AgentDeps, AgentResponse], AgentDeps]:
+) -> tuple[ShotgunAgent, AgentDeps]:
     """Create a base agent with common configuration.
 
     Args:
@@ -482,7 +482,7 @@ async def add_system_prompt_message(
 
 
 async def run_agent(
-    agent: Agent[AgentDeps, AgentResponse],
+    agent: ShotgunAgent,
     prompt: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
