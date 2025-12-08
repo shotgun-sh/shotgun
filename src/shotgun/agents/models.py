@@ -32,7 +32,9 @@ class SubAgentContext(BaseModel):
     is_router_delegated: bool = Field(
         default=True, description="Always True when passed to sub-agent"
     )
-    plan_goal: str = Field(default="", description="High-level goal from execution plan")
+    plan_goal: str = Field(
+        default="", description="High-level goal from execution plan"
+    )
     current_step_id: str | None = Field(
         default=None, description="ID of the current execution step"
     )

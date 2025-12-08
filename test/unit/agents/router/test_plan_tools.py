@@ -49,9 +49,15 @@ def sample_plan():
     return ExecutionPlan(
         goal="Implement OAuth",
         steps=[
-            ExecutionStep(id="step-1", title="Research OAuth", objective="Find best practices"),
-            ExecutionStep(id="step-2", title="Write spec", objective="Create specification"),
-            ExecutionStep(id="step-3", title="Create tasks", objective="Generate tasks"),
+            ExecutionStep(
+                id="step-1", title="Research OAuth", objective="Find best practices"
+            ),
+            ExecutionStep(
+                id="step-2", title="Write spec", objective="Create specification"
+            ),
+            ExecutionStep(
+                id="step-3", title="Create tasks", objective="Generate tasks"
+            ),
         ],
         current_step_index=0,
     )
@@ -63,7 +69,9 @@ async def test_create_plan_success(mock_context):
     input_data = CreatePlanInput(
         goal="Implement OAuth",
         steps=[
-            ExecutionStepInput(id="step-1", title="Research", objective="Research OAuth"),
+            ExecutionStepInput(
+                id="step-1", title="Research", objective="Research OAuth"
+            ),
             ExecutionStepInput(id="step-2", title="Implement", objective="Write code"),
         ],
     )

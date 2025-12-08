@@ -225,7 +225,9 @@ def test_execution_plan_pending_steps():
 def test_execution_plan_format_for_display():
     """Test format_for_display output format."""
     steps = [
-        ExecutionStep(id="step-1", title="Research OAuth", objective="First", done=True),
+        ExecutionStep(
+            id="step-1", title="Research OAuth", objective="First", done=True
+        ),
         ExecutionStep(id="step-2", title="Write spec", objective="Second", done=False),
         ExecutionStep(id="step-3", title="Create tasks", objective="Third", done=False),
     ]
@@ -378,7 +380,9 @@ def test_create_plan_input_creation():
     input_model = CreatePlanInput(
         goal="Implement OAuth",
         steps=[
-            ExecutionStepInput(id="step-1", title="Research", objective="Research OAuth"),
+            ExecutionStepInput(
+                id="step-1", title="Research", objective="Research OAuth"
+            ),
             ExecutionStepInput(id="step-2", title="Implement", objective="Write code"),
         ],
     )
