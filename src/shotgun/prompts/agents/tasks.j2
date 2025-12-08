@@ -154,6 +154,45 @@ Depends on: Stage 1, Stage 2
 - Group related tasks under clear section headings
 - Mark completed tasks with `[X]` when updating the file
 
+## DEPENDENCY-AWARE TASK ORDERING
+
+When breaking down implementation tasks for an existing codebase:
+
+1. **Query the dependency graph first** (if codebase is indexed)
+   - Use `query_graph` to ask: "What is the call order from entry point to [target]?"
+   - Order tasks so dependencies are modified before dependents
+   - Identify functions with many callers (higher risk, do last)
+
+2. **Group tasks by blast radius**
+   - **Stage 1**: Low-risk changes first (isolated, few callers)
+   - **Stage 2**: Medium-risk changes (some callers, add verification)
+   - **Stage 3**: High-risk changes last (after tests for dependencies pass)
+
+3. **Include verification tasks based on callers**
+   - After modifying a function, add task: "Verify all N callers still work"
+   - After changing an interface, add task: "Update M overriding implementations"
+   - Reference specific caller names from the graph query results
+
+**Example task structure for a refactor:**
+```markdown
+### Stage 1: Foundation (No External Callers)
+- [ ] In src/utils/helpers.py, modify internal utility function (0 external callers)
+- [ ] In src/utils/helpers.py, add new helper method
+
+### Stage 2: Core Changes (3 Callers Identified)
+- [ ] In src/core/processor.py, update main interface (callers: service_a, handler_b, api_c)
+- [ ] Verify src/services/service_a.py still works with updated interface
+- [ ] Verify src/handlers/handler_b.py still works with updated interface
+- [ ] Verify src/api/api_c.py still works with updated interface
+
+### Stage 3: Dependent Updates
+- [ ] In src/services/service_a.py, update to use new interface features
+- [ ] In src/handlers/handler_b.py, update to use new interface features
+- [ ] In src/api/api_c.py, update to use new interface features
+```
+
+**Why this matters**: Generic coding assistants modify code in arbitrary order and discover breakages late. You can use the dependency graph to create tasks that minimize cascading failures.
+
 {% if interactive_mode %}
 USER INTERACTION - ASK CLARIFYING QUESTIONS:
 

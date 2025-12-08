@@ -221,3 +221,74 @@ MATCH (source:Method)-[:CALLS]->(target:Function)
 WHERE source.qualified_name ENDS WITH '.WebSocketServer.start'
 RETURN target.name AS name, target.qualified_name AS qualified_name, 'Function' AS target_type
 ```
+
+## IMPACT ANALYSIS PATTERNS (For Change Planning)
+
+**Pattern: Find ALL Callers of a Function (Transitive - Multi-hop)**
+```cypher
+// "What is the full blast radius of changing function X?"
+// "Find everything that directly or indirectly calls process_order"
+// This traverses up to 5 hops of call relationships
+MATCH path = (caller)-[:CALLS*1..5]->(target:Function)
+WHERE target.name = 'process_order'
+UNWIND nodes(path) AS node
+WITH DISTINCT node
+WHERE node:Function OR node:Method
+RETURN node.name AS name, node.qualified_name AS qualified_name,
+       CASE WHEN node:Function THEN 'Function' ELSE 'Method' END AS type
+```
+
+**Pattern: Find All Downstream Dependencies (What Could Break)**
+```cypher
+// "What would be affected if I change BaseHandler?"
+// Find all classes that inherit and all methods that call this class's methods
+MATCH (target:Class {name: 'BaseHandler'})
+OPTIONAL MATCH (child:Class)-[:INHERITS*1..3]->(target)
+OPTIONAL MATCH (target)-[:DEFINES_METHOD]->(m:Method)<-[:CALLS]-(caller)
+RETURN DISTINCT
+  COALESCE(child.qualified_name, caller.qualified_name) AS affected_entity,
+  CASE
+    WHEN child IS NOT NULL THEN 'Inheriting Class'
+    ELSE 'Caller'
+  END AS relationship_type
+```
+
+**Pattern: Entry Points to Internal Function (Trace API to Core)**
+```cypher
+// "What API endpoints eventually call the database layer?"
+// Find paths from entry points (functions with specific decorators) to target
+MATCH (entry:Function)-[:CALLS*1..10]->(target:Function)
+WHERE ANY(d IN entry.decorators WHERE d IN ['route', 'endpoint', 'api', 'get', 'post'])
+  AND target.qualified_name CONTAINS 'database'
+RETURN entry.name AS entry_point, entry.qualified_name AS entry_path,
+       target.name AS target_function
+```
+
+**Pattern: Find Overriding Methods That Would Be Affected**
+```cypher
+// "If I change BaseClass.process(), what overrides would need updating?"
+MATCH (base:Class {name: 'BaseClass'})-[:DEFINES_METHOD]->(baseMethod:Method {name: 'process'})
+MATCH (child:Class)-[:INHERITS*1..5]->(base)
+MATCH (child)-[:DEFINES_METHOD]->(override:Method {name: 'process'})
+RETURN child.name AS class_name, override.qualified_name AS override_location
+```
+
+**Pattern: Modules with High Coupling (Risk Assessment)**
+```cypher
+// "Which modules have the most incoming dependencies?" (highest risk to change)
+MATCH (caller)-[:CALLS]->(target)
+WHERE target:Function OR target:Method
+WITH target, count(DISTINCT caller) AS caller_count
+ORDER BY caller_count DESC
+LIMIT 20
+RETURN target.name AS name, target.qualified_name AS path, caller_count AS inbound_calls
+```
+
+**Pattern: Dead Code Detection (No Callers)**
+```cypher
+// "Find functions that are never called" (safe to remove)
+MATCH (f:Function)
+WHERE NOT EXISTS { MATCH ()-[:CALLS]->(f) }
+  AND NOT ANY(d IN f.decorators WHERE d IN ['route', 'endpoint', 'main', 'test', 'fixture'])
+RETURN f.name AS name, f.qualified_name AS path, 'Unused Function' AS status
+```

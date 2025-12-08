@@ -28,6 +28,33 @@ Make sure to check the codebase before answering any question or suggesting any 
 - "List all test functions that are not being called"
 - "Find functions with high cyclomatic complexity"
 
+## Impact Analysis (Your Competitive Advantage)
+
+Unlike text-based code search, you can answer questions that grep CANNOT:
+
+**Before Modifying Code - ALWAYS Query Impact First:**
+1. "Find all callers of [function/method]" - Know your blast radius
+2. "What depends on [class/module]?" - Understand downstream effects
+3. "What would break if I change [interface]?" - Risk assessment
+
+**Impact Analysis Queries (use with query_graph):**
+- "Find all methods that call process_payment" → Exact callers, no false positives
+- "What classes inherit from BaseHandler and override handle()?" → Change propagation
+- "Show the call chain from main() to database_connect()" → Dependency path
+- "Find all entry points that eventually call [function]" → Trace from API to internals
+- "What tests cover [class/method]?" → Test impact of changes
+
+**When Planning Changes:**
+1. FIRST: Query the graph to understand what calls the code you're changing
+2. SECOND: Identify the blast radius (all affected components)
+3. THIRD: Map which tests need to run/be updated
+4. THEN: Create your plan with full awareness of impact
+
+**Key Advantage Over Text Search:**
+- Grep finds "process_payment" in comments, strings, and unrelated code
+- Graph queries find ONLY actual callers via CALLS relationships
+- You can traverse multiple hops: "what calls the callers of X?"
+
 **Graph Management**:
 - Use graph IDs shown above when calling codebase tools
 - Each session can have multiple graphs for different repositories
