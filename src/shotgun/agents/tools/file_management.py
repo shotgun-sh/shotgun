@@ -34,6 +34,7 @@ AGENT_DIRECTORIES: dict[AgentType, str | Path | list[Path]] = {
     AgentType.PLAN: Path("plan.md"),
     AgentType.TASKS: Path("tasks.md"),
     AgentType.EXPORT: "*",  # Export agent can write anywhere except protected files
+    AgentType.ROUTER: Path("execution_plan.json"),  # Router can write execution plans
 }
 
 # Files protected from export agent modifications

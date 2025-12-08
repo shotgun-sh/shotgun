@@ -16,6 +16,7 @@ from shotgun.agents.usage_manager import SessionUsageManager, get_session_usage_
 from .config.models import ModelConfig
 
 if TYPE_CHECKING:
+    from shotgun.agents.router.models import SubAgentContext
     from shotgun.codebase.service import CodebaseService
 
 
@@ -51,6 +52,7 @@ class AgentType(StrEnum):
     PLAN = "plan"
     TASKS = "tasks"
     EXPORT = "export"
+    ROUTER = "router"
 
 
 class PipelineConfigEntry(BaseModel):
@@ -319,9 +321,15 @@ class AgentDeps(AgentRuntimeOptions):
         description="Current agent mode for file scoping",
     )
 
+    sub_agent_context: "SubAgentContext | None" = Field(
+        default=None,
+        description="Context passed to sub-agents when router-delegated",
+    )
+
 
 # Rebuild model to resolve forward references after imports are available
 try:
+    from shotgun.agents.router.models import SubAgentContext
     from shotgun.codebase.service import CodebaseService
 
     AgentDeps.model_rebuild()
