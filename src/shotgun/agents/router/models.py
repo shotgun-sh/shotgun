@@ -8,12 +8,15 @@ IMPORTANT: All tool inputs/outputs must use Pydantic models - no raw dict/list/t
 """
 
 from enum import StrEnum
-from typing import Any, Final
+from typing import TYPE_CHECKING, Final
 
 from pydantic import BaseModel, Field
 
 # Import SubAgentContext from the main models module
-from shotgun.agents.models import SubAgentContext
+from shotgun.agents.models import AgentResponse, SubAgentContext
+
+if TYPE_CHECKING:
+    from pydantic_ai import Agent
 
 # Re-export SubAgentContext for convenience
 __all__ = ["SubAgentContext"]
@@ -269,8 +272,7 @@ from shotgun.agents.models import AgentDeps, AgentType  # noqa: E402
 
 # Type alias for sub-agent cache entries
 # Each entry is a tuple of (Agent instance, AgentDeps instance)
-# Using Any for Agent generic params since different sub-agents have different types
-SubAgentCacheEntry = tuple[Any, AgentDeps]
+SubAgentCacheEntry = tuple["Agent[AgentDeps, AgentResponse]", AgentDeps]
 
 
 class RouterDeps(AgentDeps):
