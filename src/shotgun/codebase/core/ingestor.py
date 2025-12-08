@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
-import kuzu
+import real_ladybug as kuzu
 from tree_sitter import Node, Parser, QueryCursor
 
 from shotgun.codebase.core.language_config import LANGUAGE_CONFIGS, get_language_config
