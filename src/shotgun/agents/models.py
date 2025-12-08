@@ -77,6 +77,10 @@ class AgentSystemPromptContext(BaseModel):
         default=False,
         description="Whether Context7 MCP server is available for documentation lookup",
     )
+    has_codebase_indexed: bool = Field(
+        default=False,
+        description="Whether any codebase graphs are indexed and available",
+    )
 
 
 class AgentResponse(BaseModel):
@@ -424,6 +428,11 @@ class AgentDeps(AgentRuntimeOptions):
     has_context7: bool = Field(
         default=False,
         description="Whether Context7 MCP server is available for documentation lookup",
+    )
+
+    has_codebase_indexed: bool = Field(
+        default=False,
+        description="Whether any codebase graphs are indexed and available",
     )
 
 

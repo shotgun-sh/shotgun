@@ -587,6 +587,7 @@ def build_agent_system_prompt(
         supports_pdf=supports_pdf,
         supports_images=supports_images,
         has_context7=has_context7,
+        has_codebase_indexed=ctx.deps.has_codebase_indexed,
     )
 
     result = prompt_loader.render(
@@ -629,6 +630,12 @@ async def add_system_prompt_message(
         Updated message history with system prompt prepended as first message
     """
     message_history = message_history or []
+
+    # Check if any codebase graphs are indexed before rendering prompt
+    # This allows prompts to conditionally include codebase-specific guidance
+    if deps.codebase_service:
+        codebase_graphs = await deps.codebase_service.list_graphs_for_directory()
+        deps.has_codebase_indexed = len(codebase_graphs) > 0
 
     # Create a minimal RunContext to call the system prompt function
     # We'll pass None for model and usage since they're not used

@@ -28,6 +28,7 @@ Make sure to check the codebase before answering any question or suggesting any 
 - "List all test functions that are not being called"
 - "Find functions with high cyclomatic complexity"
 
+{% if has_codebase_indexed %}
 ## Impact Analysis (Your Competitive Advantage)
 
 Unlike text-based code search, you can answer questions that grep CANNOT.
@@ -56,6 +57,7 @@ Use this to create **better plans and tasks** that coding agents (Claude Code, C
 - Graph queries find ONLY actual callers via CALLS relationships
 - You can traverse multiple hops: "what calls the callers of X?"
 - Your plans will be more accurate because you understand the full dependency graph
+{% endif %}
 
 **Graph Management**:
 - Use graph IDs shown above when calling codebase tools
