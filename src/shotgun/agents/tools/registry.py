@@ -30,6 +30,7 @@ class ToolCategory(StrEnum):
     ARTIFACT_MANAGEMENT = "artifact_management"
     WEB_RESEARCH = "web_research"
     AGENT_RESPONSE = "agent_response"
+    PLANNING = "planning"
     UNKNOWN = "unknown"
 
 

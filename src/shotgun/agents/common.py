@@ -73,6 +73,15 @@ async def add_system_status_message(
     # Get current datetime with timezone information
     dt_context = get_datetime_context()
 
+    # Get execution plan if this is the Router agent
+    execution_plan = None
+    if deps.agent_mode == AgentType.ROUTER:
+        # Import here to avoid circular imports
+        from shotgun.agents.router.models import RouterDeps
+
+        if isinstance(deps, RouterDeps) and deps.current_plan is not None:
+            execution_plan = deps.current_plan.format_for_display()
+
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
@@ -82,6 +91,7 @@ async def add_system_status_message(
         current_datetime=dt_context.datetime_formatted,
         timezone_name=dt_context.timezone_name,
         utc_offset=dt_context.utc_offset,
+        execution_plan=execution_plan,
     )
 
     message_history.append(

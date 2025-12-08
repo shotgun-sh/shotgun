@@ -4,6 +4,12 @@ Your training data may be old. The current date and time is: {{ current_datetime
 
 {% include 'agents/state/codebase/codebase_graphs_available.j2' %}
 
+{% if execution_plan %}
+## Current Execution Plan
+
+{{ execution_plan }}
+
+{% endif %}
 ## Available Files
 
 {% if existing_files %}

@@ -19,6 +19,28 @@ if TYPE_CHECKING:
     from shotgun.codebase.service import CodebaseService
 
 
+class SubAgentContext(BaseModel):
+    """
+    Context passed to sub-agents so they know they're being orchestrated.
+
+    When sub-agents receive this context, they should:
+    - Be more concise (router handles user communication)
+    - Focus on their specific task
+    - Return structured results
+    """
+
+    is_router_delegated: bool = Field(
+        default=True, description="Always True when passed to sub-agent"
+    )
+    plan_goal: str = Field(default="", description="High-level goal from execution plan")
+    current_step_id: str | None = Field(
+        default=None, description="ID of the current execution step"
+    )
+    current_step_title: str | None = Field(
+        default=None, description="Title of the current execution step"
+    )
+
+
 class AgentResponse(BaseModel):
     """Structured response from an agent with optional clarifying questions.
 
@@ -51,6 +73,7 @@ class AgentType(StrEnum):
     PLAN = "plan"
     TASKS = "tasks"
     EXPORT = "export"
+    ROUTER = "router"
 
 
 class PipelineConfigEntry(BaseModel):
@@ -317,6 +340,11 @@ class AgentDeps(AgentRuntimeOptions):
     agent_mode: AgentType | None = Field(
         default=None,
         description="Current agent mode for file scoping",
+    )
+
+    sub_agent_context: SubAgentContext | None = Field(
+        default=None,
+        description="Context when agent is delegated to by router",
     )
 
 
