@@ -25,16 +25,25 @@ def clean_env(monkeypatch, tmp_path):
 
 
 def test_telemetry_settings_defaults():
-    """Test TelemetrySettings loads with default values."""
-    from shotgun.settings import TelemetrySettings
+    """Test TelemetrySettings loads from build_constants as expected.
+
+    Note: The actual defaults come from build_constants.py which may contain
+    real values in dev builds. This test verifies the settings load correctly
+    and can be overridden by environment variables.
+    """
+    from shotgun.settings import TelemetrySettings, _get_build_constant
 
     settings = TelemetrySettings()
 
-    assert settings.sentry_dsn == ""
-    assert settings.posthog_api_key == ""
-    assert settings.posthog_project_id == ""
-    assert settings.logfire_enabled is False
-    assert settings.logfire_token == ""
+    # Verify settings match what _get_build_constant returns
+    # (either empty strings or values from build_constants.py)
+    assert settings.sentry_dsn == _get_build_constant("SENTRY_DSN", "")
+    assert settings.posthog_api_key == _get_build_constant("POSTHOG_API_KEY", "")
+    assert settings.posthog_project_id == _get_build_constant("POSTHOG_PROJECT_ID", "")
+    # logfire_enabled defaults to False if build_constants returns falsy value
+    expected_logfire = _get_build_constant("LOGFIRE_ENABLED", False)
+    assert settings.logfire_enabled == (expected_logfire in (True, "true", "1", "yes"))
+    assert settings.logfire_token == _get_build_constant("LOGFIRE_TOKEN", "")
 
 
 def test_telemetry_settings_from_env(monkeypatch):
