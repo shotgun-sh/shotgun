@@ -1,7 +1,5 @@
 """Tests for router agent models."""
 
-import pytest
-
 from shotgun.agents.router.models import (
     AddStepInput,
     CascadeScope,
