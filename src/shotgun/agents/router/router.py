@@ -22,10 +22,17 @@ from shotgun.agents.conversation.history import token_limit_compactor
 from shotgun.agents.models import AgentResponse, AgentRuntimeOptions, AgentType
 from shotgun.agents.router.models import RouterDeps
 from shotgun.agents.router.tools import (
+    # Plan management tools
     add_step,
     create_plan,
     mark_step_done,
     remove_step,
+    # Delegation tools
+    delegate_to_export,
+    delegate_to_plan,
+    delegate_to_research,
+    delegate_to_specification,
+    delegate_to_tasks,
 )
 from shotgun.agents.tools import (
     append_file,
@@ -118,6 +125,13 @@ async def create_router_agent(
     agent.tool(mark_step_done)
     agent.tool(add_step)
     agent.tool(remove_step)
+
+    # Register delegation tools (router orchestrates sub-agents)
+    agent.tool(delegate_to_research)
+    agent.tool(delegate_to_specification)
+    agent.tool(delegate_to_plan)
+    agent.tool(delegate_to_tasks)
+    agent.tool(delegate_to_export)
 
     # Register common file management tools
     agent.tool(write_file)
