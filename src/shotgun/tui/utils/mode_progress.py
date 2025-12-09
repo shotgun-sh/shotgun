@@ -113,93 +113,24 @@ class ModeProgressChecker:
 
 
 class PlaceholderHints:
-    """Manages dynamic placeholder hints for each mode based on progress."""
+    """Manages dynamic placeholder hints for the Router agent."""
 
-    # Placeholder variations for each mode and state
+    # Placeholder variations for Router mode
     HINTS = {
-        # Research mode
-        AgentType.RESEARCH: {
+        AgentType.ROUTER: {
             False: [
-                "Research a product or idea (SHIFT+TAB to cycle modes)",
-                "What would you like to explore? Start your research journey here (SHIFT+TAB to switch modes)",
-                "Dive into discovery mode - research anything that sparks curiosity (SHIFT+TAB for mode menu)",
-                "Ready to investigate? Feed me your burning questions (SHIFT+TAB to explore other modes)",
-                " 🔍 The research rabbit hole awaits! What shall we uncover? (SHIFT+TAB for mode carousel)",
+                "What would you like to work on? (SHIFT+TAB to toggle Planning/Drafting)",
+                "Ask me to research, plan, or implement anything (SHIFT+TAB toggles mode)",
+                "Describe your goal and I'll help break it down (SHIFT+TAB for mode toggle)",
+                "Ready to help with research, specs, plans, or tasks (SHIFT+TAB toggles mode)",
+                "Tell me what you need - I'll coordinate the work (SHIFT+TAB for Planning/Drafting)",
             ],
             True: [
-                "Research complete! SHIFT+TAB to move to Specify mode",
-                "Great research! Time to specify (SHIFT+TAB to Specify mode)",
-                "Research done! Ready to create specifications (SHIFT+TAB to Specify)",
-                "Findings gathered! Move to specifications (SHIFT+TAB for Specify mode)",
-                " 🎯 Research complete! Advance to Specify mode (SHIFT+TAB)",
-            ],
-        },
-        # Specify mode
-        AgentType.SPECIFY: {
-            False: [
-                "Create detailed specifications and requirements (SHIFT+TAB to switch modes)",
-                "Define your project specifications here (SHIFT+TAB to navigate modes)",
-                "Time to get specific - write comprehensive specs (SHIFT+TAB for mode options)",
-                "Specification station: Document requirements and designs (SHIFT+TAB to change modes)",
-                " 📋 Spec-tacular time! Let's architect your ideas (SHIFT+TAB for mode magic)",
-            ],
-            True: [
-                "Specifications complete! SHIFT+TAB to create a Plan",
-                "Specs ready! Time to plan (SHIFT+TAB to Plan mode)",
-                "Requirements defined! Move to planning (SHIFT+TAB to Plan)",
-                "Specifications done! Create your roadmap (SHIFT+TAB for Plan mode)",
-                " 🚀 Specs complete! Advance to Plan mode (SHIFT+TAB)",
-            ],
-        },
-        # Tasks mode
-        AgentType.TASKS: {
-            False: [
-                "Break down your project into actionable tasks (SHIFT+TAB for modes)",
-                "Task creation time! Define your implementation steps (SHIFT+TAB to switch)",
-                "Ready to get tactical? Create your task list (SHIFT+TAB for mode options)",
-                "Task command center: Organize your work items (SHIFT+TAB to navigate)",
-                " ✅ Task mode activated! Break it down into bite-sized pieces (SHIFT+TAB)",
-            ],
-            True: [
-                "Tasks defined! Ready to export or cycle back (SHIFT+TAB)",
-                "Task list complete! Export your work (SHIFT+TAB to Export)",
-                "All tasks created! Time to export (SHIFT+TAB for Export mode)",
-                "Implementation plan ready! Export everything (SHIFT+TAB to Export)",
-                " 🎊 Tasks complete! Export your masterpiece (SHIFT+TAB)",
-            ],
-        },
-        # Export mode
-        AgentType.EXPORT: {
-            False: [
-                "Export your complete project documentation (SHIFT+TAB for modes)",
-                "Ready to package everything? Export time! (SHIFT+TAB to switch)",
-                "Export station: Generate deliverables (SHIFT+TAB for mode menu)",
-                "Time to share your work! Export documents (SHIFT+TAB to navigate)",
-                " 📦 Export mode! Package and share your creation (SHIFT+TAB)",
-            ],
-            True: [
-                "Exported! Start new research or continue refining (SHIFT+TAB)",
-                "Export complete! New cycle begins (SHIFT+TAB to Research)",
-                "All exported! Ready for another round (SHIFT+TAB for Research)",
-                "Documents exported! Start fresh (SHIFT+TAB to Research mode)",
-                " 🎉 Export complete! Begin a new adventure (SHIFT+TAB)",
-            ],
-        },
-        # Plan mode
-        AgentType.PLAN: {
-            False: [
-                "Create a strategic plan for your project (SHIFT+TAB for modes)",
-                "Planning phase: Map out your roadmap (SHIFT+TAB to switch)",
-                "Time to strategize! Create your project plan (SHIFT+TAB for options)",
-                "Plan your approach and milestones (SHIFT+TAB to navigate)",
-                " 🗺️ Plan mode! Chart your course to success (SHIFT+TAB)",
-            ],
-            True: [
-                "Plan complete! Move to Tasks mode (SHIFT+TAB)",
-                "Strategy ready! Time for tasks (SHIFT+TAB to Tasks mode)",
-                "Roadmap done! Create task list (SHIFT+TAB for Tasks)",
-                "Planning complete! Break into tasks (SHIFT+TAB to Tasks)",
-                " ⚡ Plan ready! Advance to Tasks mode (SHIFT+TAB)",
+                "Continue working or start something new (SHIFT+TAB toggles mode)",
+                "What's next? (SHIFT+TAB to toggle Planning/Drafting)",
+                "Ready for the next task (SHIFT+TAB toggles Planning/Drafting)",
+                "Let's keep going! (SHIFT+TAB to toggle mode)",
+                "What else can I help with? (SHIFT+TAB for mode toggle)",
             ],
         },
     }
@@ -224,19 +155,22 @@ class PlaceholderHints:
         Returns:
             A contextual hint string for the placeholder.
         """
+        # Always use Router hints since Router is the only user-facing agent
+        mode_key = AgentType.ROUTER
+
         # Default hint if mode not configured
-        if current_mode not in self.HINTS:
-            return f"Enter your {current_mode.value} mode prompt (SHIFT+TAB to switch modes)"
+        if mode_key not in self.HINTS:
+            return "Enter your prompt (SHIFT+TAB to toggle Planning/Drafting mode)"
 
         # For placeholder text, we default to "no content" state (initial hints)
         # This avoids async file system checks in the UI rendering path
         has_content = False
 
         # Get hint variations for this mode and state
-        hints_list = self.HINTS[current_mode][has_content]
+        hints_list = self.HINTS[mode_key][has_content]
 
         # Cache key for this mode and state
-        cache_key = (current_mode, has_content)
+        cache_key = (mode_key, has_content)
 
         # Force refresh or first time
         if force_refresh or cache_key not in self._cached_hints:
