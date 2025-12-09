@@ -32,6 +32,7 @@ def mock_router_deps():
     deps.router_mode = RouterMode.PLANNING
     deps.current_plan = None
     deps.file_tracker = FileOperationTracker()
+    deps.pending_checkpoint = None
     return deps
 
 
@@ -315,3 +316,67 @@ async def test_remove_step_at_end_adjusts_index(mock_context, sample_plan):
 
     # Index should adjust to valid position
     assert sample_plan.current_step_index <= len(sample_plan.steps) - 1
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_sets_pending_checkpoint_in_planning_mode(
+    mock_context, sample_plan
+):
+    """Test that mark_step_done sets pending_checkpoint in Planning mode."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.pending_checkpoint = None
+
+    input_data = MarkStepDoneInput(step_id="step-1")
+    result = await mark_step_done(mock_context, input_data)
+
+    assert result.success is True
+    # Pending checkpoint should be set
+    assert mock_context.deps.pending_checkpoint is not None
+    completed_step, next_step = mock_context.deps.pending_checkpoint
+    assert completed_step.id == "step-1"
+    # After marking step-1 done, current_step_index advances to 1 (step-2)
+    # So next_step() returns the step at index 2 (step-3)
+    assert next_step is not None
+    # The next step is the one after the current step (which is now step-2)
+    assert next_step.id == "step-3"
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_sets_pending_checkpoint_with_none_for_last_step(
+    mock_context, sample_plan
+):
+    """Test that mark_step_done sets next_step to None when completing last step."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.pending_checkpoint = None
+
+    # Mark all steps done to get to the last step
+    sample_plan.current_step_index = 2
+
+    input_data = MarkStepDoneInput(step_id="step-3")
+    result = await mark_step_done(mock_context, input_data)
+
+    assert result.success is True
+    # Pending checkpoint should be set with None for next_step
+    assert mock_context.deps.pending_checkpoint is not None
+    completed_step, next_step = mock_context.deps.pending_checkpoint
+    assert completed_step.id == "step-3"
+    assert next_step is None
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_skips_checkpoint_in_drafting_mode(
+    mock_context, sample_plan
+):
+    """Test that mark_step_done does NOT set checkpoint in Drafting mode."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+    mock_context.deps.pending_checkpoint = None
+
+    input_data = MarkStepDoneInput(step_id="step-1")
+    result = await mark_step_done(mock_context, input_data)
+
+    assert result.success is True
+    # Pending checkpoint should NOT be set in Drafting mode
+    assert mock_context.deps.pending_checkpoint is None

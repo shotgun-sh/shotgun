@@ -5,7 +5,10 @@ import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from shotgun.agents.router.models import ExecutionStep
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -48,6 +51,7 @@ from shotgun.agents.models import (
     AgentType,
     FileOperationTracker,
 )
+from shotgun.agents.router.models import RouterDeps, RouterMode
 from shotgun.agents.runner import AgentRunner
 from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
@@ -85,6 +89,12 @@ from shotgun.tui.screens.chat_screen.command_providers import (
 )
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
+from shotgun.tui.screens.chat_screen.messages import (
+    CheckpointContinue,
+    CheckpointModify,
+    CheckpointStop,
+    StepCompleted,
+)
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.onboarding import OnboardingModal
 from shotgun.tui.screens.shared_specs import (
@@ -96,6 +106,7 @@ from shotgun.tui.screens.shared_specs import (
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+from shotgun.tui.widgets.step_checkpoint_widget import StepCheckpointWidget
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 from shotgun.utils.file_system_utils import get_shotgun_base_path
@@ -162,6 +173,9 @@ class ChatScreen(Screen[None]):
     # Throttle context indicator updates (in seconds)
     _last_context_update: float = 0.0
     _context_update_throttle: float = 5.0  # 5 seconds
+
+    # Step checkpoint widget (Planning mode)
+    _checkpoint_widget: StepCheckpointWidget | None = None
 
     def __init__(
         self,
@@ -1548,6 +1562,9 @@ class ChatScreen(Screen[None]):
             if self.deps.llm_model.is_shotgun_account:
                 await self._check_low_balance_warning()
 
+        # Check for pending checkpoint (Planning mode step completion)
+        self._check_pending_checkpoint()
+
         # Save conversation after each interaction
         self._save_conversation()
 
@@ -1628,3 +1645,121 @@ class ChatScreen(Screen[None]):
             # Mark as shown in config with current timestamp
             config.shown_onboarding_popup = datetime.now(timezone.utc)
             await config_manager.save(config)
+
+    # =========================================================================
+    # Step Checkpoint Handlers (Planning Mode)
+    # =========================================================================
+
+    @on(StepCompleted)
+    def handle_step_completed(self, event: StepCompleted) -> None:
+        """Show checkpoint widget when a step completes in Planning mode.
+
+        This handler is triggered after mark_step_done is called and sets
+        up a pending checkpoint. It shows the StepCheckpointWidget to let
+        the user decide whether to continue, modify, or stop.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+        if self.deps.router_mode != RouterMode.PLANNING:
+            return
+
+        # Show checkpoint widget
+        self._show_checkpoint_widget(event.step, event.next_step)
+
+    @on(CheckpointContinue)
+    def handle_checkpoint_continue(self) -> None:
+        """Continue to next step when user approves at checkpoint."""
+        self._hide_checkpoint_widget()
+        self._execute_next_step()
+
+    @on(CheckpointModify)
+    def handle_checkpoint_modify(self) -> None:
+        """Return to prompt input for plan modification."""
+        self._hide_checkpoint_widget()
+
+        if isinstance(self.deps, RouterDeps):
+            self.deps.is_executing = False
+
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    @on(CheckpointStop)
+    def handle_checkpoint_stop(self) -> None:
+        """Stop execution, keep remaining steps as pending."""
+        self._hide_checkpoint_widget()
+
+        if isinstance(self.deps, RouterDeps):
+            self.deps.is_executing = False
+
+        # Show confirmation message
+        self.mount_hint("⏸️ Execution stopped. Remaining steps are still in the plan.")
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    def _show_checkpoint_widget(
+        self,
+        step: "ExecutionStep",
+        next_step: "ExecutionStep | None",
+    ) -> None:
+        """Replace PromptInput with StepCheckpointWidget.
+
+        Args:
+            step: The step that was just completed.
+            next_step: The next step to execute, or None if last step.
+        """
+        # Create the checkpoint widget
+        self._checkpoint_widget = StepCheckpointWidget(step, next_step)
+
+        # Hide PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = False
+
+        # Mount checkpoint widget in footer
+        footer = self.query_one("#footer")
+        footer.mount(self._checkpoint_widget, after=prompt_input)
+
+    def _hide_checkpoint_widget(self) -> None:
+        """Remove checkpoint widget, restore PromptInput."""
+        if hasattr(self, "_checkpoint_widget") and self._checkpoint_widget:
+            self._checkpoint_widget.remove()
+            self._checkpoint_widget = None
+
+        # Show PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = True
+
+    def _execute_next_step(self) -> None:
+        """Execute the next step in the plan."""
+        if not isinstance(self.deps, RouterDeps) or not self.deps.current_plan:
+            return
+
+        # Advance to next step
+        plan = self.deps.current_plan
+        plan.current_step_index += 1
+
+        next_step = plan.current_step()
+        if next_step:
+            # Resume router execution for the next step
+            self.run_agent(f"Continue with next step: {next_step.title}")
+        else:
+            # Plan complete
+            self.deps.is_executing = False
+            self.mount_hint("✅ All plan steps completed!")
+            self.widget_coordinator.update_prompt_input(focus=True)
+
+    def _check_pending_checkpoint(self) -> None:
+        """Check if there's a pending checkpoint and post StepCompleted if so.
+
+        This is called after each agent run to check if mark_step_done
+        set a pending checkpoint in Planning mode.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        if self.deps.pending_checkpoint is None:
+            return
+
+        # Extract checkpoint data and clear the pending state
+        step, next_step = self.deps.pending_checkpoint
+        self.deps.pending_checkpoint = None
+
+        # Post the StepCompleted message to trigger the checkpoint UI
+        self.post_message(StepCompleted(step=step, next_step=next_step))

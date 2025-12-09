@@ -17,6 +17,7 @@ from shotgun.agents.router.models import (
     MarkStepDoneInput,
     RemoveStepInput,
     RouterDeps,
+    RouterMode,
     ToolResult,
 )
 from shotgun.agents.tools.registry import ToolCategory, register_tool
@@ -115,6 +116,17 @@ async def mark_step_done(
                 and plan.steps[plan.current_step_index].done
             ):
                 plan.current_step_index += 1
+
+            # Set pending checkpoint for Planning mode
+            # The TUI will detect this and show the StepCheckpointWidget
+            if ctx.deps.router_mode == RouterMode.PLANNING:
+                next_step = plan.next_step()
+                ctx.deps.pending_checkpoint = (step, next_step)
+                logger.debug(
+                    "Set pending checkpoint: completed='%s', next='%s'",
+                    step.title,
+                    next_step.title if next_step else None,
+                )
 
             return ToolResult(
                 success=True,
