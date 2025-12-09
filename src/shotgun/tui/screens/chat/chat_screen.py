@@ -260,10 +260,11 @@ class ChatScreen(Screen[None]):
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
 
-    def on_mount(self) -> None:
-        # Sync mode with agent manager's current agent type
-        self.mode = self.agent_manager._current_agent_type
+        # Initialize mode from agent_manager before compose() runs
+        # This ensures ModeIndicator shows correct mode on first render
+        self.mode = agent_manager._current_agent_type
 
+    def on_mount(self) -> None:
         # Use widget coordinator to focus input
         self.widget_coordinator.update_prompt_input(focus=True)
         # Hide spinner initially
