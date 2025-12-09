@@ -1,16 +1,20 @@
 """Unit tests for ModeIndicator widget."""
 
 import pytest
+from textual.app import App
 
 from shotgun.agents.models import AgentType
-from shotgun.tui.components.mode_indicator import ModeIndicator
+from shotgun.tui.components.mode_indicator import (
+    AGENT_DESCRIPTIONS,
+    AGENT_DISPLAY_NAMES,
+    ModeIndicator,
+)
 
 pytestmark = pytest.mark.asyncio
 
 
 async def test_render_legacy_research_mode() -> None:
     """Test that legacy Research mode displays correctly."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -27,7 +31,6 @@ async def test_render_legacy_research_mode() -> None:
 
 async def test_render_legacy_specify_mode() -> None:
     """Test that legacy Specify mode displays correctly."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -44,7 +47,6 @@ async def test_render_legacy_specify_mode() -> None:
 
 async def test_render_legacy_plan_mode() -> None:
     """Test that legacy Plan mode displays correctly."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -61,7 +63,6 @@ async def test_render_legacy_plan_mode() -> None:
 
 async def test_render_legacy_tasks_mode() -> None:
     """Test that legacy Tasks mode displays correctly."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -78,7 +79,6 @@ async def test_render_legacy_tasks_mode() -> None:
 
 async def test_render_legacy_export_mode() -> None:
     """Test that legacy Export mode displays correctly."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -95,7 +95,6 @@ async def test_render_legacy_export_mode() -> None:
 
 async def test_render_router_mode_defaults_to_planning() -> None:
     """Test that Router mode defaults to Planning display when no provider."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -121,7 +120,6 @@ async def test_mode_indicator_initialization() -> None:
 
 async def test_legacy_mode_clears_router_css_classes() -> None:
     """Test that legacy modes don't have router CSS classes."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -138,7 +136,6 @@ async def test_legacy_mode_clears_router_css_classes() -> None:
 
 async def test_render_router_mode_method_planning() -> None:
     """Test _render_router_mode returns Planning format when screen has no provider."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -179,7 +176,6 @@ def test_render_legacy_mode_with_unknown_type() -> None:
 
 async def test_router_mode_sets_planning_css_class() -> None:
     """Test that router mode sets mode-planning CSS class."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -215,46 +211,46 @@ def test_mode_display_mapping() -> None:
 
 
 def test_mode_description_mapping() -> None:
-    """Test that all modes have descriptions."""
-    indicator = ModeIndicator(mode=AgentType.RESEARCH)
+    """Test that AGENT_DESCRIPTIONS constant contains all agent types."""
+    expected_agent_types = [
+        AgentType.RESEARCH,
+        AgentType.SPECIFY,
+        AgentType.PLAN,
+        AgentType.TASKS,
+        AgentType.EXPORT,
+    ]
 
-    expected_descriptions = {
-        AgentType.RESEARCH: "research",
-        AgentType.SPECIFY: "specification",
-        AgentType.PLAN: "plan",
-        AgentType.TASKS: "task",
-        AgentType.EXPORT: "export",
-    }
-
-    for mode, _keyword in expected_descriptions.items():
-        indicator.mode = mode
-        rendered = indicator._render_legacy_mode()
-        # Each mode should have some description text
-        assert len(rendered) > 20  # Has some content beyond just mode name
+    for agent_type in expected_agent_types:
+        # All expected types should be in the mapping
+        assert agent_type in AGENT_DESCRIPTIONS
+        # Description should be a non-empty string
+        description = AGENT_DESCRIPTIONS[agent_type]
+        assert isinstance(description, str)
+        assert len(description) > 10  # Has meaningful content
 
 
 def test_sub_agent_display_mapping() -> None:
-    """Test that sub-agent type strings map to display names correctly."""
-    # Verify the sub_agent_display dict mapping used in ModeIndicator
-    sub_agent_types = ["research", "specify", "plan", "tasks", "export"]
+    """Test that AGENT_DISPLAY_NAMES constant maps all agent types correctly."""
+    # Verify the shared AGENT_DISPLAY_NAMES constant used in ModeIndicator
+    expected_agent_types = [
+        AgentType.RESEARCH,
+        AgentType.SPECIFY,
+        AgentType.PLAN,
+        AgentType.TASKS,
+        AgentType.EXPORT,
+    ]
 
-    for sub_type in sub_agent_types:
-        # The mapping should handle these types
-        expected_display = sub_type.title()
-        # Verify the display name would be used (dict lookup)
-        sub_agent_display = {
-            "research": "Research",
-            "specify": "Specify",
-            "plan": "Plan",
-            "tasks": "Tasks",
-            "export": "Export",
-        }
-        assert sub_agent_display.get(sub_type) == expected_display
+    for agent_type in expected_agent_types:
+        # All expected types should be in the mapping
+        assert agent_type in AGENT_DISPLAY_NAMES
+        # Display name should be a non-empty string
+        display_name = AGENT_DISPLAY_NAMES[agent_type]
+        assert isinstance(display_name, str)
+        assert len(display_name) > 0
 
 
 async def test_indicator_can_change_mode() -> None:
     """Test that mode can be changed after initialization."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):

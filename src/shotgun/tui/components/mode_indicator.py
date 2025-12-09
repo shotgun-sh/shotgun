@@ -3,12 +3,31 @@
 from textual.widget import Widget
 
 from shotgun.agents.models import AgentType
+from shotgun.agents.router.models import RouterMode
 from shotgun.tui.protocols import (
     ActiveSubAgentProvider,
     QAStateProvider,
     RouterModeProvider,
 )
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+
+# Shared display name mapping for agent types
+AGENT_DISPLAY_NAMES: dict[AgentType, str] = {
+    AgentType.RESEARCH: "Research",
+    AgentType.SPECIFY: "Specify",
+    AgentType.PLAN: "Planning",
+    AgentType.TASKS: "Tasks",
+    AgentType.EXPORT: "Export",
+}
+
+# Mode descriptions for legacy agent display
+AGENT_DESCRIPTIONS: dict[AgentType, str] = {
+    AgentType.RESEARCH: "Research topics with web search and synthesize findings",
+    AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
+    AgentType.TASKS: "Generate specific, actionable tasks from research and plans",
+    AgentType.SPECIFY: "Create detailed specifications and requirements documents",
+    AgentType.EXPORT: "Export artifacts and findings to various formats",
+}
 
 
 class ModeIndicator(Widget):
@@ -75,12 +94,18 @@ class ModeIndicator(Widget):
             router_mode = self.screen.router_mode
 
         # Get active sub-agent from screen
-        active_sub_agent: str | None = None
+        active_sub_agent: AgentType | None = None
         if isinstance(self.screen, ActiveSubAgentProvider):
-            active_sub_agent = self.screen.active_sub_agent
+            sub_agent_str = self.screen.active_sub_agent
+            if sub_agent_str:
+                # Convert string back to AgentType enum
+                try:
+                    active_sub_agent = AgentType(sub_agent_str)
+                except ValueError:
+                    pass
 
-        # Determine mode display
-        if router_mode == "drafting":
+        # Determine mode display using RouterMode enum
+        if router_mode == RouterMode.DRAFTING.value:
             icon = "✍️"
             mode_name = "Drafting"
             description = "Auto-execute without confirmation"
@@ -97,16 +122,9 @@ class ModeIndicator(Widget):
 
         # Add sub-agent suffix if executing
         if active_sub_agent:
-            # Convert sub-agent type to display name
-            sub_agent_display = {
-                "research": "Research",
-                "specify": "Specify",
-                "plan": "Plan",
-                "tasks": "Tasks",
-                "export": "Export",
-            }
-            sub_agent_name = sub_agent_display.get(
-                active_sub_agent, active_sub_agent.title()
+            # Use shared display name mapping
+            sub_agent_name = AGENT_DISPLAY_NAMES.get(
+                active_sub_agent, active_sub_agent.value.title()
             )
             return f"[bold $text-accent]{icon} {mode_name} → {sub_agent_name}[/]"
 
@@ -120,29 +138,8 @@ class ModeIndicator(Widget):
 
         Shows the agent name with description and content status.
         """
-        mode_display = {
-            AgentType.RESEARCH: "Research",
-            AgentType.PLAN: "Planning",
-            AgentType.TASKS: "Tasks",
-            AgentType.SPECIFY: "Specify",
-            AgentType.EXPORT: "Export",
-        }
-        mode_description = {
-            AgentType.RESEARCH: (
-                "Research topics with web search and synthesize findings"
-            ),
-            AgentType.PLAN: "Create comprehensive, actionable plans with milestones",
-            AgentType.TASKS: (
-                "Generate specific, actionable tasks from research and plans"
-            ),
-            AgentType.SPECIFY: (
-                "Create detailed specifications and requirements documents"
-            ),
-            AgentType.EXPORT: "Export artifacts and findings to various formats",
-        }
-
-        mode_title = mode_display.get(self.mode, self.mode.value.title())
-        description = mode_description.get(self.mode, "")
+        mode_title = AGENT_DISPLAY_NAMES.get(self.mode, self.mode.value.title())
+        description = AGENT_DESCRIPTIONS.get(self.mode, "")
 
         # Check if mode has content
         has_content = self.progress_checker.has_mode_content(self.mode)
