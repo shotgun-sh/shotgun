@@ -15,7 +15,9 @@ from shotgun.agents.router.models import (
     ExecutionPlan,
     ExecutionStep,
     MarkStepDoneInput,
+    PendingApproval,
     PendingCheckpoint,
+    PlanApprovalStatus,
     RemoveStepInput,
     RouterDeps,
     RouterMode,
@@ -68,6 +70,20 @@ async def create_plan(
     )
 
     ctx.deps.current_plan = plan
+
+    # Set pending approval for multi-step plans in Planning mode
+    # The TUI will detect this and show the PlanApprovalWidget
+    if ctx.deps.router_mode == RouterMode.PLANNING and plan.needs_approval():
+        ctx.deps.pending_approval = PendingApproval(plan=plan)
+        ctx.deps.approval_status = PlanApprovalStatus.PENDING
+        logger.debug(
+            "Set pending approval for plan with %d steps",
+            len(steps),
+        )
+    else:
+        # Single-step plans or Drafting mode - skip approval
+        ctx.deps.approval_status = PlanApprovalStatus.SKIPPED
+
     logger.info(
         "Created execution plan with %d steps: %s",
         len(steps),

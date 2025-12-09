@@ -272,6 +272,16 @@ class PendingCascade(BaseModel):
     )
 
 
+class PendingApproval(BaseModel):
+    """Pending approval state for Planning mode multi-step plans.
+
+    Set by create_plan tool when plan.needs_approval() returns True
+    (i.e., the plan has more than one step) in Planning mode.
+    """
+
+    plan: "ExecutionPlan" = Field(..., description="The plan that needs user approval")
+
+
 # =============================================================================
 # File Dependency Map (for Cascade Confirmation)
 # =============================================================================
@@ -334,3 +344,7 @@ class RouterDeps(AgentDeps):
     # Set when a file with dependents is modified
     # Excluded from serialization as it's transient UI state
     pending_cascade: PendingCascade | None = Field(default=None, exclude=True)
+    # Approval state for Planning mode multi-step plans
+    # Set by create_plan tool when plan.needs_approval() returns True
+    # Excluded from serialization as it's transient UI state
+    pending_approval: PendingApproval | None = Field(default=None, exclude=True)

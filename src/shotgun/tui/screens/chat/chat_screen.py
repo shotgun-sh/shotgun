@@ -51,7 +51,13 @@ from shotgun.agents.models import (
     AgentType,
     FileOperationTracker,
 )
-from shotgun.agents.router.models import CascadeScope, RouterDeps, RouterMode
+from shotgun.agents.router.models import (
+    CascadeScope,
+    ExecutionPlan,
+    PlanApprovalStatus,
+    RouterDeps,
+    RouterMode,
+)
 from shotgun.agents.runner import AgentRunner
 from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
@@ -96,6 +102,9 @@ from shotgun.tui.screens.chat_screen.messages import (
     CheckpointContinue,
     CheckpointModify,
     CheckpointStop,
+    PlanApprovalRequired,
+    PlanApproved,
+    PlanRejected,
     StepCompleted,
 )
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
@@ -109,6 +118,7 @@ from shotgun.tui.screens.shared_specs import (
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+from shotgun.tui.widgets.approval_widget import PlanApprovalWidget
 from shotgun.tui.widgets.cascade_confirmation_widget import CascadeConfirmationWidget
 from shotgun.tui.widgets.step_checkpoint_widget import StepCheckpointWidget
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
@@ -183,6 +193,9 @@ class ChatScreen(Screen[None]):
 
     # Cascade confirmation widget (Planning mode)
     _cascade_widget: CascadeConfirmationWidget | None = None
+
+    # Plan approval widget (Planning mode)
+    _approval_widget: PlanApprovalWidget | None = None
 
     def __init__(
         self,
@@ -1569,6 +1582,9 @@ class ChatScreen(Screen[None]):
             if self.deps.llm_model.is_shotgun_account:
                 await self._check_low_balance_warning()
 
+        # Check for pending approval (Planning mode multi-step plan creation)
+        self._check_pending_approval()
+
         # Check for pending checkpoint (Planning mode step completion)
         self._check_pending_checkpoint()
 
@@ -1904,3 +1920,100 @@ class ChatScreen(Screen[None]):
                 dependent_files=cascade.dependent_files,
             )
         )
+
+    # =========================================================================
+    # Plan Approval Handlers (Planning Mode - Stage 7)
+    # =========================================================================
+
+    @on(PlanApprovalRequired)
+    def handle_plan_approval_required(self, event: PlanApprovalRequired) -> None:
+        """Show approval widget when a multi-step plan is created.
+
+        In Planning mode, after creating a plan with multiple steps,
+        this shows the PlanApprovalWidget to let the user decide
+        whether to proceed or clarify.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+        if self.deps.router_mode != RouterMode.PLANNING:
+            return
+
+        # Show approval widget
+        self._show_approval_widget(event.plan)
+
+    @on(PlanApproved)
+    def handle_plan_approved(self) -> None:
+        """Begin plan execution when user approves."""
+        self._hide_approval_widget()
+
+        if isinstance(self.deps, RouterDeps):
+            self.deps.approval_status = PlanApprovalStatus.APPROVED
+            self.deps.is_executing = True
+
+            # Begin execution of the first step
+            plan = self.deps.current_plan
+            if plan and plan.current_step():
+                first_step = plan.current_step()
+                if first_step:
+                    self.run_agent(f"Execute step: {first_step.title}")
+            else:
+                self.widget_coordinator.update_prompt_input(focus=True)
+
+    @on(PlanRejected)
+    def handle_plan_rejected(self) -> None:
+        """Return to prompt input for clarification when user rejects plan."""
+        self._hide_approval_widget()
+
+        if isinstance(self.deps, RouterDeps):
+            self.deps.approval_status = PlanApprovalStatus.REJECTED
+            # Clear the plan since user wants to modify
+            self.deps.current_plan = None
+
+        self.mount_hint("ℹ️ Plan cancelled. Please clarify what you'd like to do.")
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    def _show_approval_widget(self, plan: ExecutionPlan) -> None:
+        """Replace PromptInput with PlanApprovalWidget.
+
+        Args:
+            plan: The execution plan that needs user approval.
+        """
+        # Create the approval widget
+        self._approval_widget = PlanApprovalWidget(plan)
+
+        # Hide PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = False
+
+        # Mount approval widget in footer
+        footer = self.query_one("#footer")
+        footer.mount(self._approval_widget, after=prompt_input)
+
+    def _hide_approval_widget(self) -> None:
+        """Remove approval widget, restore PromptInput."""
+        if self._approval_widget:
+            self._approval_widget.remove()
+            self._approval_widget = None
+
+        # Show PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = True
+
+    def _check_pending_approval(self) -> None:
+        """Check if there's a pending approval and post PlanApprovalRequired if so.
+
+        This is called after each agent run to check if create_plan
+        set a pending approval in Planning mode.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        if self.deps.pending_approval is None:
+            return
+
+        # Extract approval data and clear the pending state
+        approval = self.deps.pending_approval
+        self.deps.pending_approval = None
+
+        # Post the PlanApprovalRequired message to trigger the approval UI
+        self.post_message(PlanApprovalRequired(plan=approval.plan))

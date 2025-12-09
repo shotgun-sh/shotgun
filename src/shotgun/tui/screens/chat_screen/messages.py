@@ -7,7 +7,7 @@ and cascade confirmation in the Router's Planning mode.
 
 from textual.message import Message
 
-from shotgun.agents.router.models import CascadeScope, ExecutionStep
+from shotgun.agents.router.models import CascadeScope, ExecutionPlan, ExecutionStep
 
 __all__ = [
     # Step checkpoint messages (Stage 4)
@@ -19,6 +19,10 @@ __all__ = [
     "CascadeConfirmationRequired",
     "CascadeConfirmed",
     "CascadeDeclined",
+    # Plan approval messages (Stage 7)
+    "PlanApprovalRequired",
+    "PlanApproved",
+    "PlanRejected",
 ]
 
 
@@ -106,4 +110,40 @@ class CascadeDeclined(Message):
 
     This message indicates the user does not want to update dependent
     files and will handle them manually.
+    """
+
+
+# =============================================================================
+# Plan Approval Messages (Stage 7)
+# =============================================================================
+
+
+class PlanApprovalRequired(Message):
+    """Posted when a multi-step plan is created and needs user approval.
+
+    In Planning mode, after the router creates a plan with multiple steps,
+    this message triggers the approval UI to appear.
+
+    Attributes:
+        plan: The execution plan that needs user approval.
+    """
+
+    def __init__(self, plan: ExecutionPlan) -> None:
+        super().__init__()
+        self.plan = plan
+
+
+class PlanApproved(Message):
+    """Posted when user approves the plan.
+
+    This message indicates the user wants to proceed with executing
+    the plan ("Go Ahead").
+    """
+
+
+class PlanRejected(Message):
+    """Posted when user rejects the plan to clarify/modify.
+
+    This message indicates the user wants to return to the prompt input
+    to modify or clarify the request ("No, Let Me Clarify").
     """
