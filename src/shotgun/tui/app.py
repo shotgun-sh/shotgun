@@ -13,6 +13,7 @@ from shotgun.agents.config import (
 from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
 from shotgun.tui.containers import TUIContainer
+from shotgun.tui.dependencies import create_default_router_deps
 from shotgun.tui.screens.splash import SplashScreen
 from shotgun.utils.file_system_utils import (
     ensure_shotgun_directory_exists,
@@ -170,8 +171,6 @@ class ShotgunApp(App[None]):
             agent_mode = AgentType.ROUTER
 
             # Create RouterDeps asynchronously (get_provider_model is now async)
-            from shotgun.tui.dependencies import create_default_router_deps
-
             agent_deps = await create_default_router_deps()
 
             # Create AgentManager with async initialization
