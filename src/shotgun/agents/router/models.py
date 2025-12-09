@@ -321,9 +321,8 @@ SubAgentCacheEntry = tuple[Any, AgentDeps]
 
 # Type alias for event stream handler callback
 # Matches the signature expected by pydantic_ai's agent.run()
-EventStreamHandler = Callable[
-    ["RunContext[AgentDeps]", AsyncIterable[Any]], Awaitable[None]
-]
+# Using Any for RunContext to avoid forward reference issues with pydantic
+EventStreamHandler = Callable[[Any, AsyncIterable[Any]], Awaitable[None]]
 
 
 class RouterDeps(AgentDeps):
