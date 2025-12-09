@@ -29,6 +29,19 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def _notify_plan_changed(deps: RouterDeps) -> None:
+    """Notify TUI of plan changes via callback if registered.
+
+    This helper is called after any plan modification to update the
+    Plan Panel widget in the TUI.
+
+    Args:
+        deps: RouterDeps containing the on_plan_changed callback.
+    """
+    if deps.on_plan_changed:
+        deps.on_plan_changed(deps.current_plan)
+
+
 @register_tool(
     category=ToolCategory.PLANNING,
     display_text="Creating execution plan",
@@ -90,9 +103,7 @@ async def create_plan(
         input.goal,
     )
 
-    # Notify TUI of plan change (Stage 11)
-    if ctx.deps.on_plan_changed:
-        ctx.deps.on_plan_changed(ctx.deps.current_plan)
+    _notify_plan_changed(ctx.deps)
 
     return ToolResult(
         success=True,
@@ -151,9 +162,7 @@ async def mark_step_done(
                     next_step.title if next_step else None,
                 )
 
-            # Notify TUI of plan change (Stage 11)
-            if ctx.deps.on_plan_changed:
-                ctx.deps.on_plan_changed(ctx.deps.current_plan)
+            _notify_plan_changed(ctx.deps)
 
             return ToolResult(
                 success=True,
@@ -213,9 +222,7 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
         plan.steps.append(new_step)
         logger.info("Appended step '%s' to end of plan", input.step.id)
 
-        # Notify TUI of plan change (Stage 11)
-        if ctx.deps.on_plan_changed:
-            ctx.deps.on_plan_changed(ctx.deps.current_plan)
+        _notify_plan_changed(ctx.deps)
 
         return ToolResult(
             success=True,
@@ -232,9 +239,7 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
                 input.after_step_id,
             )
 
-            # Notify TUI of plan change (Stage 11)
-            if ctx.deps.on_plan_changed:
-                ctx.deps.on_plan_changed(ctx.deps.current_plan)
+            _notify_plan_changed(ctx.deps)
 
             return ToolResult(
                 success=True,
@@ -284,9 +289,7 @@ async def remove_step(
             elif plan.current_step_index >= len(plan.steps):
                 plan.current_step_index = max(0, len(plan.steps) - 1)
 
-            # Notify TUI of plan change (Stage 11)
-            if ctx.deps.on_plan_changed:
-                ctx.deps.on_plan_changed(ctx.deps.current_plan)
+            _notify_plan_changed(ctx.deps)
 
             return ToolResult(
                 success=True,

@@ -1,6 +1,7 @@
 """Unit tests for PlanPanelWidget."""
 
 import pytest
+from textual.app import App
 
 from shotgun.agents.router.models import ExecutionPlan, ExecutionStep
 from shotgun.tui.screens.chat_screen.messages import PlanPanelClosed
@@ -88,7 +89,6 @@ async def test_plan_panel_update_plan(
 
 async def test_plan_panel_composes_without_error(sample_plan: ExecutionPlan) -> None:
     """Test that the plan panel composes without errors."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -102,7 +102,6 @@ async def test_plan_panel_composes_without_error(sample_plan: ExecutionPlan) -> 
 
 async def test_plan_panel_has_static_widgets(sample_plan: ExecutionPlan) -> None:
     """Test that the plan panel contains Static widgets."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -117,7 +116,6 @@ async def test_plan_panel_has_static_widgets(sample_plan: ExecutionPlan) -> None
 
 async def test_plan_panel_has_correct_structure(sample_plan: ExecutionPlan) -> None:
     """Test that the plan panel has the correct widget structure."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):
@@ -138,8 +136,6 @@ async def test_close_button_posts_panel_closed_message(
     sample_plan: ExecutionPlan,
 ) -> None:
     """Test that clicking the close button posts PlanPanelClosed."""
-    from textual.app import App
-
     messages_received: list = []
 
     class TestApp(App):
@@ -157,7 +153,6 @@ async def test_close_button_posts_panel_closed_message(
 
 async def test_plan_panel_has_close_button(sample_plan: ExecutionPlan) -> None:
     """Test that the plan panel has a close button."""
-    from textual.app import App
 
     class TestApp(App):
         def compose(self):

@@ -204,7 +204,6 @@ class ChatScreen(Screen[None]):
 
     # Plan panel widget (Stage 11)
     _plan_panel: "PlanPanelWidget | None" = None
-    _plan_panel_dismissed: bool = False
 
     def __init__(
         self,
@@ -2096,19 +2095,16 @@ class ChatScreen(Screen[None]):
         modified, and hides when the plan is cleared.
         """
         if event.plan is not None:
-            # Show panel (even if user previously dismissed - plan changed!)
+            # Show panel (auto-reopens when plan changes)
             self._show_plan_panel(event.plan)
-            self._plan_panel_dismissed = False
         else:
             # Plan cleared - hide panel
             self._hide_plan_panel()
-            self._plan_panel_dismissed = False
 
     @on(PlanPanelClosed)
     def handle_plan_panel_closed(self, event: PlanPanelClosed) -> None:
         """Handle user closing the plan panel with × button."""
         self._hide_plan_panel()
-        self._plan_panel_dismissed = True
 
     def _show_plan_panel(self, plan: ExecutionPlan) -> None:
         """Show the plan panel with the given plan.
