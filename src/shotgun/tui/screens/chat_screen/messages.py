@@ -2,18 +2,23 @@
 
 This module defines Textual message types used for communication
 between widgets and the ChatScreen, particularly for step checkpoints
-in the Router's Planning mode.
+and cascade confirmation in the Router's Planning mode.
 """
 
 from textual.message import Message
 
-from shotgun.agents.router.models import ExecutionStep
+from shotgun.agents.router.models import CascadeScope, ExecutionStep
 
 __all__ = [
+    # Step checkpoint messages (Stage 4)
     "StepCompleted",
     "CheckpointContinue",
     "CheckpointModify",
     "CheckpointStop",
+    # Cascade confirmation messages (Stage 5)
+    "CascadeConfirmationRequired",
+    "CascadeConfirmed",
+    "CascadeDeclined",
 ]
 
 
@@ -55,4 +60,50 @@ class CheckpointStop(Message):
 
     This message indicates the user wants to halt execution while
     keeping the remaining steps in the plan as pending.
+    """
+
+
+# =============================================================================
+# Cascade Confirmation Messages (Stage 5)
+# =============================================================================
+
+
+class CascadeConfirmationRequired(Message):
+    """Posted when a file with dependents was modified and needs cascade confirmation.
+
+    In Planning mode, after modifying a file like specification.md that has
+    dependent files (plan.md, tasks.md), this message triggers the cascade
+    confirmation UI to appear.
+
+    Attributes:
+        updated_file: The file that was just updated (e.g., "specification.md").
+        dependent_files: List of files that depend on the updated file.
+    """
+
+    def __init__(self, updated_file: str, dependent_files: list[str]) -> None:
+        super().__init__()
+        self.updated_file = updated_file
+        self.dependent_files = dependent_files
+
+
+class CascadeConfirmed(Message):
+    """Posted when user confirms cascade update.
+
+    This message indicates the user wants to proceed with updating
+    dependent files based on the selected scope.
+
+    Attributes:
+        scope: The scope of files to update (ALL, PLAN_ONLY, TASKS_ONLY, NONE).
+    """
+
+    def __init__(self, scope: CascadeScope) -> None:
+        super().__init__()
+        self.scope = scope
+
+
+class CascadeDeclined(Message):
+    """Posted when user declines cascade update.
+
+    This message indicates the user does not want to update dependent
+    files and will handle them manually.
     """

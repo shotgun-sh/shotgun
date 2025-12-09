@@ -332,14 +332,14 @@ async def test_mark_step_done_sets_pending_checkpoint_in_planning_mode(
 
     assert result.success is True
     # Pending checkpoint should be set
-    assert mock_context.deps.pending_checkpoint is not None
-    completed_step, next_step = mock_context.deps.pending_checkpoint
-    assert completed_step.id == "step-1"
+    checkpoint = mock_context.deps.pending_checkpoint
+    assert checkpoint is not None
+    assert checkpoint.completed_step.id == "step-1"
     # After marking step-1 done, current_step_index advances to 1 (step-2)
     # So next_step() returns the step at index 2 (step-3)
-    assert next_step is not None
+    assert checkpoint.next_step is not None
     # The next step is the one after the current step (which is now step-2)
-    assert next_step.id == "step-3"
+    assert checkpoint.next_step.id == "step-3"
 
 
 @pytest.mark.asyncio
@@ -359,10 +359,10 @@ async def test_mark_step_done_sets_pending_checkpoint_with_none_for_last_step(
 
     assert result.success is True
     # Pending checkpoint should be set with None for next_step
-    assert mock_context.deps.pending_checkpoint is not None
-    completed_step, next_step = mock_context.deps.pending_checkpoint
-    assert completed_step.id == "step-3"
-    assert next_step is None
+    checkpoint = mock_context.deps.pending_checkpoint
+    assert checkpoint is not None
+    assert checkpoint.completed_step.id == "step-3"
+    assert checkpoint.next_step is None
 
 
 @pytest.mark.asyncio

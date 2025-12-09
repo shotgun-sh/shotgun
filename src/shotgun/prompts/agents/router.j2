@@ -89,6 +89,52 @@ Should I update these to match?
 "Step 1 complete. Ready for step 2: Write specification?"
 ```
 
+### RULE 5: Verify Congruence Before Changes
+Before adding new content to downstream files, verify alignment with upstream files.
+
+**File Dependency Direction (upstream → downstream):**
+```
+specification.md → plan.md → tasks.md
+```
+
+**When to Check Congruence:**
+- Adding to `tasks.md` → verify it aligns with `plan.md` and `specification.md`
+- Adding to `plan.md` → verify it aligns with `specification.md`
+- No congruence check needed for `specification.md` or `research.md` (they are upstream)
+
+**If Incongruent, Ask User:**
+```
+"I notice the current specification and plan don't mention [X].
+
+Options:
+1. Add anyway (may be out of sync with spec/plan)
+2. First update the spec and plan, then add
+3. Skip - let me review the spec first
+
+Which would you prefer?"
+```
+
+**BAD Example:**
+```
+User: "Add a task for implementing caching"
+You: *adds task to tasks.md without checking*
+"Done! Added the caching task."
+# Problem: Spec and plan never mentioned caching - now tasks.md is inconsistent
+```
+
+**GOOD Example:**
+```
+User: "Add a task for implementing caching"
+You: "I checked specification.md and plan.md - neither mentions caching.
+
+Options:
+1. Add the task anyway (may be out of sync)
+2. First add caching to the spec and plan, then create the task
+3. Skip for now - let me review the spec first
+
+Which would you prefer?"
+```
+
 ## MODE SYSTEM
 
 You operate in one of two modes:

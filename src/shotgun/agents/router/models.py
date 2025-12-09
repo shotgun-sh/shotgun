@@ -242,6 +242,37 @@ class SubAgentResult(BaseModel):
 
 
 # =============================================================================
+# Pending State Models (for UI coordination)
+# =============================================================================
+
+
+class PendingCheckpoint(BaseModel):
+    """Pending checkpoint state for Planning mode step-by-step execution.
+
+    Set by mark_step_done tool to trigger checkpoint UI.
+    """
+
+    completed_step: ExecutionStep = Field(
+        ..., description="The step that was just completed"
+    )
+    next_step: ExecutionStep | None = Field(
+        default=None, description="The next step to execute, or None if plan complete"
+    )
+
+
+class PendingCascade(BaseModel):
+    """Pending cascade confirmation state for Planning mode.
+
+    Set when a file with dependents is modified and cascade confirmation is needed.
+    """
+
+    updated_file: str = Field(..., description="The file that was just updated")
+    dependent_files: list[str] = Field(
+        default_factory=list, description="Files that depend on the updated file"
+    )
+
+
+# =============================================================================
 # File Dependency Map (for Cascade Confirmation)
 # =============================================================================
 
@@ -296,8 +327,10 @@ class RouterDeps(AgentDeps):
     is_executing: bool = Field(default=False)
     sub_agent_cache: dict[AgentType, SubAgentCacheEntry] = Field(default_factory=dict)
     # Checkpoint state for Planning mode step-by-step execution
-    # Tuple of (completed_step, next_step) set by mark_step_done tool
+    # Set by mark_step_done tool to trigger checkpoint UI
     # Excluded from serialization as it's transient UI state
-    pending_checkpoint: tuple[ExecutionStep, ExecutionStep | None] | None = Field(
-        default=None, exclude=True
-    )
+    pending_checkpoint: PendingCheckpoint | None = Field(default=None, exclude=True)
+    # Cascade confirmation state for Planning mode
+    # Set when a file with dependents is modified
+    # Excluded from serialization as it's transient UI state
+    pending_cascade: PendingCascade | None = Field(default=None, exclude=True)
