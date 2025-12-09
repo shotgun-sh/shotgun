@@ -222,6 +222,9 @@ class ChatScreen(Screen[None]):
         # Bind spinner to processing state manager
         self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
 
+        # Load saved router mode if using Router agent
+        self.call_later(self._load_saved_router_mode)
+
         # Load conversation history if --continue flag was provided
         # Use call_later to handle async exists() check
         if self.continue_session:
@@ -334,6 +337,7 @@ class ChatScreen(Screen[None]):
             self.widget_coordinator.update_messages(messages)
 
     def action_toggle_mode(self) -> None:
+        """Toggle mode - Router mode toggle OR legacy agent cycling."""
         # Prevent mode switching during Q&A
         if self.qa_mode:
             self.agent_manager.add_hint_message(
@@ -341,6 +345,52 @@ class ChatScreen(Screen[None]):
             )
             return
 
+        # Check if using Router agent
+        from shotgun.agents.router.models import RouterDeps
+
+        if isinstance(self.deps, RouterDeps):
+            # Router mode: toggle Planning ↔ Drafting
+            self._toggle_router_mode()
+        else:
+            # Legacy mode: cycle through agents
+            self._cycle_legacy_agents()
+
+    def _toggle_router_mode(self) -> None:
+        """Toggle between Planning and Drafting modes for Router."""
+        from shotgun.agents.router.models import RouterDeps, RouterMode
+
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        # Prevent mode switching during execution
+        if self.deps.is_executing:
+            self.agent_manager.add_hint_message(
+                HintMessage(message="⚠️ Cannot switch modes during plan execution")
+            )
+            return
+
+        # Toggle mode
+        if self.deps.router_mode == RouterMode.PLANNING:
+            self.deps.router_mode = RouterMode.DRAFTING
+            mode_name = "Drafting"
+        else:
+            self.deps.router_mode = RouterMode.PLANNING
+            mode_name = "Planning"
+
+        # Persist mode (fire-and-forget)
+        self._save_router_mode(self.deps.router_mode.value)
+
+        # Show mode change feedback
+        self.agent_manager.add_hint_message(
+            HintMessage(message=f"Switched to {mode_name} mode")
+        )
+
+        # Update UI
+        self.widget_coordinator.update_for_mode_change(self.mode)
+        self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
+
+    def _cycle_legacy_agents(self) -> None:
+        """Cycle through legacy 5-agent system."""
         modes = [
             AgentType.RESEARCH,
             AgentType.SPECIFY,
@@ -352,6 +402,30 @@ class ChatScreen(Screen[None]):
         self.agent_manager.set_agent(self.mode)
         # Re-focus input after mode change
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
+
+    def _save_router_mode(self, mode: str) -> None:
+        """Save router mode to config (fire-and-forget)."""
+
+        async def _save() -> None:
+            config_manager = get_config_manager()
+            await config_manager.set_router_mode(mode)
+
+        asyncio.create_task(_save())
+
+    async def _load_saved_router_mode(self) -> None:
+        """Load saved router mode from config."""
+        from shotgun.agents.router.models import RouterDeps, RouterMode
+
+        if isinstance(self.deps, RouterDeps):
+            config_manager = get_config_manager()
+            saved_mode = await config_manager.get_router_mode()
+
+            if saved_mode == "drafting":
+                self.deps.router_mode = RouterMode.DRAFTING
+            else:
+                self.deps.router_mode = RouterMode.PLANNING
+
+            logger.debug("Loaded router mode from config: %s", saved_mode)
 
     async def action_show_usage(self) -> None:
         usage_hint = self.agent_manager.get_usage_hint()

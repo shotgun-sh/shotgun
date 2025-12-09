@@ -277,3 +277,7 @@ class ShotgunConfig(BaseModel):
         default=None,
         description="Path to the backup file created when migration failed",
     )
+    router_mode: str = Field(
+        default="planning",
+        description="Router execution mode: 'planning' or 'drafting'",
+    )
