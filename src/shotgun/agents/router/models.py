@@ -312,11 +312,12 @@ def get_dependent_files(file_path: str) -> list[str]:
 # =============================================================================
 
 # Import AgentDeps for inheritance - must be done here to avoid circular imports
-from shotgun.agents.models import AgentDeps, AgentType, ShotgunAgent  # noqa: E402
+from shotgun.agents.models import AgentDeps, AgentType  # noqa: E402
 
 # Type alias for sub-agent cache entries
 # Each entry is a tuple of (Agent instance, AgentDeps instance)
-SubAgentCacheEntry = tuple[ShotgunAgent, AgentDeps]
+# Using Any for agent to avoid forward reference issues with pydantic
+SubAgentCacheEntry = tuple[Any, AgentDeps]
 
 # Type alias for event stream handler callback
 # Matches the signature expected by pydantic_ai's agent.run()
