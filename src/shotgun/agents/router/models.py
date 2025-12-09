@@ -9,7 +9,7 @@ IMPORTANT: All tool inputs/outputs must use Pydantic models - no raw dict/list/t
 
 from collections.abc import AsyncIterable, Awaitable, Callable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from pydantic_ai import RunContext
@@ -316,13 +316,13 @@ from shotgun.agents.models import AgentDeps, AgentType  # noqa: E402
 
 # Type alias for sub-agent cache entries
 # Each entry is a tuple of (Agent instance, AgentDeps instance)
-# Using Any for agent to avoid forward reference issues with pydantic
-SubAgentCacheEntry = tuple[Any, AgentDeps]
+# Using object for agent to avoid forward reference issues with pydantic
+SubAgentCacheEntry = tuple[object, AgentDeps]
 
 # Type alias for event stream handler callback
 # Matches the signature expected by pydantic_ai's agent.run()
-# Using Any for RunContext to avoid forward reference issues with pydantic
-EventStreamHandler = Callable[[Any, AsyncIterable[Any]], Awaitable[None]]
+# Using object to avoid forward reference issues with pydantic
+EventStreamHandler = Callable[[object, AsyncIterable[object]], Awaitable[None]]
 
 
 class RouterDeps(AgentDeps):

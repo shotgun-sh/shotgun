@@ -324,7 +324,7 @@ class AgentManager(Widget):
         self._specify_deps: AgentDeps | None = None
         self._export_agent: ShotgunAgent | None = None
         self._export_deps: AgentDeps | None = None
-        self._router_agent: Any = None  # Agent[RouterDeps, AgentResponse] - Any to avoid contravariance issues
+        self._router_agent: object = None  # Agent[RouterDeps, AgentResponse] - object to avoid contravariance issues
         self._router_deps: RouterDeps | None = None
         self._agents_initialized = False
 
@@ -458,7 +458,7 @@ class AgentManager(Widget):
         return self._export_deps
 
     @property
-    def router_agent(self) -> Any:
+    def router_agent(self) -> object:
         """Get router agent (must call _ensure_agents_initialized first)."""
         if self._router_agent is None:
             raise RuntimeError(
@@ -476,7 +476,7 @@ class AgentManager(Widget):
         return self._router_deps
 
     @property
-    def current_agent(self) -> Any:
+    def current_agent(self) -> object:
         """Get the currently active agent.
 
         Returns:
@@ -484,7 +484,7 @@ class AgentManager(Widget):
         """
         return self._get_agent(self._current_agent_type)
 
-    def _get_agent(self, agent_type: AgentType) -> Any:
+    def _get_agent(self, agent_type: AgentType) -> object:
         """Get agent by type.
 
         Args:
@@ -493,7 +493,7 @@ class AgentManager(Widget):
         Returns:
             The requested agent instance (ShotgunAgent or router agent).
         """
-        agent_map: dict[AgentType, Any] = {
+        agent_map: dict[AgentType, object] = {
             AgentType.RESEARCH: self.research_agent,
             AgentType.PLAN: self.plan_agent,
             AgentType.TASKS: self.tasks_agent,

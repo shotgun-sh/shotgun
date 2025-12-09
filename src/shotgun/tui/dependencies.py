@@ -1,7 +1,5 @@
 """Dependency creation utilities for TUI components."""
 
-from typing import Any
-
 from pydantic_ai import RunContext
 
 from shotgun.agents.config import get_config_manager, get_provider_model
@@ -66,7 +64,7 @@ async def create_default_router_deps() -> RouterDeps:
     router_mode_str = getattr(config, "router_mode", RouterMode.PLANNING.value)
     router_mode = RouterMode(router_mode_str)
 
-    def _placeholder_system_prompt_fn(ctx: RunContext[Any]) -> str:
+    def _placeholder_system_prompt_fn(ctx: RunContext[RouterDeps]) -> str:
         raise RuntimeError(
             "This should not be called - router provides its own system_prompt_fn"
         )
