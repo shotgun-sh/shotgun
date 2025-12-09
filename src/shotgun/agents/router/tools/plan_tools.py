@@ -29,6 +29,19 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def _notify_plan_changed(deps: RouterDeps) -> None:
+    """Notify TUI of plan changes via callback if registered.
+
+    This helper is called after any plan modification to update the
+    Plan Panel widget in the TUI.
+
+    Args:
+        deps: RouterDeps containing the on_plan_changed callback.
+    """
+    if deps.on_plan_changed:
+        deps.on_plan_changed(deps.current_plan)
+
+
 @register_tool(
     category=ToolCategory.PLANNING,
     display_text="Creating execution plan",
@@ -90,6 +103,8 @@ async def create_plan(
         input.goal,
     )
 
+    _notify_plan_changed(ctx.deps)
+
     return ToolResult(
         success=True,
         message=f"Created plan with {len(steps)} steps. Goal: {input.goal}",
@@ -146,6 +161,8 @@ async def mark_step_done(
                     step.title,
                     next_step.title if next_step else None,
                 )
+
+            _notify_plan_changed(ctx.deps)
 
             return ToolResult(
                 success=True,
@@ -204,6 +221,9 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
         # Append to end
         plan.steps.append(new_step)
         logger.info("Appended step '%s' to end of plan", input.step.id)
+
+        _notify_plan_changed(ctx.deps)
+
         return ToolResult(
             success=True,
             message=f"Added step '{new_step.title}' at end of plan.",
@@ -218,6 +238,9 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
                 input.step.id,
                 input.after_step_id,
             )
+
+            _notify_plan_changed(ctx.deps)
+
             return ToolResult(
                 success=True,
                 message=f"Added step '{new_step.title}' after '{step.title}'.",
@@ -265,6 +288,8 @@ async def remove_step(
                 plan.current_step_index -= 1
             elif plan.current_step_index >= len(plan.steps):
                 plan.current_step_index = max(0, len(plan.steps) - 1)
+
+            _notify_plan_changed(ctx.deps)
 
             return ToolResult(
                 success=True,

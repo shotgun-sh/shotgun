@@ -27,6 +27,9 @@ __all__ = [
     # Sub-agent lifecycle messages (Stage 8)
     "SubAgentStarted",
     "SubAgentCompleted",
+    # Plan panel messages (Stage 11)
+    "PlanUpdated",
+    "PlanPanelClosed",
 ]
 
 
@@ -186,3 +189,31 @@ class SubAgentCompleted(Message):
     def __init__(self, agent_type: AgentType) -> None:
         super().__init__()
         self.agent_type = agent_type
+
+
+# =============================================================================
+# Plan Panel Messages (Stage 11)
+# =============================================================================
+
+
+class PlanUpdated(Message):
+    """Posted when the current plan changes.
+
+    This message triggers the plan panel to auto-show/hide based on
+    whether a plan exists.
+
+    Attributes:
+        plan: The updated execution plan, or None if plan was cleared.
+    """
+
+    def __init__(self, plan: ExecutionPlan | None) -> None:
+        super().__init__()
+        self.plan = plan
+
+
+class PlanPanelClosed(Message):
+    """Posted when user closes the plan panel with × button.
+
+    This message indicates the user wants to dismiss the plan panel
+    temporarily. The panel will reopen when the plan changes.
+    """

@@ -104,7 +104,9 @@ from shotgun.tui.screens.chat_screen.messages import (
     CheckpointStop,
     PlanApprovalRequired,
     PlanApproved,
+    PlanPanelClosed,
     PlanRejected,
+    PlanUpdated,
     StepCompleted,
     SubAgentCompleted,
     SubAgentStarted,
@@ -122,6 +124,7 @@ from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.approval_widget import PlanApprovalWidget
 from shotgun.tui.widgets.cascade_confirmation_widget import CascadeConfirmationWidget
+from shotgun.tui.widgets.plan_panel import PlanPanelWidget
 from shotgun.tui.widgets.step_checkpoint_widget import StepCheckpointWidget
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
@@ -199,6 +202,9 @@ class ChatScreen(Screen[None]):
     # Plan approval widget (Planning mode)
     _approval_widget: PlanApprovalWidget | None = None
 
+    # Plan panel widget (Stage 11)
+    _plan_panel: PlanPanelWidget | None = None
+
     def __init__(
         self,
         agent_manager: AgentManager,
@@ -237,6 +243,11 @@ class ChatScreen(Screen[None]):
 
         # All dependencies are now required and injected
         self.deps = deps
+
+        # Wire up plan change callback for Plan Panel (Stage 11)
+        if isinstance(deps, RouterDeps):
+            deps.on_plan_changed = self._on_plan_changed
+
         self.codebase_sdk = codebase_sdk
         self.agent_manager = agent_manager
         self.command_handler = command_handler
@@ -2071,3 +2082,58 @@ class ChatScreen(Screen[None]):
 
         # Post the PlanApprovalRequired message to trigger the approval UI
         self.post_message(PlanApprovalRequired(plan=approval.plan))
+
+    # =========================================================================
+    # Plan Panel (Stage 11)
+    # =========================================================================
+
+    @on(PlanUpdated)
+    def handle_plan_updated(self, event: PlanUpdated) -> None:
+        """Auto-show/hide plan panel when plan changes.
+
+        The plan panel automatically shows when a plan is created or
+        modified, and hides when the plan is cleared.
+        """
+        if event.plan is not None:
+            # Show panel (auto-reopens when plan changes)
+            self._show_plan_panel(event.plan)
+        else:
+            # Plan cleared - hide panel
+            self._hide_plan_panel()
+
+    @on(PlanPanelClosed)
+    def handle_plan_panel_closed(self, event: PlanPanelClosed) -> None:
+        """Handle user closing the plan panel with × button."""
+        self._hide_plan_panel()
+
+    def _show_plan_panel(self, plan: ExecutionPlan) -> None:
+        """Show the plan panel with the given plan.
+
+        Args:
+            plan: The execution plan to display.
+        """
+        if self._plan_panel is None:
+            self._plan_panel = PlanPanelWidget(plan)
+            # Mount in window container, before footer
+            window = self.query_one("#window")
+            footer = self.query_one("#footer")
+            window.mount(self._plan_panel, before=footer)
+        else:
+            self._plan_panel.update_plan(plan)
+
+    def _hide_plan_panel(self) -> None:
+        """Hide the plan panel."""
+        if self._plan_panel:
+            self._plan_panel.remove()
+            self._plan_panel = None
+
+    def _on_plan_changed(self, plan: ExecutionPlan | None) -> None:
+        """Handle plan changes from router tools.
+
+        This callback is set on RouterDeps to receive plan updates
+        and post PlanUpdated messages to update the plan panel.
+
+        Args:
+            plan: The updated plan or None if plan was cleared.
+        """
+        self.post_message(PlanUpdated(plan))
