@@ -203,7 +203,7 @@ class ChatScreen(Screen[None]):
     _approval_widget: PlanApprovalWidget | None = None
 
     # Plan panel widget (Stage 11)
-    _plan_panel: "PlanPanelWidget | None" = None
+    _plan_panel: PlanPanelWidget | None = None
 
     def __init__(
         self,
