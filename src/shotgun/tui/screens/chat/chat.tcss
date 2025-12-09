@@ -16,6 +16,14 @@ ModeIndicator {
   height: auto;
 }
 
+ModeIndicator.mode-planning {
+  /* Blue/cyan accent for planning mode */
+}
+
+ModeIndicator.mode-drafting {
+  /* Green accent for drafting mode */
+}
+
 #footer {
   dock: bottom;
   height: auto;
