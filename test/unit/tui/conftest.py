@@ -66,6 +66,7 @@ def mock_agent_manager(mock_agent_deps):
     manager.deps = mock_agent_deps
     manager.current_agent = Mock()
     manager.current_type = AgentType.RESEARCH
+    manager._current_agent_type = AgentType.RESEARCH  # Used by ChatScreen.__init__
     manager.switch_agent = Mock()
     manager.run_agent = AsyncMock(return_value="Test response")
     return manager
