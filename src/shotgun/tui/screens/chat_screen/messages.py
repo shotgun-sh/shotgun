@@ -7,6 +7,7 @@ and cascade confirmation in the Router's Planning mode.
 
 from textual.message import Message
 
+from shotgun.agents.models import AgentType
 from shotgun.agents.router.models import CascadeScope, ExecutionPlan, ExecutionStep
 
 __all__ = [
@@ -23,6 +24,9 @@ __all__ = [
     "PlanApprovalRequired",
     "PlanApproved",
     "PlanRejected",
+    # Sub-agent lifecycle messages (Stage 8)
+    "SubAgentStarted",
+    "SubAgentCompleted",
 ]
 
 
@@ -147,3 +151,38 @@ class PlanRejected(Message):
     This message indicates the user wants to return to the prompt input
     to modify or clarify the request ("No, Let Me Clarify").
     """
+
+
+# =============================================================================
+# Sub-Agent Lifecycle Messages (Stage 8)
+# =============================================================================
+
+
+class SubAgentStarted(Message):
+    """Posted when router starts delegating to a sub-agent.
+
+    This message triggers the mode indicator to show the active sub-agent
+    in the format "📋 Planning → Research".
+
+    Attributes:
+        agent_type: The type of sub-agent that started executing.
+    """
+
+    def __init__(self, agent_type: AgentType) -> None:
+        super().__init__()
+        self.agent_type = agent_type
+
+
+class SubAgentCompleted(Message):
+    """Posted when sub-agent delegation completes.
+
+    This message triggers the mode indicator to clear the sub-agent
+    display and return to showing just the mode.
+
+    Attributes:
+        agent_type: The type of sub-agent that completed.
+    """
+
+    def __init__(self, agent_type: AgentType) -> None:
+        super().__init__()
+        self.agent_type = agent_type

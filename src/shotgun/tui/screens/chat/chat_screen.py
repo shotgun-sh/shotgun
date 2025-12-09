@@ -106,6 +106,8 @@ from shotgun.tui.screens.chat_screen.messages import (
     PlanApproved,
     PlanRejected,
     StepCompleted,
+    SubAgentCompleted,
+    SubAgentStarted,
 )
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.onboarding import OnboardingModal
@@ -369,6 +371,32 @@ class ChatScreen(Screen[None]):
         if self.is_mounted:
             # Use widget coordinator for all widget updates
             self.widget_coordinator.update_messages(messages)
+
+    # =========================================================================
+    # Router State Properties (for Protocol compliance)
+    # =========================================================================
+
+    @property
+    def router_mode(self) -> str | None:
+        """Get the current router mode for RouterModeProvider protocol.
+
+        Returns:
+            'planning' or 'drafting' if using router agent, None otherwise.
+        """
+        if isinstance(self.deps, RouterDeps):
+            return self.deps.router_mode.value
+        return None
+
+    @property
+    def active_sub_agent(self) -> str | None:
+        """Get the active sub-agent for ActiveSubAgentProvider protocol.
+
+        Returns:
+            The sub-agent type string if executing, None otherwise.
+        """
+        if isinstance(self.deps, RouterDeps) and self.deps.active_sub_agent:
+            return self.deps.active_sub_agent.value
+        return None
 
     def action_toggle_mode(self) -> None:
         """Toggle mode - Router mode toggle OR legacy agent cycling."""
@@ -1790,6 +1818,32 @@ class ChatScreen(Screen[None]):
                 step=checkpoint.completed_step, next_step=checkpoint.next_step
             )
         )
+
+    # =========================================================================
+    # Sub-Agent Lifecycle Handlers (Stage 8)
+    # =========================================================================
+
+    @on(SubAgentStarted)
+    def handle_sub_agent_started(self, event: SubAgentStarted) -> None:
+        """Update mode indicator when router delegates to a sub-agent.
+
+        Sets the active_sub_agent in RouterDeps and refreshes the mode
+        indicator to show "📋 Planning → Research" format.
+        """
+        if isinstance(self.deps, RouterDeps):
+            self.deps.active_sub_agent = event.agent_type
+            self.widget_coordinator.refresh_mode_indicator()
+
+    @on(SubAgentCompleted)
+    def handle_sub_agent_completed(self, event: SubAgentCompleted) -> None:
+        """Clear sub-agent display when delegation completes.
+
+        Clears the active_sub_agent in RouterDeps and refreshes the mode
+        indicator to show just the mode name.
+        """
+        if isinstance(self.deps, RouterDeps):
+            self.deps.active_sub_agent = None
+            self.widget_coordinator.refresh_mode_indicator()
 
     # =========================================================================
     # Cascade Confirmation Handlers (Planning Mode)
