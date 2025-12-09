@@ -1,5 +1,7 @@
 """Unit tests for language_config module."""
 
+import pytest
+
 from shotgun.codebase.core.language_config import (
     LANGUAGE_CONFIGS,
     LanguageConfig,
@@ -7,6 +9,7 @@ from shotgun.codebase.core.language_config import (
 )
 
 
+@pytest.mark.smoke
 def test_language_config_creation():
     """Test LanguageConfig dataclass creation with required fields."""
     config = LanguageConfig(

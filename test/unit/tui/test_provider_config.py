@@ -1,8 +1,11 @@
 """Unit tests for provider_config screen module."""
 
+import pytest
+
 from shotgun.tui.screens.provider_config import get_configurable_providers
 
 
+@pytest.mark.smoke
 def test_get_configurable_providers_includes_shotgun():
     """Test that get_configurable_providers always includes shotgun."""
     providers = get_configurable_providers()

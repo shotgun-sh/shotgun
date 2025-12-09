@@ -11,6 +11,7 @@ from shotgun.shotgun_web.models import (
 )
 
 
+@pytest.mark.smoke
 def test_token_status_enum():
     """Test TokenStatus enum values."""
     assert TokenStatus.PENDING == "pending"

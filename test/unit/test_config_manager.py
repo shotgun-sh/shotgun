@@ -28,6 +28,7 @@ from shotgun.agents.config.models import (
 from shotgun.agents.config.provider import get_provider_model
 
 
+@pytest.mark.smoke
 def test_init_default_path(monkeypatch):
     """Test ConfigManager initialization with default path."""
     # Clear any SHOTGUN_HOME env var for this test

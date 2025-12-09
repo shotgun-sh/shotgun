@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from typer.testing import CliRunner
 
@@ -11,6 +12,7 @@ from shotgun.cli.clear import app
 runner = CliRunner()
 
 
+@pytest.mark.smoke
 def test_clear_conversation_success(tmp_path):
     """Test successfully clearing conversation."""
     import asyncio

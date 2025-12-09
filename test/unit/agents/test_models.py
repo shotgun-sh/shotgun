@@ -2,9 +2,12 @@
 
 from pathlib import Path
 
+import pytest
+
 from shotgun.agents.models import FileOperationTracker, FileOperationType
 
 
+@pytest.mark.smoke
 def test_file_operation_tracker_get_display_path_empty():
     """Test get_display_path with no operations."""
     tracker = FileOperationTracker()
