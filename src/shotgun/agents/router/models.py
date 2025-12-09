@@ -295,3 +295,9 @@ class RouterDeps(AgentDeps):
     active_sub_agent: AgentType | None = Field(default=None)
     is_executing: bool = Field(default=False)
     sub_agent_cache: dict[AgentType, SubAgentCacheEntry] = Field(default_factory=dict)
+    # Checkpoint state for Planning mode step-by-step execution
+    # Tuple of (completed_step, next_step) set by mark_step_done tool
+    # Excluded from serialization as it's transient UI state
+    pending_checkpoint: tuple[ExecutionStep, ExecutionStep | None] | None = Field(
+        default=None, exclude=True
+    )
