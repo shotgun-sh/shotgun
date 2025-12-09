@@ -51,7 +51,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 5
+CURRENT_CONFIG_VERSION = 6
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -183,6 +183,26 @@ def _migrate_v4_to_v5(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 5 to version 6.
+
+    Changes:
+    - Add 'router_mode' field with default 'planning'
+
+    Args:
+        data: Config data dict at version 5
+
+    Returns:
+        Modified config data dict at version 6
+    """
+    if "router_mode" not in data:
+        data["router_mode"] = "planning"
+        logger.info("Migrated config v5->v6: added router_mode field")
+
+    data["config_version"] = 6
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -203,6 +223,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         2: _migrate_v2_to_v3,
         3: _migrate_v3_to_v4,
         4: _migrate_v4_to_v5,
+        5: _migrate_v5_to_v6,
     }
 
     # Apply migrations sequentially
@@ -771,6 +792,26 @@ class ConfigManager:
 
         await self.save(config)
         logger.info("Updated Shotgun Account configuration")
+
+    async def get_router_mode(self) -> str:
+        """Get the saved router mode.
+
+        Returns:
+            The router mode string ('planning' or 'drafting')
+        """
+        config = await self.load()
+        return config.router_mode
+
+    async def set_router_mode(self, mode: str) -> None:
+        """Save the router mode.
+
+        Args:
+            mode: Router mode to save ('planning' or 'drafting')
+        """
+        config = await self.load()
+        config.router_mode = mode
+        await self.save(config)
+        logger.debug("Router mode saved: %s", mode)
 
 
 # Global singleton instance

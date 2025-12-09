@@ -9,7 +9,12 @@ import pytest
 def router_prompt_content() -> str:
     """Load the router.j2 prompt template content."""
     prompt_path = (
-        Path(__file__).parents[4] / "src" / "shotgun" / "prompts" / "agents" / "router.j2"
+        Path(__file__).parents[4]
+        / "src"
+        / "shotgun"
+        / "prompts"
+        / "agents"
+        / "router.j2"
     )
     return prompt_path.read_text()
 

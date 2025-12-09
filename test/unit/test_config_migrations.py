@@ -67,6 +67,20 @@ V5_CONFIG = {
     "marketing": {"messages": {}},
 }
 
+V6_CONFIG = {
+    "openai": {"api_key": "sk-test123", "supports_streaming": None},
+    "anthropic": {"api_key": None},
+    "google": {"api_key": None},
+    "shotgun": {"api_key": None, "supabase_jwt": None},
+    "selected_model": "gpt-5",
+    "shotgun_instance_id": "test-user-id-12345",
+    "config_version": 6,
+    "shown_welcome_screen": False,
+    "shown_onboarding_popup": None,
+    "marketing": {"messages": {}},
+    "router_mode": "planning",
+}
+
 
 def test_migrate_v2_to_v3():
     """Test migration from version 2 to version 3."""
@@ -176,16 +190,16 @@ def test_apply_migrations_from_v4_to_current():
 
 def test_apply_migrations_already_current():
     """Test applying migrations when already at current version."""
-    config = V5_CONFIG.copy()
+    config = V6_CONFIG.copy()
 
     result = _apply_migrations(config)
 
     assert result["config_version"] == CURRENT_CONFIG_VERSION
-    assert result == V5_CONFIG  # Should be unchanged
+    assert result == V6_CONFIG  # Should be unchanged
 
 
 def test_apply_migrations_sequential():
-    """Test that migrations are applied sequentially v2->v3->v4->v5."""
+    """Test that migrations are applied sequentially v2->v3->v4->v5->v6."""
     config = V2_CONFIG.copy()
 
     result = _apply_migrations(config)
@@ -196,6 +210,7 @@ def test_apply_migrations_sequential():
     assert "marketing" in result  # v3->v4 change
     assert result["shown_welcome_screen"] is False  # v3->v4 change (BYOK user)
     assert result["openai"]["supports_streaming"] is None  # v4->v5 change
+    assert result["router_mode"] == "planning"  # v5->v6 change
     assert result["config_version"] == CURRENT_CONFIG_VERSION
 
 
@@ -663,7 +678,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config (no migration needed)
-        current_config = V5_CONFIG.copy()
+        current_config = V6_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
