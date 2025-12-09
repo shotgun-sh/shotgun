@@ -301,3 +301,7 @@ class RouterDeps(AgentDeps):
     pending_checkpoint: tuple[ExecutionStep, ExecutionStep | None] | None = Field(
         default=None, exclude=True
     )
+    # Cascade confirmation state for Planning mode
+    # Tuple of (updated_file, dependent_files) pending cascade confirmation
+    # Excluded from serialization as it's transient UI state
+    pending_cascade: tuple[str, list[str]] | None = Field(default=None, exclude=True)
