@@ -13,6 +13,7 @@ from shotgun.agents.config import (
 from shotgun.agents.models import AgentType
 from shotgun.logging_config import get_logger
 from shotgun.tui.containers import TUIContainer
+from shotgun.tui.dependencies import create_default_router_deps
 from shotgun.tui.screens.splash import SplashScreen
 from shotgun.utils.file_system_utils import (
     ensure_shotgun_directory_exists,
@@ -166,13 +167,11 @@ class ShotgunApp(App[None]):
                 return
 
             # Create ChatScreen with all dependencies injected from container
-            # Get the default agent mode (RESEARCH)
-            agent_mode = AgentType.RESEARCH
+            # Get the default agent mode (ROUTER)
+            agent_mode = AgentType.ROUTER
 
-            # Create AgentDeps asynchronously (get_provider_model is now async)
-            from shotgun.tui.dependencies import create_default_tui_deps
-
-            agent_deps = await create_default_tui_deps()
+            # Create RouterDeps asynchronously (get_provider_model is now async)
+            agent_deps = await create_default_router_deps()
 
             # Create AgentManager with async initialization
             agent_manager = AgentManager(deps=agent_deps, initial_type=agent_mode)
