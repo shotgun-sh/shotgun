@@ -15,15 +15,13 @@ from shotgun.agents.router.tools.plan_tools import (
 )
 
 __all__ = [
-    # Plan management tools
-    "create_plan",
-    "mark_step_done",
     "add_step",
-    "remove_step",
-    # Delegation tools
+    "create_plan",
+    "delegate_to_export",
+    "delegate_to_plan",
     "delegate_to_research",
     "delegate_to_specification",
-    "delegate_to_plan",
     "delegate_to_tasks",
-    "delegate_to_export",
+    "mark_step_done",
+    "remove_step",
 ]

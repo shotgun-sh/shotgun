@@ -22,10 +22,8 @@ from shotgun.agents.conversation.history import token_limit_compactor
 from shotgun.agents.models import AgentResponse, AgentRuntimeOptions, AgentType
 from shotgun.agents.router.models import RouterDeps
 from shotgun.agents.router.tools import (
-    # Plan management tools
     add_step,
     create_plan,
-    # Delegation tools
     delegate_to_export,
     delegate_to_plan,
     delegate_to_research,
