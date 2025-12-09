@@ -1,5 +1,7 @@
 """Widget to display the current agent mode."""
 
+from enum import StrEnum
+
 from textual.widget import Widget
 
 from shotgun.agents.models import AgentType
@@ -10,6 +12,14 @@ from shotgun.tui.protocols import (
     RouterModeProvider,
 )
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+
+
+class RouterModeCssClass(StrEnum):
+    """CSS class names for router mode styling."""
+
+    PLANNING = "mode-planning"
+    DRAFTING = "mode-drafting"
+
 
 # Shared display name mapping for agent types
 AGENT_DISPLAY_NAMES: dict[AgentType, str] = {
@@ -109,13 +119,13 @@ class ModeIndicator(Widget):
             icon = "✍️"
             mode_name = "Drafting"
             description = "Auto-execute without confirmation"
-            css_class = "mode-drafting"
+            css_class = RouterModeCssClass.DRAFTING
         else:
             # Default to planning mode
             icon = "📋"
             mode_name = "Planning"
             description = "Review plans before execution"
-            css_class = "mode-planning"
+            css_class = RouterModeCssClass.PLANNING
 
         # Update CSS class for styling
         self.set_classes(css_class)
@@ -146,8 +156,8 @@ class ModeIndicator(Widget):
         status_icon = " ✓" if has_content else ""
 
         # Clear any router mode CSS classes
-        self.remove_class("mode-planning")
-        self.remove_class("mode-drafting")
+        self.remove_class(RouterModeCssClass.PLANNING)
+        self.remove_class(RouterModeCssClass.DRAFTING)
 
         return (
             f"[bold $text-accent]{mode_title}{status_icon} mode[/]"

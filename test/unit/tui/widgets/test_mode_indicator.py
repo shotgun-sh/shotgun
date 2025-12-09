@@ -8,6 +8,7 @@ from shotgun.tui.components.mode_indicator import (
     AGENT_DESCRIPTIONS,
     AGENT_DISPLAY_NAMES,
     ModeIndicator,
+    RouterModeCssClass,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -130,8 +131,8 @@ async def test_legacy_mode_clears_router_css_classes() -> None:
         # Force a render
         indicator.render()
 
-        assert not indicator.has_class("mode-planning")
-        assert not indicator.has_class("mode-drafting")
+        assert not indicator.has_class(RouterModeCssClass.PLANNING)
+        assert not indicator.has_class(RouterModeCssClass.DRAFTING)
 
 
 async def test_render_router_mode_method_planning() -> None:
@@ -187,7 +188,7 @@ async def test_router_mode_sets_planning_css_class() -> None:
         indicator.render()
 
         # Default should be planning mode
-        assert indicator.has_class("mode-planning")
+        assert indicator.has_class(RouterModeCssClass.PLANNING)
 
 
 def test_mode_display_mapping() -> None:
@@ -247,6 +248,16 @@ def test_sub_agent_display_mapping() -> None:
         display_name = AGENT_DISPLAY_NAMES[agent_type]
         assert isinstance(display_name, str)
         assert len(display_name) > 0
+
+
+def test_router_mode_css_class_enum() -> None:
+    """Test that RouterModeCssClass enum has expected values."""
+    # Verify enum values match expected CSS class names
+    assert RouterModeCssClass.PLANNING == "mode-planning"
+    assert RouterModeCssClass.DRAFTING == "mode-drafting"
+
+    # Verify enum has exactly 2 members
+    assert len(RouterModeCssClass) == 2
 
 
 async def test_indicator_can_change_mode() -> None:
