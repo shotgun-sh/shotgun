@@ -1765,11 +1765,15 @@ class ChatScreen(Screen[None]):
             return
 
         # Extract checkpoint data and clear the pending state
-        step, next_step = self.deps.pending_checkpoint
+        checkpoint = self.deps.pending_checkpoint
         self.deps.pending_checkpoint = None
 
         # Post the StepCompleted message to trigger the checkpoint UI
-        self.post_message(StepCompleted(step=step, next_step=next_step))
+        self.post_message(
+            StepCompleted(
+                step=checkpoint.completed_step, next_step=checkpoint.next_step
+            )
+        )
 
     # =========================================================================
     # Cascade Confirmation Handlers (Planning Mode)
@@ -1800,7 +1804,7 @@ class ChatScreen(Screen[None]):
         """Execute cascade update based on user's selected scope."""
         # Get dependent files from the widget before hiding it
         dependent_files: list[str] = []
-        if hasattr(self, "_cascade_widget") and self._cascade_widget:
+        if self._cascade_widget:
             dependent_files = self._cascade_widget.dependent_files
 
         self._hide_cascade_widget()
@@ -1839,7 +1843,7 @@ class ChatScreen(Screen[None]):
 
     def _hide_cascade_widget(self) -> None:
         """Remove cascade widget, restore PromptInput."""
-        if hasattr(self, "_cascade_widget") and self._cascade_widget:
+        if self._cascade_widget:
             self._cascade_widget.remove()
             self._cascade_widget = None
 
@@ -1890,12 +1894,13 @@ class ChatScreen(Screen[None]):
             return
 
         # Extract cascade data and clear the pending state
-        updated_file, dependent_files = self.deps.pending_cascade
+        cascade = self.deps.pending_cascade
         self.deps.pending_cascade = None
 
         # Post the CascadeConfirmationRequired message to trigger the cascade UI
         self.post_message(
             CascadeConfirmationRequired(
-                updated_file=updated_file, dependent_files=dependent_files
+                updated_file=cascade.updated_file,
+                dependent_files=cascade.dependent_files,
             )
         )
