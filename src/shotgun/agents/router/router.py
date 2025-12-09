@@ -24,6 +24,11 @@ from shotgun.agents.router.models import RouterDeps
 from shotgun.agents.router.tools import (
     add_step,
     create_plan,
+    delegate_to_export,
+    delegate_to_plan,
+    delegate_to_research,
+    delegate_to_specification,
+    delegate_to_tasks,
     mark_step_done,
     remove_step,
 )
@@ -118,6 +123,13 @@ async def create_router_agent(
     agent.tool(mark_step_done)
     agent.tool(add_step)
     agent.tool(remove_step)
+
+    # Register delegation tools (router orchestrates sub-agents)
+    agent.tool(delegate_to_research)
+    agent.tool(delegate_to_specification)
+    agent.tool(delegate_to_plan)
+    agent.tool(delegate_to_tasks)
+    agent.tool(delegate_to_export)
 
     # Register common file management tools
     agent.tool(write_file)

@@ -208,17 +208,49 @@ Your execution plan is shown in the System Status message above. You don't need 
 - Single-file edits
 - Quick questions
 
-## YOUR SCOPE
+## SUB-AGENT DELEGATION
 
-You orchestrate the following sub-agents (delegation tools coming in a future stage):
+You orchestrate specialized sub-agents through delegation tools:
 
-- **Research Agent**: Researches topics, writes to research.md and research/
-- **Specify Agent**: Creates specifications, writes to specification.md and contracts/
-- **Plan Agent**: Creates implementation plans, writes to plan.md
-- **Tasks Agent**: Creates actionable tasks, writes to tasks.md
-- **Export Agent**: Exports deliverables
+| Tool | Sub-Agent | Use For |
+|------|-----------|---------|
+| `delegate_to_research` | Research Agent | Finding information, web search, analyzing code |
+| `delegate_to_specification` | Specification Agent | Writing/updating specification.md, creating contracts |
+| `delegate_to_plan` | Plan Agent | Writing/updating plan.md with implementation steps |
+| `delegate_to_tasks` | Tasks Agent | Writing/updating tasks.md with actionable tasks |
+| `delegate_to_export` | Export Agent | Exporting artifacts, generating outputs |
 
-For now, you can use file tools to read/write directly. Delegation tools will be added later.
+### How to Delegate
+
+1. Use `delegate_to_research` when you need to gather information or analyze code
+2. Use `delegate_to_specification` when updating the specification or creating contracts
+3. Use `delegate_to_plan` when updating the implementation plan
+4. Use `delegate_to_tasks` when updating the task list
+5. Use `delegate_to_export` when exporting deliverables
+
+### Delegation Input
+
+Each delegation tool takes:
+- `task`: The task description to delegate (required)
+- `context_hint`: Optional context to help the sub-agent understand the task
+
+### Delegation Result
+
+Each delegation returns:
+- `success`: Whether the task completed successfully
+- `response`: The sub-agent's response text
+- `files_modified`: List of files the sub-agent modified (important for cascade confirmation!)
+- `has_questions`: Whether the sub-agent has clarifying questions
+- `questions`: List of clarifying questions (relay these to the user)
+- `error`: Error message (if failed)
+
+### Important Delegation Notes
+
+- Sub-agents run with **isolated message history** - they don't see prior conversation
+- Provide clear, detailed tasks with enough context in the `task` field
+- Check `files_modified` to know what cascade confirmation may be needed
+- If `has_questions` is True, relay those questions to the user before proceeding
+- You can still use file tools directly for simple reads/edits
 
 ## FILE ACCESS
 
