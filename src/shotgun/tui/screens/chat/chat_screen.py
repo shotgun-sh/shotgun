@@ -51,7 +51,7 @@ from shotgun.agents.models import (
     AgentType,
     FileOperationTracker,
 )
-from shotgun.agents.router.models import RouterDeps, RouterMode
+from shotgun.agents.router.models import CascadeScope, RouterDeps, RouterMode
 from shotgun.agents.runner import AgentRunner
 from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
@@ -90,6 +90,9 @@ from shotgun.tui.screens.chat_screen.command_providers import (
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.chat_screen.messages import (
+    CascadeConfirmationRequired,
+    CascadeConfirmed,
+    CascadeDeclined,
     CheckpointContinue,
     CheckpointModify,
     CheckpointStop,
@@ -106,6 +109,7 @@ from shotgun.tui.screens.shared_specs import (
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
+from shotgun.tui.widgets.cascade_confirmation_widget import CascadeConfirmationWidget
 from shotgun.tui.widgets.step_checkpoint_widget import StepCheckpointWidget
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
@@ -176,6 +180,9 @@ class ChatScreen(Screen[None]):
 
     # Step checkpoint widget (Planning mode)
     _checkpoint_widget: StepCheckpointWidget | None = None
+
+    # Cascade confirmation widget (Planning mode)
+    _cascade_widget: CascadeConfirmationWidget | None = None
 
     def __init__(
         self,
@@ -1763,3 +1770,132 @@ class ChatScreen(Screen[None]):
 
         # Post the StepCompleted message to trigger the checkpoint UI
         self.post_message(StepCompleted(step=step, next_step=next_step))
+
+    # =========================================================================
+    # Cascade Confirmation Handlers (Planning Mode)
+    # =========================================================================
+
+    @on(CascadeConfirmationRequired)
+    def handle_cascade_confirmation_required(
+        self, event: CascadeConfirmationRequired
+    ) -> None:
+        """Show cascade confirmation widget when a file with dependents is updated.
+
+        In Planning mode, after updating a file like specification.md that has
+        dependent files, this shows the CascadeConfirmationWidget to let the
+        user decide which dependent files should also be updated.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+        if self.deps.router_mode != RouterMode.PLANNING:
+            # In Drafting mode, auto-cascade without confirmation
+            self._execute_cascade(CascadeScope.ALL, event.dependent_files)
+            return
+
+        # Show cascade confirmation widget
+        self._show_cascade_widget(event.updated_file, event.dependent_files)
+
+    @on(CascadeConfirmed)
+    def handle_cascade_confirmed(self, event: CascadeConfirmed) -> None:
+        """Execute cascade update based on user's selected scope."""
+        # Get dependent files from the widget before hiding it
+        dependent_files: list[str] = []
+        if hasattr(self, "_cascade_widget") and self._cascade_widget:
+            dependent_files = self._cascade_widget.dependent_files
+
+        self._hide_cascade_widget()
+        self._execute_cascade(event.scope, dependent_files)
+
+    @on(CascadeDeclined)
+    def handle_cascade_declined(self) -> None:
+        """Handle user declining cascade update."""
+        self._hide_cascade_widget()
+        self.mount_hint(
+            "ℹ️ Cascade update skipped. You can update dependent files manually."
+        )
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    def _show_cascade_widget(
+        self,
+        updated_file: str,
+        dependent_files: list[str],
+    ) -> None:
+        """Replace PromptInput with CascadeConfirmationWidget.
+
+        Args:
+            updated_file: The file that was just updated.
+            dependent_files: List of files that depend on the updated file.
+        """
+        # Create the cascade confirmation widget
+        self._cascade_widget = CascadeConfirmationWidget(updated_file, dependent_files)
+
+        # Hide PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = False
+
+        # Mount cascade widget in footer
+        footer = self.query_one("#footer")
+        footer.mount(self._cascade_widget, after=prompt_input)
+
+    def _hide_cascade_widget(self) -> None:
+        """Remove cascade widget, restore PromptInput."""
+        if hasattr(self, "_cascade_widget") and self._cascade_widget:
+            self._cascade_widget.remove()
+            self._cascade_widget = None
+
+        # Show PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = True
+
+    def _execute_cascade(self, scope: CascadeScope, dependent_files: list[str]) -> None:
+        """Execute cascade updates based on the selected scope.
+
+        Args:
+            scope: The scope of files to update.
+            dependent_files: List of dependent files that could be updated.
+
+        Note:
+            Actual cascade execution (calling sub-agents) requires Stage 9's
+            delegation tools. For now, this shows a hint about what would happen.
+        """
+        if scope == CascadeScope.NONE:
+            return
+
+        # Determine which files will be updated based on scope
+        files_to_update: list[str] = []
+        if scope == CascadeScope.ALL:
+            files_to_update = dependent_files
+        elif scope == CascadeScope.PLAN_ONLY:
+            files_to_update = [f for f in dependent_files if "plan.md" in f]
+        elif scope == CascadeScope.TASKS_ONLY:
+            files_to_update = [f for f in dependent_files if "tasks.md" in f]
+
+        if files_to_update:
+            file_names = ", ".join(f.split("/")[-1] for f in files_to_update)
+            # TODO: Stage 9 will implement actual delegation to sub-agents
+            self.mount_hint(f"📋 Cascade update queued for: {file_names}")
+
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    def _check_pending_cascade(self) -> None:
+        """Check if there's a pending cascade and post CascadeConfirmationRequired if so.
+
+        This is called after each agent run to check if a file modification
+        set a pending cascade in Planning mode.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        if self.deps.pending_cascade is None:
+            return
+
+        # Extract cascade data and clear the pending state
+        updated_file, dependent_files = self.deps.pending_cascade
+        self.deps.pending_cascade = None
+
+        # Post the CascadeConfirmationRequired message to trigger the cascade UI
+        self.post_message(
+            CascadeConfirmationRequired(
+                updated_file=updated_file, dependent_files=dependent_files
+            )
+        )
