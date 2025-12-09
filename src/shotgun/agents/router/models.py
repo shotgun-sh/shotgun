@@ -12,8 +12,6 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
-    from pydantic_ai import RunContext
-
     from shotgun.agents.models import AgentDeps
 
 from pydantic import BaseModel, Field

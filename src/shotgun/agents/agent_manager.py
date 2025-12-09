@@ -61,8 +61,10 @@ from shotgun.agents.context_analyzer import (
 from shotgun.agents.models import (
     AgentResponse,
     AgentType,
+    AnyAgent,
     FileOperation,
     FileOperationTracker,
+    RouterAgent,
     ShotgunAgent,
 )
 from shotgun.posthog_telemetry import track_event
@@ -324,7 +326,7 @@ class AgentManager(Widget):
         self._specify_deps: AgentDeps | None = None
         self._export_agent: ShotgunAgent | None = None
         self._export_deps: AgentDeps | None = None
-        self._router_agent: object = None  # Agent[RouterDeps, AgentResponse] - object to avoid contravariance issues
+        self._router_agent: RouterAgent | None = None
         self._router_deps: RouterDeps | None = None
         self._agents_initialized = False
 
@@ -458,7 +460,7 @@ class AgentManager(Widget):
         return self._export_deps
 
     @property
-    def router_agent(self) -> object:
+    def router_agent(self) -> RouterAgent:
         """Get router agent (must call _ensure_agents_initialized first)."""
         if self._router_agent is None:
             raise RuntimeError(
@@ -476,24 +478,24 @@ class AgentManager(Widget):
         return self._router_deps
 
     @property
-    def current_agent(self) -> object:
+    def current_agent(self) -> AnyAgent:
         """Get the currently active agent.
 
         Returns:
-            The currently selected agent instance (ShotgunAgent or router agent).
+            The currently selected agent instance (ShotgunAgent or RouterAgent).
         """
         return self._get_agent(self._current_agent_type)
 
-    def _get_agent(self, agent_type: AgentType) -> object:
+    def _get_agent(self, agent_type: AgentType) -> AnyAgent:
         """Get agent by type.
 
         Args:
             agent_type: The type of agent to retrieve.
 
         Returns:
-            The requested agent instance (ShotgunAgent or router agent).
+            The requested agent instance (ShotgunAgent or RouterAgent).
         """
-        agent_map: dict[AgentType, object] = {
+        agent_map: dict[AgentType, AnyAgent] = {
             AgentType.RESEARCH: self.research_agent,
             AgentType.PLAN: self.plan_agent,
             AgentType.TASKS: self.tasks_agent,
@@ -572,7 +574,7 @@ class AgentManager(Widget):
     )
     async def _run_agent_with_retry(
         self,
-        agent: ShotgunAgent,
+        agent: AnyAgent,
         prompt: str | None,
         deps: AgentDeps,
         usage_limits: UsageLimits | None,
@@ -583,9 +585,9 @@ class AgentManager(Widget):
         """Run agent with automatic retry on transient errors.
 
         Args:
-            agent: The agent to run.
+            agent: The agent to run (ShotgunAgent or RouterAgent).
             prompt: Optional prompt to send to the agent.
-            deps: Agent dependencies.
+            deps: Agent dependencies (AgentDeps or RouterDeps).
             usage_limits: Optional usage limits.
             message_history: Message history to provide to agent.
             event_stream_handler: Event handler for streaming.
@@ -596,8 +598,16 @@ class AgentManager(Widget):
 
         Raises:
             Various exceptions if all retries fail.
+
+        Note:
+            Type safety for agent/deps pairing is maintained by AgentManager's
+            _get_agent_deps which ensures the correct deps type is used for each
+            agent type. The cast is needed because Agent is contravariant in deps.
         """
-        return await agent.run(
+        # Cast needed because Agent is contravariant in deps type parameter.
+        # The agent/deps pairing is ensured by _get_agent_deps returning the
+        # correct deps type for each agent type.
+        return await cast(ShotgunAgent, agent).run(
             prompt,
             deps=deps,
             usage_limits=usage_limits,

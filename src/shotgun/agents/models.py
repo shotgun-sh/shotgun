@@ -18,6 +18,7 @@ from .config.models import ModelConfig
 if TYPE_CHECKING:
     from pydantic_ai import Agent
 
+    from shotgun.agents.router.models import RouterDeps
     from shotgun.codebase.service import CodebaseService
 
 
@@ -364,3 +365,10 @@ except ImportError:
 
 # Type alias for the standard agent type used throughout the codebase
 ShotgunAgent: TypeAlias = "Agent[AgentDeps, AgentResponse]"
+
+# Type alias for router agent (uses RouterDeps which extends AgentDeps)
+# Note: Agent is contravariant in deps, so RouterAgent is NOT a subtype of ShotgunAgent
+RouterAgent: TypeAlias = "Agent[RouterDeps, AgentResponse]"
+
+# Union type for any agent type (used in AgentManager)
+AnyAgent: TypeAlias = "ShotgunAgent | RouterAgent"
