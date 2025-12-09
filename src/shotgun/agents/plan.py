@@ -10,6 +10,7 @@ from shotgun.agents.models import ShotgunAgent
 from shotgun.logging_config import get_logger
 
 from .common import (
+    EventStreamHandler,
     add_system_status_message,
     build_agent_system_prompt,
     create_base_agent,
@@ -53,6 +54,7 @@ async def run_plan_agent(
     goal: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
+    event_stream_handler: EventStreamHandler | None = None,
 ) -> AgentRunResult[AgentResponse]:
     """Create or update a plan based on the given goal using artifacts.
 
@@ -61,6 +63,7 @@ async def run_plan_agent(
         goal: The planning goal or instruction
         deps: Agent dependencies
         message_history: Optional message history for conversation continuity
+        event_stream_handler: Optional callback for streaming events
 
     Returns:
         AgentRunResult containing the planning process output
@@ -82,6 +85,7 @@ async def run_plan_agent(
             deps=deps,
             message_history=message_history,
             usage_limits=usage_limits,
+            event_stream_handler=event_stream_handler,
         )
 
         logger.debug("✅ Planning completed successfully")

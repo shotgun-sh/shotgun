@@ -7,8 +7,14 @@ These models define the contracts between router, sub-agents, and UI.
 IMPORTANT: All tool inputs/outputs must use Pydantic models - no raw dict/list/tuple.
 """
 
+from collections.abc import AsyncIterable, Awaitable, Callable
 from enum import StrEnum
-from typing import Final
+from typing import TYPE_CHECKING, Any, Final
+
+if TYPE_CHECKING:
+    from pydantic_ai import RunContext
+
+    from shotgun.agents.models import AgentDeps
 
 from pydantic import BaseModel, Field
 
@@ -312,6 +318,12 @@ from shotgun.agents.models import AgentDeps, AgentType, ShotgunAgent  # noqa: E4
 # Each entry is a tuple of (Agent instance, AgentDeps instance)
 SubAgentCacheEntry = tuple[ShotgunAgent, AgentDeps]
 
+# Type alias for event stream handler callback
+# Matches the signature expected by pydantic_ai's agent.run()
+EventStreamHandler = Callable[
+    ["RunContext[AgentDeps]", AsyncIterable[Any]], Awaitable[None]
+]
+
 
 class RouterDeps(AgentDeps):
     """
@@ -348,3 +360,11 @@ class RouterDeps(AgentDeps):
     # Set by create_plan tool when plan.needs_approval() returns True
     # Excluded from serialization as it's transient UI state
     pending_approval: PendingApproval | None = Field(default=None, exclude=True)
+    # Event stream handler for forwarding sub-agent streaming events to UI
+    # This is set by the AgentManager when running the router with streaming
+    # Excluded from serialization as it's a callable
+    parent_stream_handler: EventStreamHandler | None = Field(
+        default=None,
+        exclude=True,
+        description="Event stream handler from parent context for forwarding sub-agent events",
+    )

@@ -1,6 +1,6 @@
 """Common utilities for agent creation and management."""
 
-from collections.abc import Callable
+from collections.abc import AsyncIterable, Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -418,6 +418,7 @@ def build_agent_system_prompt(
         f"agents/{agent_type}.j2",
         interactive_mode=ctx.deps.interactive_mode,
         mode=agent_type,
+        sub_agent_context=ctx.deps.sub_agent_context,
     )
 
     if agent_type == "research":
@@ -481,13 +482,33 @@ async def add_system_prompt_message(
     return message_history
 
 
+EventStreamHandler = Callable[
+    [RunContext[AgentDeps], AsyncIterable[Any]], Awaitable[None]
+]
+
+
 async def run_agent(
     agent: ShotgunAgent,
     prompt: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
     usage_limits: UsageLimits | None = None,
+    event_stream_handler: EventStreamHandler | None = None,
 ) -> AgentRunResult[AgentResponse]:
+    """Run an agent with optional streaming support.
+
+    Args:
+        agent: The agent to run.
+        prompt: The prompt to send to the agent.
+        deps: Agent dependencies.
+        message_history: Optional message history to continue from.
+        usage_limits: Optional usage limits for the run.
+        event_stream_handler: Optional callback for streaming events.
+            When provided, enables real-time streaming of agent responses.
+
+    Returns:
+        The agent run result.
+    """
     # Clear file tracker for new run
     deps.file_tracker.clear()
     logger.debug("🔧 Cleared file tracker for new agent run")
@@ -500,6 +521,7 @@ async def run_agent(
         deps=deps,
         usage_limits=usage_limits,
         message_history=message_history,
+        event_stream_handler=event_stream_handler,
     )
 
     # Log file operations summary if any files were modified
