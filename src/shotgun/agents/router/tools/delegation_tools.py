@@ -216,12 +216,13 @@ async def _run_sub_agent(
     last_error: BaseException | None = None
     for attempt in range(MAX_RETRIES + 1):
         try:
-            # Run sub-agent with isolated message history
+            # Run sub-agent with isolated message history and streaming support
             result = await run_fn(
                 agent=agent,
                 query=prompt,  # Most agents use 'query' parameter
                 deps=sub_agent_deps,
                 message_history=[],  # Isolated context
+                event_stream_handler=deps.parent_stream_handler,  # Forward streaming
             )
 
             # Extract response text

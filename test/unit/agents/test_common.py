@@ -193,6 +193,7 @@ def test_build_agent_system_prompt_research_agent():
     """Test build_agent_system_prompt for research agent type."""
     mock_context = MagicMock()
     mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -206,6 +207,7 @@ def test_build_agent_system_prompt_research_agent():
             "agents/research.j2",
             interactive_mode=True,
             mode="research",
+            sub_agent_context=None,
         )
 
 
@@ -213,6 +215,7 @@ def test_build_agent_system_prompt_custom_context():
     """Test build_agent_system_prompt with custom context name."""
     mock_context = MagicMock()
     mock_context.deps.interactive_mode = False
+    mock_context.deps.sub_agent_context = None
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -226,6 +229,7 @@ def test_build_agent_system_prompt_custom_context():
             "agents/plan.j2",
             interactive_mode=False,
             mode="plan",
+            sub_agent_context=None,
         )
 
 
@@ -233,6 +237,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
     """Test build_agent_system_prompt with unknown agent type."""
     mock_context = MagicMock()
     mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -246,6 +251,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
             "agents/unknown.j2",
             interactive_mode=True,
             mode="unknown",
+            sub_agent_context=None,
         )
 
 

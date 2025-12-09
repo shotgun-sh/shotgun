@@ -14,6 +14,7 @@ def mock_context():
     context = MagicMock()
     context.deps = MagicMock(spec=AgentDeps)
     context.deps.interactive_mode = True
+    context.deps.sub_agent_context = None
     return context
 
 
@@ -58,6 +59,7 @@ def test_research_system_prompt_template_loading():
 
     mock_context = MagicMock()
     mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -71,5 +73,6 @@ def test_research_system_prompt_template_loading():
             "agents/research.j2",
             interactive_mode=True,
             mode="research",
+            sub_agent_context=None,
         )
         assert result == "Test system prompt"

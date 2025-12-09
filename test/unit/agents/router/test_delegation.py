@@ -50,6 +50,7 @@ def mock_router_deps():
     deps.max_iterations = 100
     deps.queue = Queue()  # Must be a Queue instance
     deps.tasks = []
+    deps.parent_stream_handler = None  # For streaming support
     return deps
 
 
@@ -531,3 +532,71 @@ async def test_sub_agent_cached_after_first_use(mock_context, mock_agent_result)
         # Second call - should reuse cached agent
         await _run_sub_agent(mock_context, AgentType.RESEARCH, "Task 2")
         assert create_call_count == 1  # Still 1 - no new creation
+
+
+# =============================================================================
+# Tests for streaming support (Stage 10)
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_run_sub_agent_passes_stream_handler(mock_context, mock_agent_result):
+    """Test that parent_stream_handler is passed to sub-agent run function."""
+    mock_agent = MagicMock()
+    mock_sub_deps = _create_mock_sub_agent_deps()
+    mock_context.deps.sub_agent_cache = {}
+
+    # Set up a mock stream handler
+    mock_stream_handler = AsyncMock()
+    mock_context.deps.parent_stream_handler = mock_stream_handler
+
+    captured_kwargs = {}
+
+    async def capture_run_kwargs(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return mock_agent_result
+
+    with patch.dict(
+        "shotgun.agents.router.tools.delegation_tools.AGENT_FACTORIES",
+        {
+            AgentType.RESEARCH: (
+                AsyncMock(return_value=(mock_agent, mock_sub_deps)),
+                capture_run_kwargs,
+            )
+        },
+    ):
+        await _run_sub_agent(mock_context, AgentType.RESEARCH, "Test task")
+
+    # Verify that the event_stream_handler was passed
+    assert "event_stream_handler" in captured_kwargs
+    assert captured_kwargs["event_stream_handler"] is mock_stream_handler
+
+
+@pytest.mark.asyncio
+async def test_run_sub_agent_none_stream_handler(mock_context, mock_agent_result):
+    """Test that None stream handler is passed when not set."""
+    mock_agent = MagicMock()
+    mock_sub_deps = _create_mock_sub_agent_deps()
+    mock_context.deps.sub_agent_cache = {}
+    mock_context.deps.parent_stream_handler = None
+
+    captured_kwargs = {}
+
+    async def capture_run_kwargs(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return mock_agent_result
+
+    with patch.dict(
+        "shotgun.agents.router.tools.delegation_tools.AGENT_FACTORIES",
+        {
+            AgentType.RESEARCH: (
+                AsyncMock(return_value=(mock_agent, mock_sub_deps)),
+                capture_run_kwargs,
+            )
+        },
+    ):
+        await _run_sub_agent(mock_context, AgentType.RESEARCH, "Test task")
+
+    # Verify that event_stream_handler was passed but is None
+    assert "event_stream_handler" in captured_kwargs
+    assert captured_kwargs["event_stream_handler"] is None
