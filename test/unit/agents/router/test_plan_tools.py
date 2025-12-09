@@ -381,3 +381,100 @@ async def test_mark_step_done_skips_checkpoint_in_drafting_mode(
     assert result.success is True
     # Pending checkpoint should NOT be set in Drafting mode
     assert mock_context.deps.pending_checkpoint is None
+
+
+# Tests for is_executing flag behavior
+
+
+@pytest.mark.asyncio
+async def test_create_plan_sets_is_executing_for_single_step(mock_context):
+    """Test that creating a single-step plan sets is_executing=True."""
+    mock_context.deps.is_executing = False
+
+    input_data = CreatePlanInput(
+        goal="Simple task",
+        steps=[
+            ExecutionStepInput(id="step-1", title="Do it", objective="Just do it"),
+        ],
+    )
+
+    await create_plan(mock_context, input_data)
+
+    # Single-step plans skip approval and start executing immediately
+    assert mock_context.deps.is_executing is True
+
+
+@pytest.mark.asyncio
+async def test_create_plan_sets_is_executing_for_drafting_mode(mock_context):
+    """Test that creating a multi-step plan in Drafting mode sets is_executing=True."""
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+    mock_context.deps.is_executing = False
+
+    input_data = CreatePlanInput(
+        goal="Multi-step task",
+        steps=[
+            ExecutionStepInput(id="step-1", title="Step 1", objective="First step"),
+            ExecutionStepInput(id="step-2", title="Step 2", objective="Second step"),
+        ],
+    )
+
+    await create_plan(mock_context, input_data)
+
+    # Drafting mode skips approval and starts executing immediately
+    assert mock_context.deps.is_executing is True
+
+
+@pytest.mark.asyncio
+async def test_create_plan_does_not_set_is_executing_for_multi_step_planning(
+    mock_context,
+):
+    """Test that creating a multi-step plan in Planning mode does NOT set is_executing."""
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.is_executing = False
+
+    input_data = CreatePlanInput(
+        goal="Multi-step task",
+        steps=[
+            ExecutionStepInput(id="step-1", title="Step 1", objective="First step"),
+            ExecutionStepInput(id="step-2", title="Step 2", objective="Second step"),
+        ],
+    )
+
+    await create_plan(mock_context, input_data)
+
+    # Multi-step plans in Planning mode need approval first
+    assert mock_context.deps.is_executing is False
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_clears_is_executing_when_plan_complete(
+    mock_context, sample_plan
+):
+    """Test that completing the last step sets is_executing=False."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.is_executing = True
+
+    # Mark all steps done
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-2"))
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-3"))
+
+    # Plan is now complete, is_executing should be False
+    assert sample_plan.is_complete() is True
+    assert mock_context.deps.is_executing is False
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_keeps_is_executing_when_plan_not_complete(
+    mock_context, sample_plan
+):
+    """Test that completing a non-final step keeps is_executing=True."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.is_executing = True
+
+    # Mark first step done (not the last)
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+
+    # Plan is not complete, is_executing should still be True
+    assert sample_plan.is_complete() is False
+    assert mock_context.deps.is_executing is True

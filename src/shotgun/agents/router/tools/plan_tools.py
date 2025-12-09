@@ -89,13 +89,17 @@ async def create_plan(
     if ctx.deps.router_mode == RouterMode.PLANNING and plan.needs_approval():
         ctx.deps.pending_approval = PendingApproval(plan=plan)
         ctx.deps.approval_status = PlanApprovalStatus.PENDING
+        # Plan is NOT executing yet - user must approve first
+        ctx.deps.is_executing = False
         logger.debug(
             "Set pending approval for plan with %d steps",
             len(steps),
         )
     else:
-        # Single-step plans or Drafting mode - skip approval
+        # Single-step plans or Drafting mode - skip approval and start executing
         ctx.deps.approval_status = PlanApprovalStatus.SKIPPED
+        ctx.deps.is_executing = True
+        logger.debug("Plan approved automatically, is_executing=True")
 
     logger.info(
         "Created execution plan with %d steps: %s",
@@ -149,9 +153,13 @@ async def mark_step_done(
             ):
                 plan.current_step_index += 1
 
+            # Check if plan is complete
+            if plan.is_complete():
+                ctx.deps.is_executing = False
+                logger.debug("Plan complete, is_executing=False")
             # Set pending checkpoint for Planning mode
             # The TUI will detect this and show the StepCheckpointWidget
-            if ctx.deps.router_mode == RouterMode.PLANNING:
+            elif ctx.deps.router_mode == RouterMode.PLANNING:
                 next_step = plan.next_step()
                 ctx.deps.pending_checkpoint = PendingCheckpoint(
                     completed_step=step, next_step=next_step

@@ -427,40 +427,45 @@ Here are some helpful resources to get you up to speed with Shotgun:
 """
 
     def _page_2_modes(self) -> str:
-        """Page 2: Explanation of the 5 modes."""
+        """Page 2: Explanation of the Router and its modes."""
         return """
-## Understanding Shotgun's 5 Modes
+## Understanding Shotgun's Router
 
-Shotgun has 5 specialized modes, each designed for specific tasks. Each mode writes to its own dedicated file in `.shotgun/`:
+Shotgun uses an intelligent **Router** that orchestrates your workflow automatically. Just describe what you need, and the Router will coordinate research, specifications, planning, and tasks for you.
 
-### 🔬 Research Mode
-Research topics with web search and synthesize findings. Perfect for gathering information and exploring new concepts.
+### Two Operating Modes
 
-**Writes to:** `.shotgun/research.md`
+The Router operates in two modes, which you can toggle with `Shift+Tab`:
 
-### 📝 Specify Mode
-Create detailed specifications and requirements documents. Great for planning features and documenting requirements.
+### 📋 Planning Mode (Default)
+- **Incremental execution**: Does one step at a time
+- **Asks clarifying questions** before complex tasks
+- **Shows plan for approval** before executing multi-step work
+- **Confirms before cascading** changes to dependent files
 
-**Writes to:** `.shotgun/specification.md`
+Best for: Complex tasks, learning the workflow, staying in control
 
-### 📋 Plan Mode
-Create comprehensive, actionable plans with milestones. Ideal for breaking down large projects into manageable steps.
+### ✍️ Drafting Mode
+- **Auto-executes** plans without stopping for approval
+- **Makes reasonable assumptions** instead of asking questions
+- **Updates all dependent files** automatically
 
-**Writes to:** `.shotgun/plan.md`
-
-### ✅ Tasks Mode
-Generate specific, actionable tasks from research and plans. Best for getting concrete next steps and action items.
-
-**Writes to:** `.shotgun/tasks.md`
-
-### 📤 Export Mode
-Export artifacts and findings to various formats. Creates documentation like Claude.md (AI instructions), Agent.md (agent specs), PRDs, and other deliverables. Can write to any file in `.shotgun/` except the mode-specific files above.
-
-**Writes to:** `.shotgun/Claude.md`, `.shotgun/Agent.md`, `.shotgun/PRD.md`, etc.
+Best for: Routine tasks, experienced users, speed-focused work
 
 ---
 
-**Tip:** You can switch between modes using `Shift+Tab` or `Ctrl+P` to open the command palette!
+### Files Created
+
+The Router manages these files in `.shotgun/`:
+- `research.md` - Research findings
+- `specification.md` - Detailed specifications
+- `plan.md` - Implementation plans
+- `tasks.md` - Actionable task lists
+- `exports/` - Documentation exports
+
+---
+
+**Tip:** Press `Shift+Tab` to toggle between Planning and Drafting modes!
 """
 
     def _page_3_prompts(self) -> str:
@@ -485,12 +490,11 @@ Provide relevant context about what you're trying to accomplish:
 
 > "I'm working on the payment flow. I need to add support for refunds."
 
-### 4. Use the Right Mode
-Switch to the appropriate mode for your task:
-- Use **Research** for exploration
-- Use **Specify** for requirements
-- Use **Plan** for implementation strategy
-- Use **Tasks** for actionable next steps
+### 4. Let the Router Guide You
+The Router will automatically coordinate the right workflow:
+- Describe what you want to accomplish
+- In Planning mode, it will ask clarifying questions first
+- In Drafting mode, it will execute immediately
 
 ---
 

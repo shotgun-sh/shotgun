@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, cast
 
 from textual.command import DiscoveryHit, Hit, Provider
 
-from shotgun.agents.models import AgentType
 from shotgun.codebase.models import CodebaseGraph
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.model_picker import ModelPickerScreen
@@ -11,92 +10,6 @@ from shotgun.tui.screens.provider_config import ProviderConfigScreen
 
 if TYPE_CHECKING:
     from shotgun.tui.screens.chat import ChatScreen
-
-
-class AgentModeProvider(Provider):
-    """Command provider for agent mode switching."""
-
-    @property
-    def chat_screen(self) -> "ChatScreen":
-        from shotgun.tui.screens.chat import ChatScreen
-
-        return cast(ChatScreen, self.screen)
-
-    def set_mode(self, mode: AgentType) -> None:
-        """Switch to research mode."""
-        self.chat_screen.mode = mode
-
-    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
-        """Provide default mode switching commands when palette opens."""
-        yield DiscoveryHit(
-            "Switch to Research Mode",
-            lambda: self.set_mode(AgentType.RESEARCH),
-            help="🔬 Research topics with web search and synthesize findings",
-        )
-        yield DiscoveryHit(
-            "Switch to Specify Mode",
-            lambda: self.set_mode(AgentType.SPECIFY),
-            help="📝 Create detailed specifications and requirements documents",
-        )
-        yield DiscoveryHit(
-            "Switch to Plan Mode",
-            lambda: self.set_mode(AgentType.PLAN),
-            help="📋 Create comprehensive, actionable plans with milestones",
-        )
-        yield DiscoveryHit(
-            "Switch to Tasks Mode",
-            lambda: self.set_mode(AgentType.TASKS),
-            help="✅ Generate specific, actionable tasks from research and plans",
-        )
-        yield DiscoveryHit(
-            "Switch to Export Mode",
-            lambda: self.set_mode(AgentType.EXPORT),
-            help="📤 Export artifacts and findings to various formats",
-        )
-
-    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
-        """Search for mode commands."""
-        matcher = self.matcher(query)
-
-        commands = [
-            (
-                "Switch to Research Mode",
-                "🔬 Research topics with web search and synthesize findings",
-                lambda: self.set_mode(AgentType.RESEARCH),
-                AgentType.RESEARCH,
-            ),
-            (
-                "Switch to Specify Mode",
-                "📝 Create detailed specifications and requirements documents",
-                lambda: self.set_mode(AgentType.SPECIFY),
-                AgentType.SPECIFY,
-            ),
-            (
-                "Switch to Plan Mode",
-                "📋 Create comprehensive, actionable plans with milestones",
-                lambda: self.set_mode(AgentType.PLAN),
-                AgentType.PLAN,
-            ),
-            (
-                "Switch to Tasks Mode",
-                "✅ Generate specific, actionable tasks from research and plans",
-                lambda: self.set_mode(AgentType.TASKS),
-                AgentType.TASKS,
-            ),
-            (
-                "Switch to Export Mode",
-                "📤 Export artifacts and findings to various formats",
-                lambda: self.set_mode(AgentType.EXPORT),
-                AgentType.EXPORT,
-            ),
-        ]
-
-        for title, help_text, callback, mode in commands:
-            if self.chat_screen.mode == mode:
-                continue
-            score = matcher.match(title)
-            if score > 0:
-                yield Hit(score, matcher.highlight(title), callback, help=help_text)
 
 
 class UsageProvider(Provider):

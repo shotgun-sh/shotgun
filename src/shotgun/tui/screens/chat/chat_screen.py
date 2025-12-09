@@ -414,27 +414,15 @@ class ChatScreen(Screen[None]):
         return None
 
     def action_toggle_mode(self) -> None:
-        """Toggle mode - Router mode toggle OR legacy agent cycling."""
+        """Toggle between Planning and Drafting modes for Router."""
+        from shotgun.agents.router.models import RouterDeps, RouterMode
+
         # Prevent mode switching during Q&A
         if self.qa_mode:
             self.agent_manager.add_hint_message(
                 HintMessage(message="⚠️ Cannot switch modes while answering questions")
             )
             return
-
-        # Check if using Router agent
-        from shotgun.agents.router.models import RouterDeps
-
-        if isinstance(self.deps, RouterDeps):
-            # Router mode: toggle Planning ↔ Drafting
-            self._toggle_router_mode()
-        else:
-            # Legacy mode: cycle through agents
-            self._cycle_legacy_agents()
-
-    def _toggle_router_mode(self) -> None:
-        """Toggle between Planning and Drafting modes for Router."""
-        from shotgun.agents.router.models import RouterDeps, RouterMode
 
         if not isinstance(self.deps, RouterDeps):
             return
@@ -443,6 +431,13 @@ class ChatScreen(Screen[None]):
         if self.deps.is_executing:
             self.agent_manager.add_hint_message(
                 HintMessage(message="⚠️ Cannot switch modes during plan execution")
+            )
+            return
+
+        # Prevent mode switching while sub-agent is active
+        if self.deps.active_sub_agent is not None:
+            self.agent_manager.add_hint_message(
+                HintMessage(message="⚠️ Cannot switch modes while sub-agent is running")
             )
             return
 
@@ -464,20 +459,6 @@ class ChatScreen(Screen[None]):
 
         # Update UI
         self.widget_coordinator.update_for_mode_change(self.mode)
-        self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
-
-    def _cycle_legacy_agents(self) -> None:
-        """Cycle through legacy 5-agent system."""
-        modes = [
-            AgentType.RESEARCH,
-            AgentType.SPECIFY,
-            AgentType.PLAN,
-            AgentType.TASKS,
-            AgentType.EXPORT,
-        ]
-        self.mode = modes[(modes.index(self.mode) + 1) % len(modes)]
-        self.agent_manager.set_agent(self.mode)
-        # Re-focus input after mode change
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
 
     def _save_router_mode(self, mode: str) -> None:
