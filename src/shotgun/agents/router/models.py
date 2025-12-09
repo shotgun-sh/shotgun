@@ -368,3 +368,11 @@ class RouterDeps(AgentDeps):
         exclude=True,
         description="Event stream handler from parent context for forwarding sub-agent events",
     )
+    # Callback for notifying TUI when plan changes (Stage 11)
+    # Set by ChatScreen to receive plan updates for the Plan Panel widget
+    # Excluded from serialization as it's a callable
+    on_plan_changed: Callable[["ExecutionPlan | None"], None] | None = Field(
+        default=None,
+        exclude=True,
+        description="Callback to notify TUI when plan changes",
+    )

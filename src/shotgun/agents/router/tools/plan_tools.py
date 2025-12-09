@@ -90,6 +90,10 @@ async def create_plan(
         input.goal,
     )
 
+    # Notify TUI of plan change (Stage 11)
+    if ctx.deps.on_plan_changed:
+        ctx.deps.on_plan_changed(ctx.deps.current_plan)
+
     return ToolResult(
         success=True,
         message=f"Created plan with {len(steps)} steps. Goal: {input.goal}",
@@ -146,6 +150,10 @@ async def mark_step_done(
                     step.title,
                     next_step.title if next_step else None,
                 )
+
+            # Notify TUI of plan change (Stage 11)
+            if ctx.deps.on_plan_changed:
+                ctx.deps.on_plan_changed(ctx.deps.current_plan)
 
             return ToolResult(
                 success=True,
@@ -204,6 +212,11 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
         # Append to end
         plan.steps.append(new_step)
         logger.info("Appended step '%s' to end of plan", input.step.id)
+
+        # Notify TUI of plan change (Stage 11)
+        if ctx.deps.on_plan_changed:
+            ctx.deps.on_plan_changed(ctx.deps.current_plan)
+
         return ToolResult(
             success=True,
             message=f"Added step '{new_step.title}' at end of plan.",
@@ -218,6 +231,11 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
                 input.step.id,
                 input.after_step_id,
             )
+
+            # Notify TUI of plan change (Stage 11)
+            if ctx.deps.on_plan_changed:
+                ctx.deps.on_plan_changed(ctx.deps.current_plan)
+
             return ToolResult(
                 success=True,
                 message=f"Added step '{new_step.title}' after '{step.title}'.",
@@ -265,6 +283,10 @@ async def remove_step(
                 plan.current_step_index -= 1
             elif plan.current_step_index >= len(plan.steps):
                 plan.current_step_index = max(0, len(plan.steps) - 1)
+
+            # Notify TUI of plan change (Stage 11)
+            if ctx.deps.on_plan_changed:
+                ctx.deps.on_plan_changed(ctx.deps.current_plan)
 
             return ToolResult(
                 success=True,

@@ -33,6 +33,7 @@ def mock_router_deps():
     deps.current_plan = None
     deps.file_tracker = FileOperationTracker()
     deps.pending_checkpoint = None
+    deps.on_plan_changed = None  # Plan panel callback (Stage 11)
     return deps
 
 
