@@ -30,6 +30,53 @@ class ToolFormatter:
         return args if isinstance(args, dict) else {}
 
     @classmethod
+    def _extract_key_arg(
+        cls,
+        args: dict[str, object],
+        key_arg: str,
+        tool_name: str | None = None,
+    ) -> str | None:
+        """Extract key argument value, handling nested args and special cases.
+
+        Supports:
+        - Direct key access: key_arg="query" -> args["query"]
+        - Nested access: key_arg="task" -> args["input"]["task"] (for Pydantic model inputs)
+        - Special handling for codebase_shell
+
+        Args:
+            args: Parsed tool arguments dict
+            key_arg: The key argument to extract
+            tool_name: Optional tool name for special handling
+
+        Returns:
+            The extracted value as a string, or None if not found
+        """
+        if not args or not isinstance(args, dict):
+            return None
+
+        # Special handling for codebase_shell which needs command + args
+        if tool_name == "codebase_shell" and "command" in args:
+            command = args.get("command", "")
+            cmd_args = args.get("args", [])
+            if isinstance(cmd_args, list):
+                args_str = " ".join(str(arg) for arg in cmd_args)
+            else:
+                args_str = ""
+            return f"{command} {args_str}".strip()
+
+        # Direct key access
+        if key_arg in args:
+            return str(args[key_arg])
+
+        # Try nested access through "input" (for Pydantic model inputs)
+        if "input" in args and isinstance(args["input"], dict):
+            input_dict = args["input"]
+            if key_arg in input_dict:
+                return str(input_dict[key_arg])
+
+        return None
+
+    @classmethod
     def format_tool_call_part(cls, part: ToolCallPart) -> str:
         """Format a tool call part using the tool display registry."""
         # Look up the display config for this tool
@@ -44,19 +91,10 @@ class ToolFormatter:
             args = cls.parse_args(part.args)
 
             # Get the key argument value
-            if args and isinstance(args, dict) and display_config.key_arg in args:
-                # Special handling for codebase_shell which needs command + args
-                if part.tool_name == "codebase_shell" and "command" in args:
-                    command = args.get("command", "")
-                    cmd_args = args.get("args", [])
-                    if isinstance(cmd_args, list):
-                        args_str = " ".join(str(arg) for arg in cmd_args)
-                    else:
-                        args_str = ""
-                    key_value = f"{command} {args_str}".strip()
-                else:
-                    key_value = str(args[display_config.key_arg])
-
+            key_value = cls._extract_key_arg(
+                args, display_config.key_arg, part.tool_name
+            )
+            if key_value:
                 # Format: "display_text: key_value"
                 return f"{display_config.display_text}: {cls.truncate(key_value)}"
             else:
@@ -95,8 +133,8 @@ class ToolFormatter:
 
             args = cls.parse_args(part.args)
             # Get the key argument value
-            if args and isinstance(args, dict) and display_config.key_arg in args:
-                key_value = str(args[display_config.key_arg])
+            key_value = cls._extract_key_arg(args, display_config.key_arg)
+            if key_value:
                 # Format: "display_text: key_value"
                 return f"{display_config.display_text}: {cls.truncate(key_value)}"
             else:

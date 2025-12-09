@@ -32,16 +32,7 @@ from shotgun.agents.router.tools import (
     mark_step_done,
     remove_step,
 )
-from shotgun.agents.tools import (
-    append_file,
-    codebase_shell,
-    directory_lister,
-    file_read,
-    query_graph,
-    read_file,
-    retrieve_code,
-    write_file,
-)
+from shotgun.agents.tools import read_file
 from shotgun.logging_config import get_logger
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
@@ -131,17 +122,12 @@ async def create_router_agent(
     agent.tool(delegate_to_tasks)
     agent.tool(delegate_to_export)
 
-    # Register common file management tools
-    agent.tool(write_file)
-    agent.tool(append_file)
+    # Register read-only file access for .shotgun/ directory
     agent.tool(read_file)
 
-    # Register codebase understanding tools
-    agent.tool(query_graph)
-    agent.tool(retrieve_code)
-    agent.tool(file_read)
-    agent.tool(directory_lister)
-    agent.tool(codebase_shell)
+    # Note: The Router does NOT have write_file, append_file, or codebase tools.
+    # All file modifications and codebase understanding must be delegated to
+    # the appropriate sub-agent (Research, Specify, Plan, Tasks, Export).
 
     logger.debug("Router agent tools registered")
     logger.info(

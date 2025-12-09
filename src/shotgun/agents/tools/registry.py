@@ -31,6 +31,7 @@ class ToolCategory(StrEnum):
     WEB_RESEARCH = "web_research"
     AGENT_RESPONSE = "agent_response"
     PLANNING = "planning"
+    DELEGATION = "delegation"
     UNKNOWN = "unknown"
 
 
