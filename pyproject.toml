@@ -7,7 +7,7 @@ license = { text = "MIT" }
 authors = [
     { name = "Proofs.io", email = "hello@proofs.io" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"  # Upper bound due to real-ladybug lacking Python 3.14 wheels
 keywords = ["cli", "ai", "agent", "research", "planning", "task-management", "productivity", "llm", "pydantic-ai"]
 classifiers = [
     "Development Status :: 4 - Beta",
