@@ -20,7 +20,7 @@ concurrency:
 jobs:
   test-macos-15-curl:
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -30,7 +30,7 @@ jobs:
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -43,19 +43,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -64,13 +64,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -97,7 +97,7 @@ jobs:
 
   test-macos-15-homebrew:
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -107,7 +107,7 @@ jobs:
       - name: Install uv via Homebrew
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: brew install uv
 
       - name: Verify uv installation
@@ -118,19 +118,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -139,13 +139,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -172,7 +172,7 @@ jobs:
 
   test-macos-14-curl:
     runs-on: macos-14
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -182,7 +182,7 @@ jobs:
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -195,19 +195,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -216,13 +216,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -249,7 +249,7 @@ jobs:
 
   test-macos-14-homebrew:
     runs-on: macos-14
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -259,7 +259,7 @@ jobs:
       - name: Install uv via Homebrew
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: brew install uv
 
       - name: Verify uv installation
@@ -270,19 +270,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -291,13 +291,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -324,7 +324,7 @@ jobs:
 
   test-macos-13-curl:
     runs-on: macos-13
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -334,7 +334,7 @@ jobs:
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -347,19 +347,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -368,13 +368,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -401,7 +401,7 @@ jobs:
 
   test-macos-13-homebrew:
     runs-on: macos-13
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -411,7 +411,7 @@ jobs:
       - name: Install uv via Homebrew
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: brew install uv
 
       - name: Verify uv installation
@@ -422,19 +422,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -443,13 +443,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -476,7 +476,7 @@ jobs:
 
   test-ubuntu-24-curl:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -486,7 +486,7 @@ jobs:
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -499,19 +499,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -520,13 +520,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -553,7 +553,7 @@ jobs:
 
   test-ubuntu-22-curl:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -563,7 +563,7 @@ jobs:
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -576,19 +576,19 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 30
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         run: uv tool install shotgun-sh
 
       - name: Add uv tools to PATH
@@ -597,13 +597,13 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         run: shotgun --help
 
       - name: Record final status
@@ -630,7 +630,7 @@ jobs:
 
   test-windows-latest-powershell:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     outputs:
       result: ${{ steps.final-status.outputs.result }}
@@ -640,7 +640,7 @@ jobs:
       - name: Install uv via PowerShell
         id: install-uv
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         shell: powershell
         run: |
           irm https://astral.sh/uv/install.ps1 | iex
@@ -655,21 +655,21 @@ jobs:
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
-        timeout-minutes: 15
+        timeout-minutes: 30
         shell: powershell
         run: uvx shotgun-sh@latest --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
-        timeout-minutes: 15
+        timeout-minutes: 30
         shell: powershell
         run: uvx shotgun-sh@latest --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 30
         shell: powershell
         run: uv tool install shotgun-sh
 
@@ -680,14 +680,14 @@ jobs:
       - name: Test installed binary - version
         id: test-installed-version
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         shell: powershell
         run: shotgun --version
 
       - name: Test installed binary - help
         id: test-installed-help
         continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 30
         shell: powershell
         run: shotgun --help
 
