@@ -285,3 +285,48 @@ async def append_file(ctx: RunContext[AgentDeps], filename: str, content: str) -
         Success message or error message
     """
     return await write_file(ctx, filename, content, mode="a")
+
+
+@register_tool(
+    category=ToolCategory.ARTIFACT_MANAGEMENT,
+    display_text="Deleting file",
+    key_arg="filename",
+)
+async def delete_file(ctx: RunContext[AgentDeps], filename: str) -> str:
+    """Delete a file from the .shotgun directory.
+
+    Uses the same permission model as write_file - agents can only delete
+    files they have permission to write to.
+
+    Args:
+        filename: Relative path to file within .shotgun directory
+
+    Returns:
+        Success message or error message
+
+    Raises:
+        ValueError: If path is outside .shotgun directory or agent lacks permission
+        FileNotFoundError: If file does not exist
+    """
+    logger.debug("🔧 Deleting file: %s", filename)
+
+    try:
+        # Use agent-scoped validation (same as write_file)
+        file_path = _validate_agent_scoped_path(filename, ctx.deps.agent_mode)
+
+        if not await aiofiles.os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {filename}")
+
+        # Delete the file
+        await aiofiles.os.remove(file_path)
+        logger.debug("🗑️ Deleted file: %s", filename)
+
+        # Track the file operation
+        ctx.deps.file_tracker.add_operation(file_path, FileOperationType.DELETED)
+
+        return f"Successfully deleted {filename}"
+
+    except Exception as e:
+        error_msg = f"Error deleting file '{filename}': {str(e)}"
+        logger.error("❌ File delete failed: %s", error_msg)
+        return error_msg

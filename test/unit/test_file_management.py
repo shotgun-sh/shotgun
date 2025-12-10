@@ -9,6 +9,7 @@ import pytest
 from shotgun.agents.tools.file_management import (
     _validate_shotgun_path,
     append_file,
+    delete_file,
     read_file,
     write_file,
 )
@@ -558,3 +559,227 @@ class TestIntegrationScenarios:
                         mock_ctx, malicious_path, "malicious"
                     )
                     assert "Error writing file" in append_result
+
+
+@pytest.mark.asyncio
+async def test_delete_file_successful():
+    """Test successful file deletion."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create test file
+            test_file = shotgun_dir / "to_delete.md"
+            test_file.write_text("content to delete", encoding="utf-8")
+            assert test_file.exists()
+
+            # Create mock context with file tracker
+            mock_ctx = MagicMock()
+            mock_tracker = MagicMock()
+            mock_ctx.deps.file_tracker = mock_tracker
+            mock_ctx.deps.agent_mode = None
+
+            result = await delete_file(mock_ctx, "to_delete.md")
+
+            assert result == "Successfully deleted to_delete.md"
+            assert not test_file.exists()
+
+            # Verify tracker was called with DELETED operation
+            mock_tracker.add_operation.assert_called_once()
+            call_args = mock_tracker.add_operation.call_args
+            assert call_args[0][1].value == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_delete_file_not_found():
+    """Test deletion of non-existent file."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create mock context
+            mock_ctx = MagicMock()
+            mock_ctx.deps.file_tracker = MagicMock()
+            mock_ctx.deps.agent_mode = None
+
+            result = await delete_file(mock_ctx, "nonexistent.md")
+
+            assert "File not found: nonexistent.md" in result
+
+
+@pytest.mark.asyncio
+async def test_delete_file_path_traversal_blocked():
+    """Test that path traversal attacks are blocked for delete."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create mock context
+            mock_ctx = MagicMock()
+            mock_ctx.deps.file_tracker = MagicMock()
+            mock_ctx.deps.agent_mode = None
+
+            result = await delete_file(mock_ctx, "../../../etc/passwd")
+
+            assert "Error deleting file" in result
+            assert "Access denied" in result
+
+
+@pytest.mark.asyncio
+async def test_delete_file_agent_permission_denied():
+    """Test that agent cannot delete files outside their scope."""
+    from shotgun.agents.models import AgentType
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create a file that research agent shouldn't be able to delete
+            plan_file = shotgun_dir / "plan.md"
+            plan_file.write_text("plan content", encoding="utf-8")
+
+            # Create mock context with RESEARCH agent mode
+            mock_ctx = MagicMock()
+            mock_ctx.deps.file_tracker = MagicMock()
+            mock_ctx.deps.agent_mode = AgentType.RESEARCH
+
+            result = await delete_file(mock_ctx, "plan.md")
+
+            assert "Error deleting file" in result
+            # File should still exist
+            assert plan_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_delete_file_agent_permission_allowed():
+    """Test that agent can delete files within their scope."""
+    from shotgun.agents.models import AgentType
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create a file that research agent can delete
+            research_file = shotgun_dir / "research.md"
+            research_file.write_text("research content", encoding="utf-8")
+
+            # Create mock context with RESEARCH agent mode
+            mock_ctx = MagicMock()
+            mock_tracker = MagicMock()
+            mock_ctx.deps.file_tracker = mock_tracker
+            mock_ctx.deps.agent_mode = AgentType.RESEARCH
+
+            result = await delete_file(mock_ctx, "research.md")
+
+            assert result == "Successfully deleted research.md"
+            assert not research_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_delete_file_nested_in_allowed_directory():
+    """Test deletion of file in nested directory within agent scope."""
+    from shotgun.agents.models import AgentType
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create nested file in research directory
+            research_dir = shotgun_dir / "research"
+            research_dir.mkdir()
+            nested_file = research_dir / "notes.md"
+            nested_file.write_text("nested notes", encoding="utf-8")
+
+            # Create mock context with RESEARCH agent mode
+            mock_ctx = MagicMock()
+            mock_tracker = MagicMock()
+            mock_ctx.deps.file_tracker = mock_tracker
+            mock_ctx.deps.agent_mode = AgentType.RESEARCH
+
+            result = await delete_file(mock_ctx, "research/notes.md")
+
+            assert result == "Successfully deleted research/notes.md"
+            assert not nested_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_delete_file_export_agent_cannot_delete_protected():
+    """Test that export agent cannot delete protected files."""
+    from shotgun.agents.models import AgentType
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create protected file
+            protected_file = shotgun_dir / "research.md"
+            protected_file.write_text("protected content", encoding="utf-8")
+
+            # Create mock context with EXPORT agent mode
+            mock_ctx = MagicMock()
+            mock_ctx.deps.file_tracker = MagicMock()
+            mock_ctx.deps.agent_mode = AgentType.EXPORT
+
+            result = await delete_file(mock_ctx, "research.md")
+
+            assert "Error deleting file" in result
+            assert "protected file" in result.lower()
+            # File should still exist
+            assert protected_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_delete_file_export_agent_can_delete_unprotected():
+    """Test that export agent can delete non-protected files."""
+    from shotgun.agents.models import AgentType
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with patch(
+            "shotgun.agents.tools.file_management.get_shotgun_base_path"
+        ) as mock_base:
+            shotgun_dir = Path(temp_dir) / ".shotgun"
+            shotgun_dir.mkdir()
+            mock_base.return_value = shotgun_dir
+
+            # Create non-protected file
+            other_file = shotgun_dir / "output.txt"
+            other_file.write_text("output content", encoding="utf-8")
+
+            # Create mock context with EXPORT agent mode
+            mock_ctx = MagicMock()
+            mock_tracker = MagicMock()
+            mock_ctx.deps.file_tracker = mock_tracker
+            mock_ctx.deps.agent_mode = AgentType.EXPORT
+
+            result = await delete_file(mock_ctx, "output.txt")
+
+            assert result == "Successfully deleted output.txt"
+            assert not other_file.exists()
