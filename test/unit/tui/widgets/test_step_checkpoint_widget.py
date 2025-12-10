@@ -89,10 +89,10 @@ async def test_checkpoint_widget_has_three_buttons_with_next_step(
         assert "btn-stop" in button_ids
 
 
-async def test_checkpoint_widget_has_two_buttons_without_next_step(
+async def test_checkpoint_widget_has_done_button_without_next_step(
     completed_step: ExecutionStep,
 ) -> None:
-    """Test that Continue button is hidden when there's no next step."""
+    """Test that only Done button is shown when plan is complete (no next step)."""
     from textual.app import App
 
     class TestApp(App):
@@ -102,13 +102,14 @@ async def test_checkpoint_widget_has_two_buttons_without_next_step(
     async with TestApp().run_test() as pilot:
         # Query for buttons
         buttons = pilot.app.query("Button")
-        assert len(buttons) == 2
+        assert len(buttons) == 1
 
-        # Verify button IDs - Continue should be missing
+        # Verify only Done button is present
         button_ids = {btn.id for btn in buttons}
+        assert "btn-done" in button_ids
         assert "btn-continue" not in button_ids
-        assert "btn-modify" in button_ids
-        assert "btn-stop" in button_ids
+        assert "btn-modify" not in button_ids
+        assert "btn-stop" not in button_ids
 
 
 async def test_continue_button_posts_checkpoint_continue_message(
@@ -279,10 +280,10 @@ async def test_keyboard_shortcut_escape_posts_stop(
         assert isinstance(messages_received[0], CheckpointStop)
 
 
-async def test_keyboard_c_does_not_continue_without_next_step(
+async def test_keyboard_c_dismisses_when_plan_complete(
     completed_step: ExecutionStep,
 ) -> None:
-    """Test that 'c' doesn't trigger continue when there's no next step."""
+    """Test that 'c' dismisses (posts CheckpointStop) when plan is complete."""
     from textual.app import App
 
     messages_received: list = []
@@ -291,12 +292,37 @@ async def test_keyboard_c_does_not_continue_without_next_step(
         def compose(self):
             yield StepCheckpointWidget(completed_step, next_step=None)
 
-        def on_checkpoint_continue(self, event: CheckpointContinue) -> None:
+        def on_checkpoint_stop(self, event: CheckpointStop) -> None:
             messages_received.append(event)
 
     async with TestApp().run_test() as pilot:
         # Press 'c' key
         await pilot.press("c")
 
-        # Verify no message was posted (no next step to continue to)
-        assert len(messages_received) == 0
+        # Verify CheckpointStop was posted (dismisses the widget)
+        assert len(messages_received) == 1
+        assert isinstance(messages_received[0], CheckpointStop)
+
+
+async def test_done_button_posts_checkpoint_stop_message(
+    completed_step: ExecutionStep,
+) -> None:
+    """Test that clicking Done button posts CheckpointStop message."""
+    from textual.app import App
+
+    messages_received: list = []
+
+    class TestApp(App):
+        def compose(self):
+            yield StepCheckpointWidget(completed_step, next_step=None)
+
+        def on_checkpoint_stop(self, event: CheckpointStop) -> None:
+            messages_received.append(event)
+
+    async with TestApp().run_test() as pilot:
+        # Click the Done button
+        await pilot.click("#btn-done")
+
+        # Verify message was posted
+        assert len(messages_received) == 1
+        assert isinstance(messages_received[0], CheckpointStop)
