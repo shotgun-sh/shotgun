@@ -152,6 +152,12 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing --cov-report=html --cov-branch"
 testpaths = ["test"]
+asyncio_mode = "auto"
+markers = [
+    "smoke: Quick sanity tests for local development (1 per major module)",
+    "slow: Tests that take a long time to run",
+    "integration: Integration tests requiring external dependencies",
+]
 
 [tool.coverage.run]
 source = ["src"]

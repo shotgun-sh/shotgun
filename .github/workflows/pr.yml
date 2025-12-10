@@ -46,7 +46,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  basic-pr-check:
+  # Linting and type checking (runs in parallel with tests)
+  lint-and-typecheck:
     runs-on: ubuntu-latest
 
     steps:
@@ -62,27 +63,173 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-extras
-        
+
       - name: Run ruff
         run: uv run ruff check src/
-        
+
       - name: Run ruff format check
         run: uv run ruff format --check src/
-        
+
       - name: Run mypy
         run: uv run mypy src/
-        
-      - name: Run unit tests with coverage
-        run: uv run pytest test/unit/ --cov=src --cov-report= --cov-append
+
+  # Test Group 1: Config, conversation, history, and agents (medium load)
+  test-group-1:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ''
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run tests - Config, History & Agents
+        run: |
+          uv run pytest \
+            test/unit/test_config*.py \
+            test/unit/test_conversation*.py \
+            test/unit/test_history*.py \
+            test/unit/agents/ \
+            --cov=src --cov-report= -q
+          # Note: test_config*.py includes test_config_manager.py and test_config_migrations.py
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-group-1
+          path: .coverage
+          include-hidden-files: true
+
+  # Test Group 2: Codebase, LLM proxy, Web (heavy load - Kuzu database)
+  test-group-2:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ''
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run tests - Codebase, LLM Proxy & Web
+        run: |
+          uv run pytest \
+            test/unit/codebase/ \
+            test/unit/llm_proxy/ \
+            test/unit/shotgun_web/ \
+            test/unit/test_web_search.py \
+            --cov=src --cov-report= -q
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-group-2
+          path: .coverage
+          include-hidden-files: true
+
+  # Test Group 3: CLI, TUI, exceptions & utilities (light load)
+  test-group-3:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ''
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run tests - CLI, TUI & Utilities
+        run: |
+          uv run pytest \
+            test/unit/cli/ \
+            test/unit/tui/ \
+            test/unit/exceptions/ \
+            test/unit/test_common.py \
+            test/unit/test_file_management.py \
+            test/unit/test_file_system_utils.py \
+            test/unit/test_logging_config.py \
+            test/unit/test_marketing.py \
+            test/unit/test_posthog_telemetry.py \
+            test/unit/test_provider.py \
+            test/unit/test_sentry_filtering.py \
+            test/unit/test_settings.py \
+            test/unit/test_streaming_detection.py \
+            test/unit/test_update_checker.py \
+            test/unit/test_agent_manager_filtering.py \
+            --cov=src --cov-report= -q
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-group-3
+          path: .coverage
+          include-hidden-files: true
+
+  # Combine coverage from all test groups
+  coverage-report:
+    runs-on: ubuntu-latest
+    needs: [test-group-1, test-group-2, test-group-3]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ''
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-group-*
+          merge-multiple: false
+
+      - name: Combine coverage data
+        run: |
+          # Move coverage files with unique names
+          mv coverage-group-1/.coverage .coverage.group1
+          mv coverage-group-2/.coverage .coverage.group2
+          mv coverage-group-3/.coverage .coverage.group3
+
+          # Combine all coverage data
+          uv run coverage combine
 
       - name: Generate coverage reports
         run: |
           uv run coverage report --show-missing
           uv run coverage xml
-        
+
       - name: Check core coverage (${{ env.COVERAGE_THRESHOLD }}% minimum, excluding CLI/TUI)
         run: |
-          # Use combined coverage data from both unit and integration tests
+          # Use combined coverage data from all test groups
           # excluding CLI and TUI directories
           echo "Checking combined coverage for core functionality (excluding CLI/TUI)..."
 
@@ -386,14 +533,18 @@ jobs:
 
   all-checks-passed:
     runs-on: ubuntu-latest
-    needs: [validate-pr-title, basic-pr-check, test-cli-basics, check-permissions, test-cli-commands, secret-scanning, docker-build-test]
+    needs: [validate-pr-title, lint-and-typecheck, test-group-1, test-group-2, test-group-3, coverage-report, test-cli-basics, check-permissions, test-cli-commands, secret-scanning, docker-build-test]
     if: always()
 
     steps:
       - name: Check job results
         run: |
           echo "validate-pr-title: ${{ needs.validate-pr-title.result }}"
-          echo "basic-pr-check: ${{ needs.basic-pr-check.result }}"
+          echo "lint-and-typecheck: ${{ needs.lint-and-typecheck.result }}"
+          echo "test-group-1: ${{ needs.test-group-1.result }}"
+          echo "test-group-2: ${{ needs.test-group-2.result }}"
+          echo "test-group-3: ${{ needs.test-group-3.result }}"
+          echo "coverage-report: ${{ needs.coverage-report.result }}"
           echo "test-cli-basics: ${{ needs.test-cli-basics.result }}"
           echo "check-permissions: ${{ needs.check-permissions.result }}"
           echo "test-cli-commands: ${{ needs.test-cli-commands.result }}"
@@ -402,7 +553,11 @@ jobs:
 
           # Required jobs that must always succeed
           if [[ "${{ needs.validate-pr-title.result }}" != "success" || \
-                "${{ needs.basic-pr-check.result }}" != "success" || \
+                "${{ needs.lint-and-typecheck.result }}" != "success" || \
+                "${{ needs.test-group-1.result }}" != "success" || \
+                "${{ needs.test-group-2.result }}" != "success" || \
+                "${{ needs.test-group-3.result }}" != "success" || \
+                "${{ needs.coverage-report.result }}" != "success" || \
                 "${{ needs.test-cli-basics.result }}" != "success" || \
                 "${{ needs.check-permissions.result }}" != "success" || \
                 "${{ needs.secret-scanning.result }}" != "success" || \
