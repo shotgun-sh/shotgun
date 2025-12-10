@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pydantic_ai import RunContext
+from pydantic_ai.tools import ToolDefinition
 
 from shotgun.agents.export import create_export_agent, run_export_agent
 from shotgun.agents.models import (
@@ -25,6 +26,7 @@ from shotgun.agents.router.models import (
     DelegationInput,
     DelegationResult,
     RouterDeps,
+    RouterMode,
     SubAgentCacheEntry,
 )
 from shotgun.agents.specify import create_specify_agent, run_specify_agent
@@ -33,6 +35,49 @@ from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# =============================================================================
+# Tool Preparation (Conditional Availability)
+# =============================================================================
+
+
+async def prepare_delegation_tool(
+    ctx: RunContext[RouterDeps], tool_def: ToolDefinition
+) -> ToolDefinition | None:
+    """Prepare function to conditionally show delegation tools.
+
+    In Planning mode, delegation tools are ONLY available when:
+    1. A plan exists (current_plan is not None)
+    2. The plan has been approved (pending_approval is None)
+
+    In Drafting mode, delegation tools are always available.
+
+    Args:
+        ctx: RunContext with RouterDeps containing plan state.
+        tool_def: The tool definition to conditionally return.
+
+    Returns:
+        The tool_def if delegation is allowed, None to hide the tool.
+    """
+    deps = ctx.deps
+
+    # Drafting mode - tools always available
+    if deps.router_mode == RouterMode.DRAFTING:
+        return tool_def
+
+    # Planning mode - check plan state
+    if deps.current_plan is None:
+        logger.debug("Hiding %s: no plan exists in Planning mode", tool_def.name)
+        return None
+
+    if deps.pending_approval is not None:
+        logger.debug("Hiding %s: plan pending user approval", tool_def.name)
+        return None
+
+    # Plan exists and is approved - allow delegation
+    return tool_def
+
 
 # Type aliases for factory functions
 CreateAgentFn = Callable[
@@ -167,6 +212,7 @@ async def _run_sub_agent(
     """Run a sub-agent with the given task.
 
     This helper function handles:
+    - Checking for pending approval (blocks delegation until user approves)
     - Getting or creating the sub-agent from cache
     - Setting up SubAgentContext
     - Managing active_sub_agent state for UI updates
@@ -183,6 +229,10 @@ async def _run_sub_agent(
         DelegationResult with success/failure status, response, and files_modified.
     """
     deps = ctx.deps
+
+    # Note: Delegation checks are now handled by prepare_delegation_tool which
+    # hides delegation tools entirely when delegation isn't allowed. This is a
+    # cleaner approach than returning errors - the LLM simply won't see the tools.
 
     # Build the prompt with context hint if provided
     prompt = task
@@ -220,7 +270,7 @@ async def _run_sub_agent(
             # Run sub-agent with isolated message history and streaming support
             result = await run_fn(
                 agent=agent,
-                query=prompt,  # Most agents use 'query' parameter
+                prompt=prompt,
                 deps=sub_agent_deps,
                 message_history=[],  # Isolated context
                 event_stream_handler=deps.parent_stream_handler,  # Forward streaming

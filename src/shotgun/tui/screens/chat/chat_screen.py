@@ -1983,12 +1983,22 @@ class ChatScreen(Screen[None]):
         this shows the PlanApprovalWidget to let the user decide
         whether to proceed or clarify.
         """
+        logger.debug(
+            "[PLAN] handle_plan_approval_required - plan=%s",
+            f"'{event.plan.goal}' with {len(event.plan.steps)} steps",
+        )
         if not isinstance(self.deps, RouterDeps):
+            logger.debug("[PLAN] Not RouterDeps, skipping approval widget")
             return
         if self.deps.router_mode != RouterMode.PLANNING:
+            logger.debug(
+                "[PLAN] Not in PLANNING mode (%s), skipping approval widget",
+                self.deps.router_mode,
+            )
             return
 
         # Show approval widget
+        logger.debug("[PLAN] Showing approval widget")
         self._show_approval_widget(event.plan)
 
     @on(PlanApproved)
@@ -2055,15 +2065,24 @@ class ChatScreen(Screen[None]):
         This is called after each agent run to check if create_plan
         set a pending approval in Planning mode.
         """
+        logger.debug("[PLAN] _check_pending_approval called")
         if not isinstance(self.deps, RouterDeps):
+            logger.debug("[PLAN] Not RouterDeps, skipping pending approval check")
             return
 
         if self.deps.pending_approval is None:
+            logger.debug("[PLAN] No pending approval")
             return
 
         # Extract approval data and clear the pending state
         approval = self.deps.pending_approval
         self.deps.pending_approval = None
+
+        logger.debug(
+            "[PLAN] Found pending approval for plan: '%s' with %d steps",
+            approval.plan.goal,
+            len(approval.plan.steps),
+        )
 
         # Post the PlanApprovalRequired message to trigger the approval UI
         self.post_message(PlanApprovalRequired(plan=approval.plan))
@@ -2121,4 +2140,8 @@ class ChatScreen(Screen[None]):
         Args:
             plan: The updated plan or None if plan was cleared.
         """
+        logger.debug(
+            "[PLAN] _on_plan_changed called - plan=%s",
+            f"'{plan.goal}' with {len(plan.steps)} steps" if plan else "None",
+        )
         self.post_message(PlanUpdated(plan))

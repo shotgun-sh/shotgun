@@ -65,16 +65,16 @@ async def create_research_agent(
 
 async def run_research_agent(
     agent: ShotgunAgent,
-    query: str,
+    prompt: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
     event_stream_handler: EventStreamHandler | None = None,
 ) -> AgentRunResult[AgentResponse]:
-    """Perform research on the given query and update research artifacts.
+    """Perform research on the given prompt and update research artifacts.
 
     Args:
         agent: The configured research agent
-        query: The research query to investigate
+        prompt: The research prompt to investigate
         deps: Agent dependencies
         message_history: Optional message history for conversation continuity
         event_stream_handler: Optional callback for streaming events
@@ -82,7 +82,7 @@ async def run_research_agent(
     Returns:
         Summary of research findings
     """
-    logger.debug("🔬 Starting research for query: %s", query)
+    logger.debug("🔬 Starting research for prompt: %s", prompt)
 
     message_history = await add_system_status_message(deps, message_history)
 
@@ -92,7 +92,7 @@ async def run_research_agent(
 
         result = await run_agent(
             agent=agent,
-            prompt=query,
+            prompt=prompt,
             deps=deps,
             message_history=message_history,
             usage_limits=usage_limits,

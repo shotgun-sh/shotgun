@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic_ai import RunContext
 from pydantic_ai.agent import AgentRunResult
+from pydantic_ai.tools import ToolDefinition
 
 from shotgun.agents.models import (
     AgentResponse,
@@ -18,6 +19,7 @@ from shotgun.agents.router.models import (
     DelegationResult,
     ExecutionPlan,
     ExecutionStep,
+    PendingApproval,
     RouterDeps,
     RouterMode,
 )
@@ -32,14 +34,20 @@ from shotgun.agents.router.tools.delegation_tools import (
     delegate_to_research,
     delegate_to_specification,
     delegate_to_tasks,
+    prepare_delegation_tool,
 )
 
 
 @pytest.fixture
 def mock_router_deps():
-    """Create mock RouterDeps for testing."""
+    """Create mock RouterDeps for testing.
+
+    Uses DRAFTING mode by default to allow delegation without a plan.
+    Tests that verify Planning mode behavior should explicitly set
+    router_mode = RouterMode.PLANNING.
+    """
     deps = MagicMock(spec=RouterDeps)
-    deps.router_mode = RouterMode.PLANNING
+    deps.router_mode = RouterMode.DRAFTING  # Default to drafting to allow delegation
     deps.current_plan = None
     deps.file_tracker = FileOperationTracker()
     deps.active_sub_agent = None
@@ -51,6 +59,7 @@ def mock_router_deps():
     deps.queue = Queue()  # Must be a Queue instance
     deps.tasks = []
     deps.parent_stream_handler = None  # For streaming support
+    deps.pending_approval = None  # No pending approval by default
     return deps
 
 
@@ -264,6 +273,68 @@ async def test_run_sub_agent_success(mock_context, mock_agent_result):
     assert result.error is None
     # active_sub_agent should be cleared after completion
     assert mock_context.deps.active_sub_agent is None
+
+
+@pytest.mark.asyncio
+async def test_prepare_delegation_tool_hidden_when_no_plan_in_planning_mode(
+    mock_context,
+):
+    """Test that delegation tools are hidden in Planning mode when no plan exists."""
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.current_plan = None
+    mock_context.deps.pending_approval = None
+
+    tool_def = ToolDefinition(name="delegate_to_research")
+
+    # Tool should be hidden (prepare returns None)
+    result = await prepare_delegation_tool(mock_context, tool_def)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_prepare_delegation_tool_hidden_when_pending_approval(
+    mock_context, sample_plan
+):
+    """Test that delegation tools are hidden when pending approval is set."""
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.pending_approval = PendingApproval(plan=sample_plan)
+
+    tool_def = ToolDefinition(name="delegate_to_research")
+
+    # Tool should be hidden (prepare returns None)
+    result = await prepare_delegation_tool(mock_context, tool_def)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_prepare_delegation_tool_visible_when_plan_approved(
+    mock_context, sample_plan
+):
+    """Test that delegation tools are visible when plan is approved."""
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.pending_approval = None  # Approved
+
+    tool_def = ToolDefinition(name="delegate_to_research")
+
+    # Tool should be visible (prepare returns tool_def)
+    result = await prepare_delegation_tool(mock_context, tool_def)
+    assert result is tool_def
+
+
+@pytest.mark.asyncio
+async def test_prepare_delegation_tool_always_visible_in_drafting_mode(mock_context):
+    """Test that delegation tools are always visible in Drafting mode."""
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+    mock_context.deps.current_plan = None  # No plan
+    mock_context.deps.pending_approval = None
+
+    tool_def = ToolDefinition(name="delegate_to_research")
+
+    # Tool should be visible in Drafting mode regardless of plan state
+    result = await prepare_delegation_tool(mock_context, tool_def)
+    assert result is tool_def
 
 
 @pytest.mark.asyncio

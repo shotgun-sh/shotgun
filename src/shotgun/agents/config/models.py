@@ -226,6 +226,18 @@ class ShotgunAccountConfig(BaseModel):
         default=None, description="Default workspace ID for shared specs"
     )
 
+    @property
+    def has_valid_account(self) -> bool:
+        """Check if the user has a valid Shotgun Account configured.
+
+        Returns:
+            True if api_key is set and non-empty, False otherwise
+        """
+        if self.api_key is None:
+            return False
+        value = self.api_key.get_secret_value()
+        return bool(value and value.strip())
+
 
 class MarketingMessageRecord(BaseModel):
     """Record of when a marketing message was shown to the user."""

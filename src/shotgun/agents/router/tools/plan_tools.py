@@ -109,6 +109,16 @@ async def create_plan(
 
     _notify_plan_changed(ctx.deps)
 
+    # Return different message based on whether approval is needed
+    if ctx.deps.pending_approval is not None:
+        return ToolResult(
+            success=True,
+            message=f"Created plan with {len(steps)} steps. Goal: {input.goal}\n\n"
+            "IMPORTANT: This plan requires user approval before execution. "
+            "You MUST call final_result NOW to present this plan to the user. "
+            "Do NOT attempt to delegate or execute any steps yet.",
+        )
+
     return ToolResult(
         success=True,
         message=f"Created plan with {len(steps)} steps. Goal: {input.goal}",
@@ -160,7 +170,9 @@ async def mark_step_done(
             # Set pending checkpoint for Planning mode
             # The TUI will detect this and show the StepCheckpointWidget
             elif ctx.deps.router_mode == RouterMode.PLANNING:
-                next_step = plan.next_step()
+                # Use current_step() since the while loop above already advanced
+                # current_step_index to the next incomplete step
+                next_step = plan.current_step()
                 ctx.deps.pending_checkpoint = PendingCheckpoint(
                     completed_step=step, next_step=next_step
                 )

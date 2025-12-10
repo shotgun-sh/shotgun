@@ -134,8 +134,10 @@ async def test_router_planning_mode_creates_checkpoints(run_context):
     assert run_context.deps.pending_checkpoint is not None
     checkpoint = run_context.deps.pending_checkpoint
     assert checkpoint.completed_step.id == "step-1"
+    # After marking step-1 done, current_step_index advances to 1 (step-2)
+    # So current_step() returns step-2 as the next step to execute
     assert checkpoint.next_step is not None
-    assert checkpoint.next_step.id == "step-3"
+    assert checkpoint.next_step.id == "step-2"
 
 
 @pytest.mark.asyncio
@@ -186,10 +188,14 @@ async def test_router_drafting_mode_skips_checkpoints(run_context):
 
 @pytest.mark.asyncio
 async def test_is_executing_flag_lifecycle_single_step(run_context):
-    """is_executing flag is set correctly for single-step plans."""
+    """is_executing flag is set correctly for single-step plans.
+
+    All plans require approval in Planning mode - even single-step plans.
+    User must approve before execution begins.
+    """
     run_context.deps.router_mode = RouterMode.PLANNING
 
-    # Create single-step plan (auto-approved)
+    # Create single-step plan - now requires approval like multi-step
     input_data = CreatePlanInput(
         goal="Simple task",
         steps=[
@@ -199,8 +205,13 @@ async def test_is_executing_flag_lifecycle_single_step(run_context):
 
     await create_plan(run_context, input_data)
 
-    # Single-step plans start executing immediately
-    assert run_context.deps.is_executing is True
+    # All plans require approval - not executing until approved
+    assert run_context.deps.is_executing is False
+    assert run_context.deps.pending_approval is not None
+
+    # Simulate user approval
+    run_context.deps.pending_approval = None
+    run_context.deps.is_executing = True
 
     # Complete the step
     await mark_step_done(run_context, MarkStepDoneInput(step_id="step-1"))

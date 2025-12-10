@@ -44,9 +44,8 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
     # Check if using Shotgun Account
     config_manager = get_config_manager()
     config = await config_manager.load()
-    has_shotgun_key = config.shotgun.api_key is not None
 
-    if has_shotgun_key:
+    if config.shotgun.has_valid_account:
         logger.debug("🔑 Shotgun Account - only Gemini web search available")
 
         # Gemini: Only search tool available for Shotgun Account

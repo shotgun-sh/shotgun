@@ -33,6 +33,7 @@ def mock_router_deps():
     deps.current_plan = None
     deps.file_tracker = FileOperationTracker()
     deps.pending_checkpoint = None
+    deps.pending_approval = None  # No pending approval by default
     deps.on_plan_changed = None  # Plan panel callback (Stage 11)
     return deps
 
@@ -337,10 +338,9 @@ async def test_mark_step_done_sets_pending_checkpoint_in_planning_mode(
     assert checkpoint is not None
     assert checkpoint.completed_step.id == "step-1"
     # After marking step-1 done, current_step_index advances to 1 (step-2)
-    # So next_step() returns the step at index 2 (step-3)
+    # So current_step() returns step-2 as the next step to execute
     assert checkpoint.next_step is not None
-    # The next step is the one after the current step (which is now step-2)
-    assert checkpoint.next_step.id == "step-3"
+    assert checkpoint.next_step.id == "step-2"
 
 
 @pytest.mark.asyncio
@@ -387,9 +387,15 @@ async def test_mark_step_done_skips_checkpoint_in_drafting_mode(
 
 
 @pytest.mark.asyncio
-async def test_create_plan_sets_is_executing_for_single_step(mock_context):
-    """Test that creating a single-step plan sets is_executing=True."""
+async def test_create_plan_sets_pending_approval_for_single_step(mock_context):
+    """Test that creating a single-step plan in Planning mode requires approval.
+
+    All plans require approval in Planning mode - user should always see
+    the plan before execution begins, even for simple tasks.
+    """
+    mock_context.deps.router_mode = RouterMode.PLANNING
     mock_context.deps.is_executing = False
+    mock_context.deps.pending_approval = None
 
     input_data = CreatePlanInput(
         goal="Simple task",
@@ -400,8 +406,9 @@ async def test_create_plan_sets_is_executing_for_single_step(mock_context):
 
     await create_plan(mock_context, input_data)
 
-    # Single-step plans skip approval and start executing immediately
-    assert mock_context.deps.is_executing is True
+    # All plans require approval in Planning mode - not executing yet
+    assert mock_context.deps.is_executing is False
+    assert mock_context.deps.pending_approval is not None
 
 
 @pytest.mark.asyncio

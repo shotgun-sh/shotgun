@@ -51,16 +51,16 @@ async def create_plan_agent(
 
 async def run_plan_agent(
     agent: ShotgunAgent,
-    goal: str,
+    prompt: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
     event_stream_handler: EventStreamHandler | None = None,
 ) -> AgentRunResult[AgentResponse]:
-    """Create or update a plan based on the given goal using artifacts.
+    """Create or update a plan based on the given prompt using artifacts.
 
     Args:
         agent: The configured plan agent
-        goal: The planning goal or instruction
+        prompt: The planning prompt or instruction
         deps: Agent dependencies
         message_history: Optional message history for conversation continuity
         event_stream_handler: Optional callback for streaming events
@@ -68,10 +68,7 @@ async def run_plan_agent(
     Returns:
         AgentRunResult containing the planning process output
     """
-    logger.debug("📋 Starting planning for goal: %s", goal)
-
-    # Simple prompt - the agent system prompt has all the artifact instructions
-    full_prompt = f"Create a comprehensive plan for: {goal}"
+    logger.debug("📋 Starting planning for prompt: %s", prompt)
 
     try:
         # Create usage limits for responsible API usage
@@ -81,7 +78,7 @@ async def run_plan_agent(
 
         result = await run_agent(
             agent=agent,
-            prompt=full_prompt,
+            prompt=prompt,
             deps=deps,
             message_history=message_history,
             usage_limits=usage_limits,

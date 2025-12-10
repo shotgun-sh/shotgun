@@ -17,7 +17,12 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import ProviderType, get_provider_model
-from shotgun.agents.models import AgentResponse, AgentType, ShotgunAgent
+from shotgun.agents.models import (
+    AgentResponse,
+    AgentSystemPromptContext,
+    AgentType,
+    ShotgunAgent,
+)
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
@@ -73,14 +78,18 @@ async def add_system_status_message(
     # Get current datetime with timezone information
     dt_context = get_datetime_context()
 
-    # Get execution plan if this is the Router agent
+    # Get execution plan and pending approval state if this is the Router agent
     execution_plan = None
+    pending_approval = False
     if deps.agent_mode == AgentType.ROUTER:
         # Import here to avoid circular imports
         from shotgun.agents.router.models import RouterDeps
 
-        if isinstance(deps, RouterDeps) and deps.current_plan is not None:
-            execution_plan = deps.current_plan.format_for_display()
+        if isinstance(deps, RouterDeps):
+            if deps.current_plan is not None:
+                execution_plan = deps.current_plan.format_for_display()
+            # Check if plan is pending approval (multi-step plan in Planning mode)
+            pending_approval = deps.pending_approval is not None
 
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
@@ -92,6 +101,7 @@ async def add_system_status_message(
         timezone_name=dt_context.timezone_name,
         utc_offset=dt_context.utc_offset,
         execution_plan=execution_plan,
+        pending_approval=pending_approval,
     )
 
     message_history.append(
@@ -414,11 +424,24 @@ def build_agent_system_prompt(
         logger.debug("🔧 Building research agent system prompt...")
         logger.debug("Interactive mode: %s", ctx.deps.interactive_mode)
 
-    result = prompt_loader.render(
-        f"agents/{agent_type}.j2",
+    # Build template context using Pydantic model for type safety and testability
+    # Import here to avoid circular imports (same pattern as add_system_status_message)
+    from shotgun.agents.router.models import RouterDeps
+
+    router_mode = None
+    if isinstance(ctx.deps, RouterDeps):
+        router_mode = ctx.deps.router_mode.value
+
+    template_context = AgentSystemPromptContext(
         interactive_mode=ctx.deps.interactive_mode,
         mode=agent_type,
         sub_agent_context=ctx.deps.sub_agent_context,
+        router_mode=router_mode,
+    )
+
+    result = prompt_loader.render(
+        f"agents/{agent_type}.j2",
+        **template_context.model_dump(),
     )
 
     if agent_type == "research":

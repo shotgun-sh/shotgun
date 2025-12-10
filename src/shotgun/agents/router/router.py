@@ -7,7 +7,7 @@ sub-agents (Research, Specify, Plan, Tasks, Export) based on user intent.
 import traceback
 from functools import partial
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, Tool
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
 
@@ -24,13 +24,16 @@ from shotgun.agents.router.models import RouterDeps
 from shotgun.agents.router.tools import (
     add_step,
     create_plan,
+    mark_step_done,
+    remove_step,
+)
+from shotgun.agents.router.tools.delegation_tools import (
     delegate_to_export,
     delegate_to_plan,
     delegate_to_research,
     delegate_to_specification,
     delegate_to_tasks,
-    mark_step_done,
-    remove_step,
+    prepare_delegation_tool,
 )
 from shotgun.agents.tools import read_file
 from shotgun.logging_config import get_logger
@@ -99,7 +102,17 @@ async def create_router_agent(
         ctx = ProcessorContext(deps)
         return await token_limit_compactor(ctx, messages)  # type: ignore[arg-type]
 
-    # Create the agent
+    # Delegation tools with prepare function - only visible after plan is approved
+    # in Planning mode, always available in Drafting mode
+    delegation_tools = [
+        Tool(delegate_to_research, prepare=prepare_delegation_tool),
+        Tool(delegate_to_specification, prepare=prepare_delegation_tool),
+        Tool(delegate_to_plan, prepare=prepare_delegation_tool),
+        Tool(delegate_to_tasks, prepare=prepare_delegation_tool),
+        Tool(delegate_to_export, prepare=prepare_delegation_tool),
+    ]
+
+    # Create the agent with delegation tools that have prepare functions
     agent: Agent[RouterDeps, AgentResponse] = Agent(
         model,
         output_type=AgentResponse,
@@ -107,20 +120,14 @@ async def create_router_agent(
         instrument=True,
         history_processors=[history_processor],
         retries=3,
+        tools=delegation_tools,
     )
 
-    # Register plan management tools (router-specific)
+    # Register plan management tools (router-specific, always available)
     agent.tool(create_plan)
     agent.tool(mark_step_done)
     agent.tool(add_step)
     agent.tool(remove_step)
-
-    # Register delegation tools (router orchestrates sub-agents)
-    agent.tool(delegate_to_research)
-    agent.tool(delegate_to_specification)
-    agent.tool(delegate_to_plan)
-    agent.tool(delegate_to_tasks)
-    agent.tool(delegate_to_export)
 
     # Register read-only file access for .shotgun/ directory
     agent.tool(read_file)

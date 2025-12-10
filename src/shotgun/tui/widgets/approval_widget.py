@@ -6,7 +6,7 @@ allowing the user to approve or reject the plan before execution begins.
 
 from textual import events, on
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widget import Widget
 from textual.widgets import Button, Static
@@ -32,12 +32,19 @@ class PlanApprovalWidget(Widget):
         PlanApprovalWidget {
             background: $secondary-background-darken-1;
             height: auto;
-            margin: 1;
+            max-height: 20;
+            margin: 0 1;
             padding: 1;
         }
 
         PlanApprovalWidget .approval-header {
-            margin-bottom: 1;
+            height: auto;
+        }
+
+        PlanApprovalWidget .plan-content {
+            height: auto;
+            max-height: 12;
+            margin: 1 0;
         }
 
         PlanApprovalWidget .plan-goal {
@@ -57,7 +64,7 @@ class PlanApprovalWidget(Widget):
         PlanApprovalWidget .approval-buttons {
             height: auto;
             width: 100%;
-            margin-top: 1;
+            dock: bottom;
         }
 
         PlanApprovalWidget Button {
@@ -91,21 +98,23 @@ class PlanApprovalWidget(Widget):
             classes="approval-header",
         )
 
-        # Goal
-        yield Static(
-            f"[dim]Goal:[/] {self.plan.goal}",
-            classes="plan-goal",
-        )
-
-        # Steps list
-        yield Static("[dim]Steps:[/]", classes="plan-steps-label")
-        for i, step in enumerate(self.plan.steps, 1):
+        # Scrollable content area for goal and steps
+        with VerticalScroll(classes="plan-content"):
+            # Goal
             yield Static(
-                f"{i}. {step.title}",
-                classes="step-item",
+                f"[dim]Goal:[/] {self.plan.goal}",
+                classes="plan-goal",
             )
 
-        # Action buttons
+            # Steps list
+            yield Static("[dim]Steps:[/]", classes="plan-steps-label")
+            for i, step in enumerate(self.plan.steps, 1):
+                yield Static(
+                    f"{i}. {step.title}",
+                    classes="step-item",
+                )
+
+        # Action buttons (always visible at bottom)
         with Horizontal(classes="approval-buttons"):
             yield Button("✓ Go Ahead", id="btn-approve")
             yield Button("✗ No, Let Me Clarify", id="btn-reject")
