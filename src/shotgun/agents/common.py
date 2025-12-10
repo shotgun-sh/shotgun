@@ -17,7 +17,12 @@ from pydantic_ai.messages import (
 )
 
 from shotgun.agents.config import ProviderType, get_provider_model
-from shotgun.agents.models import AgentResponse, AgentType, ShotgunAgent
+from shotgun.agents.models import (
+    AgentResponse,
+    AgentSystemPromptContext,
+    AgentType,
+    ShotgunAgent,
+)
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
@@ -419,23 +424,24 @@ def build_agent_system_prompt(
         logger.debug("🔧 Building research agent system prompt...")
         logger.debug("Interactive mode: %s", ctx.deps.interactive_mode)
 
-    # Build template context
-    template_context: dict[str, Any] = {
-        "interactive_mode": ctx.deps.interactive_mode,
-        "mode": agent_type,
-        "sub_agent_context": ctx.deps.sub_agent_context,
-    }
-
-    # Add router_mode for router agent
+    # Build template context using Pydantic model for type safety and testability
     # Import here to avoid circular imports (same pattern as add_system_status_message)
     from shotgun.agents.router.models import RouterDeps
 
+    router_mode = None
     if isinstance(ctx.deps, RouterDeps):
-        template_context["router_mode"] = ctx.deps.router_mode.value
+        router_mode = ctx.deps.router_mode.value
+
+    template_context = AgentSystemPromptContext(
+        interactive_mode=ctx.deps.interactive_mode,
+        mode=agent_type,
+        sub_agent_context=ctx.deps.sub_agent_context,
+        router_mode=router_mode,
+    )
 
     result = prompt_loader.render(
         f"agents/{agent_type}.j2",
-        **template_context,
+        **template_context.model_dump(),
     )
 
     if agent_type == "research":

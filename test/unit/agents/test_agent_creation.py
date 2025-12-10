@@ -381,10 +381,7 @@ async def test_run_specify_agent(
     # Check the call to run_agent
     call_kwargs = mock_run_agent.call_args[1]
     assert call_kwargs["agent"] == mock_agent
-    assert (
-        call_kwargs["prompt"]
-        == "test requirement"
-    )
+    assert call_kwargs["prompt"] == "test requirement"
     assert call_kwargs["deps"] == mock_agent_deps
 
 

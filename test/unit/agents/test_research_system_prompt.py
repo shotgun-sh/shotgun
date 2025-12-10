@@ -76,5 +76,6 @@ def test_research_system_prompt_template_loading():
             interactive_mode=True,
             mode="research",
             sub_agent_context=None,
+            router_mode=None,
         )
         assert result == "Test system prompt"

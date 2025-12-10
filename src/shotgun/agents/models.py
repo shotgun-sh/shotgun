@@ -46,6 +46,27 @@ class SubAgentContext(BaseModel):
     )
 
 
+class AgentSystemPromptContext(BaseModel):
+    """Context passed to agent system prompt templates.
+
+    This model standardizes the context variables passed to Jinja2 templates
+    when rendering agent system prompts. Using a model makes it easier to
+    test template context construction and ensures type safety.
+    """
+
+    interactive_mode: bool = Field(
+        description="Whether the agent is running in interactive mode"
+    )
+    mode: str = Field(description="The agent type (research, specify, plan, etc.)")
+    sub_agent_context: SubAgentContext | None = Field(
+        default=None, description="Context when running as a sub-agent of the router"
+    )
+    router_mode: str | None = Field(
+        default=None,
+        description="Router mode value (planning/drafting) if router agent",
+    )
+
+
 class AgentResponse(BaseModel):
     """Structured response from an agent with optional clarifying questions.
 

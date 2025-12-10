@@ -211,6 +211,7 @@ def test_build_agent_system_prompt_research_agent():
             interactive_mode=True,
             mode="research",
             sub_agent_context=None,
+            router_mode=None,
         )
 
 
@@ -235,6 +236,7 @@ def test_build_agent_system_prompt_custom_context():
             interactive_mode=False,
             mode="plan",
             sub_agent_context=None,
+            router_mode=None,
         )
 
 
@@ -259,6 +261,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
             interactive_mode=True,
             mode="unknown",
             sub_agent_context=None,
+            router_mode=None,
         )
 
 
