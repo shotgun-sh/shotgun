@@ -29,6 +29,7 @@ from shotgun.agents.router.models import (
 )
 from shotgun.agents.specify import create_specify_agent, run_specify_agent
 from shotgun.agents.tasks import create_tasks_agent, run_tasks_agent
+from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -296,6 +297,11 @@ async def _run_sub_agent(
 # =============================================================================
 
 
+@register_tool(
+    category=ToolCategory.DELEGATION,
+    display_text="Delegating to Research agent",
+    key_arg="task",
+)
 async def delegate_to_research(
     ctx: RunContext[RouterDeps],
     input: DelegationInput,
@@ -323,6 +329,11 @@ async def delegate_to_research(
     )
 
 
+@register_tool(
+    category=ToolCategory.DELEGATION,
+    display_text="Delegating to Specification agent",
+    key_arg="task",
+)
 async def delegate_to_specification(
     ctx: RunContext[RouterDeps],
     input: DelegationInput,
@@ -349,6 +360,11 @@ async def delegate_to_specification(
     )
 
 
+@register_tool(
+    category=ToolCategory.DELEGATION,
+    display_text="Delegating to Plan agent",
+    key_arg="task",
+)
 async def delegate_to_plan(
     ctx: RunContext[RouterDeps],
     input: DelegationInput,
@@ -375,6 +391,11 @@ async def delegate_to_plan(
     )
 
 
+@register_tool(
+    category=ToolCategory.DELEGATION,
+    display_text="Delegating to Tasks agent",
+    key_arg="task",
+)
 async def delegate_to_tasks(
     ctx: RunContext[RouterDeps],
     input: DelegationInput,
@@ -401,6 +422,11 @@ async def delegate_to_tasks(
     )
 
 
+@register_tool(
+    category=ToolCategory.DELEGATION,
+    display_text="Delegating to Export agent",
+    key_arg="task",
+)
 async def delegate_to_export(
     ctx: RunContext[RouterDeps],
     input: DelegationInput,
