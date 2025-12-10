@@ -10,12 +10,8 @@ BYOK: All tools work with direct provider API keys
 """
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
 
 from shotgun.agents.config import get_config_manager
-
-if TYPE_CHECKING:
-    from pydantic import SecretStr
 from shotgun.agents.config.models import ProviderType
 from shotgun.logging_config import get_logger
 
@@ -28,14 +24,6 @@ logger = get_logger(__name__)
 
 # Type alias for web search tools (all now async)
 WebSearchTool = Callable[[str], Awaitable[str]]
-
-
-def _has_api_key(secret: "SecretStr | None") -> bool:
-    """Check if a SecretStr has a non-empty value."""
-    if secret is None:
-        return False
-    value = secret.get_secret_value()
-    return bool(value and value.strip())
 
 
 async def get_available_web_search_tools() -> list[WebSearchTool]:
@@ -56,9 +44,8 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
     # Check if using Shotgun Account
     config_manager = get_config_manager()
     config = await config_manager.load()
-    has_shotgun_key = _has_api_key(config.shotgun.api_key)
 
-    if has_shotgun_key:
+    if config.shotgun.has_valid_account:
         logger.debug("🔑 Shotgun Account - only Gemini web search available")
 
         # Gemini: Only search tool available for Shotgun Account
