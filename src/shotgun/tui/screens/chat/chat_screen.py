@@ -448,6 +448,11 @@ class ChatScreen(Screen[None]):
         else:
             self.deps.router_mode = RouterMode.PLANNING
             mode_name = "Planning"
+            # Clear plan when switching back to Planning mode
+            # This forces the agent to create a new plan for the next request
+            self.deps.current_plan = None
+            self.deps.approval_status = PlanApprovalStatus.SKIPPED
+            self.deps.is_executing = False
 
         # Persist mode (fire-and-forget)
         self._save_router_mode(self.deps.router_mode.value)
@@ -919,6 +924,12 @@ class ChatScreen(Screen[None]):
 
         if has_file_write:
             return  # Skip context update for file writes
+
+        # Skip context updates when a sub-agent is streaming
+        # Sub-agents run with isolated message history, so their streaming doesn't
+        # represent the router's actual context usage
+        if isinstance(self.deps, RouterDeps) and self.deps.active_sub_agent is not None:
+            return  # Skip context update for sub-agent streaming
 
         # Throttle context indicator updates to improve performance during streaming
         # Only update at most once per 5 seconds to avoid excessive token calculations
@@ -2009,6 +2020,11 @@ class ChatScreen(Screen[None]):
         if isinstance(self.deps, RouterDeps):
             self.deps.approval_status = PlanApprovalStatus.APPROVED
             self.deps.is_executing = True
+
+            # Switch to Drafting mode when plan is approved
+            self.deps.router_mode = RouterMode.DRAFTING
+            self._save_router_mode(RouterMode.DRAFTING.value)
+            self.widget_coordinator.update_for_mode_change(self.mode)
 
             # Begin execution of the first step
             plan = self.deps.current_plan

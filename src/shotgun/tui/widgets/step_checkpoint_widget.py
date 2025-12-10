@@ -68,6 +68,10 @@ class StepCheckpointWidget(Widget):
         StepCheckpointWidget #btn-stop {
             background: $error;
         }
+
+        StepCheckpointWidget #btn-done {
+            background: $success;
+        }
     """
 
     def __init__(self, step: ExecutionStep, next_step: ExecutionStep | None) -> None:
@@ -83,43 +87,49 @@ class StepCheckpointWidget(Widget):
 
     def compose(self) -> ComposeResult:
         """Compose the checkpoint widget layout."""
-        # Header showing completed step
-        yield Static(
-            f"[bold green]✅ Step completed:[/] {self.step.title}",
-            classes="checkpoint-header",
-        )
-
-        # Preview next step if available
         if self.next_step:
+            # Mid-plan checkpoint: show step completed with next step preview
+            yield Static(
+                f"[bold green]✅ Step completed:[/] {self.step.title}",
+                classes="checkpoint-header",
+            )
             yield Static(
                 f"[dim]Next:[/] {self.next_step.title}",
                 classes="next-step-preview",
             )
+            with Horizontal(classes="checkpoint-buttons"):
+                yield Button("Continue", id="btn-continue")
+                yield Button("Modify plan", id="btn-modify")
+                yield Button("Stop here", id="btn-stop")
         else:
+            # Plan completed: show completion message with Done button only
             yield Static(
-                "[dim]This was the last step[/]",
+                "[bold green]✅ Plan completed![/]",
+                classes="checkpoint-header",
+            )
+            yield Static(
+                f"[dim]Final step:[/] {self.step.title}",
                 classes="next-step-preview",
             )
-
-        # Action buttons
-        with Horizontal(classes="checkpoint-buttons"):
-            if self.next_step:
-                yield Button("Continue", id="btn-continue")
-            yield Button("Modify plan", id="btn-modify")
-            yield Button("Stop here", id="btn-stop")
+            with Horizontal(classes="checkpoint-buttons"):
+                yield Button("Done", id="btn-done")
 
     def on_mount(self) -> None:
         """Auto-focus the appropriate button on mount."""
-        # Auto-focus Continue button if available, otherwise Modify
+        # Auto-focus Continue button if available, otherwise Done, then Modify
         try:
             continue_btn = self.query_one("#btn-continue", Button)
             continue_btn.focus()
         except NoMatches:
             try:
-                modify_btn = self.query_one("#btn-modify", Button)
-                modify_btn.focus()
+                done_btn = self.query_one("#btn-done", Button)
+                done_btn.focus()
             except NoMatches:
-                pass  # No buttons to focus
+                try:
+                    modify_btn = self.query_one("#btn-modify", Button)
+                    modify_btn.focus()
+                except NoMatches:
+                    pass  # No buttons to focus
 
     @on(Button.Pressed, "#btn-continue")
     def handle_continue(self) -> None:
@@ -136,21 +146,35 @@ class StepCheckpointWidget(Widget):
         """Handle Stop here button press."""
         self.post_message(CheckpointStop())
 
+    @on(Button.Pressed, "#btn-done")
+    def handle_done(self) -> None:
+        """Handle Done button press (plan completed)."""
+        self.post_message(CheckpointStop())
+
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard shortcuts for checkpoint actions.
 
         Shortcuts:
-            Enter/C: Continue to next step (if available)
-            M: Modify the plan
-            S/Escape: Stop execution
+            Enter/C: Continue to next step (if available), or Done (if plan complete)
+            M: Modify the plan (only if not complete)
+            S/Escape: Stop execution (only if not complete)
         """
         if event.key in ("enter", "c", "C"):
             if self.next_step:
                 self.post_message(CheckpointContinue())
-                event.stop()
+            else:
+                # Plan complete - Enter dismisses
+                self.post_message(CheckpointStop())
+            event.stop()
         elif event.key in ("m", "M"):
-            self.post_message(CheckpointModify())
-            event.stop()
+            if self.next_step:
+                self.post_message(CheckpointModify())
+                event.stop()
         elif event.key in ("s", "S", "escape"):
-            self.post_message(CheckpointStop())
-            event.stop()
+            if self.next_step:
+                self.post_message(CheckpointStop())
+                event.stop()
+            else:
+                # Plan complete - Escape also dismisses
+                self.post_message(CheckpointStop())
+                event.stop()
