@@ -426,8 +426,11 @@ def build_agent_system_prompt(
         "sub_agent_context": ctx.deps.sub_agent_context,
     }
 
-    # Add router_mode for router agent (RouterDeps has this attribute)
-    if hasattr(ctx.deps, "router_mode"):
+    # Add router_mode for router agent
+    # Import here to avoid circular imports (same pattern as add_system_status_message)
+    from shotgun.agents.router.models import RouterDeps
+
+    if isinstance(ctx.deps, RouterDeps):
         template_context["router_mode"] = ctx.deps.router_mode.value
 
     result = prompt_loader.render(
