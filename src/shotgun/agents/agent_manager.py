@@ -674,6 +674,11 @@ class AgentManager(Widget):
 
         deps.agent_mode = self._current_agent_type
 
+        # For router agent, set up the parent stream handler so sub-agents can stream
+        if self._current_agent_type == AgentType.ROUTER:
+            if isinstance(deps, RouterDeps):
+                deps.parent_stream_handler = self._handle_event_stream  # type: ignore[assignment]
+
         # Filter out system prompts from other agent types
         from pydantic_ai.messages import ModelRequestPart
 

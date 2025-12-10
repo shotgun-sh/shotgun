@@ -18,9 +18,10 @@ from .formatters import ToolFormatter
 class AgentResponseWidget(Widget):
     """Widget that displays agent responses in the chat history."""
 
-    def __init__(self, item: ModelResponse | None) -> None:
+    def __init__(self, item: ModelResponse | None, is_sub_agent: bool = False) -> None:
         super().__init__()
         self.item = item
+        self.is_sub_agent = is_sub_agent
 
     def compose(self) -> ComposeResult:
         self.display = self.item is not None
@@ -35,11 +36,14 @@ class AgentResponseWidget(Widget):
         if self.item is None:
             return ""
 
+        # Use different prefix for sub-agent responses
+        prefix = "**⏺** " if not self.is_sub_agent else "  **↳** "
+
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                # Only show the circle prefix if there's actual content
+                # Only show the prefix if there's actual content
                 if part.content and part.content.strip():
-                    acc += f"**⏺** {part.content}\n\n"
+                    acc += f"{prefix}{part.content}\n\n"
             elif isinstance(part, ToolCallPart):
                 parts_str = ToolFormatter.format_tool_call_part(part)
                 if parts_str:  # Only add if there's actual content
