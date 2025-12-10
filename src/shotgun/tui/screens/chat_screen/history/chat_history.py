@@ -8,10 +8,12 @@ from pydantic_ai.messages import (
     ModelResponse,
     UserPromptPart,
 )
+from textual import events
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widget import Widget
 
+from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.vertical_tail import VerticalTail
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessageWidget
 
@@ -113,3 +115,13 @@ class ChatHistory(Widget):
 
             # Scroll to bottom to show newly added messages
             self.vertical_tail.scroll_end(animate=False)
+
+    def on_click(self, event: events.Click) -> None:
+        """Focus the prompt input when clicking on the history area."""
+        # Only handle clicks that weren't already handled by a child widget
+        if event.button == 1:  # Left click
+            results = self.screen.query(PromptInput)
+            if results:
+                prompt_input = results.first()
+                if prompt_input.display:
+                    prompt_input.focus()
