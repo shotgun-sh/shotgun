@@ -134,8 +134,10 @@ async def test_router_planning_mode_creates_checkpoints(run_context):
     assert run_context.deps.pending_checkpoint is not None
     checkpoint = run_context.deps.pending_checkpoint
     assert checkpoint.completed_step.id == "step-1"
+    # After marking step-1 done, current_step_index advances to 1 (step-2)
+    # So current_step() returns step-2 as the next step to execute
     assert checkpoint.next_step is not None
-    assert checkpoint.next_step.id == "step-3"
+    assert checkpoint.next_step.id == "step-2"
 
 
 @pytest.mark.asyncio

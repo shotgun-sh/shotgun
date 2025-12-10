@@ -338,10 +338,9 @@ async def test_mark_step_done_sets_pending_checkpoint_in_planning_mode(
     assert checkpoint is not None
     assert checkpoint.completed_step.id == "step-1"
     # After marking step-1 done, current_step_index advances to 1 (step-2)
-    # So next_step() returns the step at index 2 (step-3)
+    # So current_step() returns step-2 as the next step to execute
     assert checkpoint.next_step is not None
-    # The next step is the one after the current step (which is now step-2)
-    assert checkpoint.next_step.id == "step-3"
+    assert checkpoint.next_step.id == "step-2"
 
 
 @pytest.mark.asyncio

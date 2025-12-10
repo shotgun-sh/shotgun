@@ -170,7 +170,9 @@ async def mark_step_done(
             # Set pending checkpoint for Planning mode
             # The TUI will detect this and show the StepCheckpointWidget
             elif ctx.deps.router_mode == RouterMode.PLANNING:
-                next_step = plan.next_step()
+                # Use current_step() since the while loop above already advanced
+                # current_step_index to the next incomplete step
+                next_step = plan.current_step()
                 ctx.deps.pending_checkpoint = PendingCheckpoint(
                     completed_step=step, next_step=next_step
                 )
