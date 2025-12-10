@@ -5,6 +5,13 @@ on:
     # Run daily at 5AM UTC (7AM Warsaw CET, 6AM CEST)
     - cron: '0 5 * * *'
   workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+  pull_request:
+    paths:
+      - 'pyproject.toml'
 
 concurrency:
   group: installation-tests
