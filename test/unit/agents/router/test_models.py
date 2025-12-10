@@ -95,12 +95,16 @@ def test_execution_plan_creation():
 
 
 def test_execution_plan_needs_approval_single_step():
-    """Test needs_approval returns False for single-step plans."""
+    """Test needs_approval returns True for single-step plans.
+
+    All plans require approval in Planning mode - user should always
+    see the plan before execution begins, even for simple tasks.
+    """
     plan = ExecutionPlan(
         goal="Simple task",
         steps=[ExecutionStep(id="step-1", title="Step 1", objective="Do it")],
     )
-    assert plan.needs_approval() is False
+    assert plan.needs_approval() is True
 
 
 def test_execution_plan_needs_approval_multi_step():

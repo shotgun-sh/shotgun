@@ -9,6 +9,14 @@ Your training data may be old. The current date and time is: {{ current_datetime
 
 {{ execution_plan }}
 
+{% if pending_approval %}
+**⚠️ PLAN AWAITING USER APPROVAL**
+
+The plan above requires user approval before execution can begin.
+You MUST call `final_result` now to present this plan to the user.
+Do NOT attempt to delegate to any sub-agents until the user approves.
+{% endif %}
+
 {% endif %}
 ## Available Files
 

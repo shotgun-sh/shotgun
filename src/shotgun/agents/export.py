@@ -49,16 +49,16 @@ async def create_export_agent(
 
 async def run_export_agent(
     agent: ShotgunAgent,
-    instruction: str,
+    prompt: str,
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
     event_stream_handler: EventStreamHandler | None = None,
 ) -> AgentRunResult[AgentResponse]:
-    """Export artifacts based on the given instruction.
+    """Export artifacts based on the given prompt.
 
     Args:
         agent: The configured export agent
-        instruction: The export instruction
+        prompt: The export prompt
         deps: Agent dependencies
         message_history: Optional message history for conversation continuity
         event_stream_handler: Optional callback for streaming events
@@ -66,12 +66,9 @@ async def run_export_agent(
     Returns:
         AgentRunResult containing the export process output
     """
-    logger.debug("📤 Starting export for instruction: %s", instruction)
+    logger.debug("📤 Starting export for prompt: %s", prompt)
 
     message_history = await add_system_status_message(deps, message_history)
-
-    # Let the agent use its tools to read existing artifacts and export them
-    full_prompt = f"Export artifacts or findings based on: {instruction}"
 
     try:
         # Create usage limits for responsible API usage
@@ -79,7 +76,7 @@ async def run_export_agent(
 
         result = await run_agent(
             agent=agent,
-            prompt=full_prompt,
+            prompt=prompt,
             deps=deps,
             message_history=message_history,
             usage_limits=usage_limits,

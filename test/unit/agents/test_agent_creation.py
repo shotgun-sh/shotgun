@@ -327,7 +327,7 @@ async def test_run_plan_agent(
     # Check the call to run_agent
     call_kwargs = mock_run_agent.call_args[1]
     assert call_kwargs["agent"] == mock_agent
-    assert call_kwargs["prompt"] == "Create a comprehensive plan for: test goal"
+    assert call_kwargs["prompt"] == "test goal"
     assert call_kwargs["deps"] == mock_agent_deps
 
 
@@ -383,7 +383,7 @@ async def test_run_specify_agent(
     assert call_kwargs["agent"] == mock_agent
     assert (
         call_kwargs["prompt"]
-        == "Create a comprehensive specification for: test requirement"
+        == "test requirement"
     )
     assert call_kwargs["deps"] == mock_agent_deps
 
@@ -413,7 +413,7 @@ async def test_run_tasks_agent(
     # Check the call to run_agent
     call_kwargs = mock_run_agent.call_args[1]
     assert call_kwargs["agent"] == mock_agent
-    assert call_kwargs["prompt"] == "Create or update tasks based on: test instruction"
+    assert call_kwargs["prompt"] == "test instruction"
     assert call_kwargs["deps"] == mock_agent_deps
 
 

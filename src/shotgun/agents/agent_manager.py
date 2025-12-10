@@ -529,6 +529,10 @@ class AgentManager(Widget):
 
         This preserves the agent's system_prompt_fn while using shared runtime state.
 
+        For Router agent, returns the shared deps directly (not a copy) because
+        Router state (pending_approval, current_plan, etc.) must be shared with
+        the TUI for features like plan approval widgets.
+
         Args:
             agent_type: The type of agent to create merged deps for.
 
@@ -541,8 +545,14 @@ class AgentManager(Widget):
         if self.deps is None:
             raise ValueError("Shared deps is None - this should not happen")
 
-        # Create new deps with shared runtime state but agent's system_prompt_fn
-        # Use a copy of the shared deps and update the system_prompt_fn
+        # For Router, use shared deps directly so state mutations are visible to TUI
+        # (e.g., pending_approval, current_plan need to be seen by ChatScreen)
+        if agent_type == AgentType.ROUTER:
+            # Update system_prompt_fn on shared deps in place
+            self.deps.system_prompt_fn = agent_deps.system_prompt_fn
+            return self.deps
+
+        # For other agents, create a copy with agent-specific system_prompt_fn
         merged_deps = self.deps.model_copy(
             update={"system_prompt_fn": agent_deps.system_prompt_fn}
         )

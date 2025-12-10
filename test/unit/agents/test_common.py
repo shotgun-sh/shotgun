@@ -97,6 +97,7 @@ async def test_add_system_status_message_empty_history(mock_deps):
                         timezone_name="UTC",
                         utc_offset="UTC+00:00",
                         execution_plan=None,
+                        pending_approval=False,
                     )
 
 
@@ -192,6 +193,8 @@ async def test_run_agent_simple_string_output(mock_agent, mock_deps):
 def test_build_agent_system_prompt_research_agent():
     """Test build_agent_system_prompt for research agent type."""
     mock_context = MagicMock()
+    # Use spec=AgentDeps to prevent auto-creation of router_mode attribute
+    mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = True
     mock_context.deps.sub_agent_context = None
 
@@ -214,6 +217,8 @@ def test_build_agent_system_prompt_research_agent():
 def test_build_agent_system_prompt_custom_context():
     """Test build_agent_system_prompt with custom context name."""
     mock_context = MagicMock()
+    # Use spec=AgentDeps to prevent auto-creation of router_mode attribute
+    mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = False
     mock_context.deps.sub_agent_context = None
 
@@ -236,6 +241,8 @@ def test_build_agent_system_prompt_custom_context():
 def test_build_agent_system_prompt_unknown_agent_type():
     """Test build_agent_system_prompt with unknown agent type."""
     mock_context = MagicMock()
+    # Use spec=AgentDeps to prevent auto-creation of router_mode attribute
+    mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = True
     mock_context.deps.sub_agent_context = None
 

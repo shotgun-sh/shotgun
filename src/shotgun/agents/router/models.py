@@ -110,10 +110,10 @@ class ExecutionPlan(BaseModel):
         """
         Determine if plan requires user approval in Planning mode.
 
-        Single-step plans execute immediately.
-        Multi-step plans require approval.
+        All plans require approval - user should always see and approve
+        the plan before execution begins.
         """
-        return len(self.steps) > 1
+        return len(self.steps) >= 1
 
     def current_step(self) -> ExecutionStep | None:
         """Get the current step being executed."""

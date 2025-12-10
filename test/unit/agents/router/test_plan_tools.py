@@ -33,6 +33,7 @@ def mock_router_deps():
     deps.current_plan = None
     deps.file_tracker = FileOperationTracker()
     deps.pending_checkpoint = None
+    deps.pending_approval = None  # No pending approval by default
     deps.on_plan_changed = None  # Plan panel callback (Stage 11)
     return deps
 
@@ -387,9 +388,15 @@ async def test_mark_step_done_skips_checkpoint_in_drafting_mode(
 
 
 @pytest.mark.asyncio
-async def test_create_plan_sets_is_executing_for_single_step(mock_context):
-    """Test that creating a single-step plan sets is_executing=True."""
+async def test_create_plan_sets_pending_approval_for_single_step(mock_context):
+    """Test that creating a single-step plan in Planning mode requires approval.
+
+    All plans require approval in Planning mode - user should always see
+    the plan before execution begins, even for simple tasks.
+    """
+    mock_context.deps.router_mode = RouterMode.PLANNING
     mock_context.deps.is_executing = False
+    mock_context.deps.pending_approval = None
 
     input_data = CreatePlanInput(
         goal="Simple task",
@@ -400,8 +407,9 @@ async def test_create_plan_sets_is_executing_for_single_step(mock_context):
 
     await create_plan(mock_context, input_data)
 
-    # Single-step plans skip approval and start executing immediately
-    assert mock_context.deps.is_executing is True
+    # All plans require approval in Planning mode - not executing yet
+    assert mock_context.deps.is_executing is False
+    assert mock_context.deps.pending_approval is not None
 
 
 @pytest.mark.asyncio

@@ -58,6 +58,8 @@ def test_research_system_prompt_template_loading():
     from unittest.mock import patch
 
     mock_context = MagicMock()
+    # Use spec=AgentDeps to prevent auto-creation of router_mode attribute
+    mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = True
     mock_context.deps.sub_agent_context = None
 
