@@ -1371,6 +1371,8 @@ class AgentManager(Widget):
         Args:
             deps: Agent dependencies (may be RouterDeps for router agent)
         """
+        from shotgun.agents.router.models import RouterMode
+
         if self._current_agent_type != AgentType.ROUTER:
             logger.debug("Skipping plan hint: not router agent")
             return
@@ -1384,6 +1386,14 @@ class AgentManager(Widget):
             return
 
         plan_display = deps.current_plan.format_for_display()
+
+        # In drafting mode, if plan is not complete, prompt user to continue
+        if (
+            deps.router_mode == RouterMode.DRAFTING
+            and not deps.current_plan.is_complete()
+        ):
+            plan_display += "\n\n**Shall I continue?**"
+
         logger.debug("Adding plan hint to UI history")
         self.ui_message_history.append(
             HintMessage(message=f"**Current Plan**\n\n{plan_display}")
