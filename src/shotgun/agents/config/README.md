@@ -41,7 +41,6 @@ This directory contains the configuration management system for Shotgun, includi
 - **Title**: "feat: add config migration for streaming capability field (v4->v5)"
 - **Key Changes**:
   - Added `supports_streaming` field to OpenAI config
-  - Added `shown_onboarding_popup` timestamp field
   - Added `supabase_jwt` to Shotgun Account config
 
 ## Migration System

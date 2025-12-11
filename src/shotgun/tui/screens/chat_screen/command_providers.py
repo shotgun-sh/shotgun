@@ -288,11 +288,6 @@ class UnifiedCommandProvider(Provider):
             self.chat_screen.action_show_usage,
             help="Display usage information for the current session",
         )
-        yield DiscoveryHit(
-            "View Onboarding",
-            self.chat_screen.action_view_onboarding,
-            help="View the onboarding tutorial and helpful resources",
-        )
 
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
         """Search for commands in alphabetical order."""
@@ -344,11 +339,6 @@ class UnifiedCommandProvider(Provider):
                 "Show usage",
                 self.chat_screen.action_show_usage,
                 "Display usage information for the current session",
-            ),
-            (
-                "View Onboarding",
-                self.chat_screen.action_view_onboarding,
-                "View the onboarding tutorial and helpful resources",
             ),
         ]
 
