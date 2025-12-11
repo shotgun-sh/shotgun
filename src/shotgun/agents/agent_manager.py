@@ -948,6 +948,9 @@ class AgentManager(Widget):
                     )
                 )
 
+            # Add plan hint for router if plan exists
+            self._maybe_add_plan_hint(deps)
+
             # Post UI update with hint messages (file operations will be posted after compaction)
             logger.debug("Posting UI update for Q&A mode with hint messages")
             self._post_messages_updated([])
@@ -983,6 +986,9 @@ class AgentManager(Widget):
                     self.ui_message_history.append(
                         HintMessage(message="✅ Task completed")
                     )
+
+            # Add plan hint for router if plan exists
+            self._maybe_add_plan_hint(deps)
 
             # Post UI update immediately so user sees the response without delay
             # (file operations will be posted after compaction to avoid duplicates)
@@ -1358,6 +1364,30 @@ class AgentManager(Widget):
             else:
                 # Common path is a file, show parent directory
                 return f"📁 Modified {num_files} files in: `{path_obj.parent}`"
+
+    def _maybe_add_plan_hint(self, deps: AgentDeps) -> None:
+        """Add execution plan hint for router agent if a plan exists.
+
+        Args:
+            deps: Agent dependencies (may be RouterDeps for router agent)
+        """
+        if self._current_agent_type != AgentType.ROUTER:
+            logger.debug("Skipping plan hint: not router agent")
+            return
+
+        if not isinstance(deps, RouterDeps):
+            logger.debug("Skipping plan hint: deps is not RouterDeps")
+            return
+
+        if deps.current_plan is None:
+            logger.debug("Skipping plan hint: no current plan")
+            return
+
+        plan_display = deps.current_plan.format_for_display()
+        logger.debug("Adding plan hint to UI history")
+        self.ui_message_history.append(
+            HintMessage(message=f"**Current Plan**\n\n{plan_display}")
+        )
 
     def _post_messages_updated(
         self, file_operations: list[FileOperation] | None = None
