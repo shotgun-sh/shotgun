@@ -102,7 +102,7 @@ jobs:
           # Note: test_config*.py includes test_config_manager.py and test_config_migrations.py
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-group-1
           path: .coverage
@@ -136,7 +136,7 @@ jobs:
             --cov=src --cov-report= -q
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-group-2
           path: .coverage
@@ -181,7 +181,7 @@ jobs:
             --cov=src --cov-report= -q
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-group-3
           path: .coverage
