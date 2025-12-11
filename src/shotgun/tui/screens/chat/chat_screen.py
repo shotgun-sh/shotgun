@@ -39,7 +39,6 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
-from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
@@ -272,9 +271,6 @@ class ChatScreen(Screen[None]):
         # Bind spinner to processing state manager
         self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
 
-        # Load saved router mode if using Router agent
-        self.call_later(self._load_saved_router_mode)
-
         # Load conversation history if --continue flag was provided
         # Use call_later to handle async exists() check
         if self.continue_session:
@@ -450,9 +446,6 @@ class ChatScreen(Screen[None]):
             self.deps.approval_status = PlanApprovalStatus.SKIPPED
             self.deps.is_executing = False
 
-        # Persist mode (fire-and-forget)
-        self._save_router_mode(self.deps.router_mode.value)
-
         # Show mode change feedback
         self.agent_manager.add_hint_message(
             HintMessage(message=f"Switched to {mode_name} mode")
@@ -461,30 +454,6 @@ class ChatScreen(Screen[None]):
         # Update UI
         self.widget_coordinator.update_for_mode_change(self.mode)
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
-
-    def _save_router_mode(self, mode: str) -> None:
-        """Save router mode to config (fire-and-forget)."""
-
-        async def _save() -> None:
-            config_manager = get_config_manager()
-            await config_manager.set_router_mode(mode)
-
-        asyncio.create_task(_save())
-
-    async def _load_saved_router_mode(self) -> None:
-        """Load saved router mode from config."""
-        from shotgun.agents.router.models import RouterDeps, RouterMode
-
-        if isinstance(self.deps, RouterDeps):
-            config_manager = get_config_manager()
-            saved_mode = await config_manager.get_router_mode()
-
-            if saved_mode == "drafting":
-                self.deps.router_mode = RouterMode.DRAFTING
-            else:
-                self.deps.router_mode = RouterMode.PLANNING
-
-            logger.debug("Loaded router mode from config: %s", saved_mode)
 
     async def action_show_usage(self) -> None:
         usage_hint = self.agent_manager.get_usage_hint()
@@ -2032,7 +2001,6 @@ class ChatScreen(Screen[None]):
 
             # Switch to Drafting mode when plan is approved
             self.deps.router_mode = RouterMode.DRAFTING
-            self._save_router_mode(RouterMode.DRAFTING.value)
             self.widget_coordinator.update_for_mode_change(self.mode)
 
             # Begin execution of the first step

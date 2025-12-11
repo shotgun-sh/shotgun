@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic_ai import RunContext
 
-from shotgun.agents.config import get_config_manager, get_provider_model
+from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.models import ModelConfig
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.router.models import RouterDeps, RouterMode
@@ -68,7 +68,7 @@ async def create_default_router_deps() -> RouterDeps:
 
     This creates a RouterDeps configuration suitable for interactive
     TUI usage with:
-    - Router mode loaded from config (default: PLANNING)
+    - Router mode always starts in PLANNING (not persisted)
     - Interactive mode enabled
     - TUI context flag set
     - Filtered codebase service (restricted to CWD)
@@ -79,16 +79,11 @@ async def create_default_router_deps() -> RouterDeps:
     """
     model_config, codebase_service = await _get_tui_config()
 
-    # Load router mode from config (default to PLANNING)
-    config_manager = get_config_manager()
-    config = await config_manager.load()
-    router_mode = RouterMode(config.router_mode)
-
     return RouterDeps(
         interactive_mode=True,
         is_tui_context=True,
         llm_model=model_config,
         codebase_service=codebase_service,
         system_prompt_fn=_placeholder_system_prompt_fn,
-        router_mode=router_mode,
+        router_mode=RouterMode.PLANNING,
     )
