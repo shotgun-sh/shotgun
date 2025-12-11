@@ -918,6 +918,8 @@ class AgentManager(Widget):
                 self.ui_message_history.append(
                     HintMessage(message=f"💡 {agent_response.clarifying_questions[0]}")
                 )
+                # Add plan hint for router if plan exists (single question is non-blocking)
+                self._maybe_add_plan_hint(deps)
             else:
                 # Multiple questions (2+) - enter Q&A mode
                 self._qa_questions = agent_response.clarifying_questions
@@ -947,9 +949,8 @@ class AgentManager(Widget):
                         response_text=agent_response.response,
                     )
                 )
-
-            # Add plan hint for router if plan exists
-            self._maybe_add_plan_hint(deps)
+                # NOTE: Don't add plan hint here - defer until Q&A completes
+                # The plan hint will be added after the user answers all questions
 
             # Post UI update with hint messages (file operations will be posted after compaction)
             logger.debug("Posting UI update for Q&A mode with hint messages")
