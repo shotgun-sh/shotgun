@@ -485,3 +485,67 @@ async def test_mark_step_done_keeps_is_executing_when_plan_not_complete(
     # Plan is not complete, is_executing should still be True
     assert sample_plan.is_complete() is False
     assert mock_context.deps.is_executing is True
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_sets_pending_completion_in_drafting_mode(
+    mock_context, sample_plan
+):
+    """Test that completing the final step in Drafting mode sets pending_completion."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+    mock_context.deps.is_executing = True
+    mock_context.deps.pending_completion = False
+
+    # Mark all steps done
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-2"))
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-3"))
+
+    # Plan is complete, pending_completion should be set in Drafting mode
+    assert sample_plan.is_complete() is True
+    assert mock_context.deps.is_executing is False
+    assert mock_context.deps.pending_completion is True
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_does_not_set_pending_completion_in_planning_mode(
+    mock_context, sample_plan
+):
+    """Test that completing the final step in Planning mode does NOT set pending_completion."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.is_executing = True
+    mock_context.deps.pending_completion = False
+    mock_context.deps.pending_checkpoint = None
+
+    # Mark all steps done
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+    mock_context.deps.pending_checkpoint = None  # Clear checkpoint for next step
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-2"))
+    mock_context.deps.pending_checkpoint = None  # Clear checkpoint for next step
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-3"))
+
+    # Plan is complete, but pending_completion should NOT be set in Planning mode
+    # (Planning mode uses pending_checkpoint instead)
+    assert sample_plan.is_complete() is True
+    assert mock_context.deps.is_executing is False
+    assert mock_context.deps.pending_completion is False
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_does_not_set_pending_completion_for_non_final_step(
+    mock_context, sample_plan
+):
+    """Test that completing a non-final step does NOT set pending_completion."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+    mock_context.deps.is_executing = True
+    mock_context.deps.pending_completion = False
+
+    # Mark first step done (not the last)
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+
+    # Plan is not complete, pending_completion should NOT be set
+    assert sample_plan.is_complete() is False
+    assert mock_context.deps.pending_completion is False

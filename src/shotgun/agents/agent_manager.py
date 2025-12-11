@@ -78,7 +78,7 @@ from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .router import create_router_agent
-from .router.models import RouterDeps
+from .router.models import RouterDeps, RouterMode
 from .specify import create_specify_agent
 from .tasks import create_tasks_agent
 
@@ -1384,6 +1384,14 @@ class AgentManager(Widget):
             return
 
         plan_display = deps.current_plan.format_for_display()
+
+        # In drafting mode, if plan is not complete, prompt user to continue
+        if (
+            deps.router_mode == RouterMode.DRAFTING
+            and not deps.current_plan.is_complete()
+        ):
+            plan_display += "\n\n**Shall I continue?**"
+
         logger.debug("Adding plan hint to UI history")
         self.ui_message_history.append(
             HintMessage(message=f"**Current Plan**\n\n{plan_display}")

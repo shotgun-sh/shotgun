@@ -167,6 +167,11 @@ async def mark_step_done(
             if plan.is_complete():
                 ctx.deps.is_executing = False
                 logger.debug("Plan complete, is_executing=False")
+                # Set pending completion for Drafting mode
+                # The TUI will detect this and show the completion message
+                if ctx.deps.router_mode == RouterMode.DRAFTING:
+                    ctx.deps.pending_completion = True
+                    logger.debug("Set pending_completion=True for drafting mode")
             # Set pending checkpoint for Planning mode
             # The TUI will detect this and show the StepCheckpointWidget
             elif ctx.deps.router_mode == RouterMode.PLANNING:

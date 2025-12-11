@@ -1,5 +1,6 @@
 """Chat history widget - main container for message display."""
 
+import logging
 from collections.abc import Generator, Sequence
 
 from pydantic_ai.messages import (
@@ -20,6 +21,8 @@ from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessag
 from .agent_response import AgentResponseWidget
 from .partial_response import PartialResponseWidget
 from .user_question import UserQuestionWidget
+
+logger = logging.getLogger(__name__)
 
 
 class ChatHistory(Widget):
@@ -89,23 +92,44 @@ class ChatHistory(Widget):
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the displayed messages using incremental mounting."""
         if not self.vertical_tail:
+            logger.debug(
+                "[CHAT_HISTORY] update_messages called but vertical_tail is None"
+            )
             return
 
         self.items = messages
         filtered = list(self.filtered_items())
 
+        logger.debug(
+            "[CHAT_HISTORY] update_messages - total=%d, filtered=%d, rendered=%d",
+            len(messages),
+            len(filtered),
+            self._rendered_count,
+        )
+
         # Only mount new messages that haven't been rendered yet
         if len(filtered) > self._rendered_count:
             new_messages = filtered[self._rendered_count :]
+            logger.debug(
+                "[CHAT_HISTORY] Mounting %d new messages",
+                len(new_messages),
+            )
             for item in new_messages:
                 widget: Widget
                 if isinstance(item, ModelRequest):
                     widget = UserQuestionWidget(item)
+                    logger.debug("[CHAT_HISTORY] Mounting UserQuestionWidget")
                 elif isinstance(item, HintMessage):
                     widget = HintMessageWidget(item)
+                    logger.debug("[CHAT_HISTORY] Mounting HintMessageWidget")
                 elif isinstance(item, ModelResponse):
                     widget = AgentResponseWidget(item)
+                    logger.debug("[CHAT_HISTORY] Mounting AgentResponseWidget")
                 else:
+                    logger.debug(
+                        "[CHAT_HISTORY] Skipping unknown message type: %s",
+                        type(item).__name__,
+                    )
                     continue
 
                 # Mount before the PartialResponseWidget
@@ -115,6 +139,12 @@ class ChatHistory(Widget):
 
             # Scroll to bottom to show newly added messages
             self.vertical_tail.scroll_end(animate=False)
+        else:
+            logger.debug(
+                "[CHAT_HISTORY] No new messages to mount (filtered=%d, rendered=%d)",
+                len(filtered),
+                self._rendered_count,
+            )
 
     def on_click(self, event: events.Click) -> None:
         """Focus the prompt input when clicking on the history area."""

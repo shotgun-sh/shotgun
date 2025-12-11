@@ -358,6 +358,10 @@ class RouterDeps(AgentDeps):
     # Set by create_plan tool when plan.needs_approval() returns True
     # Excluded from serialization as it's transient UI state
     pending_approval: PendingApproval | None = Field(default=None, exclude=True)
+    # Completion state for Drafting mode
+    # Set by mark_step_done when plan completes in drafting mode
+    # Excluded from serialization as it's transient UI state
+    pending_completion: bool = Field(default=False, exclude=True)
     # Event stream handler for forwarding sub-agent streaming events to UI
     # This is set by the AgentManager when running the router with streaming
     # Excluded from serialization as it's a callable

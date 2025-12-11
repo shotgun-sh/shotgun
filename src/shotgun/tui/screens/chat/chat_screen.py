@@ -988,6 +988,10 @@ class ChatScreen(Screen[None]):
         self, event: MessageHistoryUpdated
     ) -> None:
         """Handle message history updates from the agent manager."""
+        logger.debug(
+            "[MSG_HISTORY] MessageHistoryUpdated received - %d messages",
+            len(event.messages),
+        )
         self._clear_partial_response()
         self.messages = event.messages
 
@@ -1623,6 +1627,9 @@ class ChatScreen(Screen[None]):
         # Check for pending checkpoint (Planning mode step completion)
         self._check_pending_checkpoint()
 
+        # Check for plan completion (Drafting mode)
+        self._check_plan_completion()
+
         # Save conversation after each interaction
         self._save_conversation()
 
@@ -1825,6 +1832,31 @@ class ChatScreen(Screen[None]):
                 step=checkpoint.completed_step, next_step=checkpoint.next_step
             )
         )
+
+    def _check_plan_completion(self) -> None:
+        """Check if a plan was completed in Drafting mode and show completion message.
+
+        This is called after each agent run to check if mark_step_done
+        set pending_completion in Drafting mode.
+        """
+        logger.debug("[PLAN] _check_plan_completion called")
+        if not isinstance(self.deps, RouterDeps):
+            logger.debug("[PLAN] Not RouterDeps, skipping plan completion check")
+            return
+
+        if not self.deps.pending_completion:
+            logger.debug("[PLAN] No pending completion")
+            return
+
+        # Clear the pending state
+        self.deps.pending_completion = False
+
+        # Show completion message
+        logger.debug("[PLAN] Showing plan completion message for drafting mode")
+        self.mount_hint("✅ All plan steps completed!")
+
+        # Hide the plan panel since the plan is done
+        self._hide_plan_panel()
 
     # =========================================================================
     # Sub-Agent Lifecycle Handlers (Stage 8)
