@@ -78,7 +78,7 @@ from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
 from .router import create_router_agent
-from .router.models import RouterDeps
+from .router.models import RouterDeps, RouterMode
 from .specify import create_specify_agent
 from .tasks import create_tasks_agent
 
@@ -1371,8 +1371,6 @@ class AgentManager(Widget):
         Args:
             deps: Agent dependencies (may be RouterDeps for router agent)
         """
-        from shotgun.agents.router.models import RouterMode
-
         if self._current_agent_type != AgentType.ROUTER:
             logger.debug("Skipping plan hint: not router agent")
             return
