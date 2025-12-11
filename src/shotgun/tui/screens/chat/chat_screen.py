@@ -2095,6 +2095,13 @@ class ChatScreen(Screen[None]):
             logger.debug("[PLAN] Not RouterDeps, skipping pending approval check")
             return
 
+        # Don't show plan approval while user is answering questions.
+        # The pending approval will remain set and be checked again
+        # after Q&A completes (when run_agent is called with answers).
+        if self.qa_mode:
+            logger.debug("[PLAN] Q&A mode active, deferring plan approval")
+            return
+
         if self.deps.pending_approval is None:
             logger.debug("[PLAN] No pending approval")
             return
