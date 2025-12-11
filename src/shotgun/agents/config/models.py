@@ -273,10 +273,6 @@ class ShotgunConfig(BaseModel):
         default=False,
         description="Whether the welcome screen has been shown to the user",
     )
-    shown_onboarding_popup: datetime | None = Field(
-        default=None,
-        description="Timestamp when the onboarding popup was shown to the user (ISO8601 format)",
-    )
     marketing: MarketingConfig = Field(
         default_factory=MarketingConfig,
         description="Marketing messages configuration and tracking",

@@ -63,7 +63,6 @@ V5_CONFIG = {
     "shotgun_instance_id": "test-user-id-12345",
     "config_version": 5,
     "shown_welcome_screen": False,
-    "shown_onboarding_popup": None,
     "marketing": {"messages": {}},
 }
 
@@ -76,7 +75,6 @@ V6_CONFIG = {
     "shotgun_instance_id": "test-user-id-12345",
     "config_version": 6,
     "shown_welcome_screen": False,
-    "shown_onboarding_popup": None,
     "marketing": {"messages": {}},
     "router_mode": "planning",
 }
