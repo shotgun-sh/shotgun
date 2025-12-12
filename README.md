@@ -37,10 +37,6 @@
 
 It includes research on existing patterns, implementation plans that respect your architecture, and task breakdowns ready to export as **AGENTS.md** files. Each spec is complete enough that your AI agent can work longer and further without losing context or creating conflicts.
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/9c7ca014-1ed3-4935-b310-9147b275fdc7" alt="Shotgun Demo" />
-</p>
-
 </td>
 </tr>
 </table>
@@ -158,17 +154,25 @@ _Click the image above to watch the full demo on YouTube_
 
 # 🎯 Usage
 
-Shotgun's Terminal UI guides you through **5 specialized modes** — from research to export. Each mode has a dedicated AI agent optimized for that phase.
-
 ### Launch Shotgun in your project directory:
 
 | Already Installed | First Time / Try It Out |
 |-------------------|------------------------|
 | `shotgun` | `uvx shotgun-sh@latest` |
 
-_The TUI opens automatically. **Press `Shift+Tab` to switch modes** or `Ctrl+P` for the command palette._
+Shotgun's Terminal UI runs a Router that orchestrates your work using two execution modes: **Planning** and **Drafting**.
 
-### The 5-Phase Workflow
+### Planning vs Drafting
+
+| Mode | How It Works | When to Use It |
+|------|--------------|---------------|
+| **Planning** (default) | Shotgun proposes an execution plan, shows each step, and asks for confirmation before running agents that change files. You get checkpoints, can refine the plan, and can confirm or skip cascaded updates when one change affects other docs. | When you want control, visibility, and the ability to refine the plan before execution. |
+| **Drafting** | Shotgun runs the full plan in one go, without intermediate confirmations. Progress is still tracked internally, but you won’t be prompted at each step. | When you’re confident in the plan and want fast, end-to-end execution. |
+
+_The TUI opens automatically. **Press `Shift+Tab` to switch between Planning & Drafting** or `Ctrl+P` for the command palette._
+
+### How the Router Works Internally
+Under the hood, the Router relies on specialized sub-agents. You don’t select or manage them manually.
 
 <table>
 <tr>
@@ -184,21 +188,9 @@ _The TUI opens automatically. **Press `Shift+Tab` to switch modes** or `Ctrl+P` 
 </tr>
 </table>
 
-_Each phase builds on the previous one, creating a complete specification ready for AI coding agents._
-
-### Mode Reference
-
-| Mode | What It Does | Example Prompt | Output |
-|:-----|:-------------|:---------------|:-------|
-| **🔬&nbsp;Research** | Searches codebase + web, identifies patterns | `How do we handle authentication in this codebase?` | `research.md` |
-| **📝&nbsp;Specify** | Creates technical specs aware of architecture | `Add OAuth2 authentication with refresh token support` | `specification.md` |
-| **📋&nbsp;Plan** | Generates implementation roadmap | `Create an implementation plan for the payment system` | `plan.md` |
-| **✅&nbsp;Tasks** | Breaks plans into actionable items | `Break down the user dashboard plan into tasks` | `tasks.md` |
-| **📤&nbsp;Export** | Formats for AI coding agents | `Export everything to AGENTS.md` | `AGENTS.md` |
+> Planning and Drafting are the only execution modes you control; everything else is handled by the Router.
 
 _**Mode switching:** `Shift+Tab` cycles through modes_
-
-_**Visual status:** See current mode and progress at bottom_
 
 ### ⌨️ Keyboard Shortcuts
 
@@ -217,7 +209,7 @@ _**Visual status:** See current mode and progress at bottom_
 | ✅ `Research how we handle auth` | ❌ Jump straight to building |
 | ✅ `Shotgun please ask me questions first` | ❌ Assume Shotgun knows your needs |
 | ✅ `I'm working on payments, need refunds` | ❌ `Add refunds` (no context) |
-| ✅ Follow Research → Specify → Plan → Tasks | ❌ Skip phases |
+| ✅ Start in Planning mode, let Shotgun propose and refine a plan with you, then run it | ❌ Blast everything in one go without reviewing the plan first (unless you intentionally switch to Drafting mode) |
 
 **Result:** Your AI coding agent gets complete context—what exists, why, and what to build.
 
@@ -269,7 +261,7 @@ Single-agent or one-size-fits-all prompts.
 <tr>
 <td><strong>Structured Workflow</strong></td>
 <td>
-5-phase journey with checkpoints: Research → Spec → Plan → Tasks → Export
+Router-driven flow with Planning and Drafting modes; internally it runs Research → Spec → Plan → Tasks → Export with checkpoints in Planning mode.
 </td>
 <td>
 No structure. Just "prompt and hope."
@@ -373,7 +365,7 @@ Shotgun is open-source and we welcome contributions. Whether you're fixing bugs,
 
 ## 🚀 Ready to Stop AI Agents from Derailing?
 
-**Research → Specify → Plan → Tasks → Export** — Five phases that give AI agents the full picture.
+**Planning → Drafting** — Two execution modes that give AI agents the full picture, backed by internal phases for Research → Specify → Plan → Tasks → Export.
 
 ```bash
 uvx shotgun-sh@latest
