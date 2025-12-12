@@ -21,6 +21,19 @@ Usage:
 This is NOT production code - it runs only during development and CI/CD.
 """
 
+from evals.executor import (
+    ExecutionError,
+    ExecutionResult,
+    RouterExecutor,
+    get_environment_metadata,
+)
+from evals.logfire_utils import (
+    LogfireConfigurationError,
+    TraceRef,
+    configure_logfire_or_fail,
+    get_current_trace_ref,
+    start_case_trace,
+)
 from evals.models import (
     AgentExecutionOutput,
     # Agent types
@@ -65,4 +78,15 @@ __all__ = [
     # Judge config
     "JudgeModelConfig",
     "LLMJudgeConfig",
+    # Logfire utilities
+    "LogfireConfigurationError",
+    "TraceRef",
+    "configure_logfire_or_fail",
+    "start_case_trace",
+    "get_current_trace_ref",
+    # Executor
+    "ExecutionError",
+    "ExecutionResult",
+    "RouterExecutor",
+    "get_environment_metadata",
 ]
