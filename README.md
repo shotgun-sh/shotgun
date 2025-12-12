@@ -37,10 +37,6 @@
 
 It includes research on existing patterns, implementation plans that respect your architecture, and task breakdowns ready to export as **AGENTS.md** files. Each spec is complete enough that your AI agent can work longer and further without losing context or creating conflicts.
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/9c7ca014-1ed3-4935-b310-9147b275fdc7" alt="Shotgun Demo" />
-</p>
-
 </td>
 </tr>
 </table>
