@@ -219,6 +219,8 @@ _**Mode switching:** `Shift+Tab` cycles through modes_
 
 # 🤝 Share Specs with Your Team
 
+Sharing specs to a workspace is available on **paid Shotgun plans**.
+
 Shotgun lets you share specs externally by publishing them to a **workspace**. This creates a versioned, shareable snapshot your team can access outside the repo.
 
 ### How to Share a Spec
