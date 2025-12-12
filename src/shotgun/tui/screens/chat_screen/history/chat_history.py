@@ -50,7 +50,6 @@ class ChatHistory(Widget):
         self.items: Sequence[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
         self._rendered_count = 0  # Track how many messages have been mounted
-        self._is_streaming = False  # Track if we're in streaming mode
 
     def compose(self) -> ComposeResult:
         """Compose the chat history widget."""
@@ -87,27 +86,12 @@ class ChatHistory(Widget):
 
             yield item
 
-    def set_streaming(self, is_streaming: bool) -> None:
-        """Set streaming mode state.
-
-        During streaming, update_messages will store items but NOT update
-        _rendered_count for streaming content. This prevents the count from
-        getting out of sync when streaming messages differ from final messages.
-
-        Args:
-            is_streaming: True when streaming starts, False when it ends.
-        """
-        self._is_streaming = is_streaming
-
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
         """Update the displayed messages using incremental mounting.
 
-        During streaming (_is_streaming=True), ModelResponse messages are skipped
-        because they're displayed via PartialResponseWidget. Other messages like
-        HintMessage (e.g., "Delegating to...") and ModelRequest are still mounted.
-
-        When streaming ends (_is_streaming=False), all new widgets are mounted
-        including the final ModelResponse.
+        Note: During streaming, this method receives only self.messages (permanent messages
+        like HintMessages), not streaming content. Streaming content is displayed via
+        PartialResponseWidget. This prevents _rendered_count from getting out of sync.
         """
         if not self.vertical_tail:
             return
@@ -118,7 +102,6 @@ class ChatHistory(Widget):
         # Only mount new messages that haven't been rendered yet
         if len(filtered) > self._rendered_count:
             new_messages = filtered[self._rendered_count :]
-            mounted_count = 0
             for item in new_messages:
                 widget: Widget
                 if isinstance(item, ModelRequest):
@@ -126,32 +109,17 @@ class ChatHistory(Widget):
                 elif isinstance(item, HintMessage):
                     widget = HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
-                    # During streaming, skip ModelResponse - it's shown in PartialResponseWidget
-                    # This prevents _rendered_count from getting out of sync
-                    if self._is_streaming:
-                        continue
                     widget = AgentResponseWidget(item)
                 else:
                     continue
 
                 # Mount before the PartialResponseWidget
                 self.vertical_tail.mount(widget, before=self.vertical_tail.children[-1])
-                mounted_count += 1
 
-            # Update rendered count by what we actually mounted
-            # During streaming, we skip ModelResponse so count only non-ModelResponse
-            if self._is_streaming:
-                # Count only non-ModelResponse messages in the new batch
-                non_response_count = sum(
-                    1 for m in new_messages if not isinstance(m, ModelResponse)
-                )
-                self._rendered_count += non_response_count
-            else:
-                self._rendered_count = len(filtered)
+            self._rendered_count = len(filtered)
 
             # Scroll to bottom to show newly added messages
-            if mounted_count > 0:
-                self.vertical_tail.scroll_end(animate=False)
+            self.vertical_tail.scroll_end(animate=False)
 
     def on_click(self, event: events.Click) -> None:
         """Focus the prompt input when clicking on the history area."""

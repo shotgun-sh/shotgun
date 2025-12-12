@@ -261,22 +261,3 @@ class WidgetCoordinator:
             context_indicator.set_streaming(streaming)
         except Exception as e:
             logger.exception(f"Failed to set context streaming: {e}")
-
-    def set_chat_history_streaming(self, streaming: bool) -> None:
-        """Set chat history streaming mode.
-
-        During streaming, ChatHistory won't mount new widgets (they're shown
-        via PartialResponseWidget). This prevents _rendered_count from getting
-        out of sync with final messages.
-
-        Args:
-            streaming: True when streaming starts, False when it ends.
-        """
-        if not self.screen.is_mounted:
-            return
-
-        try:
-            chat_history = self.screen.query_one(ChatHistory)
-            chat_history.set_streaming(streaming)
-        except Exception as e:
-            logger.exception(f"Failed to set chat history streaming: {e}")
