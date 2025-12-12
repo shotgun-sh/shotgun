@@ -865,15 +865,12 @@ class ChatScreen(Screen[None]):
                 filtered_event_messages.append(msg)
 
         # Build new message list combining existing messages with new streaming content
-        # This combined list is used for context indicator calculations
         new_message_list = self.messages + cast(
             list[ModelMessage | HintMessage], filtered_event_messages
         )
 
         # Use widget coordinator to set partial response
-        # Pass self.messages (not new_message_list) to update_messages so we only mount
-        # permanent messages like HintMessages. Streaming content is shown via PartialResponseWidget.
-        self.widget_coordinator.set_partial_response(event.message, self.messages)
+        self.widget_coordinator.set_partial_response(event.message, new_message_list)
 
         # Skip context updates for file write operations (they don't add to input context)
         has_file_write = any(
@@ -908,6 +905,10 @@ class ChatScreen(Screen[None]):
             )
 
     def _clear_partial_response(self) -> None:
+        # Reset rendered count BEFORE clearing partial response
+        # This ensures _rendered_count matches self.messages (permanent messages),
+        # not the inflated count from streaming. Then final messages can mount properly.
+        self.widget_coordinator.reset_chat_history_rendered_count()
         # Use widget coordinator to clear partial response
         self.widget_coordinator.set_partial_response(None, self.messages)
 

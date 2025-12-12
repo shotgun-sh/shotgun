@@ -86,13 +86,18 @@ class ChatHistory(Widget):
 
             yield item
 
-    def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
-        """Update the displayed messages using incremental mounting.
+    def reset_to_permanent_messages(self) -> None:
+        """Reset _rendered_count to match only permanent (non-streaming) messages.
 
-        Note: During streaming, this method receives only self.messages (permanent messages
-        like HintMessages), not streaming content. Streaming content is displayed via
-        PartialResponseWidget. This prevents _rendered_count from getting out of sync.
+        Called when streaming ends to ensure final messages can be properly mounted.
+        During streaming, _rendered_count may include temporary streaming widgets.
+        This resets it to match self.items (which should be set to permanent messages).
         """
+        filtered = list(self.filtered_items())
+        self._rendered_count = len(filtered)
+
+    def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
+        """Update the displayed messages using incremental mounting."""
         if not self.vertical_tail:
             return
 

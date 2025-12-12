@@ -261,3 +261,18 @@ class WidgetCoordinator:
             context_indicator.set_streaming(streaming)
         except Exception as e:
             logger.exception(f"Failed to set context streaming: {e}")
+
+    def reset_chat_history_rendered_count(self) -> None:
+        """Reset chat history's rendered count to match current permanent messages.
+
+        Called when streaming ends to ensure _rendered_count doesn't include
+        temporary streaming widgets, allowing final messages to be mounted.
+        """
+        if not self.screen.is_mounted:
+            return
+
+        try:
+            chat_history = self.screen.query_one(ChatHistory)
+            chat_history.reset_to_permanent_messages()
+        except Exception as e:
+            logger.exception(f"Failed to reset chat history rendered count: {e}")
