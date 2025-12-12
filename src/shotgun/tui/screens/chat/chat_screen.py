@@ -914,7 +914,6 @@ class ChatScreen(Screen[None]):
         during streaming. This prevents the count from getting out of sync when
         streaming messages differ from final messages.
         """
-        logger.debug("[CHAT] Streaming started - setting chat history to streaming mode")
         self.widget_coordinator.set_chat_history_streaming(True)
 
     @on(AgentStreamingCompleted)
@@ -923,7 +922,6 @@ class ChatScreen(Screen[None]):
 
         Clears streaming mode so chat history can mount final widgets.
         """
-        logger.debug("[CHAT] Streaming completed - clearing streaming mode")
         self.widget_coordinator.set_chat_history_streaming(False)
 
     def _clear_partial_response(self) -> None:
