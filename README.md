@@ -217,6 +217,28 @@ _**Mode switching:** `Shift+Tab` cycles through modes_
 
 ---
 
+# 🤝 Share Specs with Your Team
+
+Shotgun lets you share specs externally by publishing them to a **workspace**. This creates a versioned, shareable snapshot your team can access outside the repo.
+
+### How to Share a Spec
+
+1. Hit `Ctrl+P` → select _Share specs to workspace_
+2. Choose one option:
+- **Create new spec** — publish a fresh spec from your current `.shotgun/` files
+- **Add new version** — publish an updated version of an existing spec
+3. Wait for upload to complete. When finished, you can:
+- **Open in Browser** — view the shared spec in the workspace
+- **Copy URL** — share the link with your team
+- **Done** — return to Shotgun
+<img width="516" height="181" alt="image" src="https://github.com/user-attachments/assets/6dd9412c-345e-4dab-a40a-ad5f1c994d34" />
+
+
+Your local `.shotgun/*.md` files remain unchanged.  
+The workspace contains a **shareable, versioned snapshot** of the spec.
+
+---
+
 # ✨ Features
 
 ### What Makes Shotgun Different
