@@ -53,6 +53,7 @@ class ChatHistory(Widget):
         self.items: Sequence[ModelMessage | HintMessage] = []
         self.vertical_tail: VerticalTail | None = None
         self._rendered_count = 0  # Track how many messages have been mounted
+        self._is_streaming = False  # Track if we're in streaming mode
 
     def compose(self) -> ComposeResult:
         """Compose the chat history widget."""
@@ -89,8 +90,35 @@ class ChatHistory(Widget):
 
             yield item
 
+    def set_streaming(self, is_streaming: bool) -> None:
+        """Set streaming mode state.
+
+        During streaming, update_messages will store items but NOT update
+        _rendered_count for streaming content. This prevents the count from
+        getting out of sync when streaming messages differ from final messages.
+
+        Args:
+            is_streaming: True when streaming starts, False when it ends.
+        """
+        was_streaming = self._is_streaming
+        self._is_streaming = is_streaming
+        logger.debug(
+            "[CHAT_HISTORY] set_streaming: %s -> %s (rendered_count=%d)",
+            was_streaming,
+            is_streaming,
+            self._rendered_count,
+        )
+
     def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
-        """Update the displayed messages using incremental mounting."""
+        """Update the displayed messages using incremental mounting.
+
+        During streaming (_is_streaming=True), this will update self.items
+        but will NOT mount new widgets or update _rendered_count. The streaming
+        content is displayed via PartialResponseWidget instead.
+
+        When streaming ends (_is_streaming=False), new widgets are mounted
+        based on the difference between filtered messages and _rendered_count.
+        """
         if not self.vertical_tail:
             logger.debug(
                 "[CHAT_HISTORY] update_messages called but vertical_tail is None"
@@ -101,11 +129,20 @@ class ChatHistory(Widget):
         filtered = list(self.filtered_items())
 
         logger.debug(
-            "[CHAT_HISTORY] update_messages - total=%d, filtered=%d, rendered=%d",
+            "[CHAT_HISTORY] update_messages - total=%d, filtered=%d, rendered=%d, streaming=%s",
             len(messages),
             len(filtered),
             self._rendered_count,
+            self._is_streaming,
         )
+
+        # During streaming, don't mount widgets - PartialResponseWidget handles display
+        # This prevents _rendered_count from getting out of sync with final messages
+        if self._is_streaming:
+            logger.debug(
+                "[CHAT_HISTORY] Skipping widget mount during streaming"
+            )
+            return
 
         # Only mount new messages that haven't been rendered yet
         if len(filtered) > self._rendered_count:

@@ -30,6 +30,8 @@ from textual.widgets import Static
 
 from shotgun.agents.agent_manager import (
     AgentManager,
+    AgentStreamingCompleted,
+    AgentStreamingStarted,
     ClarifyingQuestionsMessage,
     CompactionCompletedMessage,
     CompactionStartedMessage,
@@ -903,6 +905,26 @@ class ChatScreen(Screen[None]):
             self.update_context_indicator_with_messages(
                 combined_agent_history, new_message_list
             )
+
+    @on(AgentStreamingStarted)
+    def handle_streaming_started(self) -> None:
+        """Handle agent streaming started event.
+
+        Sets chat history to streaming mode so it doesn't update _rendered_count
+        during streaming. This prevents the count from getting out of sync when
+        streaming messages differ from final messages.
+        """
+        logger.debug("[CHAT] Streaming started - setting chat history to streaming mode")
+        self.widget_coordinator.set_chat_history_streaming(True)
+
+    @on(AgentStreamingCompleted)
+    def handle_streaming_completed(self) -> None:
+        """Handle agent streaming completed event.
+
+        Clears streaming mode so chat history can mount final widgets.
+        """
+        logger.debug("[CHAT] Streaming completed - clearing streaming mode")
+        self.widget_coordinator.set_chat_history_streaming(False)
 
     def _clear_partial_response(self) -> None:
         # Use widget coordinator to clear partial response
