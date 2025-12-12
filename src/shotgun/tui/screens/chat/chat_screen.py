@@ -1680,6 +1680,18 @@ class ChatScreen(Screen[None]):
     @on(CheckpointContinue)
     def handle_checkpoint_continue(self) -> None:
         """Continue to next step when user approves at checkpoint."""
+        # Track checkpoint continue metric
+        if isinstance(self.deps, RouterDeps) and self.deps.current_plan:
+            plan = self.deps.current_plan
+            completed_count = sum(1 for s in plan.steps if s.done)
+            track_event(
+                "checkpoint_continued",
+                {
+                    "completed_step_position": completed_count,
+                    "steps_remaining": len(plan.steps) - completed_count,
+                },
+            )
+
         self._hide_checkpoint_widget()
         self._execute_next_step()
 
@@ -1696,6 +1708,18 @@ class ChatScreen(Screen[None]):
     @on(CheckpointStop)
     def handle_checkpoint_stop(self) -> None:
         """Stop execution, keep remaining steps as pending."""
+        # Track checkpoint stop metric
+        if isinstance(self.deps, RouterDeps) and self.deps.current_plan:
+            plan = self.deps.current_plan
+            completed_count = sum(1 for s in plan.steps if s.done)
+            track_event(
+                "checkpoint_stopped",
+                {
+                    "completed_step_position": completed_count,
+                    "steps_remaining": len(plan.steps) - completed_count,
+                },
+            )
+
         self._hide_checkpoint_widget()
 
         if isinstance(self.deps, RouterDeps):
@@ -1996,6 +2020,15 @@ class ChatScreen(Screen[None]):
         self._hide_approval_widget()
 
         if isinstance(self.deps, RouterDeps):
+            # Track plan approved metric
+            if self.deps.current_plan:
+                track_event(
+                    "plan_approved",
+                    {
+                        "step_count": len(self.deps.current_plan.steps),
+                    },
+                )
+
             self.deps.approval_status = PlanApprovalStatus.APPROVED
             self.deps.is_executing = True
 
@@ -2018,6 +2051,15 @@ class ChatScreen(Screen[None]):
         self._hide_approval_widget()
 
         if isinstance(self.deps, RouterDeps):
+            # Track plan rejected metric
+            if self.deps.current_plan:
+                track_event(
+                    "plan_rejected",
+                    {
+                        "step_count": len(self.deps.current_plan.steps),
+                    },
+                )
+
             self.deps.approval_status = PlanApprovalStatus.REJECTED
             # Clear the plan since user wants to modify
             self.deps.current_plan = None
