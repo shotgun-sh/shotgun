@@ -25,6 +25,7 @@ from shotgun.agents.router.models import (
 )
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 logger = get_logger(__name__)
 
@@ -107,6 +108,17 @@ async def create_plan(
         input.goal,
     )
 
+    # Track plan creation metric
+    track_event(
+        "plan_created",
+        {
+            "step_count": len(steps),
+            "goal_preview": input.goal[:100],
+            "requires_approval": plan.needs_approval(),
+            "router_mode": ctx.deps.router_mode.value,
+        },
+    )
+
     _notify_plan_changed(ctx.deps)
 
     # Return different message based on whether approval is needed
@@ -151,10 +163,21 @@ async def mark_step_done(
         )
 
     # Find the step by ID
-    for _i, step in enumerate(plan.steps):
+    for step_index, step in enumerate(plan.steps):
         if step.id == input.step_id:
             step.done = True
             logger.info("Marked step '%s' as done", input.step_id)
+
+            # Track step completion metric
+            completed_count = sum(1 for s in plan.steps if s.done)
+            track_event(
+                "plan_step_completed",
+                {
+                    "step_position": step_index + 1,  # 1-indexed for human readability
+                    "total_steps": len(plan.steps),
+                    "steps_remaining": len(plan.steps) - completed_count,
+                },
+            )
 
             # Advance current_step_index to next incomplete step
             while (
@@ -167,6 +190,15 @@ async def mark_step_done(
             if plan.is_complete():
                 ctx.deps.is_executing = False
                 logger.debug("Plan complete, is_executing=False")
+
+                # Track plan completion metric
+                track_event(
+                    "plan_completed",
+                    {
+                        "step_count": len(plan.steps),
+                    },
+                )
+
                 # Set pending completion for Drafting mode
                 # The TUI will detect this and show the completion message
                 if ctx.deps.router_mode == RouterMode.DRAFTING:
@@ -247,6 +279,15 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
         plan.steps.append(new_step)
         logger.info("Appended step '%s' to end of plan", input.step.id)
 
+        # Track step added metric
+        track_event(
+            "plan_step_added",
+            {
+                "new_step_count": len(plan.steps),
+                "position": len(plan.steps),  # Appended at end
+            },
+        )
+
         _notify_plan_changed(ctx.deps)
 
         return ToolResult(
@@ -262,6 +303,15 @@ async def add_step(ctx: RunContext[RouterDeps], input: AddStepInput) -> ToolResu
                 "Inserted step '%s' after '%s'",
                 input.step.id,
                 input.after_step_id,
+            )
+
+            # Track step added metric
+            track_event(
+                "plan_step_added",
+                {
+                    "new_step_count": len(plan.steps),
+                    "position": i + 2,  # 1-indexed, inserted after position i+1
+                },
             )
 
             _notify_plan_changed(ctx.deps)
@@ -307,6 +357,14 @@ async def remove_step(
         if step.id == input.step_id:
             removed_step = plan.steps.pop(i)
             logger.info("Removed step '%s' from plan", input.step_id)
+
+            # Track step removed metric
+            track_event(
+                "plan_step_removed",
+                {
+                    "new_step_count": len(plan.steps),
+                },
+            )
 
             # Adjust current_step_index if needed
             if plan.current_step_index > i:

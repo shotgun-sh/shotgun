@@ -6,6 +6,7 @@ These tools allow the Router to delegate work to specialized sub-agents
 Sub-agents run with isolated message histories to prevent context window bloat.
 """
 
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -33,6 +34,7 @@ from shotgun.agents.specify import create_specify_agent, run_specify_agent
 from shotgun.agents.tasks import create_tasks_agent, run_tasks_agent
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 logger = get_logger(__name__)
 
@@ -260,11 +262,23 @@ async def _run_sub_agent(
     deps.active_sub_agent = agent_type
     logger.info("Delegating to %s agent: %s", agent_type.value, task[:100])
 
+    # Track delegation start time and event
+    start_time = time.time()
+    track_event(
+        "delegation_started",
+        {
+            "target_agent": agent_type.value,
+            "task_length": len(task),
+            "has_context_hint": context_hint is not None,
+        },
+    )
+
     # Get the run function for this agent type
     _, run_fn = AGENT_FACTORIES[agent_type]
 
     # Retry loop for transient errors
     last_error: BaseException | None = None
+    retries_attempted = 0
     for attempt in range(MAX_RETRIES + 1):
         try:
             # Run sub-agent with isolated message history and streaming support
@@ -299,6 +313,17 @@ async def _run_sub_agent(
                 files_modified,
             )
 
+            # Track delegation completion metric
+            track_event(
+                "delegation_completed",
+                {
+                    "target_agent": agent_type.value,
+                    "files_modified_count": len(files_modified),
+                    "has_questions": has_questions,
+                    "duration_seconds": round(time.time() - start_time, 2),
+                },
+            )
+
             # Clear active_sub_agent
             deps.active_sub_agent = None
 
@@ -312,6 +337,7 @@ async def _run_sub_agent(
 
         except Exception as e:
             last_error = e
+            retries_attempted = attempt
             if _is_retryable_error(e) and attempt < MAX_RETRIES:
                 logger.warning(
                     "Sub-agent %s failed (attempt %d/%d), retrying: %s",
@@ -330,6 +356,17 @@ async def _run_sub_agent(
                 str(e),
             )
             break
+
+    # Track delegation failure metric
+    track_event(
+        "delegation_failed",
+        {
+            "target_agent": agent_type.value,
+            "error_type": type(last_error).__name__ if last_error else "Unknown",
+            "retries_attempted": retries_attempted,
+            "duration_seconds": round(time.time() - start_time, 2),
+        },
+    )
 
     # Clear active_sub_agent on failure
     deps.active_sub_agent = None
