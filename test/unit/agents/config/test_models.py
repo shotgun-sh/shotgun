@@ -27,10 +27,10 @@ def test_model_spec_short_name_gpt_5_1():
     assert spec.short_name == "GPT-5.1"
 
 
-def test_model_spec_short_name_gpt_5_1_codex():
-    """Test ModelSpec short_name for GPT-5.1 Codex."""
-    spec = MODEL_SPECS[ModelName.GPT_5_1_CODEX]
-    assert spec.short_name == "GPT-5.1 Codex"
+def test_model_spec_short_name_gpt_5_2():
+    """Test ModelSpec short_name for GPT-5.2."""
+    spec = MODEL_SPECS[ModelName.GPT_5_2]
+    assert spec.short_name == "GPT-5.2"
 
 
 def test_model_spec_short_name_gemini_pro():

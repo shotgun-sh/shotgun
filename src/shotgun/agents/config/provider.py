@@ -272,8 +272,7 @@ async def get_provider_model(
         supports_streaming = True  # Default to True for all models
         if model_name in (
             ModelName.GPT_5_1,
-            ModelName.GPT_5_1_CODEX,
-            ModelName.GPT_5_1_CODEX_MINI,
+            ModelName.GPT_5_2,
         ):
             # Check if streaming capability has been tested
             streaming_capability = config.openai.supports_streaming

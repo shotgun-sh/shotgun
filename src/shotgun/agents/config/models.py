@@ -26,8 +26,7 @@ class ModelName(StrEnum):
     """Available AI model names."""
 
     GPT_5_1 = "gpt-5.1"
-    GPT_5_1_CODEX = "gpt-5.1-codex"
-    GPT_5_1_CODEX_MINI = "gpt-5.1-codex-mini"
+    GPT_5_2 = "gpt-5.2"
     CLAUDE_OPUS_4_5 = "claude-opus-4-5"
     CLAUDE_SONNET_4 = "claude-sonnet-4"
     CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
@@ -110,21 +109,13 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         litellm_proxy_model_name="openai/gpt-5.1",
         short_name="GPT-5.1",
     ),
-    ModelName.GPT_5_1_CODEX: ModelSpec(
-        name=ModelName.GPT_5_1_CODEX,
+    ModelName.GPT_5_2: ModelSpec(
+        name=ModelName.GPT_5_2,
         provider=ProviderType.OPENAI,
         max_input_tokens=272_000,
         max_output_tokens=128_000,
-        litellm_proxy_model_name="openai/gpt-5.1-codex",
-        short_name="GPT-5.1 Codex",
-    ),
-    ModelName.GPT_5_1_CODEX_MINI: ModelSpec(
-        name=ModelName.GPT_5_1_CODEX_MINI,
-        provider=ProviderType.OPENAI,
-        max_input_tokens=272_000,
-        max_output_tokens=128_000,
-        litellm_proxy_model_name="openai/gpt-5.1-codex-mini",
-        short_name="GPT-5.1 Codex Mini",
+        litellm_proxy_model_name="openai/gpt-5.2",
+        short_name="GPT-5.2",
     ),
     ModelName.CLAUDE_SONNET_4_5: ModelSpec(
         name=ModelName.CLAUDE_SONNET_4_5,
