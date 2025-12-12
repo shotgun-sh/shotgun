@@ -326,8 +326,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         """Get human-readable model name."""
         names = {
             ModelName.GPT_5_1: "GPT-5.1 (OpenAI)",
-            ModelName.GPT_5_1_CODEX: "GPT-5.1 Codex (OpenAI)",
-            ModelName.GPT_5_1_CODEX_MINI: "GPT-5.1 Codex Mini (OpenAI)",
+            ModelName.GPT_5_2: "GPT-5.2 (OpenAI)",
             ModelName.CLAUDE_OPUS_4_5: "Claude Opus 4.5 (Anthropic)",
             ModelName.CLAUDE_SONNET_4: "Claude Sonnet 4 (Anthropic)",
             ModelName.CLAUDE_SONNET_4_5: "Claude Sonnet 4.5 (Anthropic)",

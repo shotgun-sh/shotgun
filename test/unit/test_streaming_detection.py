@@ -160,8 +160,8 @@ async def test_get_provider_model_gpt5_byok_not_tested():
 
 
 @pytest.mark.asyncio
-async def test_get_provider_model_gpt5_1_codex_byok_not_tested():
-    """Test get_provider_model with GPT-5.1-Codex BYOK when streaming not tested yet."""
+async def test_get_provider_model_gpt5_2_byok_not_tested():
+    """Test get_provider_model with GPT-5.2 BYOK when streaming not tested yet."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
@@ -184,13 +184,13 @@ async def test_get_provider_model_gpt5_1_codex_byok_not_tested():
                 mock_test.return_value = False
 
                 # Get the model config
-                model_config = await get_provider_model(ModelName.GPT_5_1_CODEX)
+                model_config = await get_provider_model(ModelName.GPT_5_2)
 
                 # Verify streaming test was called
-                mock_test.assert_called_once_with("test-key", "gpt-5.1-codex")
+                mock_test.assert_called_once_with("test-key", "gpt-5.2")
 
                 # Verify ModelConfig has correct settings
-                assert model_config.name == ModelName.GPT_5_1_CODEX
+                assert model_config.name == ModelName.GPT_5_2
                 assert model_config.provider == ProviderType.OPENAI
                 assert model_config.key_provider == KeyProvider.BYOK
                 assert model_config.supports_streaming is False
