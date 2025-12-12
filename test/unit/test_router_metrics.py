@@ -5,6 +5,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic_ai import RunContext
 
+from shotgun.agents.models import (
+    AgentDeps,
+    AgentResponse,
+    AgentType,
+    FileOperationTracker,
+)
 from shotgun.agents.router.models import (
     AddStepInput,
     CreatePlanInput,
@@ -16,6 +22,7 @@ from shotgun.agents.router.models import (
     RouterDeps,
     RouterMode,
 )
+from shotgun.agents.router.tools.delegation_tools import _run_sub_agent
 from shotgun.agents.router.tools.plan_tools import (
     add_step,
     create_plan,
@@ -246,14 +253,6 @@ async def test_plan_step_removed_metric(mock_ctx):
 @pytest.mark.asyncio
 async def test_delegation_started_metric():
     """Test that delegation_started metric is tracked when delegating."""
-    from shotgun.agents.models import (
-        AgentDeps,
-        AgentResponse,
-        AgentType,
-        FileOperationTracker,
-    )
-    from shotgun.agents.router.tools.delegation_tools import _run_sub_agent
-
     mock_deps = MagicMock(spec=RouterDeps)
     mock_deps.current_plan = None
     mock_deps.active_sub_agent = None
@@ -310,14 +309,6 @@ async def test_delegation_started_metric():
 @pytest.mark.asyncio
 async def test_delegation_completed_metric():
     """Test that delegation_completed metric is tracked on successful delegation."""
-    from shotgun.agents.models import (
-        AgentDeps,
-        AgentResponse,
-        AgentType,
-        FileOperationTracker,
-    )
-    from shotgun.agents.router.tools.delegation_tools import _run_sub_agent
-
     mock_deps = MagicMock(spec=RouterDeps)
     mock_deps.current_plan = None
     mock_deps.active_sub_agent = None

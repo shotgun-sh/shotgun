@@ -1677,21 +1677,27 @@ class ChatScreen(Screen[None]):
         # Show checkpoint widget
         self._show_checkpoint_widget(event.step, event.next_step)
 
-    @on(CheckpointContinue)
-    def handle_checkpoint_continue(self) -> None:
-        """Continue to next step when user approves at checkpoint."""
-        # Track checkpoint continue metric
+    def _track_checkpoint_event(self, event_name: str) -> None:
+        """Track a checkpoint-related PostHog event.
+
+        Args:
+            event_name: The name of the event to track.
+        """
         if isinstance(self.deps, RouterDeps) and self.deps.current_plan:
             plan = self.deps.current_plan
             completed_count = sum(1 for s in plan.steps if s.done)
             track_event(
-                "checkpoint_continued",
+                event_name,
                 {
                     "completed_step_position": completed_count,
                     "steps_remaining": len(plan.steps) - completed_count,
                 },
             )
 
+    @on(CheckpointContinue)
+    def handle_checkpoint_continue(self) -> None:
+        """Continue to next step when user approves at checkpoint."""
+        self._track_checkpoint_event("checkpoint_continued")
         self._hide_checkpoint_widget()
         self._execute_next_step()
 
@@ -1708,18 +1714,7 @@ class ChatScreen(Screen[None]):
     @on(CheckpointStop)
     def handle_checkpoint_stop(self) -> None:
         """Stop execution, keep remaining steps as pending."""
-        # Track checkpoint stop metric
-        if isinstance(self.deps, RouterDeps) and self.deps.current_plan:
-            plan = self.deps.current_plan
-            completed_count = sum(1 for s in plan.steps if s.done)
-            track_event(
-                "checkpoint_stopped",
-                {
-                    "completed_step_position": completed_count,
-                    "steps_remaining": len(plan.steps) - completed_count,
-                },
-            )
-
+        self._track_checkpoint_event("checkpoint_stopped")
         self._hide_checkpoint_widget()
 
         if isinstance(self.deps, RouterDeps):
