@@ -11,43 +11,16 @@ Duration and tokens are recorded for debugging only, not for pass/fail evaluatio
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Protocol
-
-from pydantic import BaseModel, Field
 
 from evals.models import (
     AgentExecutionOutput,
     EvaluationResult,
+    EvaluatorResult,
+    EvaluatorSeverity,
     ExpectedAgentOutput,
     ShotgunTestCase,
 )
-
-
-class EvaluatorSeverity(str, Enum):
-    """Severity level for evaluator results.
-
-    - HARD: Failure results in overall test failure (critical errors)
-    - SOFT: Failure is recorded but doesn't cause overall test failure (warnings)
-    """
-
-    HARD = "hard"
-    SOFT = "soft"
-
-
-class EvaluatorResult(BaseModel):
-    """Result from a deterministic evaluator."""
-
-    evaluator_name: str = Field(..., description="Name of the evaluator")
-    passed: bool = Field(..., description="Whether the check passed")
-    severity: EvaluatorSeverity = Field(
-        ..., description="Severity of failure if failed"
-    )
-    reasoning: str = Field(..., description="Explanation of the result")
-    details: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description="Additional details (e.g., lists of violations)",
-    )
 
 
 class RouterDeterministicEvaluator(Protocol):

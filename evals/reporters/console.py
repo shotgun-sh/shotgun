@@ -10,7 +10,7 @@ Provides formatted console output with:
 import sys
 from io import StringIO
 
-from evals.models import EvaluationReport, TestCaseResult
+from evals.models import EvaluationReport, TestCaseResult, build_logfire_url
 
 
 class ConsoleReporter:
@@ -163,10 +163,11 @@ class ConsoleReporter:
         # Trace reference - extract from evaluation results if available
         trace_id = self._extract_trace_id(result)
         if trace_id:
-            trace_url = f"https://logfire.pydantic.dev/trace/{trace_id}"
+            trace_url = build_logfire_url(trace_id)
             short_trace = trace_id[:16] + "..."
             output.write(f"        Trace: {self._color(short_trace, self.BLUE)}\n")
-            output.write(f"        URL:   {trace_url}\n")
+            if trace_url:
+                output.write(f"        URL:   {trace_url}\n")
 
         # Error if present
         if result.error:

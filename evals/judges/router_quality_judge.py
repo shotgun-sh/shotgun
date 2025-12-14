@@ -10,63 +10,23 @@ Judge model is configurable to avoid same-family bias.
 """
 
 import logging
-from enum import Enum
 
 import logfire
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 from evals.models import (
     AgentExecutionOutput,
+    DimensionScoreOutput,
     EvaluationResult,
     JudgeModelConfig,
+    JudgeProviderType,
+    RouterDimension,
+    RouterDimensionRubric,
+    RouterJudgeResult,
     ShotgunTestCase,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class RouterDimension(str, Enum):
-    """Evaluation dimensions for Router agent."""
-
-    # Router-specific dimensions
-    DELEGATION_RATIONALE = "delegation_rationale"
-    CONTEXT_HANDLING = "context_handling"
-    # Core writing quality dimensions
-    CLARITY = "clarity"
-    RELEVANCE = "relevance"
-
-
-class RouterDimensionRubric(BaseModel):
-    """Rubric definition for a single Router evaluation dimension."""
-
-    dimension: RouterDimension = Field(..., description="The dimension being evaluated")
-    description: str = Field(..., description="What this dimension measures")
-    rubric_text: str = Field(..., description="Full rubric text for the LLM judge")
-    weight: float = Field(default=1.0, ge=0.0, le=2.0, description="Weight for scoring")
-
-
-class DimensionScoreOutput(BaseModel):
-    """Structured output from LLM judge for a single dimension."""
-
-    score: int = Field(..., ge=1, le=5, description="Score on 1-5 Likert scale")
-    reasoning: str = Field(..., description="Explanation for the score")
-    passed: bool = Field(
-        ..., description="Whether the minimum threshold was met (score >= 3)"
-    )
-
-
-class RouterJudgeResult(BaseModel):
-    """Complete result from Router quality judge evaluation."""
-
-    dimension_scores: dict[str, DimensionScoreOutput] = Field(
-        ..., description="Scores for each evaluated dimension"
-    )
-    overall_score: float = Field(
-        ..., ge=0.0, le=5.0, description="Weighted average score (1-5 scale)"
-    )
-    overall_passed: bool = Field(..., description="Whether overall evaluation passed")
-    summary: str = Field(..., description="Summary of the evaluation")
 
 
 # Default rubrics for Router evaluation dimensions
@@ -174,7 +134,7 @@ class RouterQualityJudge:
             dimensions: Dimensions to evaluate. Defaults to all dimensions.
         """
         self.model_config = model_config or JudgeModelConfig(
-            provider="anthropic",
+            provider=JudgeProviderType.ANTHROPIC,
             model_name="claude-sonnet-4-20250514",
             temperature=0.2,  # Low temperature for consistency
             max_tokens=2000,

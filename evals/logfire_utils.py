@@ -10,15 +10,8 @@ from typing import Any
 
 import logfire
 from opentelemetry import trace
-from pydantic import BaseModel, Field
 
-
-class TraceRef(BaseModel):
-    """Reference to a Logfire trace for debugging."""
-
-    trace_id: str = Field(..., description="OpenTelemetry trace ID (32 hex chars)")
-    span_id: str = Field(..., description="OpenTelemetry span ID (16 hex chars)")
-    url: str | None = Field(default=None, description="Logfire UI URL for this trace")
+from evals.models import TraceRef, build_logfire_url
 
 
 class LogfireConfigurationError(Exception):
@@ -84,14 +77,7 @@ def start_case_trace(
     trace_id = format(ctx.trace_id, "032x")
     span_id = format(ctx.span_id, "016x")
 
-    # Build Logfire URL if we have a valid trace ID
-    url = (
-        f"https://logfire.pydantic.dev/trace/{trace_id}"
-        if trace_id != "0" * 32
-        else None
-    )
-
-    return TraceRef(trace_id=trace_id, span_id=span_id, url=url)
+    return TraceRef(trace_id=trace_id, span_id=span_id, url=build_logfire_url(trace_id))
 
 
 def get_current_trace_ref() -> TraceRef:
@@ -106,10 +92,5 @@ def get_current_trace_ref() -> TraceRef:
 
     trace_id = format(ctx.trace_id, "032x")
     span_id = format(ctx.span_id, "016x")
-    url = (
-        f"https://logfire.pydantic.dev/trace/{trace_id}"
-        if trace_id != "0" * 32
-        else None
-    )
 
-    return TraceRef(trace_id=trace_id, span_id=span_id, url=url)
+    return TraceRef(trace_id=trace_id, span_id=span_id, url=build_logfire_url(trace_id))

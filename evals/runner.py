@@ -21,21 +21,24 @@ from pathlib import Path
 
 import logfire
 
-from evals.aggregators.router_aggregator import AggregatedResult, RouterAggregator
+from evals.aggregators.router_aggregator import RouterAggregator
 from evals.datasets.router_agent import ALL_ROUTER_CASES
 from evals.evaluators.deterministic.router_delegation import (
     run_all_deterministic_evaluators,
 )
 from evals.executor import ExecutionResult, RouterExecutor
 from evals.judges.router_quality_judge import RouterQualityJudge
-from evals.logfire_utils import TraceRef
 from evals.models import (
     AgentExecutionOutput,
+    AggregatedResult,
     EvaluationReport,
     EvaluationSuite,
     ShotgunTestCase,
     TestCaseResult,
+    TraceRef,
 )
+from evals.reporters.console import ConsoleReporter
+from evals.reporters.json_reporter import JSONReporter
 from evals.suites.router_suites import ROUTER_SUITES
 
 logger = logging.getLogger(__name__)
@@ -481,14 +484,10 @@ async def main() -> int:
 
         # Output report
         if args.report in ("console", "both"):
-            from evals.reporters.console import ConsoleReporter
-
             console_reporter = ConsoleReporter()
             console_reporter.print_report(report)
 
         if args.report in ("json", "both"):
-            from evals.reporters.json_reporter import JSONReporter
-
             json_reporter = JSONReporter()
 
             if args.out:

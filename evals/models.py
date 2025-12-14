@@ -9,9 +9,35 @@ Note: This is evaluation-specific code, not part of the main Shotgun codebase.
 """
 
 from enum import Enum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
+
+# ============================================================================
+# Constants
+# ============================================================================
+
+LOGFIRE_TRACE_URL_BASE = "https://logfire.pydantic.dev/trace"
+"""Base URL for Logfire trace links."""
+
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+
+def build_logfire_url(trace_id: str) -> str | None:
+    """Build a Logfire trace URL from a trace ID.
+
+    Args:
+        trace_id: The OpenTelemetry trace ID (32 hex chars)
+
+    Returns:
+        Full Logfire URL or None if trace ID is invalid/empty
+    """
+    if not trace_id or trace_id == "0" * 32:
+        return None
+    return f"{LOGFIRE_TRACE_URL_BASE}/{trace_id}"
+
 
 # ============================================================================
 # Agent Types
@@ -27,6 +53,75 @@ class AgentType(str, Enum):
     TASKS = "tasks"
     EXPORT = "export"
     ROUTER = "router"
+
+
+# ============================================================================
+# File Operation Types
+# ============================================================================
+
+
+class FileOperationType(str, Enum):
+    """Type of file operation performed by an agent."""
+
+    CREATED = "CREATED"
+    UPDATED = "UPDATED"
+    DELETED = "DELETED"
+
+
+# ============================================================================
+# LLM Provider Types
+# ============================================================================
+
+
+class JudgeProviderType(str, Enum):
+    """Supported LLM providers for judge models."""
+
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    GEMINI = "gemini"
+    GROQ = "groq"
+
+
+# ============================================================================
+# Evaluator Types
+# ============================================================================
+
+
+class EvaluatorSeverity(str, Enum):
+    """Severity level for evaluator results.
+
+    - HARD: Failure results in overall test failure (critical errors)
+    - SOFT: Failure is recorded but doesn't cause overall test failure (warnings)
+    """
+
+    HARD = "hard"
+    SOFT = "soft"
+
+
+class EvaluatorName(str, Enum):
+    """Names of deterministic evaluators."""
+
+    DISALLOWED_TOOL_USAGE = "disallowed_tool_usage"
+    EXECUTION_FAILURE = "execution_failure"
+    EXPECTED_TOOL_PRESENCE = "expected_tool_presence"
+    CONTENT_ASSERTION = "content_assertion"
+    DELEGATION_CORRECTNESS = "delegation_correctness"
+
+
+# ============================================================================
+# Router Evaluation Dimensions
+# ============================================================================
+
+
+class RouterDimension(str, Enum):
+    """Evaluation dimensions for Router agent."""
+
+    # Router-specific dimensions
+    DELEGATION_RATIONALE = "delegation_rationale"
+    CONTEXT_HANDLING = "context_handling"
+    # Core writing quality dimensions
+    CLARITY = "clarity"
+    RELEVANCE = "relevance"
 
 
 # ============================================================================
@@ -78,9 +173,7 @@ class FileOperation(BaseModel):
     """Represents a file operation performed by an agent."""
 
     file_path: str = Field(..., description="Path to the file")
-    operation: Literal["CREATED", "UPDATED", "DELETED"] = Field(
-        ..., description="Type of file operation"
-    )
+    operation: FileOperationType = Field(..., description="Type of file operation")
     content_snippet: str | None = Field(
         default=None, description="Optional snippet of file content for validation"
     )
@@ -286,9 +379,7 @@ class EvaluationReport(BaseModel):
 class JudgeModelConfig(BaseModel):
     """Configuration for LLM judge model."""
 
-    provider: Literal["openai", "anthropic", "gemini", "groq"] = Field(
-        ..., description="LLM provider"
-    )
+    provider: JudgeProviderType = Field(..., description="LLM provider")
     model_name: str = Field(..., description="Model identifier")
     temperature: float = Field(
         default=0.2,
@@ -302,7 +393,7 @@ class JudgeModelConfig(BaseModel):
 
     def to_model_string(self) -> str:
         """Convert to provider:model format."""
-        return f"{self.provider}:{self.model_name}"
+        return f"{self.provider.value}:{self.model_name}"
 
 
 class LLMJudgeConfig(BaseModel):
@@ -345,4 +436,127 @@ class EvaluationSuite(BaseModel):
     )
     tags: list[str] = Field(
         default_factory=list, description="Tags for filtering suites"
+    )
+
+
+# ============================================================================
+# Tracing Models
+# ============================================================================
+
+
+class TraceRef(BaseModel):
+    """Reference to a Logfire trace for debugging."""
+
+    trace_id: str = Field(..., description="OpenTelemetry trace ID (32 hex chars)")
+    span_id: str = Field(..., description="OpenTelemetry span ID (16 hex chars)")
+    url: str | None = Field(default=None, description="Logfire UI URL for this trace")
+
+
+# ============================================================================
+# Deterministic Evaluator Models
+# ============================================================================
+
+
+class EvaluatorResult(BaseModel):
+    """Result from a deterministic evaluator."""
+
+    evaluator_name: str = Field(..., description="Name of the evaluator")
+    passed: bool = Field(..., description="Whether the check passed")
+    severity: EvaluatorSeverity = Field(
+        ..., description="Severity of failure if failed"
+    )
+    reasoning: str = Field(..., description="Explanation of the result")
+    details: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Additional details (e.g., lists of violations)",
+    )
+
+
+# ============================================================================
+# LLM Judge Models
+# ============================================================================
+
+
+class RouterDimensionRubric(BaseModel):
+    """Rubric definition for a single Router evaluation dimension."""
+
+    dimension: RouterDimension = Field(..., description="The dimension being evaluated")
+    description: str = Field(..., description="What this dimension measures")
+    rubric_text: str = Field(..., description="Full rubric text for the LLM judge")
+    weight: float = Field(default=1.0, ge=0.0, le=2.0, description="Weight for scoring")
+
+
+class DimensionScoreOutput(BaseModel):
+    """Structured output from LLM judge for a single dimension."""
+
+    score: int = Field(..., ge=1, le=5, description="Score on 1-5 Likert scale")
+    reasoning: str = Field(..., description="Explanation for the score")
+    passed: bool = Field(
+        ..., description="Whether the minimum threshold was met (score >= 3)"
+    )
+
+
+class RouterJudgeResult(BaseModel):
+    """Complete result from Router quality judge evaluation."""
+
+    dimension_scores: dict[str, DimensionScoreOutput] = Field(
+        ..., description="Scores for each evaluated dimension"
+    )
+    overall_score: float = Field(
+        ..., ge=0.0, le=5.0, description="Weighted average score (1-5 scale)"
+    )
+    overall_passed: bool = Field(..., description="Whether overall evaluation passed")
+    summary: str = Field(..., description="Summary of the evaluation")
+
+
+# ============================================================================
+# Aggregation Models
+# ============================================================================
+
+
+class DimensionAggregate(BaseModel):
+    """Aggregated score for a single evaluation dimension."""
+
+    dimension: str = Field(..., description="Dimension name")
+    score: float = Field(..., ge=0.0, le=5.0, description="Average score (1-5 scale)")
+    passed: bool = Field(..., description="Whether dimension passed")
+    source: str = Field(
+        ..., description="Source of this dimension (deterministic/judge)"
+    )
+
+
+class AggregatedResult(BaseModel):
+    """Aggregated result from all evaluators for a single test case."""
+
+    test_case_name: str = Field(..., description="Test case identifier")
+    passed: bool = Field(..., description="Overall pass/fail")
+    overall_score: float = Field(
+        ..., ge=0.0, le=5.0, description="Overall score (1-5 scale)"
+    )
+
+    # Preserved per-evaluator results
+    deterministic_results: list[EvaluatorResult] = Field(
+        ..., description="Results from deterministic evaluators"
+    )
+    judge_result: RouterJudgeResult | None = Field(
+        default=None, description="Result from LLM judge (if run)"
+    )
+
+    # Per-dimension aggregates
+    dimension_scores: list[DimensionAggregate] = Field(
+        default_factory=list, description="Scores by evaluation dimension"
+    )
+
+    # Trace reference
+    trace_ref: TraceRef = Field(
+        ..., description="Logfire trace reference for debugging"
+    )
+
+    # Summary
+    summary: str = Field(..., description="Human-readable summary")
+    hard_failures: list[str] = Field(
+        default_factory=list, description="List of hard failures (if any)"
+    )
+    soft_failures: list[str] = Field(
+        default_factory=list, description="List of soft failures (if any)"
     )

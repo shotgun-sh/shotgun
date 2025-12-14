@@ -8,13 +8,12 @@ from evals.evaluators.deterministic.router_delegation import (
     ContentAssertionEvaluator,
     DelegationCorrectnessEvaluator,
     DisallowedToolUsageEvaluator,
-    EvaluatorResult,
-    EvaluatorSeverity,
     ExecutionFailureEvaluator,
     ExpectedToolPresenceEvaluator,
     RouterDeterministicEvaluator,
     run_all_deterministic_evaluators,
 )
+from evals.models import EvaluatorResult, EvaluatorSeverity
 
 __all__ = [
     "EvaluatorSeverity",

@@ -12,63 +12,17 @@ Into a final score with:
 - Trace reference for each case
 """
 
-from pydantic import BaseModel, Field
-
-from evals.evaluators.deterministic.router_delegation import (
+from evals.models import (
+    AgentExecutionOutput,
+    AggregatedResult,
+    DimensionAggregate,
+    EvaluationResult,
     EvaluatorResult,
     EvaluatorSeverity,
+    RouterJudgeResult,
+    TestCaseResult,
+    TraceRef,
 )
-from evals.judges.router_quality_judge import RouterJudgeResult
-from evals.logfire_utils import TraceRef
-from evals.models import AgentExecutionOutput, EvaluationResult, TestCaseResult
-
-
-class DimensionAggregate(BaseModel):
-    """Aggregated score for a single evaluation dimension."""
-
-    dimension: str = Field(..., description="Dimension name")
-    score: float = Field(..., ge=0.0, le=5.0, description="Average score (1-5 scale)")
-    passed: bool = Field(..., description="Whether dimension passed")
-    source: str = Field(
-        ..., description="Source of this dimension (deterministic/judge)"
-    )
-
-
-class AggregatedResult(BaseModel):
-    """Aggregated result from all evaluators for a single test case."""
-
-    test_case_name: str = Field(..., description="Test case identifier")
-    passed: bool = Field(..., description="Overall pass/fail")
-    overall_score: float = Field(
-        ..., ge=0.0, le=5.0, description="Overall score (1-5 scale)"
-    )
-
-    # Preserved per-evaluator results
-    deterministic_results: list[EvaluatorResult] = Field(
-        ..., description="Results from deterministic evaluators"
-    )
-    judge_result: RouterJudgeResult | None = Field(
-        default=None, description="Result from LLM judge (if run)"
-    )
-
-    # Per-dimension aggregates
-    dimension_scores: list[DimensionAggregate] = Field(
-        default_factory=list, description="Scores by evaluation dimension"
-    )
-
-    # Trace reference
-    trace_ref: TraceRef = Field(
-        ..., description="Logfire trace reference for debugging"
-    )
-
-    # Summary
-    summary: str = Field(..., description="Human-readable summary")
-    hard_failures: list[str] = Field(
-        default_factory=list, description="List of hard failures (if any)"
-    )
-    soft_failures: list[str] = Field(
-        default_factory=list, description="List of soft failures (if any)"
-    )
 
 
 class RouterAggregator:

@@ -16,14 +16,15 @@ from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 
 from evals.logfire_utils import (
-    TraceRef,
     configure_logfire_or_fail,
     get_current_trace_ref,
 )
 from evals.models import (
     AgentExecutionOutput,
     FileOperation,
+    FileOperationType,
     ShotgunTestCase,
+    TraceRef,
 )
 
 logger = logging.getLogger(__name__)
@@ -256,10 +257,12 @@ class RouterExecutor:
             except ValueError:
                 normalized_path = op.file_path
 
+            # Convert the shotgun FileOperationType to eval FileOperationType
+            op_value = op.operation.value.upper()
             result.append(
                 FileOperation(
                     file_path=normalized_path,
-                    operation=op.operation.value.upper(),  # CREATED, UPDATED, DELETED
+                    operation=FileOperationType(op_value),
                     content_snippet=None,
                 )
             )
