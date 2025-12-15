@@ -22,7 +22,7 @@ def router_prompt_content() -> str:
 def test_prompt_contains_congruence_rule(router_prompt_content: str):
     """Test that prompt contains the congruence verification rule."""
     assert "Verify Congruence Before Changes" in router_prompt_content
-    assert "RULE 5" in router_prompt_content
+    assert '<RULE name="Verify Congruence Before Changes">' in router_prompt_content
 
 
 def test_prompt_contains_file_dependency_direction(router_prompt_content: str):
@@ -37,11 +37,11 @@ def test_prompt_contains_file_dependency_direction(router_prompt_content: str):
 
 def test_prompt_contains_when_to_check_congruence(router_prompt_content: str):
     """Test that prompt specifies when congruence checks are needed."""
-    assert "When to Check Congruence" in router_prompt_content
+    assert "When to check congruence:" in router_prompt_content
     # Adding to tasks.md requires checking plan and spec
-    assert "Adding to `tasks.md`" in router_prompt_content
+    assert "Adding to tasks.md" in router_prompt_content
     # Adding to plan.md requires checking spec
-    assert "Adding to `plan.md`" in router_prompt_content
+    assert "Adding to plan.md" in router_prompt_content
 
 
 def test_prompt_contains_no_check_for_upstream_files(router_prompt_content: str):
@@ -55,9 +55,9 @@ def test_prompt_contains_no_check_for_upstream_files(router_prompt_content: str)
 def test_prompt_contains_incongruence_resolution_options(router_prompt_content: str):
     """Test that prompt contains the three resolution options for incongruence."""
     # Option 1: Add anyway
-    assert "Add anyway" in router_prompt_content
+    assert "Add the task anyway" in router_prompt_content
     # Option 2: Update upstream first
-    assert "update the spec and plan" in router_prompt_content.lower()
+    assert "add caching to the spec and plan" in router_prompt_content.lower()
     # Option 3: Skip/review
     assert "Skip" in router_prompt_content
 

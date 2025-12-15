@@ -64,11 +64,9 @@ from evals.models import (
     RouterJudgeResult,
     ShotgunTestCase,
     # Test case models
+    TestCaseContext,
     TestCaseInput,
-    TestCaseMetadata,
     TestCaseResult,
-    TestCategory,
-    TestDifficulty,
     # Tracing
     TraceRef,
     # Utilities
@@ -79,14 +77,12 @@ __all__ = [
     # Agent types
     "AgentType",
     # Test case models
+    "TestCaseContext",
     "TestCaseInput",
     "FileOperation",
     "FileOperationType",
     "AgentExecutionOutput",
     "ExpectedAgentOutput",
-    "TestDifficulty",
-    "TestCategory",
-    "TestCaseMetadata",
     "ShotgunTestCase",
     # Evaluation models
     "EvaluationContext",

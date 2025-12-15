@@ -1,5 +1,9 @@
 # Claude Code Instructions for Shotgun
 
+## Evals
+
+To understand how to run the evals read evals/README.md
+
 ## Commit Message Convention
 
 This project enforces **Conventional Commits** specification. All commit messages MUST follow this format:

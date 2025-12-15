@@ -33,82 +33,86 @@ logger = logging.getLogger(__name__)
 DEFAULT_RUBRICS: dict[RouterDimension, RouterDimensionRubric] = {
     RouterDimension.DELEGATION_RATIONALE: RouterDimensionRubric(
         dimension=RouterDimension.DELEGATION_RATIONALE,
-        description="Quality of Router's reasoning for sub-agent selection",
+        description="Quality of Router's clarifying questions - are they high-level and thoughtful?",
         weight=1.5,  # Higher weight - core Router responsibility
         rubric_text="""
-Evaluate the Router agent's delegation rationale quality on a 1-5 scale:
+Evaluate the quality of the Router's clarifying questions on a 1-5 scale:
 
-**Delegation Rationale Quality:**
-5 (Excellent): Clear, logical reasoning that perfectly matches request type to sub-agent capabilities. Demonstrates deep understanding of each sub-agent's strengths.
-4 (Good): Sound reasoning with correct sub-agent selection. Minor gaps in explaining the choice.
-3 (Average): Correct sub-agent chosen but reasoning is superficial or formulaic.
-2 (Fair): Questionable sub-agent choice or unclear/missing rationale.
-1 (Poor): Wrong sub-agent selected with no meaningful rationale, or completely missed the request intent.
+**Clarifying Questions Quality:**
+5 (Excellent): Questions are high-level, thoughtful, and would genuinely help understand what the user needs. Questions show understanding of the problem space.
+4 (Good): Good questions that address important ambiguities. Minor room for improvement.
+3 (Average): Reasonable questions but somewhat generic or could be more targeted.
+2 (Fair): Questions are too detailed, too many, or miss obvious ambiguities.
+1 (Poor): No questions asked when they were clearly needed, or questions are irrelevant/confusing.
 
 Consider:
-- Did Router correctly identify the type of request (research, specification, planning, task execution, export)?
-- Is the reasoning for the sub-agent choice explicit and logical?
-- Does the rationale demonstrate understanding of sub-agent capabilities?
+- Are the questions high-level (strategic) rather than low-level (implementation details)?
+- Do the questions help clarify scope, goals, or constraints?
+- Are there an appropriate number of questions (2-4 is ideal, not overwhelming)?
+
+IMPORTANT: If the Router asked clarifying questions, that is generally the correct behavior for ambiguous requests. Score based on the quality of those questions, not whether they should have been asked.
 """,
     ),
     RouterDimension.CONTEXT_HANDLING: RouterDimensionRubric(
         dimension=RouterDimension.CONTEXT_HANDLING,
-        description="How well Router prepares and passes context to sub-agents",
+        description="How well Router's questions capture the user's intent",
         weight=1.0,
         rubric_text="""
-Evaluate the Router agent's context handling on a 1-5 scale:
+Evaluate how well the Router's questions capture the user's intent on a 1-5 scale:
 
-**Context Handling Coherence:**
-5 (Excellent): All relevant context from user request is preserved and appropriately formatted for the sub-agent. No information loss.
-4 (Good): Key context is preserved with minimal loss. Sub-agent receives what it needs.
-3 (Average): Basic context preserved but some nuances may be lost in handoff.
-2 (Fair): Important context missing or distorted during delegation.
-1 (Poor): Critical context lost, garbled, or irrelevant information passed instead.
+**Intent Capture:**
+5 (Excellent): Questions demonstrate clear understanding of what the user is trying to accomplish. The questions would help refine the request meaningfully.
+4 (Good): Questions show good understanding with minor gaps.
+3 (Average): Questions are reasonable but may miss some aspects of the user's intent.
+2 (Fair): Questions seem to misunderstand what the user wants.
+1 (Poor): Questions are completely off-topic or ignore the user's stated goals.
 
 Consider:
-- Is the user's original intent preserved in the delegation?
-- Are relevant details (file paths, specific requirements, constraints) passed through?
-- Is context appropriately scoped for the sub-agent's role?
+- Do the questions relate directly to what the user asked about?
+- Would answering these questions help the Router plan appropriate next steps?
+- Do the questions show the Router understood the domain/context?
+
+IMPORTANT: Asking clarifying questions is the correct behavior before taking action on complex requests. Evaluate the questions themselves, not whether delegation happened.
 """,
     ),
     RouterDimension.CLARITY: RouterDimensionRubric(
         dimension=RouterDimension.CLARITY,
-        description="Clarity of Router's communication to users",
+        description="Clarity of Router's communication and questions",
         weight=1.0,
         rubric_text="""
-Evaluate the Router agent's communication clarity on a 1-5 scale:
+Evaluate the Router's communication clarity on a 1-5 scale:
 
 **Clarity:**
-5 (Excellent): Crystal clear communication. User understands exactly what's happening and why.
+5 (Excellent): Questions and any response text are crystal clear. User knows exactly what information is being requested and why.
 4 (Good): Clear communication with minor room for improvement.
-3 (Average): Understandable but could be more explicit about what Router is doing.
-2 (Fair): Somewhat confusing. User may not understand the delegation decision.
-1 (Poor): Unclear, cryptic, or no communication about what's happening.
+3 (Average): Understandable but questions could be more specific or better phrased.
+2 (Fair): Somewhat confusing. User may not understand what's being asked.
+1 (Poor): Unclear, cryptic, or confusing questions/response.
 
 Consider:
-- If Router communicates with the user, is the message clear?
-- Does the user understand which sub-agent is being invoked and why?
-- Are any status updates or explanations easy to follow?
+- Are the clarifying questions easy to understand?
+- Is it clear what kind of answer is expected for each question?
+- Is the overall response well-structured and professional?
 """,
     ),
     RouterDimension.RELEVANCE: RouterDimensionRubric(
         dimension=RouterDimension.RELEVANCE,
-        description="Relevance of Router's actions to the user's request",
+        description="Relevance of Router's questions to the user's request",
         weight=1.0,
         rubric_text="""
-Evaluate the Router agent's relevance to the user's request on a 1-5 scale:
+Evaluate the relevance of the Router's questions to the user's request on a 1-5 scale:
 
 **Relevance:**
-5 (Excellent): Router's delegation is perfectly aligned with what the user asked for.
-4 (Good): Highly relevant delegation with minor tangents.
-3 (Average): Generally relevant but may include unnecessary steps or miss some aspects.
-2 (Fair): Partially relevant but misses key aspects of the request.
-1 (Poor): Irrelevant delegation that doesn't address the user's actual need.
+5 (Excellent): Every question directly relates to understanding or fulfilling the user's request. No irrelevant tangents.
+4 (Good): Highly relevant questions with minor tangents.
+3 (Average): Generally relevant but some questions may not be necessary.
+2 (Fair): Some questions miss the point of what the user asked.
+1 (Poor): Questions are irrelevant or don't help clarify the user's actual request.
 
 Consider:
-- Does the delegation directly address what the user asked for?
-- Are there unnecessary intermediate steps or diversions?
-- Would the chosen sub-agent actually help fulfill the user's request?
+- Does each question help clarify something about the user's specific request?
+- Are there questions that seem off-topic or unnecessary?
+- Would these questions help the Router do what the user actually wants?
 """,
     ),
 }
@@ -159,13 +163,17 @@ class RouterQualityJudge:
         system_prompt = f"""You are an expert evaluator for AI agent systems.
 Your task is to evaluate a Router agent's performance on the "{dimension.value}" dimension.
 
+<RUBRIC>
 {rubric.rubric_text}
+</RUBRIC>
 
-Instructions:
-1. Read the user's original request and the Router's response/actions carefully.
-2. Apply the rubric to score the Router's performance on a 1-5 scale.
-3. Provide clear reasoning for your score.
-4. A score of 3 or higher indicates a passing evaluation.
+<INSTRUCTIONS>
+1. Read the USER_REQUEST and the ROUTER_RESPONSE carefully.
+2. If EXPECTED_RESPONSE_CRITERIA is provided, use it as guidance for what a good response looks like.
+3. Apply the RUBRIC to score the Router's performance on a 1-5 scale.
+4. Provide clear reasoning for your score.
+5. A score of 3 or higher indicates a passing evaluation.
+</INSTRUCTIONS>
 
 Be objective and consistent in your scoring. Focus only on the {dimension.value} dimension."""
 
@@ -202,19 +210,36 @@ Be objective and consistent in your scoring. Focus only on the {dimension.value}
         agent = self._create_judge_agent(dimension)
 
         # Construct the evaluation prompt
+        expected_response_section = ""
+        if test_case.expected.expected_response:
+            expected_response_section = f"""
+<EXPECTED_RESPONSE_CRITERIA>
+{test_case.expected.expected_response}
+</EXPECTED_RESPONSE_CRITERIA>
+"""
+
+        clarifying_questions = (
+            ", ".join(actual_output.clarifying_questions)
+            if actual_output.clarifying_questions
+            else "None"
+        )
+
         prompt = f"""
-**User Request:**
+<USER_REQUEST>
 {test_case.inputs.prompt}
+</USER_REQUEST>
 
-**Router Response:**
+<ROUTER_RESPONSE>
 {actual_output.response}
+</ROUTER_RESPONSE>
 
-**Router Actions:**
-- Tools used: {", ".join(actual_output.tools_used) or "None"}
-- Delegated to: {actual_output.delegated_sub_agent or "None"}
-- Clarifying questions: {", ".join(actual_output.clarifying_questions) if actual_output.clarifying_questions else "None"}
-
-Please evaluate the Router's performance on the "{dimension.value}" dimension."""
+<ROUTER_ACTIONS>
+Tools used: {", ".join(actual_output.tools_used) or "None"}
+Delegated to: {actual_output.delegated_sub_agent or "None"}
+Clarifying questions: {clarifying_questions}
+</ROUTER_ACTIONS>
+{expected_response_section}
+Evaluate the Router's performance on the "{dimension.value}" dimension."""
 
         with logfire.span(
             "eval.judge.dimension",
