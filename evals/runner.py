@@ -7,8 +7,10 @@ Supports running by suite name, tag, or single case with configurable concurrenc
 Usage:
     python -m evals.runner --suite router_smoke --report json --out evals/reports/router_smoke.json
     python -m evals.runner --suite router_core --report console
-    python -m evals.runner --case delegate_to_research_basic
-    python -m evals.runner --tag smoke --report json
+    python -m evals.runner --case local_models_clarifying_questions
+    python -m evals.runner --tag smoke
+    python -m evals.runner --suite router_smoke --model claude-sonnet-4-5
+    python -m evals.runner --suite router_smoke --models anthropic
 """
 
 import argparse
@@ -23,7 +25,7 @@ import logfire
 
 from evals.aggregators.router_aggregator import RouterAggregator
 from evals.datasets.router_agent import ALL_ROUTER_CASES
-from evals.evaluators.deterministic.router_delegation import (
+from evals.evaluators.deterministic.router_evaluators import (
     run_all_deterministic_evaluators,
 )
 from evals.executor import ExecutionResult, RouterExecutor
@@ -40,8 +42,41 @@ from evals.models import (
 from evals.reporters.console import ConsoleReporter
 from evals.reporters.json_reporter import JSONReporter
 from evals.suites.router_suites import ROUTER_SUITES
+from shotgun.agents.config.models import MODEL_SPECS, ModelName, ProviderType
 
 logger = logging.getLogger(__name__)
+
+
+def get_model_presets() -> dict[str, list[ModelName]]:
+    """Build model presets from MODEL_SPECS registry.
+
+    Returns:
+        Dictionary mapping preset names to lists of ModelName enums.
+        Presets include 'all', 'anthropic', 'openai', 'google', and 'fast'.
+    """
+    all_models = list(MODEL_SPECS.keys())
+
+    # Group by provider
+    by_provider: dict[ProviderType, list[ModelName]] = {}
+    for model_name, spec in MODEL_SPECS.items():
+        by_provider.setdefault(spec.provider, []).append(model_name)
+
+    return {
+        "all": all_models,
+        "anthropic": by_provider.get(ProviderType.ANTHROPIC, []),
+        "openai": by_provider.get(ProviderType.OPENAI, []),
+        "google": by_provider.get(ProviderType.GOOGLE, []),
+        # Fast models - one per provider (cheapest/fastest)
+        "fast": [
+            ModelName.CLAUDE_HAIKU_4_5,
+            ModelName.GPT_5_1_CODEX_MINI,
+            ModelName.GEMINI_2_5_FLASH_LITE,
+        ],
+    }
+
+
+# Available model presets for CLI
+MODEL_PRESETS = get_model_presets()
 
 
 class RunnerConfig:
@@ -96,11 +131,16 @@ class EvaluationRunner:
         self.judge = RouterQualityJudge() if self.config.enable_judge else None
         self.aggregator = RouterAggregator()
 
-    async def run_suite(self, suite_name: str) -> EvaluationReport:
+    async def run_suite(
+        self,
+        suite_name: str,
+        model_override: ModelName | None = None,
+    ) -> EvaluationReport:
         """Run a named evaluation suite.
 
         Args:
             suite_name: Name of the suite to run
+            model_override: Optional model to use instead of the default
 
         Returns:
             EvaluationReport with all results
@@ -111,13 +151,18 @@ class EvaluationRunner:
             )
 
         suite = ROUTER_SUITES[suite_name]
-        return await self._run_suite(suite)
+        return await self._run_suite(suite, model_override)
 
-    async def run_by_tag(self, tag: str) -> EvaluationReport:
+    async def run_by_tag(
+        self,
+        tag: str,
+        model_override: ModelName | None = None,
+    ) -> EvaluationReport:
         """Run all suites matching a tag.
 
         Args:
             tag: Tag to filter suites by
+            model_override: Optional model to use instead of the default
 
         Returns:
             Combined EvaluationReport from all matching suites
@@ -144,13 +189,18 @@ class EvaluationRunner:
             tags=[tag],
         )
 
-        return await self._run_suite(combined_suite)
+        return await self._run_suite(combined_suite, model_override)
 
-    async def run_single_case(self, case_name: str) -> EvaluationReport:
+    async def run_single_case(
+        self,
+        case_name: str,
+        model_override: ModelName | None = None,
+    ) -> EvaluationReport:
         """Run a single test case.
 
         Args:
             case_name: Name of the test case to run
+            model_override: Optional model to use instead of the default
 
         Returns:
             EvaluationReport with single result
@@ -168,13 +218,18 @@ class EvaluationRunner:
             tags=["single"],
         )
 
-        return await self._run_suite(single_suite)
+        return await self._run_suite(single_suite, model_override)
 
-    async def _run_suite(self, suite: EvaluationSuite) -> EvaluationReport:
+    async def _run_suite(
+        self,
+        suite: EvaluationSuite,
+        model_override: ModelName | None = None,
+    ) -> EvaluationReport:
         """Internal method to run an evaluation suite.
 
         Args:
             suite: Suite to run
+            model_override: Optional model to use instead of the default
 
         Returns:
             EvaluationReport with all results
@@ -186,6 +241,7 @@ class EvaluationRunner:
             "eval.run_suite",
             suite_name=suite.name,
             test_case_count=len(suite.test_case_names),
+            model_override=model_override.value if model_override else None,
         ):
             # Get test cases
             test_cases = [
@@ -198,22 +254,26 @@ class EvaluationRunner:
                 raise ValueError(f"No valid test cases found in suite {suite.name}")
 
             # Run test cases with concurrency control
-            results = await self._run_test_cases(test_cases, suite.name)
+            results = await self._run_test_cases(test_cases, suite.name, model_override)
 
             # Build report
             total_duration = time.time() - start_time
-            return self._build_report(suite.name, results, total_duration, timestamp)
+            return self._build_report(
+                suite.name, results, total_duration, timestamp, model_override
+            )
 
     async def _run_test_cases(
         self,
         test_cases: list[ShotgunTestCase],
         suite_name: str,
+        model_override: ModelName | None = None,
     ) -> list[tuple[AggregatedResult, AgentExecutionOutput]]:
         """Run test cases with concurrency control.
 
         Args:
             test_cases: Test cases to run
             suite_name: Name of the suite for logging
+            model_override: Optional model to use instead of the default
 
         Returns:
             List of (AggregatedResult, AgentExecutionOutput) tuples
@@ -225,7 +285,9 @@ class EvaluationRunner:
             test_case: ShotgunTestCase,
         ) -> tuple[AggregatedResult, AgentExecutionOutput]:
             async with semaphore:
-                return await self._evaluate_case(test_case, suite_name, judge_semaphore)
+                return await self._evaluate_case(
+                    test_case, suite_name, judge_semaphore, model_override
+                )
 
         tasks = [run_single(tc) for tc in test_cases]
         return await asyncio.gather(*tasks)
@@ -235,6 +297,7 @@ class EvaluationRunner:
         test_case: ShotgunTestCase,
         suite_name: str,
         judge_semaphore: asyncio.Semaphore,
+        model_override: ModelName | None = None,
     ) -> tuple[AggregatedResult, AgentExecutionOutput]:
         """Execute and evaluate a single test case.
 
@@ -242,6 +305,7 @@ class EvaluationRunner:
             test_case: Test case to run
             suite_name: Suite name for context
             judge_semaphore: Semaphore for judge concurrency
+            model_override: Optional model to use instead of the default
 
         Returns:
             Tuple of (AggregatedResult, AgentExecutionOutput)
@@ -250,10 +314,11 @@ class EvaluationRunner:
             "eval.evaluate_case",
             test_case_name=test_case.name,
             suite_name=suite_name,
+            model_override=model_override.value if model_override else None,
         ):
             # Execute the test case
             execution_result: ExecutionResult = await self.executor.execute_case(
-                test_case, suite_name
+                test_case, suite_name, model_override
             )
 
             # Handle execution errors
@@ -334,6 +399,7 @@ class EvaluationRunner:
         results: list[tuple[AggregatedResult, AgentExecutionOutput]],
         total_duration: float,
         timestamp: str,
+        model_override: ModelName | None = None,
     ) -> EvaluationReport:
         """Build the final evaluation report.
 
@@ -342,6 +408,7 @@ class EvaluationRunner:
             results: List of (AggregatedResult, AgentExecutionOutput) tuples
             total_duration: Total evaluation time
             timestamp: When evaluation started
+            model_override: Optional model that was used instead of the default
 
         Returns:
             EvaluationReport
@@ -382,6 +449,7 @@ class EvaluationRunner:
 
         return EvaluationReport(
             suite_name=suite_name,
+            model_name=model_override.value if model_override else None,
             total_test_cases=len(test_results),
             passed_test_cases=passed_count,
             failed_test_cases=failed_count,
@@ -397,15 +465,27 @@ class EvaluationRunner:
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
+    # Build available model choices from MODEL_SPECS
+    available_models = [m.value for m in ModelName]
+
     parser = argparse.ArgumentParser(
         description="Run Router agent evaluation suites",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 Examples:
     python -m evals.runner --suite router_smoke --report json --out evals/reports/router_smoke.json
     python -m evals.runner --suite router_core --report console
-    python -m evals.runner --case delegate_to_research_basic
+    python -m evals.runner --case local_models_clarifying_questions
     python -m evals.runner --tag smoke
+
+Model comparison examples:
+    python -m evals.runner --suite router_smoke --model claude-sonnet-4-5
+    python -m evals.runner --suite router_smoke --model claude-sonnet-4-5 --model gpt-5.1
+    python -m evals.runner --suite router_smoke --models anthropic
+    python -m evals.runner --suite router_smoke --models fast
+
+Available models: {", ".join(available_models)}
+Available presets: {", ".join(MODEL_PRESETS.keys())}
         """,
     )
 
@@ -414,6 +494,21 @@ Examples:
     selection.add_argument("--suite", help="Run a named suite")
     selection.add_argument("--tag", help="Run all suites matching a tag")
     selection.add_argument("--case", help="Run a single test case")
+
+    # Model selection options
+    model_group = parser.add_mutually_exclusive_group()
+    model_group.add_argument(
+        "--model",
+        action="append",
+        dest="model_list",
+        choices=available_models,
+        help="Model to evaluate (can be repeated for multiple models)",
+    )
+    model_group.add_argument(
+        "--models",
+        choices=list(MODEL_PRESETS.keys()),
+        help="Model preset to evaluate (e.g., 'anthropic', 'fast', 'all')",
+    )
 
     # Output options
     parser.add_argument(
@@ -450,6 +545,26 @@ Examples:
     return parser.parse_args()
 
 
+def get_models_to_run(args: argparse.Namespace) -> list[ModelName]:
+    """Determine which models to run based on CLI arguments.
+
+    Args:
+        args: Parsed CLI arguments
+
+    Returns:
+        List of ModelName enums to evaluate. Empty list means use default model.
+    """
+    if args.model_list:
+        # Individual models specified
+        return [ModelName(m) for m in args.model_list]
+    elif args.models:
+        # Model preset specified
+        return MODEL_PRESETS[args.models]
+    else:
+        # No model specified - use default (empty list = no override)
+        return []
+
+
 async def main() -> int:
     """Main entry point for the evaluation runner."""
     args = parse_args()
@@ -470,35 +585,70 @@ async def main() -> int:
     # Create runner
     runner = EvaluationRunner(config=config)
 
+    # Determine which models to run
+    models_to_run = get_models_to_run(args)
+
     try:
-        # Run based on selection
-        if args.suite:
-            report = await runner.run_suite(args.suite)
-        elif args.tag:
-            report = await runner.run_by_tag(args.tag)
-        elif args.case:
-            report = await runner.run_single_case(args.case)
+        reports: list[EvaluationReport] = []
+
+        # If no models specified, run with default
+        if not models_to_run:
+            models_to_run_iter: list[ModelName | None] = [None]
         else:
-            print("Error: Must specify --suite, --tag, or --case", file=sys.stderr)
-            return 1
+            models_to_run_iter = models_to_run  # type: ignore[assignment]
 
-        # Output report
-        if args.report in ("console", "both"):
+        # Run evaluation for each model
+        for model_override in models_to_run_iter:
+            if model_override:
+                print(f"\n{'=' * 60}")
+                print(f"Running evaluation with model: {model_override.value}")
+                print(f"{'=' * 60}\n")
+
+            # Run based on selection
+            if args.suite:
+                report = await runner.run_suite(args.suite, model_override)
+            elif args.tag:
+                report = await runner.run_by_tag(args.tag, model_override)
+            elif args.case:
+                report = await runner.run_single_case(args.case, model_override)
+            else:
+                print("Error: Must specify --suite, --tag, or --case", file=sys.stderr)
+                return 1
+
+            reports.append(report)
+
+            # Output individual report
+            if args.report in ("console", "both"):
+                console_reporter = ConsoleReporter()
+                console_reporter.print_report(report)
+
+        # If multiple models were run, print comparison report
+        if len(reports) > 1:
             console_reporter = ConsoleReporter()
-            console_reporter.print_report(report)
+            console_reporter.print_comparison_report(reports)
 
+        # Output JSON reports
         if args.report in ("json", "both"):
             json_reporter = JSONReporter()
 
-            if args.out:
-                json_reporter.write_report(report, args.out)
-                print(f"\nJSON report written to: {args.out}")
+            if len(reports) == 1:
+                # Single report
+                if args.out:
+                    json_reporter.write_report(reports[0], args.out)
+                    print(f"\nJSON report written to: {args.out}")
+                else:
+                    print(json_reporter.format_report(reports[0]))
             else:
-                # Print to stdout if no output file specified
-                print(json_reporter.format_report(report))
+                # Multiple reports - write comparison
+                if args.out:
+                    json_reporter.write_comparison_report(reports, args.out)
+                    print(f"\nJSON comparison report written to: {args.out}")
+                else:
+                    print(json_reporter.format_comparison_report(reports))
 
-        # Return exit code based on pass rate
-        return 0 if report.pass_rate >= 1.0 else 1
+        # Return exit code based on worst pass rate across all models
+        min_pass_rate = min(r.pass_rate for r in reports)
+        return 0 if min_pass_rate >= 1.0 else 1
 
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)

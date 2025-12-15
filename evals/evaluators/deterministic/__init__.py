@@ -4,7 +4,8 @@ Deterministic evaluators for Router agent evaluation.
 These evaluators apply rule-based checks with deterministic outcomes.
 """
 
-from evals.evaluators.deterministic.router_delegation import (
+from evals.evaluators.deterministic.router_evaluators import (
+    ClarifyingQuestionsEvaluator,
     ContentAssertionEvaluator,
     DelegationCorrectnessEvaluator,
     DisallowedToolUsageEvaluator,
@@ -24,5 +25,6 @@ __all__ = [
     "ExpectedToolPresenceEvaluator",
     "ContentAssertionEvaluator",
     "DelegationCorrectnessEvaluator",
+    "ClarifyingQuestionsEvaluator",
     "run_all_deterministic_evaluators",
 ]

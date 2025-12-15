@@ -26,6 +26,7 @@ from evals.models import (
     ShotgunTestCase,
     TraceRef,
 )
+from shotgun.agents.config.models import ModelName
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ class RouterExecutor:
         self,
         test_case: ShotgunTestCase,
         suite_name: str = "default",
+        model_override: ModelName | None = None,
     ) -> ExecutionResult:
         """
         Execute a single test case and capture outputs.
@@ -86,6 +88,7 @@ class RouterExecutor:
         Args:
             test_case: The test case to execute
             suite_name: Name of the evaluation suite for trace metadata
+            model_override: Optional model to use instead of the default
 
         Returns:
             ExecutionResult with captured output and trace reference
@@ -97,11 +100,12 @@ class RouterExecutor:
             test_case_name=test_case.name,
             suite_name=suite_name,
             agent_type=test_case.inputs.agent_type.value,
+            model_override=model_override.value if model_override else None,
         ):
             trace_ref = get_current_trace_ref()
 
             try:
-                output = await self._execute_agent(test_case)
+                output = await self._execute_agent(test_case, model_override)
                 return ExecutionResult(
                     test_case_name=test_case.name,
                     output=output,
@@ -123,11 +127,13 @@ class RouterExecutor:
     async def _execute_agent(
         self,
         test_case: ShotgunTestCase,
+        model_override: ModelName | None = None,
     ) -> AgentExecutionOutput:
         """Execute the agent and extract outputs.
 
         Args:
             test_case: The test case containing inputs for agent execution
+            model_override: Optional model to use instead of the default
 
         Returns:
             AgentExecutionOutput with all captured observations
@@ -142,8 +148,8 @@ class RouterExecutor:
         from shotgun.utils import get_shotgun_home
 
         with logfire.span("eval.execute_agent"):
-            # Get model configuration
-            model_config = await get_provider_model()
+            # Get model configuration (use override if provided)
+            model_config = await get_provider_model(model_override)
 
             # Create codebase service
             storage_dir = get_shotgun_home() / "codebases"
@@ -158,18 +164,37 @@ class RouterExecutor:
                     "This should not be called - agents provide their own system_prompt_fn"
                 )
 
-            # Create AgentDeps
-            deps = AgentDeps(
-                interactive_mode=False,
-                is_tui_context=False,
-                llm_model=model_config,
-                codebase_service=codebase_service,
-                system_prompt_fn=_eval_system_prompt_fn,
-                file_tracker=file_tracker,
-            )
+            # Map eval AgentType to shotgun AgentType
+            from shotgun.agents.models import AgentType as ShotgunAgentType
+            from shotgun.agents.router.models import RouterDeps, RouterMode
 
-            # Create agent manager
-            manager = AgentManager(deps=deps)
+            shotgun_agent_type = ShotgunAgentType(test_case.inputs.agent_type.value)
+
+            # Create appropriate deps based on agent type
+            # Router needs RouterDeps with router_mode, other agents use AgentDeps
+            # Simulate TUI context for realistic system prompts
+            if shotgun_agent_type == ShotgunAgentType.ROUTER:
+                deps: AgentDeps = RouterDeps(
+                    interactive_mode=True,
+                    is_tui_context=True,
+                    llm_model=model_config,
+                    codebase_service=codebase_service,
+                    system_prompt_fn=_eval_system_prompt_fn,
+                    file_tracker=file_tracker,
+                    router_mode=RouterMode.PLANNING,
+                )
+            else:
+                deps = AgentDeps(
+                    interactive_mode=True,
+                    is_tui_context=True,
+                    llm_model=model_config,
+                    codebase_service=codebase_service,
+                    system_prompt_fn=_eval_system_prompt_fn,
+                    file_tracker=file_tracker,
+                )
+
+            # Create agent manager with the correct agent type
+            manager = AgentManager(deps=deps, initial_type=shotgun_agent_type)
 
             # Time the execution
             start_time = time.time()

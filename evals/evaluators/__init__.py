@@ -6,7 +6,8 @@ Organized by evaluator type:
 - llm_judges/: LLM-as-a-judge evaluators (in evals/judges/)
 """
 
-from evals.evaluators.deterministic.router_delegation import (
+from evals.evaluators.deterministic.router_evaluators import (
+    ClarifyingQuestionsEvaluator,
     ContentAssertionEvaluator,
     DelegationCorrectnessEvaluator,
     DisallowedToolUsageEvaluator,
@@ -28,6 +29,7 @@ __all__ = [
     "ExpectedToolPresenceEvaluator",
     "ContentAssertionEvaluator",
     "DelegationCorrectnessEvaluator",
+    "ClarifyingQuestionsEvaluator",
     # Runner
     "run_all_deterministic_evaluators",
 ]

@@ -383,6 +383,81 @@ class DelegationCorrectnessEvaluator(BaseEvaluator):
         )
 
 
+class ClarifyingQuestionsEvaluator(BaseEvaluator):
+    """
+    [HARD when expected] Checks that clarifying questions were asked when expected.
+
+    When a test case explicitly sets expect_clarifying_questions=True,
+    this becomes a HARD failure because the test is specifically designed
+    to verify that behavior. Otherwise, it's a SOFT failure.
+
+    Used for test cases where we expect the agent to gather requirements
+    before proceeding (e.g., ambiguous feature requests).
+    """
+
+    name = "clarifying_questions"
+    # Default severity - will be overridden to HARD when questions are expected
+    severity = EvaluatorSeverity.SOFT
+
+    def evaluate(
+        self,
+        actual_output: AgentExecutionOutput,
+        expected_output: ExpectedAgentOutput | None,
+        test_case: ShotgunTestCase,
+    ) -> EvaluatorResult:
+        """Check if clarifying questions were asked when expected."""
+        # Check if we expect clarifying questions
+        expect_questions = (
+            expected_output.expect_clarifying_questions if expected_output else False
+        )
+
+        if not expect_questions:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=True,
+                severity=self.severity,
+                reasoning="Clarifying questions not required for this test",
+                details={},
+            )
+
+        # When questions are explicitly expected, use HARD severity
+        # This ensures the test fails when its core assertion is violated
+        failure_severity = EvaluatorSeverity.HARD
+
+        # Get minimum question count (defaults to 1)
+        min_questions = expected_output.min_clarifying_questions
+
+        # Check if agent asked clarifying questions
+        questions = actual_output.clarifying_questions or []
+        question_count = len(questions)
+
+        if question_count >= min_questions:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=True,
+                severity=failure_severity,
+                reasoning=f"Agent asked {question_count} clarifying question(s) (required: {min_questions}+)",
+                details={"questions_asked": questions, "min_required": [str(min_questions)]},
+            )
+
+        if question_count > 0:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=False,
+                severity=failure_severity,
+                reasoning=f"Agent asked {question_count} question(s) but {min_questions}+ required",
+                details={"questions_asked": questions, "min_required": [str(min_questions)]},
+            )
+
+        return EvaluatorResult(
+            evaluator_name=self.name,
+            passed=False,
+            severity=failure_severity,
+            reasoning=f"Agent did not ask clarifying questions (required: {min_questions}+)",
+            details={"questions_asked": [], "min_required": [str(min_questions)]},
+        )
+
+
 # Registry of all deterministic evaluators
 DETERMINISTIC_EVALUATORS: list[type[BaseEvaluator]] = [
     DisallowedToolUsageEvaluator,
@@ -390,6 +465,7 @@ DETERMINISTIC_EVALUATORS: list[type[BaseEvaluator]] = [
     ExpectedToolPresenceEvaluator,
     ContentAssertionEvaluator,
     DelegationCorrectnessEvaluator,
+    ClarifyingQuestionsEvaluator,
 ]
 
 

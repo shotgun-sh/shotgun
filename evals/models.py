@@ -240,6 +240,14 @@ class ExpectedAgentOutput(BaseModel):
     expected_sub_agent: str | None = Field(
         default=None, description="Expected sub-agent for Router delegation"
     )
+    expect_clarifying_questions: bool = Field(
+        default=False,
+        description="Whether the agent should ask clarifying questions",
+    )
+    min_clarifying_questions: int = Field(
+        default=1,
+        description="Minimum number of clarifying questions expected (when expect_clarifying_questions=True)",
+    )
 
 
 # ============================================================================
@@ -349,6 +357,9 @@ class EvaluationReport(BaseModel):
     """Comprehensive report from evaluation run."""
 
     suite_name: str = Field(..., description="Evaluation suite name")
+    model_name: str | None = Field(
+        default=None, description="Model used for evaluation (if overridden)"
+    )
     total_test_cases: int = Field(..., description="Total test cases run")
     passed_test_cases: int = Field(..., description="Number of passed tests")
     failed_test_cases: int = Field(..., description="Number of failed tests")

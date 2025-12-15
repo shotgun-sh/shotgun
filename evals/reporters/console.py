@@ -211,3 +211,85 @@ class ConsoleReporter:
             report: The evaluation report to print
         """
         print(self.format_report(report))
+
+    def print_comparison_report(self, reports: list[EvaluationReport]) -> None:
+        """Print a comparison report for multiple models.
+
+        Args:
+            reports: List of evaluation reports (one per model)
+        """
+        if not reports:
+            return
+
+        output = StringIO()
+
+        # Header
+        output.write("\n")
+        output.write(self._color("=" * 80, self.BOLD))
+        output.write("\n")
+        output.write(
+            self._color(f"  MODEL COMPARISON: {reports[0].suite_name}", self.BOLD)
+        )
+        output.write("\n")
+        output.write(self._color("=" * 80, self.BOLD))
+        output.write("\n\n")
+
+        # Table header
+        output.write(
+            f"  {'Model':<25} {'Pass Rate':>12} {'Score':>10} "
+            f"{'Duration':>10} {'Tokens':>12}\n"
+        )
+        output.write(f"  {'-' * 25} {'-' * 12} {'-' * 10} {'-' * 10} {'-' * 12}\n")
+
+        # Table rows
+        for report in reports:
+            model_name = report.model_name or "default"
+            pass_rate = f"{report.pass_rate * 100:.1f}%"
+            score = f"{report.average_score:.2f}/5" if report.average_score else "N/A"
+            duration = f"{report.total_duration_seconds:.1f}s"
+            tokens = f"{report.total_tokens_used:,}"
+
+            # Color based on pass rate
+            if report.pass_rate >= 0.8:
+                pass_rate_str = self._color(pass_rate, self.GREEN)
+            elif report.pass_rate >= 0.5:
+                pass_rate_str = self._color(pass_rate, self.YELLOW)
+            else:
+                pass_rate_str = self._color(pass_rate, self.RED)
+
+            # Color based on score
+            if report.average_score:
+                score_str = self._color(score, self._score_color(report.average_score))
+            else:
+                score_str = score
+
+            output.write(
+                f"  {model_name:<25} {pass_rate_str:>12} {score_str:>10} "
+                f"{duration:>10} {tokens:>12}\n"
+            )
+
+        output.write("\n")
+
+        # Find best model
+        best_by_score = max(
+            (r for r in reports if r.average_score),
+            key=lambda r: r.average_score or 0,
+            default=None,
+        )
+        best_by_pass_rate = max(reports, key=lambda r: r.pass_rate)
+
+        if best_by_score:
+            output.write(
+                f"  Best by score:     {self._color(best_by_score.model_name or 'default', self.GREEN)} "
+                f"({best_by_score.average_score:.2f}/5)\n"
+            )
+        output.write(
+            f"  Best by pass rate: {self._color(best_by_pass_rate.model_name or 'default', self.GREEN)} "
+            f"({best_by_pass_rate.pass_rate * 100:.1f}%)\n"
+        )
+
+        output.write("\n")
+        output.write(self._color("=" * 80, self.BOLD))
+        output.write("\n")
+
+        print(output.getvalue())
