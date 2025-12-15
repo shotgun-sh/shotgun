@@ -108,15 +108,23 @@ class DisallowedToolUsageEvaluator(BaseEvaluator):
     ) -> EvaluatorResult:
         """Check for disallowed tool usage."""
         tools_used = set(actual_output.tools_used)
-        violations = tools_used.intersection(self.DISALLOWED_TOOLS)
 
-        if violations:
+        # Check global disallowed tools
+        global_violations = tools_used.intersection(self.DISALLOWED_TOOLS)
+
+        # Check test case specific disallowed tools
+        test_case_disallowed = set(test_case.expected.disallowed_tools)
+        test_case_violations = tools_used.intersection(test_case_disallowed)
+
+        all_violations = global_violations | test_case_violations
+
+        if all_violations:
             return EvaluatorResult(
                 evaluator_name=self.name,
                 passed=False,
                 severity=self.severity,
-                reasoning=f"Router used disallowed tools: {', '.join(sorted(violations))}",
-                details={"violations": sorted(violations)},
+                reasoning=f"Router used disallowed tools: {', '.join(sorted(all_violations))}",
+                details={"violations": sorted(all_violations)},
             )
 
         return EvaluatorResult(

@@ -209,9 +209,12 @@ class ExpectedAgentOutput(BaseModel):
         description="Minimum clarifying questions expected. None means don't expect any.",
     )
 
-    # Tools - which tools should be called
+    # Tools - which tools should/shouldn't be called
     expected_tools: list[str] = Field(
         default_factory=list, description="Tools that must be invoked"
+    )
+    disallowed_tools: list[str] = Field(
+        default_factory=list, description="Tools that must NOT be invoked"
     )
 
     # Delegation - which sub-agent should be delegated to
