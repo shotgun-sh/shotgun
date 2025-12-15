@@ -219,10 +219,10 @@ class ExpectedAgentOutput(BaseModel):
         default=None, description="Expected sub-agent for Router delegation"
     )
 
-    # Plan description - for judge to evaluate plan quality
-    expected_plan_description: str | None = Field(
+    # Expected response - for judge to evaluate response quality (clarifying questions or plan)
+    expected_response: str | None = Field(
         default=None,
-        description="Description of expected plan for judge evaluation (e.g., 'first step is research, second is spec')",
+        description="Description of expected response for judge evaluation (e.g., 'questions should be high-level and relevant' or 'plan should start with research')",
     )
 
     # Response content checks

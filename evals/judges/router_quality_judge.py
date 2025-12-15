@@ -163,13 +163,17 @@ class RouterQualityJudge:
         system_prompt = f"""You are an expert evaluator for AI agent systems.
 Your task is to evaluate a Router agent's performance on the "{dimension.value}" dimension.
 
+<RUBRIC>
 {rubric.rubric_text}
+</RUBRIC>
 
-Instructions:
-1. Read the user's original request and the Router's response/actions carefully.
-2. Apply the rubric to score the Router's performance on a 1-5 scale.
-3. Provide clear reasoning for your score.
-4. A score of 3 or higher indicates a passing evaluation.
+<INSTRUCTIONS>
+1. Read the USER_REQUEST and the ROUTER_RESPONSE carefully.
+2. If EXPECTED_RESPONSE_CRITERIA is provided, use it as guidance for what a good response looks like.
+3. Apply the RUBRIC to score the Router's performance on a 1-5 scale.
+4. Provide clear reasoning for your score.
+5. A score of 3 or higher indicates a passing evaluation.
+</INSTRUCTIONS>
 
 Be objective and consistent in your scoring. Focus only on the {dimension.value} dimension."""
 
@@ -206,19 +210,32 @@ Be objective and consistent in your scoring. Focus only on the {dimension.value}
         agent = self._create_judge_agent(dimension)
 
         # Construct the evaluation prompt
+        expected_response_section = ""
+        if test_case.expected.expected_response:
+            expected_response_section = f"""
+<EXPECTED_RESPONSE_CRITERIA>
+{test_case.expected.expected_response}
+</EXPECTED_RESPONSE_CRITERIA>
+"""
+
+        clarifying_questions = ", ".join(actual_output.clarifying_questions) if actual_output.clarifying_questions else "None"
+
         prompt = f"""
-**User Request:**
+<USER_REQUEST>
 {test_case.inputs.prompt}
+</USER_REQUEST>
 
-**Router Response:**
+<ROUTER_RESPONSE>
 {actual_output.response}
+</ROUTER_RESPONSE>
 
-**Router Actions:**
-- Tools used: {", ".join(actual_output.tools_used) or "None"}
-- Delegated to: {actual_output.delegated_sub_agent or "None"}
-- Clarifying questions: {", ".join(actual_output.clarifying_questions) if actual_output.clarifying_questions else "None"}
-
-Please evaluate the Router's performance on the "{dimension.value}" dimension."""
+<ROUTER_ACTIONS>
+Tools used: {", ".join(actual_output.tools_used) or "None"}
+Delegated to: {actual_output.delegated_sub_agent or "None"}
+Clarifying questions: {clarifying_questions}
+</ROUTER_ACTIONS>
+{expected_response_section}
+Evaluate the Router's performance on the "{dimension.value}" dimension."""
 
         with logfire.span(
             "eval.judge.dimension",

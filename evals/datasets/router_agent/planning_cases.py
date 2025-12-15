@@ -42,7 +42,7 @@ SPECIFIC_FEATURE_CREATES_PLAN = ShotgunTestCase(
     ),
     expected=ExpectedAgentOutput(
         expected_tools=["create_plan"],
-        expected_plan_description="Plan should have research as the first step and writing a specification as the second step",
+        expected_response="Plan should have research as the first step and writing a specification as the second step",
     ),
 )
 

@@ -14,7 +14,9 @@ Exports:
 """
 
 from evals.datasets.router_agent.clarifying_questions_cases import (
+    CACHE_REQUEST_ASKS_QUESTIONS,
     CLARIFYING_QUESTIONS_CASES,
+    PERFORMANCE_REQUEST_ASKS_QUESTIONS,
     VAGUE_PROMPT_CLARIFYING_QUESTIONS,
 )
 from evals.datasets.router_agent.planning_cases import (
@@ -36,6 +38,8 @@ __all__ = [
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
+    "PERFORMANCE_REQUEST_ASKS_QUESTIONS",
+    "CACHE_REQUEST_ASKS_QUESTIONS",
     # Planning test cases
     "FEATURE_REQUEST_ASKS_QUESTIONS",
     "COMPLEX_FEATURE_ASKS_QUESTIONS",

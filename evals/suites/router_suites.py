@@ -68,6 +68,8 @@ router_all = EvaluationSuite(
     description="All Router agent test cases",
     test_case_names=[
         "vague_prompt_clarifying_questions",
+        "performance_request_asks_questions",
+        "cache_request_asks_questions",
         "feature_request_asks_questions",
         "complex_feature_asks_questions",
         "specific_feature_creates_plan",
