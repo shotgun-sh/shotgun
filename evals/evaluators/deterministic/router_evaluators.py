@@ -435,7 +435,10 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
                 passed=True,
                 severity=failure_severity,
                 reasoning=f"Agent asked {question_count} clarifying question(s) (required: {min_questions}+)",
-                details={"questions_asked": questions, "min_required": [str(min_questions)]},
+                details={
+                    "questions_asked": questions,
+                    "min_required": [str(min_questions)],
+                },
             )
 
         if question_count > 0:
@@ -444,7 +447,10 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
                 passed=False,
                 severity=failure_severity,
                 reasoning=f"Agent asked {question_count} question(s) but {min_questions}+ required",
-                details={"questions_asked": questions, "min_required": [str(min_questions)]},
+                details={
+                    "questions_asked": questions,
+                    "min_required": [str(min_questions)],
+                },
             )
 
         return EvaluatorResult(

@@ -218,7 +218,11 @@ Be objective and consistent in your scoring. Focus only on the {dimension.value}
 </EXPECTED_RESPONSE_CRITERIA>
 """
 
-        clarifying_questions = ", ".join(actual_output.clarifying_questions) if actual_output.clarifying_questions else "None"
+        clarifying_questions = (
+            ", ".join(actual_output.clarifying_questions)
+            if actual_output.clarifying_questions
+            else "None"
+        )
 
         prompt = f"""
 <USER_REQUEST>
