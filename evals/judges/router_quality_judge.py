@@ -197,6 +197,57 @@ Be objective and consistent in your scoring."""
             },
         )
 
+    def _format_message_history(self, test_case: ShotgunTestCase) -> str:
+        """Format message history for the judge prompt.
+
+        Args:
+            test_case: Test case containing message history
+
+        Returns:
+            Formatted string representation of the conversation history
+        """
+        from pydantic_ai.messages import (
+            ModelRequest,
+            ModelResponse,
+            TextPart,
+            ToolCallPart,
+            ToolReturnPart,
+            UserPromptPart,
+        )
+
+        if not test_case.inputs.message_history:
+            return ""
+
+        lines = []
+        for msg in test_case.inputs.message_history:
+            if isinstance(msg, ModelRequest):
+                for req_part in msg.parts:
+                    if isinstance(req_part, UserPromptPart):
+                        lines.append(f"USER: {req_part.content}")
+                    elif isinstance(req_part, ToolReturnPart):
+                        # Skip tool returns in the display
+                        pass
+            elif isinstance(msg, ModelResponse):
+                for resp_part in msg.parts:
+                    if isinstance(resp_part, TextPart):
+                        lines.append(f"ROUTER: {resp_part.content}")
+                    elif isinstance(resp_part, ToolCallPart):
+                        if resp_part.tool_name == "final_result":
+                            args = resp_part.args
+                            if isinstance(args, dict):
+                                if args.get("response"):
+                                    lines.append(f"ROUTER: {args['response']}")
+                                if args.get("clarifying_questions"):
+                                    questions = args["clarifying_questions"]
+                                    lines.append(
+                                        f"ROUTER QUESTIONS: {', '.join(questions)}"
+                                    )
+
+        if not lines:
+            return ""
+
+        return "\n".join(lines)
+
     async def evaluate(
         self,
         test_case: ShotgunTestCase,
@@ -225,6 +276,16 @@ Be objective and consistent in your scoring."""
 </EXPECTED_RESPONSE_CRITERIA>
 """
 
+            # Include conversation history if available
+            conversation_history = self._format_message_history(test_case)
+            conversation_section = ""
+            if conversation_history:
+                conversation_section = f"""
+<CONVERSATION_HISTORY>
+{conversation_history}
+</CONVERSATION_HISTORY>
+"""
+
             clarifying_questions = (
                 ", ".join(actual_output.clarifying_questions)
                 if actual_output.clarifying_questions
@@ -232,7 +293,7 @@ Be objective and consistent in your scoring."""
             )
 
             prompt = f"""
-<USER_REQUEST>
+{conversation_section}<USER_REQUEST>
 {test_case.inputs.prompt}
 </USER_REQUEST>
 

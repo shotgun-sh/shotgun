@@ -29,12 +29,17 @@ from evals.models import (
 OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
     name="ollama_feature_plans_research_first",
     inputs=TestCaseInput(
-        # Final user message - just confirming to proceed
-        prompt="Yes, go ahead",
+        # User's answers to follow-up questions - triggers plan creation
+        prompt=(
+            "Q1: Should the spec cover only Ollama in v1, or design for other runtimes later?\n"
+            "A1: just ollama for now, we can extend later\n\n"
+            "Q2: Do you want concrete example configs in the spec?\n"
+            "A2: yes, include example configs"
+        ),
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(has_codebase_indexed=True, codebase_name="shotgun"),
         message_history=[
-            # Turn 1: User's initial prompt
+            # User's initial request
             ModelRequest(
                 parts=[
                     UserPromptPart(
@@ -42,18 +47,20 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
                     )
                 ]
             ),
-            # Turn 2: Router asks clarifying questions
+            # Router asks initial clarifying questions
             ModelResponse(
                 parts=[
                     ToolCallPart(
                         tool_name="final_result",
                         args={
-                            "response": "To write a useful spec, I need to narrow down a few aspects.",
+                            "response": "To help you get a useful, focused spec, I need to "
+                            "clarify your goals and constraints for local LLM support first.",
                             "clarifying_questions": [
-                                "What environment are you targeting (desktop, CLI, web)?",
-                                "Which runtimes/libraries (Ollama, llama.cpp, vLLM)?",
-                                "What use cases (chat, embeddings, agents)?",
-                                "Backend only or also UX/API surfaces?",
+                                "Where will this local LLM run: on developer machines only, "
+                                "end-user desktops, servers, or all of the above?",
+                                "What environments must we support initially?",
+                                "Which runtimes are in scope for v1?",
+                                "How should this integrate into the existing system?",
                             ],
                         },
                         tool_call_id="call_clarify_1",
@@ -61,7 +68,7 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
                 ],
                 model_name="eval-model",
             ),
-            # Turn 3: Tool return
+            # Tool return
             ModelRequest(
                 parts=[
                     ToolReturnPart(
@@ -71,33 +78,33 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
                     )
                 ]
             ),
-            # Turn 4: User answers clarifying questions
+            # User answers initial questions
             ModelRequest(
                 parts=[
                     UserPromptPart(
                         content=(
-                            "Q1: What environment are you targeting (desktop, CLI, web)?\n"
-                            "A1: desktop\n\n"
-                            "Q2: Which runtimes/libraries (Ollama, llama.cpp, vLLM)?\n"
-                            "A2: Ollama\n\n"
-                            "Q3: What use cases (chat, embeddings, agents)?\n"
-                            "A3: using it with the agents\n\n"
-                            "Q4: Backend only or also UX/API surfaces?\n"
-                            "A4: backend integration only"
+                            "Q1: Where will this local LLM run?\n"
+                            "A1: developer machines\n\n"
+                            "Q2: What environments must we support initially?\n"
+                            "A2: anything that runs ollama\n\n"
+                            "Q3: Which runtimes are in scope for v1?\n"
+                            "A3: ollama to start with\n\n"
+                            "Q4: How should this integrate?\n"
+                            "A4: just make it work like it does now but support ollama models too"
                         )
                     )
                 ]
             ),
-            # Turn 5: Router asks follow-up questions
+            # Router asks follow-up questions
             ModelResponse(
                 parts=[
                     ToolCallPart(
                         tool_name="final_result",
                         args={
-                            "response": "Got it. A few more questions to make sure the spec is complete.",
+                            "response": "Thanks for the details. A couple more questions to finalize the scope.",
                             "clarifying_questions": [
-                                "Should the spec cover model selection (choosing which local model to use)?",
-                                "Any specific error handling requirements (e.g., fallback to cloud if local fails)?",
+                                "Should the spec cover only Ollama in v1, or design for other runtimes later?",
+                                "Do you want concrete example configs in the spec?",
                             ],
                         },
                         tool_call_id="call_clarify_2",
@@ -105,55 +112,13 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
                 ],
                 model_name="eval-model",
             ),
-            # Turn 6: Tool return
+            # Tool return
             ModelRequest(
                 parts=[
                     ToolReturnPart(
                         tool_name="final_result",
                         content="Final result processed.",
                         tool_call_id="call_clarify_2",
-                    )
-                ]
-            ),
-            # Turn 7: User answers follow-up questions
-            ModelRequest(
-                parts=[
-                    UserPromptPart(
-                        content=(
-                            "Q1: Should the spec cover model selection (choosing which local model to use)?\n"
-                            "A1: Yes, cover model selection\n\n"
-                            "Q2: Any specific error handling requirements (e.g., fallback to cloud if local fails)?\n"
-                            "A2: No fallback needed, just fail gracefully if Ollama isn't running"
-                        )
-                    )
-                ]
-            ),
-            # Turn 8: Router confirms ready to proceed
-            ModelResponse(
-                parts=[
-                    ToolCallPart(
-                        tool_name="final_result",
-                        args={
-                            "response": (
-                                "Great, I have enough context. Ready to create a plan "
-                                "for the Ollama integration spec."
-                            ),
-                            "clarifying_questions": [
-                                "Should I proceed with creating the plan?"
-                            ],
-                        },
-                        tool_call_id="call_confirm",
-                    )
-                ],
-                model_name="eval-model",
-            ),
-            # Turn 9: Tool return
-            ModelRequest(
-                parts=[
-                    ToolReturnPart(
-                        tool_name="final_result",
-                        content="Final result processed.",
-                        tool_call_id="call_confirm",
                     )
                 ]
             ),
@@ -162,9 +127,9 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
     expected=ExpectedAgentOutput(
         expected_tools=["create_plan"],
         expected_response=(
-            "Plan should have codebase research (delegate_to_research) as the first step, "
-            "followed by asking more informed clarifying questions based on research, "
-            "and then writing the specification"
+            "Plan should start with researching/reviewing the existing codebase architecture "
+            "to understand current patterns before writing the specification. "
+            "The plan should be practical and grounded in understanding the existing code first."
         ),
     ),
 )
@@ -223,8 +188,9 @@ AUTH_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
     expected=ExpectedAgentOutput(
         expected_tools=["create_plan"],
         expected_response=(
-            "Plan should research the codebase first to understand existing patterns "
-            "and architecture before writing the authentication specification"
+            "Plan should start with researching/reviewing the existing codebase "
+            "to understand current auth patterns and architecture before writing the specification. "
+            "The plan should be practical and grounded in understanding the existing code first."
         ),
     ),
 )
@@ -279,9 +245,9 @@ CACHE_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
     expected=ExpectedAgentOutput(
         expected_tools=["create_plan"],
         expected_response=(
-            "Plan should research the codebase first to understand the current "
-            "architecture and how caching would integrate, then ask more informed "
-            "questions, then write the specification"
+            "Plan should start with researching/reviewing the existing codebase "
+            "to understand the current architecture and how caching would integrate. "
+            "The plan should be practical and grounded in understanding the existing code first."
         ),
     ),
 )

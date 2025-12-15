@@ -5,13 +5,14 @@ Wraps AgentManager.run() to capture evaluable outputs with Logfire tracing.
 """
 
 import logging
+import os
 import platform
 import time
 from pathlib import Path
 from typing import Any
 
 import logfire
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 
@@ -29,6 +30,44 @@ from evals.models import (
 from shotgun.agents.config.models import ModelName
 
 logger = logging.getLogger(__name__)
+
+
+async def inject_env_api_keys() -> None:
+    """Inject API keys from environment variables into the config manager.
+
+    This allows evals to use env vars for API keys. The keys are saved to the
+    config file so that any code path that reloads config will still have them.
+
+    Note: This modifies the user's config file at ~/.shotgun-sh/config.json.
+    The original values are preserved if they exist.
+    """
+    from shotgun.agents.config.manager import get_config_manager
+
+    config_manager = get_config_manager()
+    config = await config_manager.load(force_reload=True)
+
+    # Inject API keys from environment variables if not already set in config
+    modified = False
+
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key and config.openai.api_key is None:
+        config.openai.api_key = SecretStr(openai_key)
+        modified = True
+
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    if anthropic_key and config.anthropic.api_key is None:
+        config.anthropic.api_key = SecretStr(anthropic_key)
+        modified = True
+
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if gemini_key and config.google.api_key is None:
+        config.google.api_key = SecretStr(gemini_key)
+        modified = True
+
+    if modified:
+        # Save to disk so any code path that calls load() will get the keys
+        await config_manager.save(config)
+        logger.debug("Injected API keys from environment variables into config")
 
 
 class ExecutionError(Exception):
@@ -68,10 +107,11 @@ class RouterExecutor:
         self._configured = False
         self._working_directory = working_directory or Path.cwd()
 
-    def _ensure_configured(self) -> None:
-        """Ensure Logfire is configured. Raises if misconfigured."""
+    async def _ensure_configured(self) -> None:
+        """Ensure Logfire and API keys are configured. Raises if misconfigured."""
         if not self._configured:
             configure_logfire_or_fail()
+            await inject_env_api_keys()
             self._configured = True
 
     async def execute_case(
@@ -93,7 +133,7 @@ class RouterExecutor:
         Returns:
             ExecutionResult with captured output and trace reference
         """
-        self._ensure_configured()
+        await self._ensure_configured()
 
         with logfire.span(
             "eval.run_case",
