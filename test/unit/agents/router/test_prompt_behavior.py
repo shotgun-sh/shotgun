@@ -61,20 +61,22 @@ def test_prompt_contains_when_not_to_ask_section(router_prompt_content: str):
 
 def test_prompt_contains_anti_batch_example(router_prompt_content: str):
     """Test that prompt warns against batching multiple steps."""
-    assert "Don't batch steps" in router_prompt_content
-    assert "steps 1-5" in router_prompt_content.lower()
+    # BAD_EXAMPLE shows batching behavior to avoid
+    assert "Let me do steps 1-5 for you" in router_prompt_content
+    assert "runs all steps autonomously" in router_prompt_content.lower()
 
 
 def test_prompt_contains_good_incremental_example(router_prompt_content: str):
     """Test that prompt shows good incremental behavior example."""
-    assert "One step at a time" in router_prompt_content
+    # GOOD_EXAMPLE shows completing one step then waiting
     assert "Step 1 complete" in router_prompt_content
+    assert "Ready for step 2" in router_prompt_content
 
 
 def test_prompt_contains_scope_expansion_warning(router_prompt_content: str):
     """Test that prompt warns against autonomous scope expansion."""
-    assert "NEVER expand scope" in router_prompt_content
-    assert "Do EXACTLY What The User Says" in router_prompt_content
+    assert "Do not expand the scope automatically" in router_prompt_content
+    assert 'RULE name="Do What The User Says"' in router_prompt_content
 
 
 def test_prompt_contains_cascade_confirmation_rule(router_prompt_content: str):
@@ -85,6 +87,6 @@ def test_prompt_contains_cascade_confirmation_rule(router_prompt_content: str):
 
 def test_prompt_contains_mode_system(router_prompt_content: str):
     """Test that prompt explains the Planning/Drafting mode system."""
-    assert "Planning Mode" in router_prompt_content
-    assert "Drafting Mode" in router_prompt_content
-    assert "MODE SYSTEM" in router_prompt_content
+    assert "PLANNING_MODE" in router_prompt_content
+    assert "DRAFTING_MODE" in router_prompt_content
+    assert "MODE_SYSTEM" in router_prompt_content

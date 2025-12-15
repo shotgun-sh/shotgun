@@ -259,7 +259,9 @@ async def get_provider_model(
     if provider_enum == ProviderType.OPENAI:
         api_key = _get_api_key(config.openai.api_key, "OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("OpenAI API key not configured. Set via config or OPENAI_API_KEY env var.")
+            raise ValueError(
+                "OpenAI API key not configured. Set via config or OPENAI_API_KEY env var."
+            )
 
         # Use requested model or default to gpt-5.1
         model_name = requested_model if requested_model else ModelName.GPT_5_1
@@ -308,7 +310,9 @@ async def get_provider_model(
     elif provider_enum == ProviderType.ANTHROPIC:
         api_key = _get_api_key(config.anthropic.api_key, "ANTHROPIC_API_KEY")
         if not api_key:
-            raise ValueError("Anthropic API key not configured. Set via config or ANTHROPIC_API_KEY env var.")
+            raise ValueError(
+                "Anthropic API key not configured. Set via config or ANTHROPIC_API_KEY env var."
+            )
 
         # Use requested model or default to claude-haiku-4-5
         model_name = requested_model if requested_model else ModelName.CLAUDE_HAIKU_4_5
@@ -330,7 +334,9 @@ async def get_provider_model(
     elif provider_enum == ProviderType.GOOGLE:
         api_key = _get_api_key(config.google.api_key, "GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("Gemini API key not configured. Set via config or GEMINI_API_KEY env var.")
+            raise ValueError(
+                "Gemini API key not configured. Set via config or GEMINI_API_KEY env var."
+            )
 
         # Use requested model or default to gemini-2.5-pro
         model_name = requested_model if requested_model else ModelName.GEMINI_2_5_PRO
@@ -372,7 +378,9 @@ def _has_provider_key(config: "ShotgunConfig", provider: ProviderType) -> bool:
     return False
 
 
-def _get_api_key(config_key: SecretStr | None, env_var_name: str | None = None) -> str | None:
+def _get_api_key(
+    config_key: SecretStr | None, env_var_name: str | None = None
+) -> str | None:
     """Get API key from config or environment variable.
 
     Args:
