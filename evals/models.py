@@ -467,6 +467,19 @@ class DimensionScoreOutput(BaseModel):
     )
 
 
+class AllDimensionsScoreOutput(BaseModel):
+    """Structured output from LLM judge for all dimensions in one call."""
+
+    delegation_rationale: DimensionScoreOutput = Field(
+        ..., description="Score for delegation rationale quality"
+    )
+    context_handling: DimensionScoreOutput = Field(
+        ..., description="Score for context handling"
+    )
+    clarity: DimensionScoreOutput = Field(..., description="Score for clarity")
+    relevance: DimensionScoreOutput = Field(..., description="Score for relevance")
+
+
 class RouterJudgeResult(BaseModel):
     """Complete result from Router quality judge evaluation."""
 

@@ -29,17 +29,8 @@ from evals.models import (
 OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
     name="ollama_feature_plans_research_first",
     inputs=TestCaseInput(
-        # The final user message (answers to clarifying questions)
-        prompt=(
-            "Q1: What environment are you targeting?\n"
-            "A1: desktop\n\n"
-            "Q2: Which runtimes/libraries?\n"
-            "A2: Ollama\n\n"
-            "Q3: What use cases?\n"
-            "A3: using it with agents\n\n"
-            "Q4: Backend only or UX/API?\n"
-            "A4: backend integration"
-        ),
+        # Final user message - just confirming to proceed
+        prompt="Yes, go ahead",
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(has_codebase_indexed=True, codebase_name="shotgun"),
         message_history=[
@@ -51,7 +42,7 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
                     )
                 ]
             ),
-            # Turn 2: Router asks clarifying questions via final_result tool
+            # Turn 2: Router asks clarifying questions
             ModelResponse(
                 parts=[
                     ToolCallPart(
@@ -65,18 +56,104 @@ OLLAMA_FEATURE_PLANS_RESEARCH_FIRST = ShotgunTestCase(
                                 "Backend only or also UX/API surfaces?",
                             ],
                         },
-                        tool_call_id="call_clarify",
+                        tool_call_id="call_clarify_1",
                     )
                 ],
                 model_name="eval-model",
             ),
-            # Turn 3: Tool return (system acknowledgment)
+            # Turn 3: Tool return
             ModelRequest(
                 parts=[
                     ToolReturnPart(
                         tool_name="final_result",
                         content="Final result processed.",
-                        tool_call_id="call_clarify",
+                        tool_call_id="call_clarify_1",
+                    )
+                ]
+            ),
+            # Turn 4: User answers clarifying questions
+            ModelRequest(
+                parts=[
+                    UserPromptPart(
+                        content=(
+                            "Q1: What environment are you targeting (desktop, CLI, web)?\n"
+                            "A1: desktop\n\n"
+                            "Q2: Which runtimes/libraries (Ollama, llama.cpp, vLLM)?\n"
+                            "A2: Ollama\n\n"
+                            "Q3: What use cases (chat, embeddings, agents)?\n"
+                            "A3: using it with the agents\n\n"
+                            "Q4: Backend only or also UX/API surfaces?\n"
+                            "A4: backend integration only"
+                        )
+                    )
+                ]
+            ),
+            # Turn 5: Router asks follow-up questions
+            ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="final_result",
+                        args={
+                            "response": "Got it. A few more questions to make sure the spec is complete.",
+                            "clarifying_questions": [
+                                "Should the spec cover model selection (choosing which local model to use)?",
+                                "Any specific error handling requirements (e.g., fallback to cloud if local fails)?",
+                            ],
+                        },
+                        tool_call_id="call_clarify_2",
+                    )
+                ],
+                model_name="eval-model",
+            ),
+            # Turn 6: Tool return
+            ModelRequest(
+                parts=[
+                    ToolReturnPart(
+                        tool_name="final_result",
+                        content="Final result processed.",
+                        tool_call_id="call_clarify_2",
+                    )
+                ]
+            ),
+            # Turn 7: User answers follow-up questions
+            ModelRequest(
+                parts=[
+                    UserPromptPart(
+                        content=(
+                            "Q1: Should the spec cover model selection (choosing which local model to use)?\n"
+                            "A1: Yes, cover model selection\n\n"
+                            "Q2: Any specific error handling requirements (e.g., fallback to cloud if local fails)?\n"
+                            "A2: No fallback needed, just fail gracefully if Ollama isn't running"
+                        )
+                    )
+                ]
+            ),
+            # Turn 8: Router confirms ready to proceed
+            ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="final_result",
+                        args={
+                            "response": (
+                                "Great, I have enough context. Ready to create a plan "
+                                "for the Ollama integration spec."
+                            ),
+                            "clarifying_questions": [
+                                "Should I proceed with creating the plan?"
+                            ],
+                        },
+                        tool_call_id="call_confirm",
+                    )
+                ],
+                model_name="eval-model",
+            ),
+            # Turn 9: Tool return
+            ModelRequest(
+                parts=[
+                    ToolReturnPart(
+                        tool_name="final_result",
+                        content="Final result processed.",
+                        tool_call_id="call_confirm",
                     )
                 ]
             ),
