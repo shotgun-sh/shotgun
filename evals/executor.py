@@ -196,6 +196,10 @@ class RouterExecutor:
             # Create agent manager with the correct agent type
             manager = AgentManager(deps=deps, initial_type=shotgun_agent_type)
 
+            # Set message history if provided (for multi-turn conversation tests)
+            if test_case.inputs.message_history:
+                manager.message_history = list(test_case.inputs.message_history)
+
             # Time the execution
             start_time = time.time()
 
