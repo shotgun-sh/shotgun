@@ -6,10 +6,12 @@ Contains test cases for evaluating Router agent behavior.
 Test case categories:
 - Clarifying questions: Tests Router asks questions for vague/ambiguous prompts
 - Planning: Tests Router creates appropriate plans for feature requests
+- Research planning: Tests Router plans research-first when adding features to codebase
 
 Exports:
 - CLARIFYING_QUESTIONS_CASES: List of clarifying questions test cases
 - PLANNING_CASES: List of planning behavior test cases
+- RESEARCH_PLANNING_CASES: List of research-first planning test cases
 - ALL_ROUTER_CASES: Dict mapping test case names to test case objects
 """
 
@@ -26,16 +28,24 @@ from evals.datasets.router_agent.planning_cases import (
     PLANNING_CASES,
     SPECIFIC_FEATURE_CREATES_PLAN,
 )
+from evals.datasets.router_agent.research_planning_cases import (
+    AUTH_FEATURE_PLANS_RESEARCH_FIRST,
+    CACHE_FEATURE_PLANS_RESEARCH_FIRST,
+    OLLAMA_FEATURE_PLANS_RESEARCH_FIRST,
+    RESEARCH_PLANNING_CASES,
+)
 
 # Index of all Router test cases by name for discovery
 ALL_ROUTER_CASES = {
-    case.name: case for case in CLARIFYING_QUESTIONS_CASES + PLANNING_CASES
+    case.name: case
+    for case in CLARIFYING_QUESTIONS_CASES + PLANNING_CASES + RESEARCH_PLANNING_CASES
 }
 
 __all__ = [
     # Collections
     "CLARIFYING_QUESTIONS_CASES",
     "PLANNING_CASES",
+    "RESEARCH_PLANNING_CASES",
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
@@ -46,4 +56,8 @@ __all__ = [
     "FEATURE_REQUEST_ASKS_QUESTIONS",
     "COMPLEX_FEATURE_ASKS_QUESTIONS",
     "SPECIFIC_FEATURE_CREATES_PLAN",
+    # Research planning test cases
+    "OLLAMA_FEATURE_PLANS_RESEARCH_FIRST",
+    "AUTH_FEATURE_PLANS_RESEARCH_FIRST",
+    "CACHE_FEATURE_PLANS_RESEARCH_FIRST",
 ]

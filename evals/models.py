@@ -11,6 +11,7 @@ Note: This is evaluation-specific code, not part of the main Shotgun codebase.
 from enum import Enum
 
 from pydantic import BaseModel, Field
+from pydantic_ai.messages import ModelMessage
 
 # ============================================================================
 # Constants
@@ -159,6 +160,10 @@ class TestCaseInput(BaseModel):
     context: TestCaseContext = Field(
         default_factory=TestCaseContext,
         description="Test context (codebase state, etc.)",
+    )
+    message_history: list[ModelMessage] | None = Field(
+        default=None,
+        description="Optional message history for multi-turn conversations",
     )
 
 
@@ -460,6 +465,19 @@ class DimensionScoreOutput(BaseModel):
     passed: bool = Field(
         ..., description="Whether the minimum threshold was met (score >= 3)"
     )
+
+
+class AllDimensionsScoreOutput(BaseModel):
+    """Structured output from LLM judge for all dimensions in one call."""
+
+    delegation_rationale: DimensionScoreOutput = Field(
+        ..., description="Score for delegation rationale quality"
+    )
+    context_handling: DimensionScoreOutput = Field(
+        ..., description="Score for context handling"
+    )
+    clarity: DimensionScoreOutput = Field(..., description="Score for clarity")
+    relevance: DimensionScoreOutput = Field(..., description="Score for relevance")
 
 
 class RouterJudgeResult(BaseModel):

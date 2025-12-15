@@ -16,6 +16,7 @@ from pydantic_ai import Agent
 
 from evals.models import (
     AgentExecutionOutput,
+    AllDimensionsScoreOutput,
     DimensionScoreOutput,
     EvaluationResult,
     JudgeModelConfig,
@@ -147,114 +148,112 @@ class RouterQualityJudge:
         self.dimensions = dimensions or list(RouterDimension)
         self.rubrics = {dim: DEFAULT_RUBRICS[dim] for dim in self.dimensions}
 
-    def _create_judge_agent(
-        self, dimension: RouterDimension
-    ) -> Agent[None, DimensionScoreOutput]:
-        """Create a Pydantic AI agent for a specific dimension evaluation.
-
-        Args:
-            dimension: The dimension to create a judge for
+    def _create_combined_judge_agent(self) -> Agent[None, AllDimensionsScoreOutput]:
+        """Create a Pydantic AI agent that evaluates all dimensions in one call.
 
         Returns:
-            Configured Agent for dimension evaluation
+            Configured Agent for combined dimension evaluation
         """
-        rubric = self.rubrics[dimension]
+        # Build rubrics section with all dimensions
+        rubrics_section = ""
+        for dimension in self.dimensions:
+            rubric = self.rubrics[dimension]
+            tag_name = f"{dimension.value.upper()}_RUBRIC"
+            rubrics_section += f"""
+<{tag_name}>
+{rubric.rubric_text}
+</{tag_name}>
+"""
 
         system_prompt = f"""You are an expert evaluator for AI agent systems.
-Your task is to evaluate a Router agent's performance on the "{dimension.value}" dimension.
+Evaluate the Router agent's performance on ALL of the following dimensions.
 
-<RUBRIC>
-{rubric.rubric_text}
-</RUBRIC>
+For EACH dimension you must provide:
+- score: 1-5 (where 3+ is passing)
+- reasoning: Clear explanation justifying the score
+- passed: true if score >= 3, false otherwise
+
+{rubrics_section}
 
 <INSTRUCTIONS>
 1. Read the USER_REQUEST and the ROUTER_RESPONSE carefully.
 2. If EXPECTED_RESPONSE_CRITERIA is provided, use it as guidance for what a good response looks like.
-3. Apply the RUBRIC to score the Router's performance on a 1-5 scale.
-4. Provide clear reasoning for your score.
-5. A score of 3 or higher indicates a passing evaluation.
+3. Apply each RUBRIC to score the Router's performance on that dimension.
+4. Provide clear, specific reasoning for each score.
+5. Evaluate each dimension independently.
 </INSTRUCTIONS>
 
-Be objective and consistent in your scoring. Focus only on the {dimension.value} dimension."""
+Be objective and consistent in your scoring."""
 
         model_string = self.model_config.to_model_string()
 
-        # Use type: ignore because the model string is dynamically constructed
-        # from configuration, so mypy can't verify it matches the literal types
         return Agent(  # type: ignore[call-overload,no-any-return]
             model=model_string,
             system_prompt=system_prompt,
-            output_type=DimensionScoreOutput,
+            output_type=AllDimensionsScoreOutput,
             model_settings={
                 "temperature": self.model_config.temperature,
                 "max_tokens": self.model_config.max_tokens,
             },
         )
 
-    async def evaluate_dimension(
-        self,
-        dimension: RouterDimension,
-        test_case: ShotgunTestCase,
-        actual_output: AgentExecutionOutput,
-    ) -> DimensionScoreOutput:
-        """Evaluate a single dimension using LLM judge.
+    def _format_message_history(self, test_case: ShotgunTestCase) -> str:
+        """Format message history for the judge prompt.
 
         Args:
-            dimension: The dimension to evaluate
-            test_case: The test case being evaluated
-            actual_output: The Router's actual output
+            test_case: Test case containing message history
 
         Returns:
-            DimensionScoreOutput with score, reasoning, and pass status
+            Formatted string representation of the conversation history
         """
-        agent = self._create_judge_agent(dimension)
-
-        # Construct the evaluation prompt
-        expected_response_section = ""
-        if test_case.expected.expected_response:
-            expected_response_section = f"""
-<EXPECTED_RESPONSE_CRITERIA>
-{test_case.expected.expected_response}
-</EXPECTED_RESPONSE_CRITERIA>
-"""
-
-        clarifying_questions = (
-            ", ".join(actual_output.clarifying_questions)
-            if actual_output.clarifying_questions
-            else "None"
+        from pydantic_ai.messages import (
+            ModelRequest,
+            ModelResponse,
+            TextPart,
+            ToolCallPart,
+            ToolReturnPart,
+            UserPromptPart,
         )
 
-        prompt = f"""
-<USER_REQUEST>
-{test_case.inputs.prompt}
-</USER_REQUEST>
+        if not test_case.inputs.message_history:
+            return ""
 
-<ROUTER_RESPONSE>
-{actual_output.response}
-</ROUTER_RESPONSE>
+        lines = []
+        for msg in test_case.inputs.message_history:
+            if isinstance(msg, ModelRequest):
+                for req_part in msg.parts:
+                    if isinstance(req_part, UserPromptPart):
+                        lines.append(f"USER: {req_part.content}")
+                    elif isinstance(req_part, ToolReturnPart):
+                        # Skip tool returns in the display
+                        pass
+            elif isinstance(msg, ModelResponse):
+                for resp_part in msg.parts:
+                    if isinstance(resp_part, TextPart):
+                        lines.append(f"ROUTER: {resp_part.content}")
+                    elif isinstance(resp_part, ToolCallPart):
+                        if resp_part.tool_name == "final_result":
+                            args = resp_part.args
+                            if isinstance(args, dict):
+                                if args.get("response"):
+                                    lines.append(f"ROUTER: {args['response']}")
+                                if args.get("clarifying_questions"):
+                                    questions = args["clarifying_questions"]
+                                    lines.append(
+                                        f"ROUTER QUESTIONS: {', '.join(questions)}"
+                                    )
 
-<ROUTER_ACTIONS>
-Tools used: {", ".join(actual_output.tools_used) or "None"}
-Delegated to: {actual_output.delegated_sub_agent or "None"}
-Clarifying questions: {clarifying_questions}
-</ROUTER_ACTIONS>
-{expected_response_section}
-Evaluate the Router's performance on the "{dimension.value}" dimension."""
+        if not lines:
+            return ""
 
-        with logfire.span(
-            "eval.judge.dimension",
-            dimension=dimension.value,
-            test_case_name=test_case.name,
-        ):
-            result = await agent.run(prompt)
-            return result.output
+        return "\n".join(lines)
 
     async def evaluate(
         self,
         test_case: ShotgunTestCase,
         actual_output: AgentExecutionOutput,
     ) -> RouterJudgeResult:
-        """Evaluate all dimensions for a Router output.
+        """Evaluate all dimensions for a Router output in a single LLM call.
 
         Args:
             test_case: The test case being evaluated
@@ -268,22 +267,73 @@ Evaluate the Router's performance on the "{dimension.value}" dimension."""
             test_case_name=test_case.name,
             dimensions=[d.value for d in self.dimensions],
         ):
-            dimension_scores: dict[str, DimensionScoreOutput] = {}
+            # Build the evaluation prompt
+            expected_response_section = ""
+            if test_case.expected.expected_response:
+                expected_response_section = f"""
+<EXPECTED_RESPONSE_CRITERIA>
+{test_case.expected.expected_response}
+</EXPECTED_RESPONSE_CRITERIA>
+"""
 
-            for dimension in self.dimensions:
-                try:
-                    score = await self.evaluate_dimension(
-                        dimension, test_case, actual_output
-                    )
-                    dimension_scores[dimension.value] = score
-                except Exception as e:
-                    logger.exception(f"Failed to evaluate dimension {dimension.value}")
-                    # Provide a failing score on error
-                    dimension_scores[dimension.value] = DimensionScoreOutput(
+            # Include conversation history if available
+            conversation_history = self._format_message_history(test_case)
+            conversation_section = ""
+            if conversation_history:
+                conversation_section = f"""
+<CONVERSATION_HISTORY>
+{conversation_history}
+</CONVERSATION_HISTORY>
+"""
+
+            clarifying_questions = (
+                ", ".join(actual_output.clarifying_questions)
+                if actual_output.clarifying_questions
+                else "None"
+            )
+
+            prompt = f"""
+{conversation_section}<USER_REQUEST>
+{test_case.inputs.prompt}
+</USER_REQUEST>
+
+<ROUTER_RESPONSE>
+{actual_output.response}
+</ROUTER_RESPONSE>
+
+<ROUTER_ACTIONS>
+Tools used: {", ".join(actual_output.tools_used) or "None"}
+Delegated to: {actual_output.delegated_sub_agent or "None"}
+Clarifying questions: {clarifying_questions}
+</ROUTER_ACTIONS>
+{expected_response_section}
+Evaluate the Router's performance on all dimensions."""
+
+            # Create combined agent and make single LLM call
+            agent = self._create_combined_judge_agent()
+
+            try:
+                result = await agent.run(prompt)
+                combined_output = result.output
+
+                # Extract dimension scores from combined output
+                dimension_scores: dict[str, DimensionScoreOutput] = {
+                    "delegation_rationale": combined_output.delegation_rationale,
+                    "context_handling": combined_output.context_handling,
+                    "clarity": combined_output.clarity,
+                    "relevance": combined_output.relevance,
+                }
+            except Exception as e:
+                logger.exception("Failed to evaluate dimensions")
+                # Provide failing scores on error
+                dimension_scores = {
+                    dim.value: DimensionScoreOutput(
                         score=1,
                         reasoning=f"Evaluation failed: {e!s}",
                         passed=False,
                     )
+                    for dim in self.dimensions
+                }
 
             # Calculate weighted average
             total_weight = sum(self.rubrics[dim].weight for dim in self.dimensions)
