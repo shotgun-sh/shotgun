@@ -42,6 +42,7 @@ from evals.models import (
     DimensionAggregate,
     # Judge output models
     DimensionScoreOutput,
+    DimensionSource,
     # Evaluation models
     EvaluationContext,
     EvaluationReport,
@@ -108,6 +109,7 @@ __all__ = [
     "RouterJudgeResult",
     # Aggregation models
     "DimensionAggregate",
+    "DimensionSource",
     "AggregatedResult",
     # Tracing
     "TraceRef",

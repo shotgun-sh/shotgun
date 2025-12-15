@@ -10,10 +10,11 @@ Into a final score and pass/fail determination.
 """
 
 from evals.aggregators.router_aggregator import RouterAggregator
-from evals.models import AggregatedResult, DimensionAggregate
+from evals.models import AggregatedResult, DimensionAggregate, DimensionSource
 
 __all__ = [
     "RouterAggregator",
     "AggregatedResult",
     "DimensionAggregate",
+    "DimensionSource",
 ]

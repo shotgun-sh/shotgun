@@ -108,6 +108,13 @@ class EvaluatorName(str, Enum):
     DELEGATION_CORRECTNESS = "delegation_correctness"
 
 
+class DimensionSource(str, Enum):
+    """Source of an evaluation dimension score."""
+
+    DETERMINISTIC = "deterministic"
+    JUDGE = "judge"
+
+
 # ============================================================================
 # Router Evaluation Dimensions
 # ============================================================================
@@ -531,9 +538,7 @@ class DimensionAggregate(BaseModel):
     dimension: str = Field(..., description="Dimension name")
     score: float = Field(..., ge=0.0, le=5.0, description="Average score (1-5 scale)")
     passed: bool = Field(..., description="Whether dimension passed")
-    source: str = Field(
-        ..., description="Source of this dimension (deterministic/judge)"
-    )
+    source: DimensionSource = Field(..., description="Source of this dimension")
 
 
 class AggregatedResult(BaseModel):

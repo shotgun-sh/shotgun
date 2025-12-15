@@ -425,7 +425,10 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
         failure_severity = EvaluatorSeverity.HARD
 
         # Get minimum question count (defaults to 1)
-        min_questions = expected_output.min_clarifying_questions
+        # expected_output is guaranteed non-None here since expect_questions=True requires it
+        min_questions = (
+            expected_output.min_clarifying_questions if expected_output else 1
+        )
 
         # Check if agent asked clarifying questions
         questions = actual_output.clarifying_questions or []

@@ -16,6 +16,7 @@ from evals.models import (
     AgentExecutionOutput,
     AggregatedResult,
     DimensionAggregate,
+    DimensionSource,
     EvaluationResult,
     EvaluatorResult,
     EvaluatorSeverity,
@@ -93,7 +94,7 @@ class RouterAggregator:
                     dimension=f"deterministic.{result.evaluator_name}",
                     score=5.0 if result.passed else 1.0,
                     passed=result.passed,
-                    source="deterministic",
+                    source=DimensionSource.DETERMINISTIC,
                 )
             )
 
@@ -105,7 +106,7 @@ class RouterAggregator:
                         dimension=f"judge.{dim_name}",
                         score=float(dim_score.score),
                         passed=dim_score.passed,
-                        source="judge",
+                        source=DimensionSource.JUDGE,
                     )
                 )
 
