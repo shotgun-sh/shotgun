@@ -67,13 +67,19 @@ router_all = EvaluationSuite(
     name="router_all",
     description="All Router agent test cases",
     test_case_names=[
+        # Clarifying questions cases
         "vague_prompt_clarifying_questions",
         "performance_request_asks_questions",
         "cache_request_asks_questions",
         "open_source_models_asks_questions",
+        # Planning cases
         "feature_request_asks_questions",
         "complex_feature_asks_questions",
         "specific_feature_creates_plan",
+        # Research planning cases
+        "ollama_feature_plans_research_first",
+        "auth_feature_plans_research_first",
+        "cache_feature_plans_research_first",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],
