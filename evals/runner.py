@@ -13,24 +13,29 @@ Usage:
     python -m evals.runner --suite router_smoke --models anthropic
 """
 
-import argparse
-import asyncio
-import logging
-import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
+# Load .env file before any other imports so API keys are available
+from dotenv import load_dotenv
 
-import logfire
+load_dotenv(override=True)
 
-from evals.aggregators.router_aggregator import RouterAggregator
-from evals.datasets.router_agent import ALL_ROUTER_CASES
-from evals.evaluators.deterministic.router_evaluators import (
+import argparse  # noqa: E402
+import asyncio  # noqa: E402
+import logging  # noqa: E402
+import sys  # noqa: E402
+import time  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import logfire  # noqa: E402
+
+from evals.aggregators.router_aggregator import RouterAggregator  # noqa: E402
+from evals.datasets.router_agent import ALL_ROUTER_CASES  # noqa: E402
+from evals.evaluators.deterministic.router_evaluators import (  # noqa: E402
     run_all_deterministic_evaluators,
 )
-from evals.executor import ExecutionResult, RouterExecutor
-from evals.judges.router_quality_judge import RouterQualityJudge
-from evals.models import (
+from evals.executor import ExecutionResult, RouterExecutor  # noqa: E402
+from evals.judges.router_quality_judge import RouterQualityJudge  # noqa: E402
+from evals.models import (  # noqa: E402
     AgentExecutionOutput,
     AggregatedResult,
     EvaluationReport,
@@ -39,10 +44,14 @@ from evals.models import (
     TestCaseResult,
     TraceRef,
 )
-from evals.reporters.console import ConsoleReporter
-from evals.reporters.json_reporter import JSONReporter
-from evals.suites.router_suites import ROUTER_SUITES
-from shotgun.agents.config.models import MODEL_SPECS, ModelName, ProviderType
+from evals.reporters.console import ConsoleReporter  # noqa: E402
+from evals.reporters.json_reporter import JSONReporter  # noqa: E402
+from evals.suites.router_suites import ROUTER_SUITES  # noqa: E402
+from shotgun.agents.config.models import (  # noqa: E402
+    MODEL_SPECS,
+    ModelName,
+    ProviderType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +78,7 @@ def get_model_presets() -> dict[str, list[ModelName]]:
         # Fast models - one per provider (cheapest/fastest)
         "fast": [
             ModelName.CLAUDE_HAIKU_4_5,
-            ModelName.GPT_5_1_CODEX_MINI,
+            ModelName.GPT_5_1,
             ModelName.GEMINI_2_5_FLASH_LITE,
         ],
     }
@@ -336,7 +345,7 @@ class EvaluationRunner:
             # Run deterministic evaluators
             deterministic_results = run_all_deterministic_evaluators(
                 execution_result.output,
-                test_case.expected_output,
+                test_case.expected,
                 test_case,
             )
 

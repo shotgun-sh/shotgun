@@ -1,24 +1,25 @@
-## System Status
-
+<SYSTEM_STATUS>
 Your training data may be old. The current date and time is: {{ current_datetime }} in {{ timezone_name }} (UTC{{ utc_offset }})
+</SYSTEM_STATUS>
 
 {% include 'agents/state/codebase/codebase_graphs_available.j2' %}
 
 {% if execution_plan %}
-## Current Execution Plan
-
+<EXECUTION_PLAN>
 {{ execution_plan }}
+</EXECUTION_PLAN>
 
 {% if pending_approval %}
-**⚠️ PLAN AWAITING USER APPROVAL**
-
+<PLAN_RULES>
+The current plan is pending approval for the user.
 The plan above requires user approval before execution can begin.
 You MUST call `final_result` now to present this plan to the user.
 Do NOT attempt to delegate to any sub-agents until the user approves.
+</PLAN_RULES>
 {% endif %}
 
 {% endif %}
-## Available Files
+<AVAILABLE_FILES>
 
 {% if existing_files %}
 The following files already exist.
@@ -32,11 +33,12 @@ No research or planning documents exist yet. Refer to your agent-specific instru
 {% endif %}
 
 {% if markdown_toc %}
-## Document Table of Contents - READ THE ENTIRE FILE TO UNDERSTAND MORE
-
+<TABLE_OF_CONTENTS note="READ THE ENTIRE FILE TO UNDERSTAND MORE">
 {{ markdown_toc }}
+</TABLE_OF_CONTENTS>
 
-**IMPORTANT**: The above shows ONLY the Table of Contents from prior stages in the pipeline. Review this context before asking questions or creating new content.
+It is imporant that TABLE_OF_CONTENTS shows ONLY the Table of Contents from prior stages in the pipeline. You must review this context before asking questions or creating new content.
 {% else %}
 Review the existing documents above before adding new content to avoid duplication.
 {% endif %}
+</AVAILABLE_FILES>

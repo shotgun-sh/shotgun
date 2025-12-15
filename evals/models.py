@@ -9,7 +9,6 @@ Note: This is evaluation-specific code, not part of the main Shotgun codebase.
 """
 
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -132,31 +131,19 @@ class RouterDimension(str, Enum):
 
 
 # ============================================================================
-# Test Difficulty and Category
+# Test Case Context
 # ============================================================================
 
 
-class TestDifficulty(str, Enum):
-    """Test case difficulty classification."""
+class TestCaseContext(BaseModel):
+    """Typed context for test cases - what state exists before the test runs."""
 
-    EASY = "easy"
-    MEDIUM = "medium"
-    HARD = "hard"
-    EXPERT = "expert"
-
-
-class TestCategory(str, Enum):
-    """Test case category classification."""
-
-    BASIC_FUNCTIONALITY = "basic_functionality"
-    TOOL_USAGE = "tool_usage"
-    FILE_OPERATIONS = "file_operations"
-    ERROR_HANDLING = "error_handling"
-    MULTI_STEP = "multi_step"
-    EDGE_CASE = "edge_case"
-    REGRESSION = "regression"
-    INTEGRATION = "integration"
-    ROUTER_DELEGATION = "router_delegation"
+    has_codebase_indexed: bool = Field(
+        default=False, description="Whether a codebase graph is available"
+    )
+    codebase_name: str | None = Field(
+        default=None, description="Name of the indexed codebase"
+    )
 
 
 # ============================================================================
@@ -169,11 +156,10 @@ class TestCaseInput(BaseModel):
 
     prompt: str = Field(..., description="The user prompt/request to the agent")
     agent_type: AgentType = Field(..., description="Which agent to invoke")
-    context: dict[str, Any] | None = Field(
-        default=None,
-        description="Additional context (codebase state, prior outputs, etc.)",
+    context: TestCaseContext = Field(
+        default_factory=TestCaseContext,
+        description="Test context (codebase state, etc.)",
     )
-    enable_tools: bool = Field(default=True, description="Whether to enable tool usage")
 
 
 class FileOperation(BaseModel):
@@ -215,74 +201,37 @@ class AgentExecutionOutput(BaseModel):
 
 
 class ExpectedAgentOutput(BaseModel):
-    """Expected output specification for reference-based evaluation."""
+    """Expected output specification - only fields that are actually evaluated."""
 
+    # Clarifying questions - if set, expect at least this many questions
+    min_clarifying_questions: int | None = Field(
+        default=None,
+        description="Minimum clarifying questions expected. None means don't expect any.",
+    )
+
+    # Tools - which tools should be called
+    expected_tools: list[str] = Field(
+        default_factory=list, description="Tools that must be invoked"
+    )
+
+    # Delegation - which sub-agent should be delegated to
+    expected_sub_agent: str | None = Field(
+        default=None, description="Expected sub-agent for Router delegation"
+    )
+
+    # Plan description - for judge to evaluate plan quality
+    expected_plan_description: str | None = Field(
+        default=None,
+        description="Description of expected plan for judge evaluation (e.g., 'first step is research, second is spec')",
+    )
+
+    # Response content checks
     response_contains: list[str] = Field(
         default_factory=list,
         description="Keywords/phrases that must appear in response",
     )
     response_not_contains: list[str] = Field(
         default_factory=list, description="Keywords/phrases that must NOT appear"
-    )
-    file_operations: list[FileOperation] = Field(
-        default_factory=list, description="Expected file operations"
-    )
-    tools_used: list[str] = Field(
-        default_factory=list, description="Expected tools to be invoked"
-    )
-    min_response_length: int | None = Field(
-        default=None, description="Minimum response length in characters"
-    )
-    max_response_length: int | None = Field(
-        default=None, description="Maximum response length in characters"
-    )
-    max_duration_seconds: float | None = Field(
-        default=None, description="Maximum acceptable execution time"
-    )
-    max_tokens: int | None = Field(
-        default=None, description="Maximum acceptable token usage"
-    )
-
-    # Router-specific expected outputs
-    expected_sub_agent: str | None = Field(
-        default=None, description="Expected sub-agent for Router delegation"
-    )
-    expect_clarifying_questions: bool = Field(
-        default=False,
-        description="Whether the agent should ask clarifying questions",
-    )
-    min_clarifying_questions: int = Field(
-        default=1,
-        description="Minimum number of clarifying questions expected (when expect_clarifying_questions=True)",
-    )
-
-
-# ============================================================================
-# Test Case Metadata
-# ============================================================================
-
-
-class TestCaseMetadata(BaseModel):
-    """Metadata for organizing and filtering test cases."""
-
-    difficulty: TestDifficulty = Field(..., description="Test difficulty level")
-    category: TestCategory = Field(..., description="Test category")
-    tags: list[str] = Field(
-        default_factory=list, description="Custom tags for filtering"
-    )
-    expected_files: list[str] = Field(
-        default_factory=list, description="Files expected to be created/modified"
-    )
-    expected_tools: list[str] = Field(
-        default_factory=list, description="Tools expected to be used"
-    )
-    description: str | None = Field(
-        default=None, description="Human-readable description of what's being tested"
-    )
-
-    # Router-specific metadata
-    expected_sub_agent: str | None = Field(
-        default=None, description="Expected sub-agent for Router delegation tests"
     )
 
 
@@ -296,11 +245,10 @@ class ShotgunTestCase(BaseModel):
 
     name: str = Field(..., description="Unique test case identifier")
     inputs: TestCaseInput = Field(..., description="Test case inputs")
-    expected_output: ExpectedAgentOutput | None = Field(
-        default=None,
-        description="Expected output specification (for reference-based eval)",
+    expected: ExpectedAgentOutput = Field(
+        default_factory=ExpectedAgentOutput,
+        description="Expected output for evaluation",
     )
-    metadata: TestCaseMetadata = Field(..., description="Test case metadata")
 
 
 # ============================================================================
@@ -316,11 +264,8 @@ class EvaluationContext(BaseModel):
     actual_output: AgentExecutionOutput = Field(
         ..., description="Agent's actual output"
     )
-    expected_output: ExpectedAgentOutput | None = Field(
-        default=None, description="Expected output (if reference-based)"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Test case metadata as dict"
+    expected: ExpectedAgentOutput = Field(
+        ..., description="Expected output for evaluation"
     )
 
 

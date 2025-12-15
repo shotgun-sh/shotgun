@@ -9,10 +9,8 @@ from evals.models import (
     AgentType,
     ExpectedAgentOutput,
     ShotgunTestCase,
+    TestCaseContext,
     TestCaseInput,
-    TestCaseMetadata,
-    TestCategory,
-    TestDifficulty,
 )
 
 # ============================================================================
@@ -24,19 +22,9 @@ VAGUE_PROMPT_CLARIFYING_QUESTIONS = ShotgunTestCase(
     inputs=TestCaseInput(
         prompt="I want to add a new feature to this project",
         agent_type=AgentType.ROUTER,
-        context={},
-        enable_tools=True,
+        context=TestCaseContext(has_codebase_indexed=False),
     ),
-    expected_output=ExpectedAgentOutput(
-        expect_clarifying_questions=True,
-        min_clarifying_questions=1,
-    ),
-    metadata=TestCaseMetadata(
-        difficulty=TestDifficulty.EASY,
-        category=TestCategory.ROUTER_DELEGATION,
-        tags=["router", "clarifying-questions", "vague-prompt"],
-        description="Router should ask clarifying questions for vague feature request",
-    ),
+    expected=ExpectedAgentOutput(min_clarifying_questions=1),
 )
 
 # ============================================================================

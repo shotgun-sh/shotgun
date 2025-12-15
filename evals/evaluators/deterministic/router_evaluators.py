@@ -208,8 +208,8 @@ class ExpectedToolPresenceEvaluator(BaseEvaluator):
         test_case: ShotgunTestCase,
     ) -> EvaluatorResult:
         """Check that expected tools were used."""
-        # Get expected tools from test case metadata
-        expected_tools = set(test_case.metadata.expected_tools)
+        # Get expected tools from test case expected output
+        expected_tools = set(test_case.expected.expected_tools)
 
         if not expected_tools:
             return EvaluatorResult(
@@ -335,8 +335,8 @@ class DelegationCorrectnessEvaluator(BaseEvaluator):
         test_case: ShotgunTestCase,
     ) -> EvaluatorResult:
         """Check delegation correctness."""
-        # Get expected sub-agent from test case metadata
-        expected_sub_agent = test_case.metadata.expected_sub_agent
+        # Get expected sub-agent from test case expected output
+        expected_sub_agent = test_case.expected.expected_sub_agent
 
         if expected_sub_agent is None:
             return EvaluatorResult(
@@ -387,9 +387,9 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
     """
     [HARD when expected] Checks that clarifying questions were asked when expected.
 
-    When a test case explicitly sets expect_clarifying_questions=True,
-    this becomes a HARD failure because the test is specifically designed
-    to verify that behavior. Otherwise, it's a SOFT failure.
+    When a test case specifies min_clarifying_questions, this becomes a HARD failure
+    because the test is specifically designed to verify that behavior. Otherwise,
+    it's a SOFT failure.
 
     Used for test cases where we expect the agent to gather requirements
     before proceeding (e.g., ambiguous feature requests).
@@ -406,12 +406,13 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
         test_case: ShotgunTestCase,
     ) -> EvaluatorResult:
         """Check if clarifying questions were asked when expected."""
-        # Check if we expect clarifying questions
-        expect_questions = (
-            expected_output.expect_clarifying_questions if expected_output else False
+        # Get minimum question count from expected output
+        min_questions = (
+            expected_output.min_clarifying_questions if expected_output else None
         )
 
-        if not expect_questions:
+        # If no minimum specified, questions are not required
+        if min_questions is None:
             return EvaluatorResult(
                 evaluator_name=self.name,
                 passed=True,
@@ -423,12 +424,6 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
         # When questions are explicitly expected, use HARD severity
         # This ensures the test fails when its core assertion is violated
         failure_severity = EvaluatorSeverity.HARD
-
-        # Get minimum question count (defaults to 1)
-        # expected_output is guaranteed non-None here since expect_questions=True requires it
-        min_questions = (
-            expected_output.min_clarifying_questions if expected_output else 1
-        )
 
         # Check if agent asked clarifying questions
         questions = actual_output.clarifying_questions or []
