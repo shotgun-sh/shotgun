@@ -13,10 +13,6 @@ from evals.models import (
     TestCaseInput,
 )
 
-# ============================================================================
-# Test Case: Vague prompts should trigger clarifying questions
-# ============================================================================
-
 VAGUE_PROMPT_CLARIFYING_QUESTIONS = ShotgunTestCase(
     name="vague_prompt_clarifying_questions",
     inputs=TestCaseInput(
@@ -26,10 +22,6 @@ VAGUE_PROMPT_CLARIFYING_QUESTIONS = ShotgunTestCase(
     ),
     expected=ExpectedAgentOutput(min_clarifying_questions=1),
 )
-
-# ============================================================================
-# Export all cases
-# ============================================================================
 
 CLARIFYING_QUESTIONS_CASES: list[ShotgunTestCase] = [
     VAGUE_PROMPT_CLARIFYING_QUESTIONS,

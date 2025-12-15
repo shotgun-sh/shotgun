@@ -13,10 +13,6 @@ from evals.models import (
     TestCaseInput,
 )
 
-# ============================================================================
-# Test Case: Vague feature request should ask clarifying questions
-# ============================================================================
-
 FEATURE_REQUEST_ASKS_QUESTIONS = ShotgunTestCase(
     name="feature_request_asks_questions",
     inputs=TestCaseInput(
@@ -27,10 +23,6 @@ FEATURE_REQUEST_ASKS_QUESTIONS = ShotgunTestCase(
     expected=ExpectedAgentOutput(min_clarifying_questions=1),
 )
 
-# ============================================================================
-# Test Case: Ambiguous request should ask clarifying questions
-# ============================================================================
-
 COMPLEX_FEATURE_ASKS_QUESTIONS = ShotgunTestCase(
     name="complex_feature_asks_questions",
     inputs=TestCaseInput(
@@ -40,10 +32,6 @@ COMPLEX_FEATURE_ASKS_QUESTIONS = ShotgunTestCase(
     ),
     expected=ExpectedAgentOutput(min_clarifying_questions=1),
 )
-
-# ============================================================================
-# Test Case: Specific request should create a plan
-# ============================================================================
 
 SPECIFIC_FEATURE_CREATES_PLAN = ShotgunTestCase(
     name="specific_feature_creates_plan",
@@ -57,10 +45,6 @@ SPECIFIC_FEATURE_CREATES_PLAN = ShotgunTestCase(
         expected_plan_description="Plan should have research as the first step and writing a specification as the second step",
     ),
 )
-
-# ============================================================================
-# Export all cases
-# ============================================================================
 
 PLANNING_CASES: list[ShotgunTestCase] = [
     FEATURE_REQUEST_ASKS_QUESTIONS,
