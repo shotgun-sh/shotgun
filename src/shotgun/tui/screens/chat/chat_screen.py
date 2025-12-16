@@ -409,10 +409,11 @@ class ChatScreen(Screen[None]):
         """Toggle between Planning and Drafting modes for Router."""
         from shotgun.agents.router.models import RouterDeps, RouterMode
 
-        # Prevent mode switching during Q&A
+        # If in Q&A mode, exit it first (SHIFT+TAB escapes Q&A mode)
         if self.qa_mode:
+            self._exit_qa_mode()
             self.agent_manager.add_hint_message(
-                HintMessage(message="⚠️ Cannot switch modes while answering questions")
+                HintMessage(message="Exited Q&A mode via Shift+Tab")
             )
             return
 
@@ -937,6 +938,11 @@ class ChatScreen(Screen[None]):
         """
         # Clear any streaming partial response (removes final_result JSON)
         self._clear_partial_response()
+
+        # Safety check: don't enter Q&A mode if questions array is empty
+        if not event.questions:
+            logger.warning("ClarifyingQuestionsMessage received with empty questions")
+            return
 
         # Enter Q&A mode
         self.qa_mode = True
