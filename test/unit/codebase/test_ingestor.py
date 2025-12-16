@@ -9,18 +9,39 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from shotgun.codebase.core.ingestor import (
-    BASE_IGNORE_DIRECTORIES,
-    BUILD_ARTIFACT_DIRECTORIES,
     IGNORE_PATTERNS,
     Ingestor,
     is_path_ignored,
     should_ignore_directory,
 )
+from shotgun.codebase.core.language_config import (
+    COMMON_IGNORE_DIRECTORIES,
+    GO_IGNORE_DIRECTORIES,
+    JAVASCRIPT_IGNORE_DIRECTORIES,
+    PYTHON_IGNORE_DIRECTORIES,
+    RUST_IGNORE_DIRECTORIES,
+    TYPESCRIPT_IGNORE_DIRECTORIES,
+    get_all_ignore_directories,
+)
 
 
-def test_ignore_patterns_default_values():
-    """Test that IGNORE_PATTERNS contains expected default values."""
-    assert IGNORE_PATTERNS == BASE_IGNORE_DIRECTORIES | BUILD_ARTIFACT_DIRECTORIES
+def test_ignore_patterns_contains_common_directories():
+    """Test that IGNORE_PATTERNS contains common directories."""
+    assert COMMON_IGNORE_DIRECTORIES.issubset(IGNORE_PATTERNS)
+
+
+def test_ignore_patterns_contains_language_specific_directories():
+    """Test that IGNORE_PATTERNS contains all language-specific directories."""
+    assert PYTHON_IGNORE_DIRECTORIES.issubset(IGNORE_PATTERNS)
+    assert JAVASCRIPT_IGNORE_DIRECTORIES.issubset(IGNORE_PATTERNS)
+    assert TYPESCRIPT_IGNORE_DIRECTORIES.issubset(IGNORE_PATTERNS)
+    assert GO_IGNORE_DIRECTORIES.issubset(IGNORE_PATTERNS)
+    assert RUST_IGNORE_DIRECTORIES.issubset(IGNORE_PATTERNS)
+
+
+def test_ignore_patterns_equals_get_all():
+    """Test that IGNORE_PATTERNS matches get_all_ignore_directories()."""
+    assert IGNORE_PATTERNS == get_all_ignore_directories()
 
 
 def test_ingestor_init():

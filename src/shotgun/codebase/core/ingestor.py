@@ -14,67 +14,32 @@ import aiofiles
 import real_ladybug as kuzu
 from tree_sitter import Node, Parser, QueryCursor
 
-from shotgun.codebase.core.language_config import LANGUAGE_CONFIGS, get_language_config
+from shotgun.codebase.core.language_config import (
+    LANGUAGE_CONFIGS,
+    get_all_ignore_directories,
+    get_language_config,
+    is_path_ignored,
+    should_ignore_directory,
+)
 from shotgun.codebase.core.parser_loader import load_parsers
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# For backwards compatibility, expose IGNORE_PATTERNS from this module
+IGNORE_PATTERNS = get_all_ignore_directories()
 
-# Directories that should never be traversed during indexing
-BASE_IGNORE_DIRECTORIES = {
-    ".git",
-    "venv",
-    ".venv",
-    "__pycache__",
-    ".eggs",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".claude",
-    ".idea",
-    ".vscode",
-}
-
-# Well-known build output directories to skip when determining source files
-BUILD_ARTIFACT_DIRECTORIES = {
-    "node_modules",
-    ".next",
-    ".nuxt",
-    ".vite",
-    ".yarn",
-    ".svelte-kit",
-    ".output",
-    ".turbo",
-    ".parcel-cache",
-    ".vercel",
-    ".serverless",
-    "build",
-    "dist",
-    "out",
-    "tmp",
-    "coverage",
-}
-
-# Default ignore patterns combines base directories and build artifacts
-IGNORE_PATTERNS = BASE_IGNORE_DIRECTORIES | BUILD_ARTIFACT_DIRECTORIES
-
-# Directory prefixes that should always be ignored
-IGNORED_DIRECTORY_PREFIXES = (".",)
-
-
-def should_ignore_directory(name: str, ignore_patterns: set[str] | None = None) -> bool:
-    """Return True if the directory name should be ignored."""
-    patterns = IGNORE_PATTERNS if ignore_patterns is None else ignore_patterns
-    if name in patterns:
-        return True
-    return name.startswith(IGNORED_DIRECTORY_PREFIXES)
-
-
-def is_path_ignored(path: Path, ignore_patterns: set[str] | None = None) -> bool:
-    """Return True if any part of the path should be ignored."""
-    patterns = IGNORE_PATTERNS if ignore_patterns is None else ignore_patterns
-    return any(should_ignore_directory(part, patterns) for part in path.parts)
+# Explicit re-exports for type checkers
+__all__ = [
+    "IGNORE_PATTERNS",
+    "LANGUAGE_CONFIGS",
+    "Ingestor",
+    "SimpleGraphBuilder",
+    "get_all_ignore_directories",
+    "get_language_config",
+    "is_path_ignored",
+    "should_ignore_directory",
+]
 
 
 class Ingestor:
