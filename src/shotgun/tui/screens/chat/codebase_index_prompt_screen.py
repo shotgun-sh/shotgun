@@ -11,8 +11,10 @@ from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Markdown, Static
 
-from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.utils.file_system_utils import get_shotgun_home
+
+# Use a higher threshold than the global default since this dialog has more content
+INDEX_PROMPT_COMPACT_THRESHOLD = 45
 
 
 def _is_home_directory() -> bool:
@@ -46,7 +48,7 @@ class CodebaseIndexPromptScreen(ModalScreen[bool]):
             max-width: 90;
             height: auto;
             max-height: 85%;
-            border: wide $primary;
+            border: none;
             padding: 1 2;
             layout: vertical;
             background: $surface;
@@ -200,12 +202,14 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
         if _is_home_directory():
             _track_event("home_directory_warning_shown")
         # Apply compact layout if starting in a short terminal
-        self._apply_compact_layout(self.app.size.height < COMPACT_HEIGHT_THRESHOLD)
+        self._apply_compact_layout(
+            self.app.size.height < INDEX_PROMPT_COMPACT_THRESHOLD
+        )
 
     @on(Resize)
     def handle_resize(self, event: Resize) -> None:
         """Adjust layout based on terminal height."""
-        self._apply_compact_layout(event.size.height < COMPACT_HEIGHT_THRESHOLD)
+        self._apply_compact_layout(event.size.height < INDEX_PROMPT_COMPACT_THRESHOLD)
 
     def _apply_compact_layout(self, compact: bool) -> None:
         """Apply or remove compact layout classes for short terminals."""
