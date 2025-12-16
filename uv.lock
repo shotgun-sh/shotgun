@@ -859,15 +859,15 @@ wheels = [
 
 [[package]]
 name = "genai-prices"
-version = "0.0.47"
+version = "0.0.48"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/47/f25fb84fa40142699dc54ca294628d600625eb3d90fead103a606b4e999a/genai_prices-0.0.47.tar.gz", hash = "sha256:3b8c514f0ce5818b3944a371861586ed9bfe10d02598e62c350b5bd2916d03c2", size = 54501, upload-time = "2025-11-25T18:38:17.695Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/55/bcdae9be6fa596ca5529f094f5d757d3ac0cdd72a607a2165d2d77f00edf/genai_prices-0.0.48.tar.gz", hash = "sha256:608374a730f9e813c70698602794414e62c8902b49fb36b7ad37f6fcf078b5a9", size = 56582, upload-time = "2025-12-12T13:18:39.131Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/84/d50c52d0eeadb9dbf7f2f86da9b6257e162b7c6a791f5b1009bae912c103/genai_prices-0.0.47-py3-none-any.whl", hash = "sha256:735e45950d2299276f2c00cd18075b77a124cd24ee58243f236ee29af3210594", size = 57000, upload-time = "2025-11-25T18:38:16.464Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/09/98ce9c0bac33793867c2a536dab0fa2bca0c9f4a50b6b1957e8c7805601e/genai_prices-0.0.48-py3-none-any.whl", hash = "sha256:88ed3f9ab399389ae7acf6e62a5f7007332d2653926f205671b29e2f2ec5b27c", size = 59089, upload-time = "2025-12-12T13:18:37.737Z" },
 ]
 
 [[package]]
