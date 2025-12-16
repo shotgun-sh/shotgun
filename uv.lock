@@ -2749,23 +2749,18 @@ dependencies = [
     { name = "watchdog" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "commitizen" },
-    { name = "lefthook" },
-    { name = "mypy" },
-    { name = "ruff" },
-]
-
 [package.dev-dependencies]
 dev = [
+    { name = "commitizen" },
     { name = "coverage" },
     { name = "debugpy" },
+    { name = "lefthook" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "python-dotenv" },
+    { name = "ruff" },
     { name = "types-aiofiles" },
     { name = "types-pyyaml" },
 ]
@@ -2774,14 +2769,11 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=24.0.0" },
     { name = "anthropic", specifier = ">=0.39.0" },
-    { name = "commitizen", marker = "extra == 'dev'", specifier = ">=3.13.0" },
     { name = "dependency-injector", specifier = ">=4.41.0" },
     { name = "genai-prices", specifier = ">=0.0.27" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "lefthook", marker = "extra == 'dev'", specifier = ">=1.12.0" },
     { name = "logfire", specifier = ">=2.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "packaging", specifier = ">=23.0" },
     { name = "posthog", specifier = ">=3.0.0" },
@@ -2790,7 +2782,6 @@ requires-dist = [
     { name = "pyperclip", specifier = ">=1.10.0" },
     { name = "real-ladybug", specifier = ">=0.12.0" },
     { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.0" },
     { name = "sentencepiece", specifier = ">=0.2.0" },
     { name = "sentry-sdk", extras = ["pure-eval"], specifier = ">=2.0.0" },
     { name = "tenacity", specifier = ">=8.0.0" },
@@ -2807,17 +2798,19 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12.0" },
     { name = "watchdog", specifier = ">=4.0.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "commitizen", specifier = ">=3.13.0" },
     { name = "coverage", specifier = ">=7.10.6" },
     { name = "debugpy", specifier = ">=1.8.16" },
+    { name = "lefthook", specifier = ">=1.12.0" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "ruff", specifier = ">=0.6.0" },
     { name = "types-aiofiles", specifier = ">=24.0.0" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
 ]
