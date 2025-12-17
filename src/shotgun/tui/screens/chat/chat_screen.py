@@ -62,6 +62,8 @@ from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
     CodebaseGraphManager,
 )
+from shotgun.codebase.graph_decision import GraphOpenAction
+from shotgun.codebase.graph_open_flow import determine_graph_action_for_codebase
 from shotgun.codebase.models import IndexProgress, ProgressPhase
 from shotgun.exceptions import (
     SHOTGUN_CONTACT_EMAIL,
@@ -83,6 +85,10 @@ from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
     CodebaseIndexPromptScreen,
 )
 from shotgun.tui.screens.chat.codebase_index_selection import CodebaseIndexSelection
+from shotgun.tui.screens.chat.graph_decision_modal import (
+    GraphChoice,
+    GraphDecisionModal,
+)
 from shotgun.tui.screens.chat.help_text import (
     help_text_empty_dir,
     help_text_with_codebase,
@@ -331,15 +337,37 @@ class ChatScreen(Screen[None]):
                         f"Failed to delete graph {graph.graph_id} during force reindex: {e}"
                     )
 
-        # Check if the current directory has any accessible codebases
-        accessible_graphs = (
-            await self.codebase_sdk.list_codebases_for_directory()
-        ).graphs
-        if accessible_graphs:
+        # Use decision flow to determine what to do with the codebase
+        graph_manager = self.codebase_sdk.service.manager
+        decision = await determine_graph_action_for_codebase(
+            cur_dir, graph_manager, config_manager=None
+        )
+
+        # Handle REUSE decision - existing graph should be loaded
+        if decision.should_reuse:
+            # Graph is already loaded by the codebase_sdk, just show hint
             self.mount_hint(help_text_with_codebase(already_indexed=True))
             return
 
-        # Ask user if they want to index the current directory
+        # Handle ASK decision - show modal to ask user
+        if decision.should_ask_user and decision.existing_graph:
+            result = await self.app.push_screen_wait(
+                GraphDecisionModal(decision.existing_graph)
+            )
+
+            # User cancelled - show help text and return
+            if result is None or result.choice == GraphChoice.CANCEL:
+                self.mount_hint(help_text_empty_dir())
+                return
+
+            # User chose to reuse existing graph
+            if result.choice == GraphChoice.REUSE:
+                self.mount_hint(help_text_with_codebase(already_indexed=True))
+                return
+
+            # User chose to create new graph - fall through to indexing flow
+
+        # Handle NEW decision or user chose NEW in modal - ask if they want to index
         should_index = await self.app.push_screen_wait(CodebaseIndexPromptScreen())
         if not should_index:
             self.mount_hint(help_text_empty_dir())
