@@ -1822,6 +1822,15 @@ class ChatScreen(Screen[None]):
             logger.debug("[PLAN] No pending completion")
             return
 
+        # Don't show completion message if Q&A mode is active.
+        # The user needs to answer the clarifying questions first.
+        # Keep pending_completion=True so it shows after Q&A is done.
+        if self.qa_mode:
+            logger.debug(
+                "[PLAN] Q&A mode active, deferring plan completion message"
+            )
+            return
+
         # Clear the pending state
         self.deps.pending_completion = False
 
