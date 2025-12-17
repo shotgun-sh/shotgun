@@ -79,7 +79,7 @@ async def test_load_graphs_with_single_graph(mock_codebase_sdk):
     mock_button = Mock()
     mock_button.disabled = False
 
-    def query_side_effect(selector, **kwargs):
+    def query_side_effect(selector, *args, **kwargs):
         if "#graph-list" in selector:
             return mock_list_view
         elif "#btn-use" in selector:
@@ -116,7 +116,7 @@ async def test_load_graphs_with_multiple_graphs(mock_codebase_sdk):
 
     mock_button = Mock()
 
-    def query_side_effect(selector, **kwargs):
+    def query_side_effect(selector, *args, **kwargs):
         if "#graph-list" in selector:
             return mock_list_view
         elif "#btn-use" in selector:
@@ -154,7 +154,7 @@ async def test_load_graphs_with_current_graph_highlighting(mock_codebase_sdk):
 
     mock_button = Mock()
 
-    def query_side_effect(selector, **kwargs):
+    def query_side_effect(selector, *args, **kwargs):
         if "#graph-list" in selector:
             return mock_list_view
         elif "#btn-use" in selector:
@@ -186,7 +186,7 @@ async def test_load_graphs_with_no_graphs(mock_codebase_sdk):
     mock_button = Mock()
     mock_button.disabled = False
 
-    def query_side_effect(selector, **kwargs):
+    def query_side_effect(selector, *args, **kwargs):
         if "#graph-list" in selector:
             return mock_list_view
         elif "#btn-use" in selector:
@@ -220,7 +220,7 @@ async def test_load_graphs_with_error(mock_codebase_sdk):
     mock_button = Mock()
     mock_button.disabled = False
 
-    def query_side_effect(selector, **kwargs):
+    def query_side_effect(selector, *args, **kwargs):
         if "#graph-list" in selector:
             return mock_list_view
         elif "#btn-use" in selector:

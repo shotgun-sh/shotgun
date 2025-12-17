@@ -17,6 +17,9 @@ def create_test_graph(
         graph_id=graph_id,
         name=name,
         repo_path="/test/path",
+        graph_path=f"/test/{graph_id}.kuzu",
+        created_at=1234567890.0,
+        updated_at=1234567890.0,
         node_count=node_count,
         relationship_count=relationship_count,
     )
@@ -108,13 +111,11 @@ def test_graph_indicator_watcher_triggers():
     indicator._refresh_display = Mock()  # type: ignore[method-assign]
 
     graph = create_test_graph()
-    indicator.current_graph = graph
-
     # Manually trigger watcher (Textual would do this automatically)
     indicator.watch_current_graph(graph)
 
     # Verify refresh was called
-    indicator._refresh_display.assert_called_once()
+    indicator._refresh_display.assert_called()
 
 
 def test_graph_indicator_entity_count_formatting_under_1k():

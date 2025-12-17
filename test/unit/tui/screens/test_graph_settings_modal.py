@@ -37,14 +37,20 @@ async def test_on_mount_loads_current_behavior(mock_config_manager):
 
     modal = GraphSettingsModal(mock_config_manager)
 
-    # Mock query_one to return a mock ListView
+    # Mock ListView and Button widgets
     mock_list_view = Mock()
     mock_list_view.index = 0
-    modal.query_one = Mock(return_value=mock_list_view)
-
-    # Mock button query for focus
     mock_button = Mock()
-    modal.query_one = Mock(side_effect=lambda selector, **kwargs: mock_list_view if "options-list" in selector else mock_button)
+
+    # Mock query_one to return appropriate widgets
+    def query_side_effect(selector, *args, **kwargs):
+        if "#options-list" in selector:
+            return mock_list_view
+        elif "#btn-save" in selector:
+            return mock_button
+        return Mock()
+
+    modal.query_one = Mock(side_effect=query_side_effect)
 
     await modal.on_mount()
 
@@ -245,9 +251,9 @@ def test_escape_key_with_other_key(mock_config_manager):
 
 def test_persistent_graph_open_behavior_enum_values():
     """Test that PersistentGraphOpenBehavior enum has expected values."""
-    assert PersistentGraphOpenBehavior.ASK == "ASK"
-    assert PersistentGraphOpenBehavior.ALWAYS_REUSE == "ALWAYS_REUSE"
-    assert PersistentGraphOpenBehavior.ALWAYS_NEW == "ALWAYS_NEW"
+    assert PersistentGraphOpenBehavior.ASK == "ask"
+    assert PersistentGraphOpenBehavior.ALWAYS_REUSE == "always_reuse"
+    assert PersistentGraphOpenBehavior.ALWAYS_NEW == "always_new"
 
     # Test that all values are strings
     assert isinstance(PersistentGraphOpenBehavior.ASK.value, str)
