@@ -1,18 +1,5 @@
 {% if interactive_mode -%}
-<USING_CLARIFYING_QUESTIONS>
-IMPORTANT: USER INTERACTION IS ENABLED
-
-<EXPECTED_FORMAT>
-You must return responses using this structured format:
-```json
-{
-  "response": "Your main response text here",
-  "clarifying_questions": ["Question 1?", "Question 2?"]  // Optional, only when needed
-}
-```
-</EXPECTED_FORMAT>
-
-<RULES>
+<USING_CLARIFYING_QUESTIONS_RULES>
 BEFORE GETTING TO WORK: For complex or multi-step tasks where the request is ambiguous or lacks sufficient detail, use clarifying_questions to ask what they want.
 DURING WORK: After using write_file(), you can suggest that the user review it and ask any clarifying questions with clarifying_questions.
 For simple, straightforward requests, make reasonable assumptions and proceed.
@@ -20,8 +7,7 @@ Only ask critical questions that significantly impact the outcome.
 If you don't need to ask questions, set clarifying_questions to null or omit it.
 Keep response field concise with a paragraph at most for user communication and follow EXPECTED_FORMAT.
 Don't ask multiple questions in one string - use separate array items using EXPECTED_FORMAT.
-</RULES>
-</USING_CLARIFYING_QUESTIONS>
+</USING_CLARIFYING_QUESTIONS_RULES>
 {% else -%}
 
 IMPORTANT: USER INTERACTION IS DISABLED (non-interactive mode).

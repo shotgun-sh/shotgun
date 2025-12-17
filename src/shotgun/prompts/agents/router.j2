@@ -440,14 +440,19 @@ To delete a file, delegate to the agent that owns it with a task like "Delete re
 <RULE name="One Delegation Per File Type" priority="CRITICAL">
 Each delegation MUST target only files owned by that specific agent.
 
-**NEVER batch updates to multiple file types in a single delegation.**
+delegate_to_specification ONLY for changes to the specification.md file any any file in the contracts/ folder.
+delegate_to_plan ONLY for changes to the plan.d file.
+delegate_to_tasks ONLY for changes to the tasks.md file
+delegate_to_research ONLY for changes to the research.md file or any file in the research/ folder.
+delegate_to_export ONLY for changes to the CLAUDE.md Agents.md or any file in the exports/ folder.
 
-If a user's request requires updating multiple files (e.g., spec + plan + tasks), you MUST make SEPARATE delegations to each agent:
+If a user's request requires updating multiple files (e.g., spec + plan + tasks), you MUST make SEPARATE delegations to each agent.
+When in doubt about which files need updating, make separate delegations. It's better to make 3 small delegations than 1 that fails.
 
 <BAD_EXAMPLE name="Batching multi-file updates to one agent">
 User: "Use JWT instead of session tokens and add rate limiting"
 
-You: *calls delegate_to_specification with task: "Update spec/plan/tasks to use JWT and add rate limiting"*
+You: calls delegate_to_specification with task: "Update spec/plan/tasks to use JWT and add rate limiting"
 
 WRONG - The specification agent can ONLY write to specification.md and contracts/.
 It CANNOT modify plan.md or tasks.md. This delegation will fail silently.
@@ -457,21 +462,12 @@ It CANNOT modify plan.md or tasks.md. This delegation will fail silently.
 User: "Use JWT instead of session tokens and add rate limiting"
 
 You:
-1. *calls delegate_to_specification* "Update spec to use JWT authentication instead of session tokens, and add rate limiting requirement"
-2. *calls delegate_to_plan* "Update plan to reflect JWT authentication and rate limiting implementation"
-3. *calls delegate_to_tasks* "Update tasks for JWT implementation and rate limiting"
+1. calls delegate_to_specification "Update spec to use JWT authentication instead of session tokens, and add rate limiting requirement"
+2. calls delegate_to_plan "Update plan to reflect JWT authentication and rate limiting implementation"
+3. calls delegate_to_tasks "Update tasks for JWT implementation and rate limiting"
 
 CORRECT - Each agent updates only their own files.
 </GOOD_EXAMPLE>
-
-**File ownership is STRICT:**
-- `specification.md`, `contracts/*` → delegate_to_specification ONLY
-- `plan.md` → delegate_to_plan ONLY
-- `tasks.md` → delegate_to_tasks ONLY
-- `research.md`, `research/*` → delegate_to_research ONLY
-- `exports/*`, `CLAUDE.md`, `Agents.md` → delegate_to_export ONLY
-
-When in doubt about which files need updating, make separate delegations. It's better to make 3 small delegations than 1 that fails.
 </RULE>
 
 Delegation input - each delegation tool takes:
