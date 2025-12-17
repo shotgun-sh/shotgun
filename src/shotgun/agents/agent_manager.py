@@ -930,12 +930,15 @@ class AgentManager(Widget):
                 self.ui_message_history.append(
                     HintMessage(message=f"💡 {agent_response.clarifying_questions[0]}")
                 )
-                # Add plan hint for router if plan exists (single question is non-blocking)
-                self._maybe_add_plan_hint(deps)
+                # Add plan hint for Drafting mode (Planning mode uses PlanPanelWidget)
+                self._maybe_add_plan_hint_drafting_mode(deps)
             else:
                 # Multiple questions (2+) - enter Q&A mode
                 self._qa_questions = agent_response.clarifying_questions
                 self._qa_mode_active = True
+
+                # In Drafting mode, show plan BEFORE Q&A questions (without "Shall I continue?")
+                self._maybe_add_plan_hint_drafting_mode(deps, in_qa_mode=True)
 
                 # Show intro with list, then first question
                 questions_list_with_intro = (
@@ -961,8 +964,6 @@ class AgentManager(Widget):
                         response_text=agent_response.response,
                     )
                 )
-                # NOTE: Don't add plan hint here - defer until Q&A completes
-                # The plan hint will be added after the user answers all questions
 
             # Post UI update with hint messages (file operations will be posted after compaction)
             logger.debug("Posting UI update for Q&A mode with hint messages")
@@ -1000,8 +1001,8 @@ class AgentManager(Widget):
                         HintMessage(message="✅ Task completed")
                     )
 
-            # Add plan hint for router if plan exists
-            self._maybe_add_plan_hint(deps)
+            # Add plan hint for Drafting mode (Planning mode uses PlanPanelWidget)
+            self._maybe_add_plan_hint_drafting_mode(deps)
 
             # Post UI update immediately so user sees the response without delay
             # (file operations will be posted after compaction to avoid duplicates)
@@ -1378,34 +1379,43 @@ class AgentManager(Widget):
                 # Common path is a file, show parent directory
                 return f"📁 Modified {num_files} files in: `{path_obj.parent}`"
 
-    def _maybe_add_plan_hint(self, deps: AgentDeps) -> None:
-        """Add execution plan hint for router agent if a plan exists.
+    def _maybe_add_plan_hint_drafting_mode(
+        self, deps: AgentDeps, in_qa_mode: bool = False
+    ) -> None:
+        """Add execution plan hint for router agent in Drafting mode only.
+
+        In Drafting mode, there's no PlanPanelWidget, so we show the plan
+        in the chat history with a "Shall I continue?" prompt (unless in Q&A mode).
+
+        In Planning mode, the PlanPanelWidget handles plan display.
 
         Args:
             deps: Agent dependencies (may be RouterDeps for router agent)
+            in_qa_mode: If True, skip the "Shall I continue?" prompt since user
+                       needs to answer Q&A questions first.
         """
         if self._current_agent_type != AgentType.ROUTER:
-            logger.debug("Skipping plan hint: not router agent")
             return
 
         if not isinstance(deps, RouterDeps):
-            logger.debug("Skipping plan hint: deps is not RouterDeps")
+            return
+
+        # Only show plan hints in Drafting mode
+        # Planning mode uses PlanPanelWidget instead
+        if deps.router_mode != RouterMode.DRAFTING:
             return
 
         if deps.current_plan is None:
-            logger.debug("Skipping plan hint: no current plan")
             return
 
         plan_display = deps.current_plan.format_for_display()
 
-        # In drafting mode, if plan is not complete, prompt user to continue
-        if (
-            deps.router_mode == RouterMode.DRAFTING
-            and not deps.current_plan.is_complete()
-        ):
+        # In drafting mode, if plan is not complete and NOT in Q&A mode,
+        # prompt user to continue
+        if not deps.current_plan.is_complete() and not in_qa_mode:
             plan_display += "\n\n**Shall I continue?**"
 
-        logger.debug("Adding plan hint to UI history")
+        logger.debug("Adding plan hint to UI history (Drafting mode)")
         self.ui_message_history.append(
             HintMessage(message=f"**Current Plan**\n\n{plan_display}")
         )
