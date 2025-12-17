@@ -470,6 +470,91 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
         )
 
 
+class MultiDelegationCorrectnessEvaluator(BaseEvaluator):
+    """
+    [HARD] Checks that Router delegated to ALL expected sub-agents separately.
+
+    This catches the bug where Router tries to batch multi-file updates to a
+    single agent instead of delegating to each appropriate agent.
+
+    Example bug scenario:
+    - User answers questions requiring updates to spec, plan, and tasks
+    - Router should delegate to: specify, plan, tasks (3 separate delegations)
+    - Bug: Router delegates "Update spec/plan/tasks" to specify only (1 delegation)
+
+    This is HARD because delegating to the wrong agent means the work won't
+    actually be completed correctly.
+    """
+
+    name = "multi_delegation_correctness"
+    severity = EvaluatorSeverity.HARD
+
+    def evaluate(
+        self,
+        actual_output: AgentExecutionOutput,
+        expected_output: ExpectedAgentOutput | None,
+        test_case: ShotgunTestCase,
+    ) -> EvaluatorResult:
+        """Check that all expected delegations occurred and no disallowed ones did."""
+        expected_delegations = set(test_case.expected.expected_delegations)
+        disallowed_delegations = set(test_case.expected.disallowed_delegations)
+
+        # If no expected delegations specified, skip this evaluator
+        if not expected_delegations and not disallowed_delegations:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=True,
+                severity=self.severity,
+                reasoning="No multi-delegation requirements specified",
+                details={},
+            )
+
+        actual_delegations = set(actual_output.delegated_sub_agents)
+
+        # Check for missing expected delegations
+        missing_delegations = expected_delegations - actual_delegations
+        # Check for disallowed delegations that occurred
+        forbidden_delegations = actual_delegations & disallowed_delegations
+
+        violations: list[str] = []
+
+        if missing_delegations:
+            violations.append(
+                f"Missing delegations: {', '.join(sorted(missing_delegations))}"
+            )
+
+        if forbidden_delegations:
+            violations.append(
+                f"Disallowed delegations occurred: {', '.join(sorted(forbidden_delegations))}"
+            )
+
+        if violations:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=False,
+                severity=self.severity,
+                reasoning=f"Delegation routing incorrect: {'; '.join(violations)}",
+                details={
+                    "expected_delegations": sorted(expected_delegations),
+                    "disallowed_delegations": sorted(disallowed_delegations),
+                    "actual_delegations": sorted(actual_delegations),
+                    "missing": sorted(missing_delegations),
+                    "forbidden": sorted(forbidden_delegations),
+                },
+            )
+
+        return EvaluatorResult(
+            evaluator_name=self.name,
+            passed=True,
+            severity=self.severity,
+            reasoning=f"Correctly delegated to: {', '.join(sorted(actual_delegations))}",
+            details={
+                "expected_delegations": sorted(expected_delegations),
+                "actual_delegations": sorted(actual_delegations),
+            },
+        )
+
+
 # Registry of all deterministic evaluators
 DETERMINISTIC_EVALUATORS: list[type[BaseEvaluator]] = [
     DisallowedToolUsageEvaluator,
@@ -477,6 +562,7 @@ DETERMINISTIC_EVALUATORS: list[type[BaseEvaluator]] = [
     ExpectedToolPresenceEvaluator,
     ContentAssertionEvaluator,
     DelegationCorrectnessEvaluator,
+    MultiDelegationCorrectnessEvaluator,
     ClarifyingQuestionsEvaluator,
 ]
 

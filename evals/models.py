@@ -145,6 +145,10 @@ class TestCaseContext(BaseModel):
     codebase_name: str | None = Field(
         default=None, description="Name of the indexed codebase"
     )
+    router_mode: str = Field(
+        default="planning",
+        description="Router mode: 'planning' (no delegation) or 'drafting' (delegation enabled)",
+    )
 
 
 # ============================================================================
@@ -197,7 +201,12 @@ class AgentExecutionOutput(BaseModel):
 
     # Router-specific fields
     delegated_sub_agent: str | None = Field(
-        default=None, description="Sub-agent Router delegated to (Router agent only)"
+        default=None,
+        description="First sub-agent Router delegated to (Router agent only)",
+    )
+    delegated_sub_agents: list[str] = Field(
+        default_factory=list,
+        description="All sub-agents Router delegated to, in order (Router agent only)",
     )
     delegation_reasoning: str | None = Field(
         default=None,
@@ -224,7 +233,17 @@ class ExpectedAgentOutput(BaseModel):
 
     # Delegation - which sub-agent should be delegated to
     expected_sub_agent: str | None = Field(
-        default=None, description="Expected sub-agent for Router delegation"
+        default=None, description="Expected sub-agent for Router delegation (single)"
+    )
+
+    # Multi-delegation - for cases where multiple agents should be called
+    expected_delegations: list[str] = Field(
+        default_factory=list,
+        description="List of sub-agents that MUST be delegated to (order independent)",
+    )
+    disallowed_delegations: list[str] = Field(
+        default_factory=list,
+        description="List of sub-agents that must NOT be delegated to",
     )
 
     # Expected response - for judge to evaluate response quality (clarifying questions or plan)

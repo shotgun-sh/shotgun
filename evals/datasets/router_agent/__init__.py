@@ -7,11 +7,13 @@ Test case categories:
 - Clarifying questions: Tests Router asks questions for vague/ambiguous prompts
 - Planning: Tests Router creates appropriate plans for feature requests
 - Research planning: Tests Router plans research-first when adding features to codebase
+- Delegation routing: Tests Router correctly delegates to each agent for their files
 
 Exports:
 - CLARIFYING_QUESTIONS_CASES: List of clarifying questions test cases
 - PLANNING_CASES: List of planning behavior test cases
 - RESEARCH_PLANNING_CASES: List of research-first planning test cases
+- DELEGATION_ROUTING_CASES: List of delegation routing test cases
 - ALL_ROUTER_CASES: Dict mapping test case names to test case objects
 """
 
@@ -21,6 +23,10 @@ from evals.datasets.router_agent.clarifying_questions_cases import (
     OPEN_SOURCE_MODELS_ASKS_QUESTIONS,
     PERFORMANCE_REQUEST_ASKS_QUESTIONS,
     VAGUE_PROMPT_CLARIFYING_QUESTIONS,
+)
+from evals.datasets.router_agent.delegation_routing_cases import (
+    DELEGATION_ROUTING_CASES,
+    MULTI_FILE_UPDATE_DELEGATES_SEPARATELY,
 )
 from evals.datasets.router_agent.planning_cases import (
     COMPLEX_FEATURE_ASKS_QUESTIONS,
@@ -38,7 +44,12 @@ from evals.datasets.router_agent.research_planning_cases import (
 # Index of all Router test cases by name for discovery
 ALL_ROUTER_CASES = {
     case.name: case
-    for case in CLARIFYING_QUESTIONS_CASES + PLANNING_CASES + RESEARCH_PLANNING_CASES
+    for case in (
+        CLARIFYING_QUESTIONS_CASES
+        + PLANNING_CASES
+        + RESEARCH_PLANNING_CASES
+        + DELEGATION_ROUTING_CASES
+    )
 }
 
 __all__ = [
@@ -46,6 +57,7 @@ __all__ = [
     "CLARIFYING_QUESTIONS_CASES",
     "PLANNING_CASES",
     "RESEARCH_PLANNING_CASES",
+    "DELEGATION_ROUTING_CASES",
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
@@ -60,4 +72,6 @@ __all__ = [
     "OLLAMA_FEATURE_PLANS_RESEARCH_FIRST",
     "AUTH_FEATURE_PLANS_RESEARCH_FIRST",
     "CACHE_FEATURE_PLANS_RESEARCH_FIRST",
+    # Delegation routing test cases
+    "MULTI_FILE_UPDATE_DELEGATES_SEPARATELY",
 ]
