@@ -59,6 +59,21 @@ router_planning = EvaluationSuite(
 )
 
 # ============================================================================
+# Delegation Routing Suite
+# Tests Router correctly routes updates to appropriate sub-agents
+# ============================================================================
+
+router_delegation_routing = EvaluationSuite(
+    name="router_delegation_routing",
+    description="Tests Router correctly delegates to each agent for their files",
+    test_case_names=[
+        "multi_file_update_delegates_separately",
+    ],
+    evaluator_names=["router_delegation", "router_correctness_judge"],
+    tags=["delegation", "router", "routing"],
+)
+
+# ============================================================================
 # All Router Tests Suite
 # Runs all Router agent test cases
 # ============================================================================
@@ -80,6 +95,8 @@ router_all = EvaluationSuite(
         "ollama_feature_plans_research_first",
         "auth_feature_plans_research_first",
         "cache_feature_plans_research_first",
+        # Delegation routing cases
+        "multi_file_update_delegates_separately",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],
@@ -93,6 +110,7 @@ ROUTER_SUITES: dict[str, EvaluationSuite] = {
     "router_smoke": router_smoke,
     "router_core": router_core,
     "router_planning": router_planning,
+    "router_delegation_routing": router_delegation_routing,
     "router_all": router_all,
 }
 
@@ -100,6 +118,7 @@ __all__ = [
     "router_smoke",
     "router_core",
     "router_planning",
+    "router_delegation_routing",
     "router_all",
     "ROUTER_SUITES",
 ]

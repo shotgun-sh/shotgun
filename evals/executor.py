@@ -214,6 +214,15 @@ class RouterExecutor:
             # Router needs RouterDeps with router_mode, other agents use AgentDeps
             # Simulate TUI context for realistic system prompts
             if shotgun_agent_type == ShotgunAgentType.ROUTER:
+                # Get router mode from test case context (default: planning)
+                context = test_case.inputs.context
+                router_mode_str = context.router_mode if context else "planning"
+                router_mode = (
+                    RouterMode.DRAFTING
+                    if router_mode_str == "drafting"
+                    else RouterMode.PLANNING
+                )
+
                 deps: AgentDeps = RouterDeps(
                     interactive_mode=True,
                     is_tui_context=True,
@@ -221,7 +230,7 @@ class RouterExecutor:
                     codebase_service=codebase_service,
                     system_prompt_fn=_eval_system_prompt_fn,
                     file_tracker=file_tracker,
-                    router_mode=RouterMode.PLANNING,
+                    router_mode=router_mode,
                 )
             else:
                 deps = AgentDeps(
@@ -270,7 +279,11 @@ class RouterExecutor:
             }
 
             # Extract router-specific fields
-            delegated_sub_agent = self._extract_delegated_agent(result.all_messages())
+            all_messages = result.all_messages()
+            delegated_sub_agents = self._extract_all_delegated_agents(all_messages)
+            delegated_sub_agent = (
+                delegated_sub_agents[0] if delegated_sub_agents else None
+            )
 
         return AgentExecutionOutput(
             response=response,
@@ -280,6 +293,7 @@ class RouterExecutor:
             duration_seconds=duration,
             token_usage=token_usage,
             delegated_sub_agent=delegated_sub_agent,
+            delegated_sub_agents=delegated_sub_agents,
             delegation_reasoning=None,  # Could extract from response if needed
         )
 
@@ -339,13 +353,25 @@ class RouterExecutor:
         return result
 
     def _extract_delegated_agent(self, messages: list[ModelMessage]) -> str | None:
-        """Extract which sub-agent was delegated to (Router-specific).
+        """Extract the first sub-agent that was delegated to (Router-specific).
 
         Args:
             messages: List of model messages from the agent run
 
         Returns:
-            Name of the delegated sub-agent or None if no delegation occurred
+            Name of the first delegated sub-agent or None if no delegation occurred
+        """
+        agents = self._extract_all_delegated_agents(messages)
+        return agents[0] if agents else None
+
+    def _extract_all_delegated_agents(self, messages: list[ModelMessage]) -> list[str]:
+        """Extract all sub-agents that were delegated to, in order (Router-specific).
+
+        Args:
+            messages: List of model messages from the agent run
+
+        Returns:
+            List of delegated sub-agent names in order of delegation
         """
         # Mapping from delegation tool names to agent names
         delegation_tools = {
@@ -356,14 +382,15 @@ class RouterExecutor:
             "delegate_to_export": "export",
         }
 
+        delegated_agents: list[str] = []
         for msg in messages:
             if isinstance(msg, ModelResponse):
                 for part in msg.parts:
                     if isinstance(part, ToolCallPart):
                         if part.tool_name in delegation_tools:
-                            return delegation_tools[part.tool_name]
+                            delegated_agents.append(delegation_tools[part.tool_name])
 
-        return None
+        return delegated_agents
 
     def _empty_output(self) -> AgentExecutionOutput:
         """Create empty output for error cases.
@@ -379,6 +406,7 @@ class RouterExecutor:
             duration_seconds=0.0,
             token_usage={},
             delegated_sub_agent=None,
+            delegated_sub_agents=[],
             delegation_reasoning=None,
         )
 

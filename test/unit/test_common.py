@@ -69,9 +69,9 @@ class TestPromptTemplateIntegration:
             "agents/partials/interactive_mode.j2",
             interactive_mode=True,
         )
-        # Interactive mode should show interaction instructions
-        assert "IMPORTANT" in result
-        assert "USER INTERACTION IS ENABLED" in result
+        # Interactive mode should show clarifying questions instructions
+        assert "USING_CLARIFYING_QUESTIONS_RULES" in result
+        assert "clarifying_questions" in result
 
     def test_non_interactive_mode_template_rendering(self):
         """Test that templates render correctly for non-interactive mode."""
