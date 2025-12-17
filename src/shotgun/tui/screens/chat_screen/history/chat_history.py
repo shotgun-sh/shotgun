@@ -100,31 +100,35 @@ class ChatHistory(Widget):
         self.items = messages
         filtered = list(self.filtered_items())
 
-        logger.debug(
-            "[CHAT_HISTORY] update_messages - total=%d, filtered=%d, rendered=%d",
-            len(messages),
-            len(filtered),
-            self._rendered_count,
-        )
+        # If rendered count is higher than filtered count, the message list was
+        # modified (not just appended). Reset rendered count to allow new messages
+        # to be mounted. This can happen when messages are compacted or filtered.
+        if self._rendered_count > len(filtered):
+            logger.debug(
+                "[CHAT_HISTORY] Rendered count (%d) > filtered count (%d), "
+                "resetting to allow new messages to be mounted",
+                self._rendered_count,
+                len(filtered),
+            )
+            self._rendered_count = len(filtered)
 
         # Only mount new messages that haven't been rendered yet
         if len(filtered) > self._rendered_count:
             new_messages = filtered[self._rendered_count :]
             logger.debug(
-                "[CHAT_HISTORY] Mounting %d new messages",
+                "[CHAT_HISTORY] Mounting %d new messages (total=%d, filtered=%d)",
                 len(new_messages),
+                len(messages),
+                len(filtered),
             )
             for item in new_messages:
                 widget: Widget
                 if isinstance(item, ModelRequest):
                     widget = UserQuestionWidget(item)
-                    logger.debug("[CHAT_HISTORY] Mounting UserQuestionWidget")
                 elif isinstance(item, HintMessage):
                     widget = HintMessageWidget(item)
-                    logger.debug("[CHAT_HISTORY] Mounting HintMessageWidget")
                 elif isinstance(item, ModelResponse):
                     widget = AgentResponseWidget(item)
-                    logger.debug("[CHAT_HISTORY] Mounting AgentResponseWidget")
                 else:
                     logger.debug(
                         "[CHAT_HISTORY] Skipping unknown message type: %s",
@@ -139,12 +143,6 @@ class ChatHistory(Widget):
 
             # Scroll to bottom to show newly added messages
             self.vertical_tail.scroll_end(animate=False)
-        else:
-            logger.debug(
-                "[CHAT_HISTORY] No new messages to mount (filtered=%d, rendered=%d)",
-                len(filtered),
-                self._rendered_count,
-            )
 
     def on_click(self, event: events.Click) -> None:
         """Focus the prompt input when clicking on the history area."""

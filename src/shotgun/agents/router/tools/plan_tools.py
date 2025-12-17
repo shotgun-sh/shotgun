@@ -221,10 +221,28 @@ async def mark_step_done(
 
             _notify_plan_changed(ctx.deps)
 
-            return ToolResult(
-                success=True,
-                message=f"Marked step '{step.title}' as complete.",
-            )
+            # Return different messages based on mode and plan state
+            if plan.is_complete():
+                return ToolResult(
+                    success=True,
+                    message=f"Marked step '{step.title}' as complete.\n\n"
+                    "All plan steps are now complete. You may return your final response.",
+                )
+            elif ctx.deps.router_mode == RouterMode.DRAFTING:
+                next_step = plan.current_step()
+                return ToolResult(
+                    success=True,
+                    message=f"Marked step '{step.title}' as complete.\n\n"
+                    f"NEXT STEP: {next_step.title if next_step else 'None'}\n"
+                    "IMPORTANT: Do NOT call final_result. "
+                    "Immediately delegate the next step.",
+                )
+            else:
+                # Planning mode - checkpoint will be shown
+                return ToolResult(
+                    success=True,
+                    message=f"Marked step '{step.title}' as complete.",
+                )
 
     return ToolResult(
         success=False,
