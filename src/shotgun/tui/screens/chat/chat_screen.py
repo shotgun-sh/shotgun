@@ -1826,9 +1826,7 @@ class ChatScreen(Screen[None]):
         # The user needs to answer the clarifying questions first.
         # Keep pending_completion=True so it shows after Q&A is done.
         if self.qa_mode:
-            logger.debug(
-                "[PLAN] Q&A mode active, deferring plan completion message"
-            )
+            logger.debug("[PLAN] Q&A mode active, deferring plan completion message")
             return
 
         # Clear the pending state
