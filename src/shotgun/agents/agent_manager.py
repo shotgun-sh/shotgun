@@ -40,6 +40,7 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ToolCallPart,
     ToolCallPartDelta,
+    UserContent,
     UserPromptPart,
 )
 from textual.message import Message
@@ -861,17 +862,28 @@ class AgentManager(Widget):
         )
 
         # Deduplicate: skip user prompts that are already in original_messages
+        # Note: We compare content only, not timestamps, since UserPromptPart
+        # has a timestamp field that differs between instances
+        def get_user_prompt_content(
+            request: ModelRequest,
+        ) -> str | Sequence[UserContent] | None:
+            """Extract the user prompt content from a ModelRequest."""
+            for part in request.parts:
+                if isinstance(part, UserPromptPart):
+                    return part.content
+            return None
+
         deduplicated_new_messages = []
         for msg in new_messages:
             # Check if this is a user prompt that's already in original_messages
             if isinstance(msg, ModelRequest) and any(
                 isinstance(part, UserPromptPart) for part in msg.parts
             ):
+                msg_content = get_user_prompt_content(msg)
                 # Check if an identical user prompt is already in original_messages
                 already_exists = any(
                     isinstance(existing, ModelRequest)
-                    and any(isinstance(p, UserPromptPart) for p in existing.parts)
-                    and existing.parts == msg.parts
+                    and get_user_prompt_content(existing) == msg_content
                     for existing in original_messages[
                         -5:
                     ]  # Check last 5 messages for efficiency

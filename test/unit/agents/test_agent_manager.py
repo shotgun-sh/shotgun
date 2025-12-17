@@ -877,3 +877,114 @@ def test_partial_stream_state_token_tracking():
     assert state.streamed_tokens == 100
     assert state.current_spinner_text == "Contemplating..."
     assert state.last_reported_tokens == 75
+
+
+@pytest.mark.asyncio
+@patch("shotgun.agents.agent_manager.add_system_status_message")
+@patch("shotgun.agents.agent_manager.create_router_agent")
+@patch("shotgun.agents.agent_manager.create_export_agent")
+@patch("shotgun.agents.agent_manager.create_research_agent")
+@patch("shotgun.agents.agent_manager.create_plan_agent")
+@patch("shotgun.agents.agent_manager.create_tasks_agent")
+@patch("shotgun.agents.agent_manager.create_specify_agent")
+async def test_user_prompt_deduplication_with_different_timestamps(
+    mock_create_specify,
+    mock_create_tasks,
+    mock_create_plan,
+    mock_create_research,
+    mock_create_export,
+    mock_create_router,
+    mock_add_system_status,
+    mock_agent_deps,
+    mock_agents,
+):
+    """Test that user prompts are deduplicated even when they have different timestamps.
+
+    This tests the fix for the bug where user prompts were shown twice because
+    UserPromptPart has a timestamp field that differs between instances,
+    causing direct comparison to fail.
+    """
+    from pydantic_ai.messages import UserPromptPart
+
+    research_agent, plan_agent, tasks_agent = mock_agents
+
+    # Create deps for each agent
+    research_deps = MagicMock(spec=AgentDeps)
+    research_deps.system_prompt_fn = MagicMock(return_value="Research system prompt")
+
+    mock_create_research.return_value = (research_agent, research_deps)
+    mock_create_plan.return_value = (plan_agent, research_deps)
+    mock_create_tasks.return_value = (tasks_agent, research_deps)
+    mock_create_specify.return_value = (tasks_agent, research_deps)
+    mock_create_export.return_value = (tasks_agent, research_deps)
+    mock_create_router.return_value = (tasks_agent, research_deps)
+
+    # Create TWO different ModelRequest objects with the same content but different timestamps
+    # This simulates what happens when:
+    # 1. TUI adds user message to ui_message_history before running agent
+    # 2. Agent returns new_messages() which includes another ModelRequest with same content
+    user_prompt_content = "Hello, this is my test prompt"
+
+    # Create the user message that the TUI adds first
+    tui_user_message = ModelRequest.user_text_prompt(user_prompt_content)
+
+    # Simulate a small time delay, then create another message with the same content
+    # (this simulates what pydantic_ai returns from result.new_messages())
+    import asyncio
+
+    await asyncio.sleep(0.01)  # Small delay to ensure different timestamp
+    agent_user_message = ModelRequest.user_text_prompt(user_prompt_content)
+
+    # Verify the two messages have the same content but different timestamps
+    tui_part = next(p for p in tui_user_message.parts if isinstance(p, UserPromptPart))
+    agent_part = next(
+        p for p in agent_user_message.parts if isinstance(p, UserPromptPart)
+    )
+
+    assert tui_part.content == agent_part.content  # Same content
+    assert tui_part.timestamp != agent_part.timestamp  # Different timestamps
+    # Without the fix, this comparison would have been used and failed:
+    assert (
+        tui_user_message.parts != agent_user_message.parts
+    )  # Direct comparison fails!
+
+    # Mock the agent run method to return the duplicate user message
+    mock_result = MagicMock(spec=AgentRunResult)
+    mock_result.output = AgentResponse(
+        response="Test response", clarifying_questions=None
+    )
+    # Return a list with the agent's version of the user message plus a response
+    agent_response = ModelResponse(parts=[TextPart(content="Hello!")])
+    mock_result.new_messages.return_value = [agent_user_message, agent_response]
+    mock_result.all_messages.return_value = [agent_user_message, agent_response]
+    mock_result.usage.return_value = MagicMock()
+    research_agent.run = AsyncMock(return_value=mock_result)
+
+    # Mock add_system_status_message
+    async def mock_add_status(deps, history):
+        return history if history else []
+
+    mock_add_system_status.side_effect = mock_add_status
+
+    manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
+    manager.post_message = MagicMock()
+
+    # Pre-populate ui_message_history with the TUI's version of the user message
+    # (simulating what chat_screen.py does before calling run_agent)
+    manager.ui_message_history = [tui_user_message]
+
+    # Run the agent
+    await manager.run(user_prompt_content)
+
+    # Check that the user message appears only ONCE in ui_message_history
+    user_messages = [
+        msg
+        for msg in manager.ui_message_history
+        if isinstance(msg, ModelRequest)
+        and any(isinstance(p, UserPromptPart) for p in msg.parts)
+    ]
+
+    assert len(user_messages) == 1, (
+        f"Expected 1 user message but found {len(user_messages)}. "
+        "User prompt deduplication failed - prompts with different timestamps were not detected as duplicates."
+    )
