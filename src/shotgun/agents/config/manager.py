@@ -25,6 +25,7 @@ from .models import (
     GoogleConfig,
     ModelName,
     OpenAIConfig,
+    PersistentGraphOpenBehavior,
     ProviderType,
     ShotgunAccountConfig,
     ShotgunConfig,
@@ -51,7 +52,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 6
+CURRENT_CONFIG_VERSION = 7
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -203,6 +204,26 @@ def _migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 6 to version 7.
+
+    Changes:
+    - Add 'persistent_graph_behavior' field with default 'ask'
+
+    Args:
+        data: Config data dict at version 6
+
+    Returns:
+        Modified config data dict at version 7
+    """
+    if "persistent_graph_behavior" not in data:
+        data["persistent_graph_behavior"] = "ask"
+        logger.info("Migrated config v6->v7: added persistent_graph_behavior field")
+
+    data["config_version"] = 7
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -224,6 +245,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         3: _migrate_v3_to_v4,
         4: _migrate_v4_to_v5,
         5: _migrate_v5_to_v6,
+        6: _migrate_v6_to_v7,
     }
 
     # Apply migrations sequentially
@@ -812,6 +834,28 @@ class ConfigManager:
         config.router_mode = mode
         await self.save(config)
         logger.debug("Router mode saved: %s", mode)
+
+    async def get_persistent_graph_behavior(self) -> PersistentGraphOpenBehavior:
+        """Get the saved persistent graph behavior preference.
+
+        Returns:
+            The persistent graph behavior (ASK, ALWAYS_REUSE, or ALWAYS_NEW)
+        """
+        config = await self.load()
+        return config.persistent_graph_behavior
+
+    async def set_persistent_graph_behavior(
+        self, behavior: PersistentGraphOpenBehavior
+    ) -> None:
+        """Save the persistent graph behavior preference.
+
+        Args:
+            behavior: Persistent graph behavior to save
+        """
+        config = await self.load()
+        config.persistent_graph_behavior = behavior
+        await self.save(config)
+        logger.debug("Persistent graph behavior saved: %s", behavior)
 
 
 # Global singleton instance

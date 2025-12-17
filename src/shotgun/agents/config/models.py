@@ -22,6 +22,14 @@ class KeyProvider(StrEnum):
     SHOTGUN = "shotgun"  # Shotgun Account (unified LiteLLM proxy)
 
 
+class PersistentGraphOpenBehavior(StrEnum):
+    """Behavior when opening a codebase with a saved graph."""
+
+    ASK = "ask"  # Ask whether to reuse or start a new graph
+    ALWAYS_REUSE = "always_reuse"  # Always reuse the last graph
+    ALWAYS_NEW = "always_new"  # Always start a new graph
+
+
 class ModelName(StrEnum):
     """Available AI model names."""
 
@@ -259,7 +267,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=5, description="Configuration schema version")
+    config_version: int = Field(default=7, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",
@@ -279,4 +287,8 @@ class ShotgunConfig(BaseModel):
     router_mode: str = Field(
         default="planning",
         description="Router execution mode: 'planning' or 'drafting'",
+    )
+    persistent_graph_behavior: PersistentGraphOpenBehavior = Field(
+        default=PersistentGraphOpenBehavior.ASK,
+        description="Behavior when opening a codebase with a saved graph: ask, always_reuse, or always_new",
     )
