@@ -97,6 +97,7 @@ from shotgun.tui.screens.chat.help_text import (
 from shotgun.tui.screens.chat.prompt_history import PromptHistory
 from shotgun.tui.screens.chat_screen.command_providers import (
     DeleteCodebasePaletteProvider,
+    GraphManagementProvider,
     UnifiedCommandProvider,
 )
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -177,6 +178,7 @@ class ChatScreen(Screen[None]):
     ]
 
     COMMANDS = {
+        GraphManagementProvider,
         UnifiedCommandProvider,
     }
 
@@ -603,13 +605,66 @@ class ChatScreen(Screen[None]):
         logger.debug(f"Graph settings modal result: {result}")
 
     async def action_open_graph_selector(self) -> None:
-        """Open the graph selector modal to switch graphs (Stage 4).
+        """Open the graph selector modal to switch graphs (Stage 4)."""
+        from shotgun.codebase.persistence import create_graph_for_path
+        from shotgun.tui.screens.chat.graph_selector_modal import (
+            GraphSelectorAction,
+            GraphSelectorModal,
+        )
 
-        This will be implemented in Phase 4 when GraphSelectorModal is created.
-        For now, just show a placeholder hint.
-        """
-        self.mount_hint("Graph selector coming in Phase 4...")
-        logger.debug("Graph selector action triggered (not yet implemented)")
+        # Show graph selector modal
+        result = await self.app.push_screen_wait(
+            GraphSelectorModal(self.codebase_sdk, self.current_graph)
+        )
+
+        if result is None:
+            # Modal was dismissed without action
+            return
+
+        # Handle different actions
+        if result.action == GraphSelectorAction.USE_SELECTED:
+            if result.selected_graph:
+                # Switch to the selected graph
+                self._update_graph_state(result.selected_graph)
+                self.mount_hint(f"Switched to graph: **{result.selected_graph.name}**")
+                logger.info(f"Switched to graph: {result.selected_graph.name}")
+            else:
+                logger.warning("USE_SELECTED action but no graph provided")
+
+        elif result.action == GraphSelectorAction.CREATE_NEW:
+            # Create a new graph for the current codebase
+            try:
+                cur_dir = Path.cwd()
+                graph_manager = self.codebase_sdk.service.manager
+
+                # Create new graph bound to current path
+                new_graph = await create_graph_for_path(str(cur_dir), graph_manager)
+
+                # Update current graph state
+                self._update_graph_state(new_graph)
+
+                # Trigger indexing flow
+                self.mount_hint("Created new graph. Indexing codebase...")
+                cwd_name = cur_dir.name
+                selection = CodebaseIndexSelection(repo_path=cur_dir, name=cwd_name)
+                self.call_later(lambda: self.index_codebase(selection))
+
+                logger.info(f"Created new graph: {new_graph.name}")
+            except Exception as e:
+                logger.error(f"Failed to create new graph: {e}", exc_info=True)
+                self.mount_hint(f"⚠️ Failed to create new graph: {e}")
+
+        elif result.action == GraphSelectorAction.OPEN_SETTINGS:
+            # Open settings modal (recursive call)
+            await self.action_open_graph_settings()
+            # After settings, re-open selector if user wants
+            # For now, just close - user can click again if needed
+
+        elif result.action == GraphSelectorAction.CANCEL:
+            # User cancelled - do nothing
+            pass
+
+        logger.debug(f"Graph selector result: {result.action}")
 
     @on(OpenGraphSelector)
     async def handle_open_graph_selector(self, event: OpenGraphSelector) -> None:

@@ -221,6 +221,49 @@ class DeleteCodebasePaletteProvider(Provider):
                 )
 
 
+class GraphManagementProvider(Provider):
+    """Command provider for graph management (Stage 4 persistent graphs)."""
+
+    @property
+    def chat_screen(self) -> "ChatScreen":
+        from shotgun.tui.screens.chat import ChatScreen
+
+        return cast(ChatScreen, self.screen)
+
+    async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        """Provide graph management commands when palette opens."""
+        yield DiscoveryHit(
+            "Graph: Switch Graph",
+            self.chat_screen.action_open_graph_selector,
+            help="🔀 Switch to a different graph or create a new one",
+        )
+        yield DiscoveryHit(
+            "Graph: Settings",
+            self.chat_screen.action_open_graph_settings,
+            help="⚙️ Configure graph behavior preferences",
+        )
+
+    async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        """Search for graph management commands."""
+        matcher = self.matcher(query)
+        commands = [
+            (
+                "Graph: Switch Graph",
+                self.chat_screen.action_open_graph_selector,
+                "🔀 Switch to a different graph or create a new one",
+            ),
+            (
+                "Graph: Settings",
+                self.chat_screen.action_open_graph_settings,
+                "⚙️ Configure graph behavior preferences",
+            ),
+        ]
+        for title, callback, help_text in commands:
+            score = matcher.match(title)
+            if score > 0:
+                yield Hit(score, matcher.highlight(title), callback, help=help_text)
+
+
 class UnifiedCommandProvider(Provider):
     """Unified command provider with all commands in alphabetical order."""
 
@@ -262,6 +305,16 @@ class UnifiedCommandProvider(Provider):
             "Compact Conversation",
             self.chat_screen.action_compact_conversation,
             help="Reduce conversation size by compacting message history",
+        )
+        yield DiscoveryHit(
+            "Graph: Settings",
+            self.chat_screen.action_open_graph_settings,
+            help="⚙️ Configure graph behavior preferences",
+        )
+        yield DiscoveryHit(
+            "Graph: Switch Graph",
+            self.chat_screen.action_open_graph_selector,
+            help="🔀 Switch to a different graph or create a new one",
         )
         yield DiscoveryHit(
             "Open Provider Setup",
@@ -314,6 +367,16 @@ class UnifiedCommandProvider(Provider):
                 "Compact Conversation",
                 self.chat_screen.action_compact_conversation,
                 "Reduce conversation size by compacting message history",
+            ),
+            (
+                "Graph: Settings",
+                self.chat_screen.action_open_graph_settings,
+                "⚙️ Configure graph behavior preferences",
+            ),
+            (
+                "Graph: Switch Graph",
+                self.chat_screen.action_open_graph_selector,
+                "🔀 Switch to a different graph or create a new one",
             ),
             (
                 "Open Provider Setup",

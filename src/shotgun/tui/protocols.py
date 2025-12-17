@@ -80,3 +80,22 @@ class ActiveSubAgentProvider(Protocol):
             a sub-agent is executing, None if idle.
         """
         ...
+
+
+@runtime_checkable
+class CurrentGraphProvider(Protocol):
+    """Protocol for screens that provide current graph state (Stage 4).
+
+    This protocol allows components to access the current graph without
+    importing the concrete ChatScreen class, eliminating circular dependencies.
+    Used by GraphIndicator and other graph-related widgets.
+    """
+
+    @property
+    def current_graph(self):  # type: ignore[no-untyped-def]
+        """The currently active graph for this codebase.
+
+        Returns:
+            CodebaseGraph if a graph is active, None otherwise.
+        """
+        ...
