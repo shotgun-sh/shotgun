@@ -549,3 +549,58 @@ async def test_mark_step_done_does_not_set_pending_completion_for_non_final_step
     # Plan is not complete, pending_completion should NOT be set
     assert sample_plan.is_complete() is False
     assert mock_context.deps.pending_completion is False
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_returns_continuation_instructions_in_drafting_mode(
+    mock_context, sample_plan
+):
+    """Test that mark_step_done returns continuation instructions in Drafting mode."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+
+    result = await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+
+    assert result.success is True
+    assert "NEXT STEP" in result.message
+    assert "Do NOT call final_result" in result.message
+    assert "Write spec" in result.message  # Next step title
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_returns_completion_message_when_plan_done(
+    mock_context, sample_plan
+):
+    """Test that mark_step_done returns completion message when all steps are done."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.DRAFTING
+
+    # Mark all steps done
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+    await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-2"))
+    result = await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-3"))
+
+    assert result.success is True
+    assert "complete" in result.message.lower()
+    assert "final response" in result.message.lower()
+    assert "Do NOT call final_result" not in result.message
+
+
+@pytest.mark.asyncio
+async def test_mark_step_done_returns_basic_message_in_planning_mode(
+    mock_context, sample_plan
+):
+    """Test that mark_step_done returns basic message in Planning mode."""
+    mock_context.deps.current_plan = sample_plan
+    mock_context.deps.router_mode = RouterMode.PLANNING
+    mock_context.deps.pending_checkpoint = None
+
+    result = await mark_step_done(mock_context, MarkStepDoneInput(step_id="step-1"))
+
+    assert result.success is True
+    # Should NOT include drafting mode instructions
+    assert "NEXT STEP" not in result.message
+    assert "Do NOT call final_result" not in result.message
+    # Should just have the basic completion message
+    assert "Research OAuth" in result.message
+    assert "complete" in result.message.lower()

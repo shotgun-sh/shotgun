@@ -1597,6 +1597,9 @@ class ChatScreen(Screen[None]):
         # Check for plan completion (Drafting mode)
         self._check_plan_completion()
 
+        # Check if agent stopped with incomplete plan (failsafe)
+        self._check_incomplete_plan()
+
         # Save conversation after each interaction
         self._save_conversation()
 
@@ -1828,6 +1831,57 @@ class ChatScreen(Screen[None]):
 
         # Hide the plan panel since the plan is done
         self._hide_plan_panel()
+
+    def _check_incomplete_plan(self) -> None:
+        """Check if agent returned with an incomplete plan in Drafting mode.
+
+        This is a failsafe to notify the user if the agent stopped
+        mid-plan without completing all steps.
+        """
+        logger.debug("[PLAN] _check_incomplete_plan called")
+
+        if not isinstance(self.deps, RouterDeps):
+            logger.debug("[PLAN] Not RouterDeps, skipping incomplete plan check")
+            return
+
+        logger.debug(
+            "[PLAN] router_mode=%s, current_plan=%s",
+            self.deps.router_mode,
+            self.deps.current_plan.goal if self.deps.current_plan else None,
+        )
+
+        if self.deps.router_mode != RouterMode.DRAFTING:
+            logger.debug("[PLAN] Not in DRAFTING mode, skipping incomplete plan check")
+            return
+
+        plan = self.deps.current_plan
+        if plan is None:
+            logger.debug("[PLAN] No current plan")
+            return
+
+        if plan.is_complete():
+            logger.debug("[PLAN] Plan is complete, no incomplete plan hint needed")
+            return
+
+        # Plan exists and is incomplete - show status hint
+        completed = sum(1 for s in plan.steps if s.done)
+        total = len(plan.steps)
+        remaining = [s.title for s in plan.steps if not s.done]
+
+        logger.info(
+            "[PLAN] Agent stopped with incomplete plan: %d/%d steps done, "
+            "remaining: %s",
+            completed,
+            total,
+            remaining,
+        )
+
+        hint = (
+            f"📋 **Plan Status: {completed}/{total} steps complete**\n\n"
+            f"Remaining: {', '.join(remaining)}\n\n"
+            f"_Type 'continue' to resume the plan._"
+        )
+        self.mount_hint(hint)
 
     # =========================================================================
     # Sub-Agent Lifecycle Handlers (Stage 8)
