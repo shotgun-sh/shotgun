@@ -1863,6 +1863,15 @@ class ChatScreen(Screen[None]):
             logger.debug("[PLAN] Plan is complete, no incomplete plan hint needed")
             return
 
+        # Don't show the "continue to resume" hint if Q&A mode is active.
+        # The user needs to answer the clarifying questions first.
+        if self.qa_mode:
+            logger.debug(
+                "[PLAN] Q&A mode active, deferring incomplete plan hint until "
+                "questions are answered"
+            )
+            return
+
         # Plan exists and is incomplete - show status hint
         completed = sum(1 for s in plan.steps if s.done)
         total = len(plan.steps)
