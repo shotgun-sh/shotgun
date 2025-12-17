@@ -64,7 +64,7 @@ from shotgun.codebase.core.manager import (
 )
 from shotgun.codebase.graph_decision import GraphOpenAction
 from shotgun.codebase.graph_open_flow import determine_graph_action_for_codebase
-from shotgun.codebase.models import IndexProgress, ProgressPhase
+from shotgun.codebase.models import CodebaseGraph, IndexProgress, ProgressPhase
 from shotgun.exceptions import (
     SHOTGUN_CONTACT_EMAIL,
     ErrorNotPickedUpBySentry,
@@ -75,6 +75,7 @@ from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.components.context_indicator import ContextIndicator
+from shotgun.tui.components.graph_indicator import GraphIndicator
 from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
@@ -107,6 +108,7 @@ from shotgun.tui.screens.chat_screen.messages import (
     CheckpointContinue,
     CheckpointModify,
     CheckpointStop,
+    OpenGraphSelector,
     PlanApprovalRequired,
     PlanApproved,
     PlanPanelClosed,
@@ -192,6 +194,9 @@ class ChatScreen(Screen[None]):
 
     # Working state - keep reactive for Textual watchers
     working = reactive(False)
+
+    # Current graph state for per-path graph persistence (Stage 4)
+    current_graph: reactive[CodebaseGraph | None] = reactive(None)
 
     # Throttle context indicator updates (in seconds)
     _last_context_update: float = 0.0
@@ -347,6 +352,8 @@ class ChatScreen(Screen[None]):
         if decision.should_reuse:
             # Graph is already loaded by the codebase_sdk, just show hint
             self.mount_hint(help_text_with_codebase(already_indexed=True))
+            # Update graph state (Stage 4)
+            self._update_graph_state(decision.existing_graph)
             return
 
         # Handle ASK decision - show modal to ask user
@@ -363,6 +370,8 @@ class ChatScreen(Screen[None]):
             # User chose to reuse existing graph
             if result.choice == GraphChoice.REUSE:
                 self.mount_hint(help_text_with_codebase(already_indexed=True))
+                # Update graph state (Stage 4)
+                self._update_graph_state(decision.existing_graph)
                 return
 
             # User chose to create new graph - fall through to indexing flow
@@ -406,6 +415,17 @@ class ChatScreen(Screen[None]):
         if self.is_mounted:
             # Use widget coordinator for all widget updates
             self.widget_coordinator.update_messages(messages)
+
+    def watch_current_graph(self, graph: CodebaseGraph | None) -> None:
+        """Update UI when current graph changes (Stage 4 graph management)."""
+        if self.is_mounted:
+            # Update GraphIndicator widget
+            try:
+                graph_indicator = self.query_one("#graph-indicator", GraphIndicator)
+                graph_indicator.update_graph(graph)
+                logger.debug(f"Current graph changed: {graph.name if graph else 'None'}")
+            except Exception as e:
+                logger.debug(f"Failed to update graph indicator: {e}")
 
     # =========================================================================
     # Router State Properties (for Protocol compliance)
@@ -568,6 +588,34 @@ class ChatScreen(Screen[None]):
             self.agent_manager.add_hint_message(
                 HintMessage(message="⚠️ No context analysis available")
             )
+
+    async def action_open_graph_settings(self) -> None:
+        """Open the graph behavior preferences modal (Stage 4)."""
+        from shotgun.tui.screens.chat.graph_settings_modal import GraphSettingsModal
+
+        result = await self.app.push_screen_wait(
+            GraphSettingsModal(self.deps.config_manager)
+        )
+
+        if result:
+            # Settings were changed
+            self.mount_hint("Graph behavior preferences updated")
+        logger.debug(f"Graph settings modal result: {result}")
+
+    async def action_open_graph_selector(self) -> None:
+        """Open the graph selector modal to switch graphs (Stage 4).
+
+        This will be implemented in Phase 4 when GraphSelectorModal is created.
+        For now, just show a placeholder hint.
+        """
+        self.mount_hint("Graph selector coming in Phase 4...")
+        logger.debug("Graph selector action triggered (not yet implemented)")
+
+    @on(OpenGraphSelector)
+    async def handle_open_graph_selector(self, event: OpenGraphSelector) -> None:
+        """Handle OpenGraphSelector message from GraphIndicator click."""
+        event.stop()
+        await self.action_open_graph_selector()
 
     @work
     async def action_compact_conversation(self) -> None:
@@ -820,6 +868,7 @@ class ChatScreen(Screen[None]):
                 with Grid():
                     yield ModeIndicator(mode=self.mode)
                     with Container(id="right-footer-indicators"):
+                        yield GraphIndicator(id="graph-indicator")
                         yield ContextIndicator(id="context-indicator")
                         yield Static("", id="indexing-job-display")
 
@@ -858,6 +907,40 @@ class ChatScreen(Screen[None]):
         except Exception:
             # Ignore errors reading meta.json - this is optional UI feedback
             logger.debug("Failed to read meta.json for pull hint", exc_info=True)
+
+    async def _initialize_graph_state(self) -> None:
+        """Initialize graph state by loading the current graph for the codebase.
+
+        Called during mount to set up the initial graph state. This queries the
+        filtered codebase service to find the current graph for the working directory.
+        """
+        try:
+            # Get all graphs for the current directory
+            graphs = await self.codebase_sdk.service.list_graphs()
+
+            # If we have exactly one graph, set it as current
+            # (Multi-graph selection will be handled via GraphSelectorModal in Phase 4)
+            if len(graphs) == 1:
+                self.current_graph = graphs[0]
+                logger.debug(f"Initialized current graph: {graphs[0].name}")
+            elif len(graphs) > 1:
+                # Multiple graphs - could auto-select the most recent one
+                # or leave it None until user selects via GraphSelectorModal
+                logger.debug(f"Found {len(graphs)} graphs, no auto-selection")
+            else:
+                logger.debug("No graphs found for current directory")
+        except Exception:
+            logger.debug("Failed to initialize graph state", exc_info=True)
+            # Don't fail mount if graph state init fails
+
+    def _update_graph_state(self, graph: CodebaseGraph | None) -> None:
+        """Update the current graph state.
+
+        Args:
+            graph: The graph to set as current, or None to clear
+        """
+        self.current_graph = graph
+        logger.info(f"Graph state updated: {graph.name if graph else 'None'}")
 
     def mount_hint_with_email(
         self, markdown_before: str, email: str, markdown_after: str = ""

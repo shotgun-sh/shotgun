@@ -30,6 +30,8 @@ __all__ = [
     # Plan panel messages (Stage 11)
     "PlanUpdated",
     "PlanPanelClosed",
+    # Graph management messages (Stage 4 persistent graphs)
+    "OpenGraphSelector",
 ]
 
 
@@ -216,4 +218,17 @@ class PlanPanelClosed(Message):
 
     This message indicates the user wants to dismiss the plan panel
     temporarily. The panel will reopen when the plan changes.
+    """
+
+
+# =============================================================================
+# Graph Management Messages (Stage 4 Persistent Graphs)
+# =============================================================================
+
+
+class OpenGraphSelector(Message):
+    """Posted when user clicks the graph indicator to open graph selector.
+
+    This message triggers the graph selector modal to appear, allowing
+    the user to switch between graphs or create a new one.
     """
