@@ -425,6 +425,19 @@ class ChatScreen(Screen[None]):
 
         self.mount_hint(help_text_with_codebase(already_indexed=False))
 
+        # If user explicitly chose NEW and an existing graph exists, delete it first
+        if decision.existing_graph:
+            try:
+                await self.codebase_sdk.delete_codebase(decision.existing_graph.graph_id)
+                logger.info(
+                    f"Deleted existing graph {decision.existing_graph.graph_id} to create new one"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to delete existing graph {decision.existing_graph.graph_id}: {e}"
+                )
+                # Continue anyway - build_graph will handle it
+
         # Auto-index the current directory with its name
         cwd_name = cur_dir.name
         selection = CodebaseIndexSelection(repo_path=cur_dir, name=cwd_name)
