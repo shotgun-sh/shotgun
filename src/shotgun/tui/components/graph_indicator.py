@@ -18,7 +18,6 @@ class GraphIndicator(Static):
 
     GraphIndicator:hover {
         text-style: underline;
-        cursor: pointer;
     }
     """
 
