@@ -245,6 +245,51 @@ Your PR description should include:
 - Keep functions focused and concise
 - Use meaningful variable names
 
+## Persistent Graph Integration
+
+When adding new features that open or initialize a codebase, you **must** integrate with the persistent graph system. This ensures consistent behavior and respects user preferences.
+
+**Required integration steps:**
+
+1. **Import the decision flow:**
+   ```python
+   from shotgun.codebase.graph_open_flow import determine_graph_action_for_codebase
+   ```
+
+2. **Call the decision function:**
+   ```python
+   decision = await determine_graph_action_for_codebase(
+       codebase_path,
+       graph_manager,
+       config_manager=None  # Uses singleton
+   )
+   ```
+
+3. **Handle the decision with error handling:**
+   ```python
+   if decision.should_reuse:
+       try:
+           graph = await graph_manager.get_graph(decision.existing_graph.graph_id)
+           # Success - use the graph
+       except Exception as e:
+           # Failed - notify and fall back to new graph
+           app.notify("Could not load graph...", severity="warning")
+
+   if decision.should_ask_user and decision.existing_graph:
+       # Show modal and respect user choice
+       result = await app.push_screen_wait(GraphDecisionModal(decision.existing_graph))
+       # Handle result
+   ```
+
+**DO NOT:**
+- ❌ Bypass `determine_graph_action_for_codebase()`
+- ❌ Skip error handling around graph loading
+- ❌ Hardcode behavior instead of respecting preferences
+- ❌ Create graphs directly (use `create_graph_for_path()`)
+- ❌ Forget path canonicalization (decision flow handles it)
+
+**See [docs/persistent-graphs.md](persistent-graphs.md) for detailed integration guide and examples.**
+
 ## Testing Guidelines
 
 - Use **pytest** for all tests

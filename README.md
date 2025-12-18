@@ -304,6 +304,34 @@ Locked into specific IDE or coding agent.
 
 </table>
 
+### Persistent Graphs Per Codebase
+
+Shotgun now **remembers your codebase analysis** between sessions. Each codebase directory gets its own persistent knowledge graph that's automatically saved and reused.
+
+**How it works:**
+- When you open a codebase, Shotgun checks if a saved graph exists for that directory
+- Your global preference controls what happens:
+  - **Ask** (default): Shows a modal asking whether to reuse the saved graph or start fresh
+  - **Always reuse**: Automatically loads the saved graph without asking
+  - **Always start new**: Creates a new graph each time without asking
+
+**Benefits:**
+- ⚡ **Instant startup** - Skip re-indexing when you already have a graph
+- 🧠 **Preserved knowledge** - Your codebase analysis persists across sessions
+- 🎯 **Per-project flexibility** - Each repository maintains its own graph
+- ⚙️ **Configurable behavior** - Set your preference via graph settings in the TUI
+
+**Changing preferences:**
+- In the TUI: Press `Ctrl+P` → "Graph: Settings"
+- Or click the graph indicator in the footer
+- Choose between Ask / Always reuse / Always start new
+
+**Modal behavior:**
+When the preference is set to "Ask", you'll see a modal asking whether to:
+- **Reuse saved graph**: Load the existing codebase analysis instantly
+- **Start a new graph**: Create fresh analysis, replacing the saved one
+- **Remember this choice**: Updates your global preference automatically
+
 ### Case Study - Real Example:
 
 We had to implement payments. Cursor, Claude Code, and Copilot all suggested building a custom payment proxy — 3-4 weeks of development. 
