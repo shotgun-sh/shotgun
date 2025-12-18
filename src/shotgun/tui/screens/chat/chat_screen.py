@@ -846,6 +846,72 @@ class ChatScreen(Screen[None]):
         )
         self.agent_manager.add_hint_message(hint)
 
+    async def execute_shell_command(self, command: str) -> None:
+        """Execute a shell command and display output.
+
+        This implements the `!`-to-shell behavior for interactive mode.
+        Commands are executed in the current working directory with
+        full shell features (pipes, redirection, etc.).
+
+        Args:
+            command: The shell command to execute (after stripping the leading `!`)
+
+        Note:
+            - Commands are executed with shell=True for full shell features
+            - Output is streamed to the TUI via hint messages
+            - Errors are displayed but do not crash the application
+            - Commands are NOT added to conversation history
+        """
+        # Handle empty command (just `!` with nothing after it)
+        if not command or command.isspace():
+            self.mount_hint("⚠️ Empty shell command. Usage: `!<command>`")
+            return
+
+        # Show what command is being executed
+        # Use code block for better visibility
+        self.mount_hint(f"**Running:** `{command}`")
+
+        try:
+            # Execute with shell=True to support pipes, redirection, etc.
+            # Run in current working directory
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=Path.cwd(),
+            )
+
+            # Wait for command to complete and capture output
+            stdout_bytes, stderr_bytes = await process.communicate()
+            stdout = stdout_bytes.decode("utf-8", errors="replace")
+            stderr = stderr_bytes.decode("utf-8", errors="replace")
+            return_code = process.returncode or 0
+
+            # Build output message
+            output_parts = []
+
+            if stdout:
+                # Show stdout in a code block for proper formatting
+                output_parts.append(f"```\n{stdout.rstrip()}\n```")
+
+            if stderr:
+                # Show stderr with a warning indicator
+                output_parts.append(f"**stderr:**\n```\n{stderr.rstrip()}\n```")
+
+            if return_code != 0:
+                # Show non-zero exit code as error
+                output_parts.append(f"**Exit code:** {return_code}")
+
+            # Display output (or success message if no output)
+            if output_parts:
+                self.mount_hint("\n\n".join(output_parts))
+            elif return_code == 0:
+                self.mount_hint("✓ Command completed successfully (no output)")
+
+        except Exception as e:
+            # Show error message
+            self.mount_hint(f"❌ **Shell command failed:**\n```\n{str(e)}\n```")
+
     @on(PartialResponseMessage)
     def handle_partial_response(self, event: PartialResponseMessage) -> None:
         # Filter event.messages to exclude ModelRequest with only ToolReturnPart
@@ -1125,10 +1191,41 @@ class ChatScreen(Screen[None]):
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:
+        """Handle user input submission from the prompt.
+
+        This is the main interactive loop entrypoint for shotgun-cli TUI.
+        Input classification:
+        1. Lines starting with `!` (after trimming whitespace) are shell commands
+        2. Lines starting with `/` are internal commands
+        3. All other lines are sent to the LLM
+
+        Shell command behavior (`!`-to-shell):
+        - Lines like `!ls` or `  !git status` execute as shell commands
+        - Shell commands are NOT sent to LLM
+        - Shell commands are NOT added to conversation history
+        - Implementation: v1 limitation - no history expansion (!!, !$, etc.)
+        """
         text = message.text.strip()
 
         # If empty text, just clear input and return
         if not text:
+            self.widget_coordinator.update_prompt_input(clear=True)
+            self.value = ""
+            return
+
+        # Stage 1: Classify input - check if line starts with `!` (shell command)
+        # Trim leading whitespace and check first character
+        trimmed = message.text.lstrip()
+        if trimmed.startswith("!"):
+            # This is a shell command - extract the command by removing exactly one `!`
+            # Note: `!!ls` becomes `!ls` in v1 (no special history expansion)
+            shell_command = trimmed[1:]  # Remove the leading `!`
+
+            # Execute shell command (do NOT forward to LLM or add to history)
+            await self.execute_shell_command(shell_command)
+
+            # Clear input and return (do not proceed to LLM handling)
+            # This ensures shell commands are never added to conversation history
             self.widget_coordinator.update_prompt_input(clear=True)
             self.value = ""
             return

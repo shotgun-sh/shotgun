@@ -321,3 +321,267 @@ class TestQAModeToggle:
         # Q&A mode should NOT be active
         assert screen.qa_mode is False
         assert screen.qa_questions == []
+
+
+class TestShellCommandHandling:
+    """Tests for `!`-to-shell command handling in interactive mode."""
+
+    @pytest.mark.asyncio
+    async def test_normal_prompt_sent_to_llm_not_shell(
+        self,
+        mock_agent_manager,
+        mock_conversation_manager,
+        mock_conversation_service,
+        mock_widget_coordinator,
+        mock_processing_state,
+        mock_command_handler,
+        mock_placeholder_hints,
+        mock_codebase_sdk,
+        mock_agent_deps,
+    ):
+        """Test that normal prompts without `!` are sent to LLM, not shell."""
+        from shotgun.tui.components.prompt_input import PromptInput
+        from shotgun.tui.screens.chat import ChatScreen
+
+        screen = ChatScreen(
+            agent_manager=mock_agent_manager,
+            conversation_manager=mock_conversation_manager,
+            conversation_service=mock_conversation_service,
+            widget_coordinator=mock_widget_coordinator,
+            processing_state=mock_processing_state,
+            command_handler=mock_command_handler,
+            placeholder_hints=mock_placeholder_hints,
+            codebase_sdk=mock_codebase_sdk,
+            deps=mock_agent_deps,
+        )
+
+        # Mock the command handler to return False (not a slash command)
+        mock_command_handler.is_command.return_value = False
+
+        # Create a mock execute_shell_command to verify it's NOT called
+        screen.execute_shell_command = AsyncMock()
+
+        # Mock run_agent to prevent full execution
+        screen.run_agent = Mock()
+
+        # Simulate user entering a normal prompt
+        event = PromptInput.Submitted(text="What is Python?")
+        await screen.handle_submit(event)
+
+        # Shell command should NOT be executed
+        screen.execute_shell_command.assert_not_called()
+
+        # Prompt should be added to UI message history (LLM path)
+        assert len(mock_agent_manager.ui_message_history) > 0
+
+    @pytest.mark.asyncio
+    async def test_shell_command_with_leading_bang(
+        self,
+        mock_agent_manager,
+        mock_conversation_manager,
+        mock_conversation_service,
+        mock_widget_coordinator,
+        mock_processing_state,
+        mock_command_handler,
+        mock_placeholder_hints,
+        mock_codebase_sdk,
+        mock_agent_deps,
+    ):
+        """Test that `!ls` is executed as shell command."""
+        from shotgun.tui.components.prompt_input import PromptInput
+        from shotgun.tui.screens.chat import ChatScreen
+
+        screen = ChatScreen(
+            agent_manager=mock_agent_manager,
+            conversation_manager=mock_conversation_manager,
+            conversation_service=mock_conversation_service,
+            widget_coordinator=mock_widget_coordinator,
+            processing_state=mock_processing_state,
+            command_handler=mock_command_handler,
+            placeholder_hints=mock_placeholder_hints,
+            codebase_sdk=mock_codebase_sdk,
+            deps=mock_agent_deps,
+        )
+
+        # Mock execute_shell_command
+        screen.execute_shell_command = AsyncMock()
+
+        # Simulate user entering `!ls`
+        event = PromptInput.Submitted(text="!ls")
+        await screen.handle_submit(event)
+
+        # Shell command should be executed with "ls" (bang removed)
+        screen.execute_shell_command.assert_called_once_with("ls")
+
+        # Should NOT be added to LLM message history
+        assert len(mock_agent_manager.ui_message_history) == 0
+
+    @pytest.mark.asyncio
+    async def test_shell_command_with_leading_whitespace(
+        self,
+        mock_agent_manager,
+        mock_conversation_manager,
+        mock_conversation_service,
+        mock_widget_coordinator,
+        mock_processing_state,
+        mock_command_handler,
+        mock_placeholder_hints,
+        mock_codebase_sdk,
+        mock_agent_deps,
+    ):
+        """Test that `   !echo hi` is treated as shell command."""
+        from shotgun.tui.components.prompt_input import PromptInput
+        from shotgun.tui.screens.chat import ChatScreen
+
+        screen = ChatScreen(
+            agent_manager=mock_agent_manager,
+            conversation_manager=mock_conversation_manager,
+            conversation_service=mock_conversation_service,
+            widget_coordinator=mock_widget_coordinator,
+            processing_state=mock_processing_state,
+            command_handler=mock_command_handler,
+            placeholder_hints=mock_placeholder_hints,
+            codebase_sdk=mock_codebase_sdk,
+            deps=mock_agent_deps,
+        )
+
+        # Mock execute_shell_command
+        screen.execute_shell_command = AsyncMock()
+
+        # Simulate user entering `   !echo hi` (with leading spaces)
+        event = PromptInput.Submitted(text="   !echo hi")
+        await screen.handle_submit(event)
+
+        # Shell command should be executed with "echo hi"
+        screen.execute_shell_command.assert_called_once_with("echo hi")
+
+        # Should NOT be added to LLM message history
+        assert len(mock_agent_manager.ui_message_history) == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_bang_shows_warning(
+        self,
+        mock_agent_manager,
+        mock_conversation_manager,
+        mock_conversation_service,
+        mock_widget_coordinator,
+        mock_processing_state,
+        mock_command_handler,
+        mock_placeholder_hints,
+        mock_codebase_sdk,
+        mock_agent_deps,
+    ):
+        """Test that `!` alone shows a warning message."""
+        from shotgun.tui.components.prompt_input import PromptInput
+        from shotgun.tui.screens.chat import ChatScreen
+
+        screen = ChatScreen(
+            agent_manager=mock_agent_manager,
+            conversation_manager=mock_conversation_manager,
+            conversation_service=mock_conversation_service,
+            widget_coordinator=mock_widget_coordinator,
+            processing_state=mock_processing_state,
+            command_handler=mock_command_handler,
+            placeholder_hints=mock_placeholder_hints,
+            codebase_sdk=mock_codebase_sdk,
+            deps=mock_agent_deps,
+        )
+
+        # Simulate user entering just `!`
+        event = PromptInput.Submitted(text="!")
+        await screen.handle_submit(event)
+
+        # Should show warning hint about empty command
+        mock_agent_manager.add_hint_message.assert_called()
+        call_args = mock_agent_manager.add_hint_message.call_args[0][0]
+        assert "Empty shell command" in call_args.message
+
+    @pytest.mark.asyncio
+    async def test_double_bang_treated_as_single_bang_command(
+        self,
+        mock_agent_manager,
+        mock_conversation_manager,
+        mock_conversation_service,
+        mock_widget_coordinator,
+        mock_processing_state,
+        mock_command_handler,
+        mock_placeholder_hints,
+        mock_codebase_sdk,
+        mock_agent_deps,
+    ):
+        """Test that `!!ls` is treated as shell command `!ls` (no history expansion in v1)."""
+        from shotgun.tui.components.prompt_input import PromptInput
+        from shotgun.tui.screens.chat import ChatScreen
+
+        screen = ChatScreen(
+            agent_manager=mock_agent_manager,
+            conversation_manager=mock_conversation_manager,
+            conversation_service=mock_conversation_service,
+            widget_coordinator=mock_widget_coordinator,
+            processing_state=mock_processing_state,
+            command_handler=mock_command_handler,
+            placeholder_hints=mock_placeholder_hints,
+            codebase_sdk=mock_codebase_sdk,
+            deps=mock_agent_deps,
+        )
+
+        # Mock execute_shell_command
+        screen.execute_shell_command = AsyncMock()
+
+        # Simulate user entering `!!ls`
+        event = PromptInput.Submitted(text="!!ls")
+        await screen.handle_submit(event)
+
+        # Shell command should be executed with "!ls" (only first `!` removed)
+        screen.execute_shell_command.assert_called_once_with("!ls")
+
+        # Should NOT be added to LLM message history
+        assert len(mock_agent_manager.ui_message_history) == 0
+
+    @pytest.mark.asyncio
+    async def test_bang_in_middle_sent_to_llm(
+        self,
+        mock_agent_manager,
+        mock_conversation_manager,
+        mock_conversation_service,
+        mock_widget_coordinator,
+        mock_processing_state,
+        mock_command_handler,
+        mock_placeholder_hints,
+        mock_codebase_sdk,
+        mock_agent_deps,
+    ):
+        """Test that `echo !` (bang not at start) is sent to LLM, not shell."""
+        from shotgun.tui.components.prompt_input import PromptInput
+        from shotgun.tui.screens.chat import ChatScreen
+
+        screen = ChatScreen(
+            agent_manager=mock_agent_manager,
+            conversation_manager=mock_conversation_manager,
+            conversation_service=mock_conversation_service,
+            widget_coordinator=mock_widget_coordinator,
+            processing_state=mock_processing_state,
+            command_handler=mock_command_handler,
+            placeholder_hints=mock_placeholder_hints,
+            codebase_sdk=mock_codebase_sdk,
+            deps=mock_agent_deps,
+        )
+
+        # Mock the command handler to return False (not a slash command)
+        mock_command_handler.is_command.return_value = False
+
+        # Mock execute_shell_command to verify it's NOT called
+        screen.execute_shell_command = AsyncMock()
+
+        # Mock run_agent to prevent full execution
+        screen.run_agent = Mock()
+
+        # Simulate user entering `echo !`
+        event = PromptInput.Submitted(text="echo !")
+        await screen.handle_submit(event)
+
+        # Shell command should NOT be executed
+        screen.execute_shell_command.assert_not_called()
+
+        # Prompt should be added to UI message history (LLM path)
+        assert len(mock_agent_manager.ui_message_history) > 0

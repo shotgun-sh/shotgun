@@ -69,6 +69,8 @@ def mock_agent_manager(mock_agent_deps):
     manager._current_agent_type = AgentType.RESEARCH  # Used by ChatScreen.__init__
     manager.switch_agent = Mock()
     manager.run_agent = AsyncMock(return_value="Test response")
+    manager.ui_message_history = []  # For shell command tests
+    manager.add_hint_message = Mock()  # For hint display in shell commands
     return manager
 
 

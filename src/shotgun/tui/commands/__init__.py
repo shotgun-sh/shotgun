@@ -54,6 +54,14 @@ class CommandHandler:
 **Commands:**
 • `/help` - Show this help message
 
+**Shell Commands:**
+• `!<command>` - Execute shell commands directly (e.g., `!ls`, `!git status`)
+  - Commands run in your current working directory
+  - Output is displayed in the chat (not sent to AI)
+  - Commands are NOT added to conversation history
+  - Leading whitespace is allowed: `  !echo hi` works
+  - Note: `!!` is treated as `!` (no history expansion in this version)
+
 **Keyboard Shortcuts:**
 
 * `Enter` - Send message
