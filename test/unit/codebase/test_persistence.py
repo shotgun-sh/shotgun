@@ -516,3 +516,84 @@ async def test_create_graph_for_path_with_progress_callback():
         # Verify callback was passed
         call_args = mock_manager.build_graph.call_args
         assert call_args[1]["progress_callback"] == mock_callback
+
+
+# Stage 5: Error Handling Tests
+
+
+@pytest.mark.asyncio
+async def test_lookup_graph_for_path_handles_storage_error():
+    """Test that lookup_graph_for_path handles storage errors gracefully (Stage 5)."""
+    canonical_path = "/home/user/my-project"
+
+    # Mock manager that raises an exception
+    mock_manager = Mock()
+    mock_manager.get_graph = AsyncMock(side_effect=Exception("Database connection failed"))
+
+    # Should return None instead of raising
+    result = await lookup_graph_for_path(canonical_path, mock_manager)
+
+    assert result is None
+    # Verify manager was called
+    mock_manager.get_graph.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_lookup_graph_for_path_handles_permission_error():
+    """Test that lookup handles permission errors gracefully (Stage 5)."""
+    canonical_path = "/home/user/my-project"
+
+    # Mock manager that raises permission error
+    mock_manager = Mock()
+    mock_manager.get_graph = AsyncMock(side_effect=PermissionError("Access denied"))
+
+    # Should return None and log warning
+    result = await lookup_graph_for_path(canonical_path, mock_manager)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_lookup_graph_for_path_handles_corruption_error():
+    """Test that lookup handles database corruption errors gracefully (Stage 5)."""
+    canonical_path = "/home/user/my-project"
+
+    # Mock manager that raises corruption error
+    mock_manager = Mock()
+    mock_manager.get_graph = AsyncMock(
+        side_effect=RuntimeError("Database file corrupted")
+    )
+
+    # Should return None, allowing fallback to creating new graph
+    result = await lookup_graph_for_path(canonical_path, mock_manager)
+
+    assert result is None
+
+
+def test_resolve_canonical_path_handles_symlink_loop():
+    """Test that resolve_canonical_path handles symlink loops gracefully (Stage 5)."""
+    # Create a path that would cause infinite symlink recursion
+    # Python's Path.resolve() should handle this, but let's verify our wrapper does too
+
+    with patch("pathlib.Path.resolve") as mock_resolve:
+        # Simulate symlink loop error
+        mock_resolve.side_effect = OSError("Too many levels of symbolic links")
+
+        # Should fall back to absolute path without raising
+        result = resolve_canonical_path("/some/path/with/loop")
+
+        # Should still return a valid absolute path
+        assert Path(result).is_absolute()
+
+
+def test_resolve_canonical_path_handles_permission_denied():
+    """Test that resolve_canonical_path handles permission errors (Stage 5)."""
+    with patch("pathlib.Path.resolve") as mock_resolve:
+        # Simulate permission error
+        mock_resolve.side_effect = PermissionError("Permission denied")
+
+        # Should fall back to absolute path
+        result = resolve_canonical_path("/restricted/path")
+
+        # Should still return a path (fallback behavior)
+        assert Path(result).is_absolute()
