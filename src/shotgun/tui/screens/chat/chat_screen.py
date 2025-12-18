@@ -62,7 +62,6 @@ from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
     CodebaseGraphManager,
 )
-from shotgun.codebase.graph_decision import GraphOpenAction
 from shotgun.codebase.graph_open_flow import determine_graph_action_for_codebase
 from shotgun.codebase.models import CodebaseGraph, IndexProgress, ProgressPhase
 from shotgun.exceptions import (
@@ -1452,9 +1451,39 @@ class ChatScreen(Screen[None]):
         """
         return self.placeholder_hints.get_placeholder_for_mode(mode)
 
-    def index_codebase_command(self) -> None:
-        # Simplified: always index current working directory with its name
+    @work
+    async def index_codebase_command(self) -> None:
+        """Re-index the current directory (triggered from command palette)."""
         cur_dir = Path.cwd().resolve()
+
+        # Ask user if they want to index
+        should_index = await self.app.push_screen_wait(CodebaseIndexPromptScreen())
+        if not should_index:
+            self.mount_hint(help_text_empty_dir())
+            return
+
+        self.mount_hint(help_text_with_codebase(already_indexed=False))
+
+        # Check if an existing graph exists for this path
+        graph_manager = self.codebase_sdk.service.manager
+        decision = await determine_graph_action_for_codebase(
+            cur_dir, graph_manager, config_manager=None
+        )
+
+        # If an existing graph exists, delete it before re-indexing
+        if decision.existing_graph:
+            try:
+                await self.codebase_sdk.delete_codebase(decision.existing_graph.graph_id)
+                logger.info(
+                    f"Deleted existing graph {decision.existing_graph.graph_id} before re-indexing"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to delete existing graph {decision.existing_graph.graph_id}: {e}"
+                )
+                # Continue anyway - build_graph will handle it
+
+        # Index the current directory with its name
         cwd_name = cur_dir.name
         selection = CodebaseIndexSelection(repo_path=cur_dir, name=cwd_name)
         self.call_later(lambda: self.index_codebase(selection))
