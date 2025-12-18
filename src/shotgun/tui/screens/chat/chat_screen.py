@@ -296,6 +296,14 @@ class ChatScreen(Screen[None]):
         # Initial update of context indicator
         self.update_context_indicator()
 
+    def on_unmount(self) -> None:
+        """Clean up resources when screen is unmounted."""
+        # Cancel all active workers to prevent hanging threads
+        for worker in self.workers:
+            if not worker.is_finished:
+                worker.cancel()
+                logger.debug(f"Cancelled worker: {worker.name}")
+
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
         # If escape is pressed during Q&A mode, exit Q&A
