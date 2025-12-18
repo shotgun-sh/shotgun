@@ -82,12 +82,17 @@ async def lookup_graph_for_path(
     This enforces the single-graph-per-path invariant: at most one graph
     can exist for any given canonical path.
 
+    Stage 5 Error Handling: If storage or lookup fails, this function treats
+    it as "no existing graph" and returns None, allowing the caller to proceed
+    with creating a new graph.
+
     Args:
         canonical_path: Canonical codebase path (from resolve_canonical_path)
         manager: CodebaseGraphManager instance
 
     Returns:
-        CodebaseGraph if a saved graph exists for this path, None otherwise
+        CodebaseGraph if a saved graph exists for this path, None otherwise.
+        Returns None if lookup fails due to storage errors.
 
     Examples:
         >>> canonical = resolve_canonical_path("/home/user/my-repo")
@@ -104,17 +109,26 @@ async def lookup_graph_for_path(
         f"Looking up graph for path - canonical_path: {canonical_path}, graph_id: {graph_id}"
     )
 
-    # Query the manager for this graph ID
-    graph = await manager.get_graph(graph_id)
+    try:
+        # Query the manager for this graph ID
+        graph = await manager.get_graph(graph_id)
 
-    if graph:
-        logger.info(
-            f"Found existing graph for path - path: {canonical_path}, graph_id: {graph_id}, name: {graph.name}"
+        if graph:
+            logger.info(
+                f"Found existing graph for path - path: {canonical_path}, graph_id: {graph_id}, name: {graph.name}"
+            )
+        else:
+            logger.debug(f"No existing graph found for path - path: {canonical_path}")
+
+        return graph
+
+    except Exception as e:
+        # Stage 5: Treat lookup/storage failures as "no existing graph"
+        logger.warning(
+            f"Failed to lookup graph for path '{canonical_path}' (graph_id: {graph_id}): {e}. "
+            "Treating as no existing graph."
         )
-    else:
-        logger.debug(f"No existing graph found for path - path: {canonical_path}")
-
-    return graph
+        return None
 
 
 async def create_graph_for_path(

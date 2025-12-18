@@ -352,11 +352,30 @@ class ChatScreen(Screen[None]):
 
         # Handle REUSE decision - existing graph should be loaded
         if decision.should_reuse:
-            # Graph is already loaded by the codebase_sdk, just show hint
-            self.mount_hint(help_text_with_codebase(already_indexed=True))
-            # Update graph state (Stage 4)
-            self._update_graph_state(decision.existing_graph)
-            return
+            try:
+                # Verify the graph can be loaded (Stage 5 error handling)
+                if decision.existing_graph:
+                    # Try to access the graph to ensure it's loadable
+                    await graph_manager.get_graph(decision.existing_graph.graph_id)
+
+                    # Graph loaded successfully
+                    self.mount_hint(help_text_with_codebase(already_indexed=True))
+                    # Update graph state (Stage 4)
+                    self._update_graph_state(decision.existing_graph)
+                    return
+            except Exception as e:
+                # Stage 5: Graph load error after REUSE decision
+                # Fall back to creating a new graph
+                logger.warning(
+                    f"Failed to load existing graph {decision.existing_graph.graph_id if decision.existing_graph else 'unknown'}: {e}. "
+                    "Falling back to creating a new graph."
+                )
+                self.app.notify(
+                    "Could not load the saved graph. A new graph will be created for this codebase.",
+                    severity="warning",
+                    timeout=8,
+                )
+                # Fall through to NEW graph flow below
 
         # Handle ASK decision - show modal to ask user
         if decision.should_ask_user and decision.existing_graph:
@@ -365,16 +384,36 @@ class ChatScreen(Screen[None]):
             )
 
             # User cancelled - show help text and return
+            # Stage 5: Modal dismissal defaults to showing empty directory help
             if result is None or result.choice == GraphChoice.CANCEL:
                 self.mount_hint(help_text_empty_dir())
                 return
 
             # User chose to reuse existing graph
             if result.choice == GraphChoice.REUSE:
-                self.mount_hint(help_text_with_codebase(already_indexed=True))
-                # Update graph state (Stage 4)
-                self._update_graph_state(decision.existing_graph)
-                return
+                try:
+                    # Stage 5: Verify graph can be loaded before proceeding
+                    if decision.existing_graph:
+                        await graph_manager.get_graph(decision.existing_graph.graph_id)
+
+                        # Graph loaded successfully
+                        self.mount_hint(help_text_with_codebase(already_indexed=True))
+                        # Update graph state (Stage 4)
+                        self._update_graph_state(decision.existing_graph)
+                        return
+                except Exception as e:
+                    # Stage 5: Graph load error after user chose REUSE
+                    # Fall back to creating a new graph
+                    logger.warning(
+                        f"Failed to load graph chosen by user {decision.existing_graph.graph_id if decision.existing_graph else 'unknown'}: {e}. "
+                        "Falling back to creating a new graph."
+                    )
+                    self.app.notify(
+                        "Could not load the selected graph. A new graph will be created for this codebase.",
+                        severity="warning",
+                        timeout=8,
+                    )
+                    # Fall through to NEW graph flow below
 
             # User chose to create new graph - fall through to indexing flow
 

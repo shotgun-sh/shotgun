@@ -32,6 +32,10 @@ async def determine_graph_action_for_codebase(
     flow for determining whether to reuse an existing graph, create a new one,
     or ask the user.
 
+    Stage 5 Error Handling: Path resolution failures are handled gracefully by
+    resolve_canonical_path (falls back to absolute path). Graph lookup failures
+    are treated as "no existing graph" by lookup_graph_for_path.
+
     Args:
         codebase_path: Raw path to the codebase directory
         graph_manager: CodebaseGraphManager instance for graph operations
@@ -41,10 +45,8 @@ async def determine_graph_action_for_codebase(
                         uses this instead of reading from config.
 
     Returns:
-        GraphOpenDecision with action (REUSE/NEW/ASK) and optional existing_graph
-
-    Raises:
-        Exception: If path resolution or graph lookup fails
+        GraphOpenDecision with action (REUSE/NEW/ASK) and optional existing_graph.
+        In case of lookup failures, returns decision with existing_graph=None.
 
     Examples:
         >>> # Basic usage with default config
@@ -67,14 +69,14 @@ async def determine_graph_action_for_codebase(
         ...     global_behavior=PersistentGraphOpenBehavior.ALWAYS_REUSE
         ... )
     """
-    # Stage 1: Path canonicalization
+    # Stage 1: Path canonicalization (handles errors internally)
     canonical_path = resolve_canonical_path(codebase_path)
     logger.info(
         f"Determining graph action for codebase - raw_path: {codebase_path}, "
         f"canonical_path: {canonical_path}"
     )
 
-    # Stage 1: Graph lookup
+    # Stage 1: Graph lookup (handles errors internally, returns None on failure)
     existing_graph = await lookup_graph_for_path(canonical_path, graph_manager)
 
     # Get global behavior if not provided
