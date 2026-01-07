@@ -43,8 +43,8 @@ jobs:
           if [[ -n "${{ inputs.ladybug_version }}" ]]; then
             VERSION="${{ inputs.ladybug_version }}"
           else
-            # Extract version like: real_ladybug>=0.12.0 -> 0.12.0
-            VERSION=$(grep -oP 'real_ladybug>=\K[0-9]+\.[0-9]+\.[0-9]+' pyproject.toml | head -1)
+            # Extract version like: real_ladybug==0.14.0 -> 0.14.0
+            VERSION=$(grep -oP 'real_ladybug==\K[0-9]+\.[0-9]+\.[0-9]+' pyproject.toml | head -1)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected real_ladybug version: $VERSION"
