@@ -194,7 +194,7 @@ jobs:
             echo "$(basename $whl)"
           done
 
-      - name: Create or update GitHub Release
+      - name: Create versioned GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: windows-wheels-v${{ needs.check-version.outputs.version }}
@@ -212,12 +212,40 @@ jobs:
             - Python 3.11
             - Python 3.12
             - Python 3.13
+          files: wheels/*.whl
+          fail_on_unmatched_files: false
+
+      # Also update the "latest" release for stable URLs
+      - name: Delete existing latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete windows-wheels-latest --yes || true
+          git push origin :refs/tags/windows-wheels-latest || true
+
+      - name: Create latest GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-wheels-latest
+          name: Windows Wheels (Latest)
+          body: |
+            ## Pre-built Windows wheels for real_ladybug (Latest)
+
+            **Current version: v${{ needs.check-version.outputs.version }}**
+
+            These wheels are provided because PyPI doesn't have ARM64 Windows wheels.
 
             ### Usage:
-            Windows users should set `UV_FIND_LINKS` before installing:
             ```powershell
-            $env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v${{ needs.check-version.outputs.version }}"
+            $env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
             uvx shotgun-sh@latest
             ```
+
+            ### Included wheels:
+            - `win_amd64` (x86-64) - For regular Windows PCs
+            - `win_arm64` (ARM64) - For Windows on ARM devices (Surface Pro X, Parallels on Mac, etc.)
+
+            ### Python versions:
+            - Python 3.11, 3.12, 3.13
           files: wheels/*.whl
           fail_on_unmatched_files: false

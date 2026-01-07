@@ -90,7 +90,7 @@ For reliable Windows installation, use our hosted wheels:
 
 ```powershell
 # Set this before installing (recommended for all Windows users)
-$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
+$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
 
 # Then install
 uvx shotgun-sh@latest
@@ -98,7 +98,7 @@ uvx shotgun-sh@latest
 
 Or for permanent installation:
 ```powershell
-$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
+$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
 uv tool install shotgun-sh
 ```
 
