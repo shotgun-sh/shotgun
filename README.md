@@ -86,18 +86,30 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 <details>
 <summary><strong>Windows Requirements</strong></summary>
 
-Shotgun requires **64-bit Python 3.11+** from [python.org](https://www.python.org/downloads/windows/).
+Shotgun supports both **x64 (Intel/AMD)** and **ARM64 (Surface Pro X, Parallels on Mac)** Windows.
 
 | Supported | Not Supported |
 |-----------|---------------|
-| Python from python.org (64-bit) | 32-bit Python |
-| Python 3.11, 3.12, 3.13 | Python 3.10 or older |
-| | Microsoft Store Python |
+| Windows x64 (regular PCs) | 32-bit Python |
+| Windows ARM64 (see below) | Python 3.10 or older |
+| Python 3.11, 3.12, 3.13 from [python.org](https://www.python.org/downloads/windows/) | Microsoft Store Python |
 
-**Troubleshooting:** If you see `failed to build real-ladybug`, verify you have 64-bit Python:
+**Important:** Run installation in **PowerShell** (not VS Developer Command Prompt).
+
+#### Windows ARM64 Users (Surface Pro X, Parallels, etc.)
+
+PyPI doesn't have ARM64 Windows wheels for a dependency. Use this workaround:
+
 ```powershell
-python -c "import struct; print(struct.calcsize('P')*8)"
-# Output should be: 64
+# Install the ARM64 wheel first, then shotgun
+$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
+uvx shotgun-sh@latest
+```
+
+Or for permanent installation:
+```powershell
+$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
+uv tool install shotgun-sh
 ```
 
 </details>
