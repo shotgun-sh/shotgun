@@ -86,29 +86,29 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 <details>
 <summary><strong>Windows Installation</strong></summary>
 
-For reliable Windows installation, use our hosted wheels:
-
 ```powershell
-# Set this before installing (recommended for all Windows users)
-$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
+# Set execution policy (one-time)
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 
-# Then install
-uvx shotgun-sh@latest
-```
+# Install uv
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-Or for permanent installation:
-```powershell
-$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
-uv tool install shotgun-sh
+# Add to PATH (or restart terminal)
+$env:Path = "C:\Users\$env:USERNAME\.local\bin;$env:Path"
+
+# Run Shotgun (ephemeral)
+uvx --python 3.12 shotgun-sh@latest
+
+# Or install permanently
+uv tool install --python 3.12 shotgun-sh
 ```
 
 | Supported | Not Supported |
 |-----------|---------------|
 | Windows x64 (regular PCs) | 32-bit Python |
-| Windows ARM64 (Surface Pro X, Parallels) | Python 3.10 or older |
-| Python 3.11+ from [python.org](https://www.python.org/downloads/windows/) | Microsoft Store Python |
+| Python 3.11-3.13 | Python 3.14+ (no wheels yet) |
 
-**Important:** Run in **PowerShell**, not VS Developer Command Prompt or other specialized shells.
+**Important:** Run in **PowerShell**, not Command Prompt or VS Developer shells.
 
 </details>
 
