@@ -77,11 +77,40 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 <td>
 
 ```powershell
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 </td>
 </tr>
 </table>
+
+<details>
+<summary><strong>Windows Installation</strong></summary>
+
+For reliable Windows installation, use our hosted wheels:
+
+```powershell
+# Set this before installing (recommended for all Windows users)
+$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
+
+# Then install
+uvx shotgun-sh@latest
+```
+
+Or for permanent installation:
+```powershell
+$env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
+uv tool install shotgun-sh
+```
+
+| Supported | Not Supported |
+|-----------|---------------|
+| Windows x64 (regular PCs) | 32-bit Python |
+| Windows ARM64 (Surface Pro X, Parallels) | Python 3.10 or older |
+| Python 3.11+ from [python.org](https://www.python.org/downloads/windows/) | Microsoft Store Python |
+
+**Important:** Run in **PowerShell**, not VS Developer Command Prompt or other specialized shells.
+
+</details>
 
 _💡 Restart your terminal after installation_
 

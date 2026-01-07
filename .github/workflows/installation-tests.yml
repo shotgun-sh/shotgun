@@ -9,9 +9,11 @@ on:
     branches: [main]
     paths:
       - 'pyproject.toml'
+      - '.github/workflows/installation-tests.yml'
   pull_request:
     paths:
       - 'pyproject.toml'
+      - '.github/workflows/installation-tests.yml'
 
 concurrency:
   group: installation-tests
@@ -27,12 +29,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/Library/Caches/uv
+          key: uv-macos-15-curl-${{ github.run_id }}
+          restore-keys: |
+            uv-macos-15-curl-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -104,6 +121,15 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+          key: uv-macos-15-homebrew-${{ github.run_id }}
+          restore-keys: |
+            uv-macos-15-homebrew-
+
       - name: Install uv via Homebrew
         id: install-uv
         continue-on-error: true
@@ -170,157 +196,14 @@ jobs:
             echo "failed_steps=" >> $GITHUB_OUTPUT
           fi
 
-  test-macos-14-curl:
-    runs-on: macos-14
-    timeout-minutes: 30
-    continue-on-error: true
-    outputs:
-      result: ${{ steps.final-status.outputs.result }}
-      failed_steps: ${{ steps.final-status.outputs.failed_steps }}
-
-    steps:
-      - name: Install uv via curl
-        id: install-uv
-        continue-on-error: true
-        timeout-minutes: 30
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Verify uv installation
-        id: verify-uv
-        continue-on-error: true
-        run: uv --version
-
-      - name: Test ephemeral execution - version
-        id: test-uvx-version
-        continue-on-error: true
-        timeout-minutes: 30
-        run: uvx shotgun-sh@latest --version
-
-      - name: Test ephemeral execution - help
-        id: test-uvx-help
-        continue-on-error: true
-        timeout-minutes: 30
-        run: uvx shotgun-sh@latest --help
-
-      - name: Test permanent installation
-        id: test-uv-tool-install
-        continue-on-error: true
-        timeout-minutes: 30
-        run: uv tool install shotgun-sh
-
-      - name: Add uv tools to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Test installed binary - version
-        id: test-installed-version
-        continue-on-error: true
-        timeout-minutes: 30
-        run: shotgun --version
-
-      - name: Test installed binary - help
-        id: test-installed-help
-        continue-on-error: true
-        timeout-minutes: 30
-        run: shotgun --help
-
-      - name: Record final status
-        id: final-status
-        if: always()
-        run: |
-          failed=""
-          [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via curl, "
-          [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
-          [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
-          [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
-          [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
-
-          if [[ -n "$failed" ]]; then
-            echo "result=failure" >> $GITHUB_OUTPUT
-            echo "failed_steps=${failed%,  }" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "result=success" >> $GITHUB_OUTPUT
-            echo "failed_steps=" >> $GITHUB_OUTPUT
-          fi
-
-  test-macos-14-homebrew:
-    runs-on: macos-14
-    timeout-minutes: 30
-    continue-on-error: true
-    outputs:
-      result: ${{ steps.final-status.outputs.result }}
-      failed_steps: ${{ steps.final-status.outputs.failed_steps }}
-
-    steps:
-      - name: Install uv via Homebrew
-        id: install-uv
-        continue-on-error: true
-        timeout-minutes: 30
-        run: brew install uv
-
-      - name: Verify uv installation
-        id: verify-uv
-        continue-on-error: true
-        run: uv --version
-
-      - name: Test ephemeral execution - version
-        id: test-uvx-version
-        continue-on-error: true
-        timeout-minutes: 30
-        run: uvx shotgun-sh@latest --version
-
-      - name: Test ephemeral execution - help
-        id: test-uvx-help
-        continue-on-error: true
-        timeout-minutes: 30
-        run: uvx shotgun-sh@latest --help
-
-      - name: Test permanent installation
-        id: test-uv-tool-install
-        continue-on-error: true
-        timeout-minutes: 30
-        run: uv tool install shotgun-sh
-
-      - name: Add uv tools to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Test installed binary - version
-        id: test-installed-version
-        continue-on-error: true
-        timeout-minutes: 30
-        run: shotgun --version
-
-      - name: Test installed binary - help
-        id: test-installed-help
-        continue-on-error: true
-        timeout-minutes: 30
-        run: shotgun --help
-
-      - name: Record final status
-        id: final-status
-        if: always()
-        run: |
-          failed=""
-          [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via Homebrew, "
-          [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
-          [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
-          [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
-          [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
-
-          if [[ -n "$failed" ]]; then
-            echo "result=failure" >> $GITHUB_OUTPUT
-            echo "failed_steps=${failed%,  }" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "result=success" >> $GITHUB_OUTPUT
-            echo "failed_steps=" >> $GITHUB_OUTPUT
-          fi
+  # NOTE: macOS 14 tests disabled - too slow (15+ minutes) and causing CI timeouts
+  # TODO: Re-enable when GitHub Actions macOS 14 runners are faster
+  # test-macos-14-curl:
+  #   runs-on: macos-14
+  #   ...
+  # test-macos-14-homebrew:
+  #   runs-on: macos-14
+  #   ...
 
   test-ubuntu-24-curl:
     runs-on: ubuntu-24.04
@@ -331,12 +214,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/.cache/uv
+          key: uv-ubuntu-24-${{ github.run_id }}
+          restore-keys: |
+            uv-ubuntu-24-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -408,12 +306,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/.cache/uv
+          key: uv-ubuntu-22-${{ github.run_id }}
+          restore-keys: |
+            uv-ubuntu-22-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -485,13 +398,152 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.local\bin\uv.exe
+            ~\.local\bin\uvx.exe
+            ${{ env.LOCALAPPDATA }}\uv\cache
+          key: uv-windows-x64-${{ github.run_id }}
+          restore-keys: |
+            uv-windows-x64-
+
+      - name: Capture environment info
+        shell: powershell
+        run: |
+          Write-Host "=== Python Details ==="
+          python --version
+          python -c "import struct; print(f'Architecture: {struct.calcsize(chr(80)) * 8}-bit')"
+          python -c "import sys; print(f'Executable: {sys.executable}')"
+
       - name: Install uv via PowerShell
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
         run: |
-          irm https://astral.sh/uv/install.ps1 | iex
+          if (Test-Path "$env:USERPROFILE\.local\bin\uv.exe") {
+            Write-Host "uv already cached, skipping download"
+          } else {
+            irm https://astral.sh/uv/install.ps1 | iex
+          }
+          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify uv installation
+        id: verify-uv
+        continue-on-error: true
+        shell: powershell
+        run: uv --version
+
+      - name: Test ephemeral execution - version
+        id: test-uvx-version
+        continue-on-error: true
+        timeout-minutes: 30
+        shell: powershell
+        run: uvx shotgun-sh@latest --version
+
+      - name: Test ephemeral execution - help
+        id: test-uvx-help
+        continue-on-error: true
+        timeout-minutes: 30
+        shell: powershell
+        run: uvx shotgun-sh@latest --help
+
+      - name: Test permanent installation
+        id: test-uv-tool-install
+        continue-on-error: true
+        timeout-minutes: 30
+        shell: powershell
+        run: uv tool install shotgun-sh
+
+      - name: Add uv tools to PATH
+        shell: powershell
+        run: echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Test installed binary - version
+        id: test-installed-version
+        continue-on-error: true
+        timeout-minutes: 30
+        shell: powershell
+        run: shotgun --version
+
+      - name: Test installed binary - help
+        id: test-installed-help
+        continue-on-error: true
+        timeout-minutes: 30
+        shell: powershell
+        run: shotgun --help
+
+      - name: Record final status
+        id: final-status
+        if: always()
+        shell: bash
+        run: |
+          failed=""
+          [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via PowerShell, "
+          [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
+          [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
+          [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
+
+          if [[ -n "$failed" ]]; then
+            echo "result=failure" >> $GITHUB_OUTPUT
+            echo "failed_steps=${failed%,  }" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "failed_steps=" >> $GITHUB_OUTPUT
+          fi
+
+  # Windows with Python 3.12 - tests newer Python version compatibility
+  test-windows-py312:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    outputs:
+      result: ${{ steps.final-status.outputs.result }}
+      failed_steps: ${{ steps.final-status.outputs.failed_steps }}
+
+    steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.local\bin\uv.exe
+            ~\.local\bin\uvx.exe
+            ${{ env.LOCALAPPDATA }}\uv\cache
+          key: uv-windows-py312-${{ github.run_id }}
+          restore-keys: |
+            uv-windows-py312-
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+
+      - name: Capture environment info
+        shell: powershell
+        run: |
+          Write-Host "=== Python Details ==="
+          python --version
+          python -c "import struct; print(f'Architecture: {struct.calcsize(chr(80)) * 8}-bit')"
+          python -c "import sys; print(f'Executable: {sys.executable}')"
+
+      - name: Install uv via PowerShell
+        id: install-uv
+        continue-on-error: true
+        timeout-minutes: 30
+        shell: powershell
+        run: |
+          if (Test-Path "$env:USERPROFILE\.local\bin\uv.exe") {
+            Write-Host "uv already cached, skipping download"
+          } else {
+            irm https://astral.sh/uv/install.ps1 | iex
+          }
           echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Verify uv installation
@@ -567,11 +619,10 @@ jobs:
     needs:
       - test-macos-15-curl
       - test-macos-15-homebrew
-      - test-macos-14-curl
-      - test-macos-14-homebrew
       - test-ubuntu-24-curl
       - test-ubuntu-22-curl
       - test-windows-latest-powershell
+      - test-windows-py312
     if: always() && github.event_name == 'schedule'
 
     steps:
@@ -598,21 +649,8 @@ jobs:
             PASSED_TESTS="${PASSED_TESTS}✅ macOS 15 Sequoia (M1) - Homebrew\n"
           fi
 
-          # macOS 14 (Sonoma, Apple Silicon) - curl
-          if [[ "${{ needs.test-macos-14-curl.outputs.result }}" == "failure" ]]; then
-            FAILED_TESTS="${FAILED_TESTS}❌ *macOS 14 Sonoma (M1) - curl*\n"
-            FAILED_TESTS="${FAILED_TESTS}  • Failed: \`${{ needs.test-macos-14-curl.outputs.failed_steps }}\`\n\n"
-          else
-            PASSED_TESTS="${PASSED_TESTS}✅ macOS 14 Sonoma (M1) - curl\n"
-          fi
-
-          # macOS 14 (Sonoma, Apple Silicon) - Homebrew
-          if [[ "${{ needs.test-macos-14-homebrew.outputs.result }}" == "failure" ]]; then
-            FAILED_TESTS="${FAILED_TESTS}❌ *macOS 14 Sonoma (M1) - Homebrew*\n"
-            FAILED_TESTS="${FAILED_TESTS}  • Failed: \`${{ needs.test-macos-14-homebrew.outputs.failed_steps }}\`\n\n"
-          else
-            PASSED_TESTS="${PASSED_TESTS}✅ macOS 14 Sonoma (M1) - Homebrew\n"
-          fi
+          # macOS 14 tests disabled - too slow
+          # Skipping test-macos-14-curl and test-macos-14-homebrew
 
           # Ubuntu 24.04 - curl
           if [[ "${{ needs.test-ubuntu-24-curl.outputs.result }}" == "failure" ]]; then
@@ -630,12 +668,20 @@ jobs:
             PASSED_TESTS="${PASSED_TESTS}✅ Ubuntu 22.04 - curl\n"
           fi
 
-          # Windows latest - PowerShell
+          # Windows latest - PowerShell (Python 3.11)
           if [[ "${{ needs.test-windows-latest-powershell.outputs.result }}" == "failure" ]]; then
-            FAILED_TESTS="${FAILED_TESTS}❌ *Windows latest - PowerShell*\n"
+            FAILED_TESTS="${FAILED_TESTS}❌ *Windows latest - Python 3.11*\n"
             FAILED_TESTS="${FAILED_TESTS}  • Failed: \`${{ needs.test-windows-latest-powershell.outputs.failed_steps }}\`\n\n"
           else
-            PASSED_TESTS="${PASSED_TESTS}✅ Windows latest - PowerShell\n"
+            PASSED_TESTS="${PASSED_TESTS}✅ Windows latest - Python 3.11\n"
+          fi
+
+          # Windows latest - Python 3.12
+          if [[ "${{ needs.test-windows-py312.outputs.result }}" == "failure" ]]; then
+            FAILED_TESTS="${FAILED_TESTS}❌ *Windows latest - Python 3.12*\n"
+            FAILED_TESTS="${FAILED_TESTS}  • Failed: \`${{ needs.test-windows-py312.outputs.failed_steps }}\`\n\n"
+          else
+            PASSED_TESTS="${PASSED_TESTS}✅ Windows latest - Python 3.12\n"
           fi
 
           # Save to output

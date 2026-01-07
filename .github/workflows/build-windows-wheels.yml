@@ -1,0 +1,251 @@
+name: Build Windows Wheels for real_ladybug
+
+# This workflow builds Windows wheels for real_ladybug that aren't available on PyPI.
+# Currently PyPI only has win_amd64 wheels, but we need win_arm64 for Windows ARM devices.
+# We also host our own win_amd64 wheels as a fallback.
+#
+# Triggers:
+# - Automatically on push to main when pyproject.toml changes (checks if wheels needed)
+# - Manually via workflow_dispatch (always builds)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+  workflow_dispatch:
+    inputs:
+      ladybug_version:
+        description: 'real_ladybug version to build (leave empty to auto-detect from pyproject.toml)'
+        required: false
+        default: ''
+      force_rebuild:
+        description: 'Force rebuild even if release exists'
+        type: boolean
+        default: false
+
+jobs:
+  check-version:
+    name: Check if wheels needed
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      needs_build: ${{ steps.check-release.outputs.needs_build }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get real_ladybug version from pyproject.toml
+        id: get-version
+        run: |
+          # Use manual input if provided, otherwise extract from pyproject.toml
+          if [[ -n "${{ inputs.ladybug_version }}" ]]; then
+            VERSION="${{ inputs.ladybug_version }}"
+          else
+            # Extract version like: real_ladybug==0.14.0 -> 0.14.0
+            VERSION=$(grep -oP 'real_ladybug==\K[0-9]+\.[0-9]+\.[0-9]+' pyproject.toml | head -1)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected real_ladybug version: $VERSION"
+
+      - name: Check if release already exists
+        id: check-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+          RELEASE_TAG="windows-wheels-v${VERSION}"
+
+          # Check if release exists
+          if gh release view "$RELEASE_TAG" &>/dev/null; then
+            echo "Release $RELEASE_TAG already exists"
+            if [[ "${{ inputs.force_rebuild }}" == "true" ]]; then
+              echo "Force rebuild requested, will rebuild"
+              echo "needs_build=true" >> $GITHUB_OUTPUT
+            else
+              echo "Skipping build (use force_rebuild to override)"
+              echo "needs_build=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Release $RELEASE_TAG does not exist, will build"
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-x64-wheels:
+    name: Build x64 Windows wheels
+    needs: check-version
+    if: needs.check-version.outputs.needs_build == 'true'
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+
+      - name: Download and extract source
+        shell: powershell
+        run: |
+          pip download --no-binary :all: --no-deps real_ladybug==${{ needs.check-version.outputs.version }}
+          $tarball = Get-ChildItem -Filter "real_ladybug-*.tar.gz" | Select-Object -First 1
+          tar -xzf $tarball.Name
+          Remove-Item $tarball.Name
+
+      - name: Build wheel
+        shell: powershell
+        run: |
+          $srcDir = Get-ChildItem -Directory -Filter "real_ladybug-*" | Select-Object -First 1
+          cd $srcDir.Name
+          pip wheel . --no-deps -w ../dist/
+
+      - name: Verify wheel
+        shell: powershell
+        run: |
+          Get-ChildItem dist/*.whl | ForEach-Object { Write-Host "Built: $($_.Name)" }
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-x64-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+  build-arm64-wheels:
+    name: Build ARM64 Windows wheels
+    needs: check-version
+    if: needs.check-version.outputs.needs_build == 'true'
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install cibuildwheel
+        run: pip install cibuildwheel
+
+      - name: Download source
+        shell: powershell
+        run: |
+          pip download --no-binary :all: --no-deps real_ladybug==${{ needs.check-version.outputs.version }}
+          $tarball = Get-ChildItem -Filter "real_ladybug-*.tar.gz" | Select-Object -First 1
+          tar -xzf $tarball.Name
+          Remove-Item $tarball.Name
+          # Rename to simple name for cibuildwheel
+          $srcDir = Get-ChildItem -Directory -Filter "real_ladybug-*" | Select-Object -First 1
+          Rename-Item $srcDir.Name "source"
+
+      - name: Build ARM64 wheel with cibuildwheel
+        env:
+          CIBW_BUILD: "cp${{ matrix.python-version == '3.11' && '311' || matrix.python-version == '3.12' && '312' || '313' }}-win_arm64"
+          CIBW_ARCHS_WINDOWS: "ARM64"
+          CIBW_BUILD_VERBOSITY: 1
+        run: |
+          cd source
+          cibuildwheel --output-dir ../dist
+
+      - name: Verify wheel
+        shell: powershell
+        run: |
+          Get-ChildItem dist/*.whl | ForEach-Object { Write-Host "Built: $($_.Name)" }
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-arm64-py${{ matrix.python-version }}
+          path: dist/*.whl
+          if-no-files-found: warn  # ARM64 cross-compile may fail
+
+  create-release:
+    name: Create GitHub Release
+    needs: [check-version, build-x64-wheels, build-arm64-wheels]
+    if: needs.check-version.outputs.needs_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wheels/
+          pattern: wheel-*
+          merge-multiple: true
+
+      - name: List wheels
+        run: |
+          echo "=== Built wheels ==="
+          ls -la wheels/
+          echo ""
+          echo "=== Wheel details ==="
+          for whl in wheels/*.whl; do
+            echo "$(basename $whl)"
+          done
+
+      - name: Create versioned GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-wheels-v${{ needs.check-version.outputs.version }}
+          name: Windows Wheels for real_ladybug v${{ needs.check-version.outputs.version }}
+          body: |
+            ## Pre-built Windows wheels for real_ladybug v${{ needs.check-version.outputs.version }}
+
+            These wheels are provided because PyPI doesn't have ARM64 Windows wheels.
+
+            ### Included wheels:
+            - `win_amd64` (x86-64) - For regular Windows PCs
+            - `win_arm64` (ARM64) - For Windows on ARM devices (Surface Pro X, Parallels on Mac, etc.)
+
+            ### Python versions:
+            - Python 3.11
+            - Python 3.12
+            - Python 3.13
+          files: wheels/*.whl
+          fail_on_unmatched_files: false
+
+      # Also update the "latest" release for stable URLs
+      - name: Delete existing latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete windows-wheels-latest --yes || true
+          git push origin :refs/tags/windows-wheels-latest || true
+
+      - name: Create latest GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-wheels-latest
+          name: Windows Wheels (Latest)
+          body: |
+            ## Pre-built Windows wheels for real_ladybug (Latest)
+
+            **Current version: v${{ needs.check-version.outputs.version }}**
+
+            These wheels are provided because PyPI doesn't have ARM64 Windows wheels.
+
+            ### Usage:
+            ```powershell
+            $env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-latest"
+            uvx shotgun-sh@latest
+            ```
+
+            ### Included wheels:
+            - `win_amd64` (x86-64) - For regular Windows PCs
+            - `win_arm64` (ARM64) - For Windows on ARM devices (Surface Pro X, Parallels on Mac, etc.)
+
+            ### Python versions:
+            - Python 3.11, 3.12, 3.13
+          files: wheels/*.whl
+          fail_on_unmatched_files: false
