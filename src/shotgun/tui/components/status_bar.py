@@ -38,12 +38,12 @@ class StatusBar(Widget):
                 "[$foreground-muted][bold $text]esc[/] to stop • "
                 "[bold $text]enter[/] to send • [bold $text]ctrl+j[/] for newline • "
                 "[bold $text]ctrl+shift+p[/] or [bold $text]/[/] command palette • "
-                "[bold $text]shift+tab[/] toggle mode • /help for commands[/]"
+                "[bold $text]shift+tab[/] toggle mode[/]"
             )
         else:
             return (
                 "[$foreground-muted][bold $text]enter[/] to send • "
                 "[bold $text]ctrl+j[/] for newline • "
                 "[bold $text]ctrl+shift+p[/] or [bold $text]/[/] command palette • "
-                "[bold $text]shift+tab[/] toggle mode • /help for commands[/]"
+                "[bold $text]shift+tab[/] toggle mode[/]"
             )

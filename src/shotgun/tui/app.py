@@ -46,6 +46,7 @@ class ShotgunApp(App[None]):
     }
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit the app"),
+        Binding("ctrl+shift+p", "command_palette", "Command Palette", show=False),
     ]
     COMMAND_PALETTE_BINDING = "ctrl+shift+p"
 
