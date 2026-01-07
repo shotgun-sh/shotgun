@@ -81,7 +81,7 @@ class ContextSizeLimitExceeded(ErrorNotPickedUpBySentry):
             f"⚠️ **Context too large for {self.model_name}**\n\n"
             f"Your conversation history exceeds this model's limit ({self.max_tokens:,} tokens).\n\n"
             f"**Choose an action:**\n\n"
-            f"1. Switch to a larger model (`Ctrl+P` → Change Model)\n"
+            f"1. Switch to a larger model (`/` → Change Model)\n"
             f"2. Switch to a larger model, compact (`/compact`), then switch back to {self.model_name}\n"
             f"3. Clear conversation (`/clear`)\n"
         )

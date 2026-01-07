@@ -57,7 +57,7 @@ class CommandHandler:
 **Keyboard Shortcuts:**
 
 * `Enter` - Send message
-* `Ctrl+P` - Open command palette (for usage, context, and other commands)
+* `/` - Open command palette (for usage, context, and other commands)
 * `Shift+Tab` - Cycle agent modes
 * `Ctrl+C` - Quit application
 
