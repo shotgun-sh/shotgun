@@ -77,11 +77,30 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 <td>
 
 ```powershell
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"       
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 </td>
 </tr>
 </table>
+
+<details>
+<summary><strong>Windows Requirements</strong></summary>
+
+Shotgun requires **64-bit Python 3.11+** from [python.org](https://www.python.org/downloads/windows/).
+
+| Supported | Not Supported |
+|-----------|---------------|
+| Python from python.org (64-bit) | 32-bit Python |
+| Python 3.11, 3.12, 3.13 | Python 3.10 or older |
+| | Microsoft Store Python |
+
+**Troubleshooting:** If you see `failed to build real-ladybug`, verify you have 64-bit Python:
+```powershell
+python -c "import struct; print(struct.calcsize('P')*8)"
+# Output should be: 64
+```
+
+</details>
 
 _💡 Restart your terminal after installation_
 
