@@ -163,7 +163,7 @@ class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
 
     BINDINGS = [
-        ("ctrl+p", "command_palette", "Command Palette"),
+        ("ctrl+shift+p", "command_palette", "Command Palette"),
         ("shift+tab", "toggle_mode", "Toggle mode"),
         ("ctrl+u", "show_usage", "Show usage"),
     ]
@@ -1122,6 +1122,13 @@ class ChatScreen(Screen[None]):
             self.agent_manager.add_hint_message(
                 HintMessage(message=f"⚠ Failed to update model configuration: {e}")
             )
+
+    @on(PromptInput.OpenCommandPalette)
+    async def _on_open_command_palette(
+        self, event: PromptInput.OpenCommandPalette
+    ) -> None:
+        """Open command palette when triggered by '/' prefix."""
+        await self.run_action("command_palette")
 
     @on(PromptInput.Submitted)
     async def handle_submit(self, message: PromptInput.Submitted) -> None:

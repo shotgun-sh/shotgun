@@ -27,6 +27,9 @@ class PromptInput(TextArea):
             super().__init__()
             self.text = text
 
+    class OpenCommandPalette(Message):
+        """Request to open the command palette."""
+
     def action_submit(self) -> None:
         """An action to submit the text."""
         self.post_message(self.Submitted(self.text))
@@ -37,6 +40,13 @@ class PromptInput(TextArea):
         # Don't handle Enter key here - let the binding handle it
         if event.key == "enter":
             self.action_submit()
+
+        # Detect "/" as first character to trigger command palette
+        if event.character == "/" and not self.text.strip():
+            event.stop()
+            event.prevent_default()
+            self.post_message(self.OpenCommandPalette())
+            return
 
         self._restart_blink()
 
