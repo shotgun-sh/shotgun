@@ -100,21 +100,15 @@ jobs:
           Write-Host "Found tarball: $($tarball.Name)"
           tar -xzf $tarball.Name
           Remove-Item $tarball.Name
-          # List what was extracted
-          Write-Host "Extracted contents:"
-          Get-ChildItem | ForEach-Object { Write-Host "  $($_.Name)" }
+          # Find the extracted directory (could be real_ladybug-*, sdist, or something else)
+          $srcDir = Get-ChildItem -Directory | Select-Object -First 1
+          Write-Host "Source directory: $($srcDir.Name)"
+          Rename-Item $srcDir.Name "source"
 
       - name: Build wheel
         shell: powershell
         run: |
-          $srcDir = Get-ChildItem -Directory -Filter "real_ladybug-*" | Select-Object -First 1
-          if (-not $srcDir) {
-            Write-Host "ERROR: No real_ladybug-* directory found. Contents:"
-            Get-ChildItem | ForEach-Object { Write-Host "  $($_.Name)" }
-            exit 1
-          }
-          Write-Host "Building from: $($srcDir.Name)"
-          cd $srcDir.Name
+          cd source
           pip wheel . --no-deps -w ../dist/
 
       - name: Verify wheel
@@ -154,16 +148,9 @@ jobs:
           Write-Host "Found tarball: $($tarball.Name)"
           tar -xzf $tarball.Name
           Remove-Item $tarball.Name
-          # List what was extracted
-          Write-Host "Extracted contents:"
-          Get-ChildItem | ForEach-Object { Write-Host "  $($_.Name)" }
-          # Rename to simple name for cibuildwheel
-          $srcDir = Get-ChildItem -Directory -Filter "real_ladybug-*" | Select-Object -First 1
-          if (-not $srcDir) {
-            Write-Host "ERROR: No real_ladybug-* directory found"
-            exit 1
-          }
-          Write-Host "Renaming $($srcDir.Name) to source"
+          # Find the extracted directory (could be real_ladybug-*, sdist, or something else)
+          $srcDir = Get-ChildItem -Directory | Select-Object -First 1
+          Write-Host "Source directory: $($srcDir.Name)"
           Rename-Item $srcDir.Name "source"
 
       - name: Build ARM64 wheel with cibuildwheel
