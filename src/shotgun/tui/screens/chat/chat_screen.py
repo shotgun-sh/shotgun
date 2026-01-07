@@ -1123,9 +1123,7 @@ class ChatScreen(Screen[None]):
             )
 
     @on(PromptInput.OpenCommandPalette)
-    def _on_open_command_palette(
-        self, event: PromptInput.OpenCommandPalette
-    ) -> None:
+    def _on_open_command_palette(self, event: PromptInput.OpenCommandPalette) -> None:
         """Open command palette when triggered by '/' prefix."""
         self.app.action_command_palette()
 
