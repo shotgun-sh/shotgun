@@ -1,6 +1,7 @@
 """Unit tests for PromptInput component."""
 
 import pytest
+from textual.app import App
 
 from shotgun.tui.components.prompt_input import PromptInput
 
@@ -9,8 +10,6 @@ pytestmark = pytest.mark.asyncio
 
 async def test_slash_in_empty_input_posts_open_command_palette() -> None:
     """Test that '/' in empty input triggers OpenCommandPalette message."""
-    from textual.app import App
-
     messages_received: list = []
 
     class TestApp(App):
@@ -40,8 +39,6 @@ async def test_slash_in_empty_input_posts_open_command_palette() -> None:
 
 async def test_slash_in_non_empty_input_is_inserted_normally() -> None:
     """Test that '/' is inserted normally when input already has text."""
-    from textual.app import App
-
     messages_received: list = []
 
     class TestApp(App):
@@ -73,8 +70,6 @@ async def test_slash_in_non_empty_input_is_inserted_normally() -> None:
 
 async def test_slash_in_whitespace_only_input_posts_open_command_palette() -> None:
     """Test that '/' triggers command palette when input has only whitespace."""
-    from textual.app import App
-
     messages_received: list = []
 
     class TestApp(App):
@@ -104,8 +99,6 @@ async def test_slash_in_whitespace_only_input_posts_open_command_palette() -> No
 
 async def test_prompt_input_submit_message() -> None:
     """Test that Enter key posts Submitted message."""
-    from textual.app import App
-
     messages_received: list = []
 
     class TestApp(App):
