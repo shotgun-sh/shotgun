@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -17,6 +16,7 @@ from shotgun.agents.conversation.history.token_estimation import (
 )
 from shotgun.cli.models import OutputFormat
 from shotgun.logging_config import get_logger
+from shotgun.utils import get_shotgun_home
 
 app = typer.Typer(
     name="compact", help="Compact the conversation history", no_args_is_help=False
@@ -74,7 +74,7 @@ async def compact_conversation() -> dict[str, Any]:
         Dictionary with compaction statistics including before/after metrics
     """
     # Get conversation file path
-    conversation_file = Path.home() / ".shotgun-sh" / "conversation.json"
+    conversation_file = get_shotgun_home() / "conversation.json"
 
     if not conversation_file.exists():
         raise FileNotFoundError(f"Conversation file not found at {conversation_file}")

@@ -1534,11 +1534,22 @@ class ChatScreen(Screen[None]):
                     f"Failed to index codebase after {attempt + 1} attempts - "
                     f"repo_path: {selection.repo_path}, name: {selection.name}, error: {exc}"
                 )
-                self.agent_manager.add_hint_message(
-                    HintMessage(
-                        message=f"❌ Failed to index codebase after {attempt + 1} attempts: {exc}"
+
+                # Provide helpful error message with correct path for kuzu errors
+                if self._is_kuzu_corruption_error(exc):
+                    storage_dir = self.codebase_sdk.service.storage_dir
+                    self.agent_manager.add_hint_message(
+                        HintMessage(
+                            message=(
+                                f"❌ Database error during indexing. "
+                                f"Try deleting files in: {storage_dir}"
+                            )
+                        )
                     )
-                )
+                else:
+                    self.agent_manager.add_hint_message(
+                        HintMessage(message=f"❌ Failed to index codebase: {exc}")
+                    )
                 break
 
         # Always stop the progress timer and clean up label

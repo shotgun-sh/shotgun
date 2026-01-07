@@ -57,8 +57,9 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
         api_key="test-api-key",
     )
 
+    shotgun_home = tmp_path / ".shotgun-sh"
     with (
-        patch("shotgun.cli.compact.Path.home", return_value=tmp_path),
+        patch("shotgun.cli.compact.get_shotgun_home", return_value=shotgun_home),
         patch("shotgun.cli.compact.get_provider_model", return_value=model_config),
         patch(
             "shotgun.cli.compact.token_limit_compactor",
@@ -90,7 +91,8 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
 @pytest.mark.asyncio
 async def test_compact_conversation_no_file(tmp_path):
     """Test compaction when conversation file doesn't exist."""
-    with patch("shotgun.cli.compact.Path.home", return_value=tmp_path):
+    shotgun_home = tmp_path / ".shotgun-sh"
+    with patch("shotgun.cli.compact.get_shotgun_home", return_value=shotgun_home):
         with pytest.raises(FileNotFoundError, match="Conversation file not found"):
             await compact_conversation()
 
@@ -106,7 +108,8 @@ async def test_compact_conversation_empty_history(tmp_path):
     manager = ConversationManager(conversation_file)
     await manager.save(history)
 
-    with patch("shotgun.cli.compact.Path.home", return_value=tmp_path):
+    shotgun_home = tmp_path / ".shotgun-sh"
+    with patch("shotgun.cli.compact.get_shotgun_home", return_value=shotgun_home):
         with pytest.raises(ValueError, match="No agent messages found"):
             await compact_conversation()
 
@@ -133,8 +136,9 @@ async def test_compact_conversation_no_reduction(tmp_path, mock_conversation_his
         api_key="test-api-key",
     )
 
+    shotgun_home = tmp_path / ".shotgun-sh"
     with (
-        patch("shotgun.cli.compact.Path.home", return_value=tmp_path),
+        patch("shotgun.cli.compact.get_shotgun_home", return_value=shotgun_home),
         patch("shotgun.cli.compact.get_provider_model", return_value=model_config),
         patch(
             "shotgun.cli.compact.token_limit_compactor",

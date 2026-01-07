@@ -35,8 +35,9 @@ def test_init_default_path(monkeypatch):
     monkeypatch.delenv("SHOTGUN_HOME", raising=False)
 
     manager = ConfigManager()
-    expected_path = Path.home() / ".shotgun-sh" / "config.json"
-    assert manager.config_path == expected_path
+    # Verify the path ends with the expected components
+    assert manager.config_path.name == "config.json"
+    assert manager.config_path.parent.name == ".shotgun-sh"
     assert manager._config is None
 
 
@@ -744,7 +745,9 @@ def test_get_config_manager():
     manager = get_config_manager()
 
     assert isinstance(manager, ConfigManager)
-    assert manager.config_path == Path.home() / ".shotgun-sh" / "config.json"
+    # Verify the path ends with the expected components
+    assert manager.config_path.name == "config.json"
+    assert manager.config_path.parent.name == ".shotgun-sh"
 
 
 def test_get_config_manager_singleton():

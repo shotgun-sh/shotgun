@@ -1,13 +1,13 @@
 """Clear command for shotgun CLI."""
 
 import asyncio
-from pathlib import Path
 
 import typer
 from rich.console import Console
 
 from shotgun.agents.conversation import ConversationManager
 from shotgun.logging_config import get_logger
+from shotgun.utils import get_shotgun_home
 
 app = typer.Typer(
     name="clear", help="Clear the conversation history", no_args_is_help=False
@@ -26,7 +26,7 @@ def clear() -> None:
     """
     try:
         # Get conversation file path
-        conversation_file = Path.home() / ".shotgun-sh" / "conversation.json"
+        conversation_file = get_shotgun_home() / "conversation.json"
 
         # Check if file exists
         if not conversation_file.exists():

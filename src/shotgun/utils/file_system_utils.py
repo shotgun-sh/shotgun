@@ -1,5 +1,6 @@
 """File system utility functions."""
 
+import os
 from pathlib import Path
 
 import aiofiles
@@ -24,7 +25,9 @@ def get_shotgun_home() -> Path:
     if custom_home := settings.dev.home:
         return Path(custom_home)
 
-    return Path.home() / ".shotgun-sh"
+    # Use os.path.join for explicit path separator handling on Windows
+    # This avoids potential edge cases with pathlib's / operator
+    return Path(os.path.join(os.path.expanduser("~"), ".shotgun-sh"))
 
 
 def ensure_shotgun_directory_exists() -> Path:
