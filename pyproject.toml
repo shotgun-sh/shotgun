@@ -174,10 +174,7 @@ show_missing = true
 [tool.uv.pip]
 only-binary = ["real_ladybug"]
 
-[tool.uv]
-# Windows wheels for real_ladybug - PyPI lacks ARM64 Windows wheels
-# Note: This only works for local development. End users need UV_FIND_LINKS env var.
-# See README.md for Windows ARM64 installation instructions.
-find-links = [
-    "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
-]
+# Note: Windows users need UV_FIND_LINKS env var for ARM64/x64 wheel support.
+# See README.md for Windows installation instructions.
+# DO NOT add [tool.uv] find-links here - it breaks CI on non-Windows platforms
+# when the release doesn't exist.
