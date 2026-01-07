@@ -34,12 +34,14 @@ class PromptInput(TextArea):
         """An action to submit the text."""
         self.post_message(self.Submitted(self.text))
 
-    async def _on_key(self, event: events.Key) -> None:
-        """Handle key presses which correspond to document inserts."""
-
-        # Don't handle Enter key here - let the binding handle it
+    def on_key(self, event: events.Key) -> None:
+        """Handle key presses for special actions."""
+        # Submit on Enter
         if event.key == "enter":
+            event.stop()
+            event.prevent_default()
             self.action_submit()
+            return
 
         # Detect "/" as first character to trigger command palette
         if event.character == "/" and not self.text.strip():
@@ -48,32 +50,15 @@ class PromptInput(TextArea):
             self.post_message(self.OpenCommandPalette())
             return
 
-        self._restart_blink()
-
-        if self.read_only:
-            return
-
-        key = event.key
-        insert_values = {
-            "ctrl+j": "\n",
-        }
-        if self.tab_behavior == "indent":
-            if key == "escape":
-                event.stop()
-                event.prevent_default()
-                self.screen.focus_next()
-                return
-            if self.indent_type == "tabs":
-                insert_values["tab"] = "\t"
-            else:
-                insert_values["tab"] = " " * self._find_columns_to_next_tab_stop()
-
-        if event.is_printable or key in insert_values:
+        # Handle ctrl+j for newline (since enter is for submit)
+        if event.key == "ctrl+j":
             event.stop()
             event.prevent_default()
-            insert = insert_values.get(key, event.character)
-            # `insert` is not None because event.character cannot be
-            # None because we've checked that it's printable.
-            assert insert is not None  # noqa: S101
             start, end = self.selection
-            self._replace_via_keyboard(insert, start, end)
+            self.replace(
+                "\n",
+                start,
+                end,
+                maintain_selection_offset=False,
+            )
+            return
