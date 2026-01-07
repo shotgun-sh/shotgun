@@ -163,7 +163,6 @@ class ChatScreen(Screen[None]):
     CSS_PATH = "chat.tcss"
 
     BINDINGS = [
-        ("ctrl+shift+p", "command_palette", "Command Palette"),
         ("shift+tab", "toggle_mode", "Toggle mode"),
         ("ctrl+u", "show_usage", "Show usage"),
     ]

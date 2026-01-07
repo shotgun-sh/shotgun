@@ -47,6 +47,7 @@ class ShotgunApp(App[None]):
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit the app"),
     ]
+    COMMAND_PALETTE_BINDING = "ctrl+shift+p"
 
     CSS_PATH = "styles.tcss"
 
