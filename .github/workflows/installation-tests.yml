@@ -614,92 +614,15 @@ jobs:
             echo "failed_steps=" >> $GITHUB_OUTPUT
           fi
 
-  # Windows 32-bit - DIAGNOSTIC ONLY
-  # This job is expected to fail because PyPI only has 64-bit wheels for real_ladybug
-  # Purpose: Confirm that 32-bit Python is the root cause of user installation failures
-  test-windows-32bit-diagnostic:
-    runs-on: windows-latest
-    timeout-minutes: 30
-    continue-on-error: true  # Always continue - this is diagnostic only
-    outputs:
-      result: ${{ steps.final-status.outputs.result }}
-      failed_steps: ${{ steps.final-status.outputs.failed_steps }}
-
-    steps:
-      - name: Set up 32-bit Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-          architecture: 'x86'  # 32-bit
-
-      - name: Capture environment info
-        shell: powershell
-        run: |
-          Write-Host "=== Python Details ==="
-          python --version
-          python -c "import struct; print(f'Architecture: {struct.calcsize(chr(80)) * 8}-bit')"
-          python -c "import sys; print(f'Executable: {sys.executable}')"
-          Write-Host ""
-          Write-Host "NOTE: This test is expected to FAIL because PyPI only has 64-bit wheels"
-          Write-Host "for real_ladybug. This confirms 32-bit Python as root cause of user issues."
-
-      - name: Install uv via PowerShell
-        id: install-uv
-        continue-on-error: true
-        timeout-minutes: 30
-        shell: powershell
-        run: |
-          irm https://astral.sh/uv/install.ps1 | iex
-          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Verify uv installation
-        id: verify-uv
-        continue-on-error: true
-        shell: powershell
-        run: uv --version
-
-      - name: Test ephemeral execution (expected to fail)
-        id: test-uvx-version
-        continue-on-error: true
-        timeout-minutes: 30
-        shell: powershell
-        run: |
-          Write-Host "Attempting installation on 32-bit Python..."
-          Write-Host "Expected error: 'failed to build real-ladybug' due to missing win32 wheels"
-          uvx shotgun-sh@latest --version
-
-      - name: Record final status
-        id: final-status
-        if: always()
-        shell: bash
-        run: |
-          failed=""
-          [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv, "
-          [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx (expected - no 32-bit wheels), "
-
-          if [[ -n "$failed" ]]; then
-            echo "result=failure" >> $GITHUB_OUTPUT
-            echo "failed_steps=${failed%,  }" >> $GITHUB_OUTPUT
-            # Don't exit 1 - this failure is expected and informational
-          else
-            echo "result=success" >> $GITHUB_OUTPUT
-            echo "failed_steps=" >> $GITHUB_OUTPUT
-          fi
-
   notify-slack:
     runs-on: ubuntu-latest
     needs:
       - test-macos-15-curl
       - test-macos-15-homebrew
-      # macOS 14 tests disabled - too slow
-      # - test-macos-14-curl
-      # - test-macos-14-homebrew
       - test-ubuntu-24-curl
       - test-ubuntu-22-curl
       - test-windows-latest-powershell
       - test-windows-py312
-      - test-windows-32bit-diagnostic
     if: always() && github.event_name == 'schedule'
 
     steps:
@@ -759,13 +682,6 @@ jobs:
             FAILED_TESTS="${FAILED_TESTS}  • Failed: \`${{ needs.test-windows-py312.outputs.failed_steps }}\`\n\n"
           else
             PASSED_TESTS="${PASSED_TESTS}✅ Windows latest - Python 3.12\n"
-          fi
-
-          # Windows 32-bit diagnostic (informational - expected to fail)
-          if [[ "${{ needs.test-windows-32bit-diagnostic.outputs.result }}" == "failure" ]]; then
-            PASSED_TESTS="${PASSED_TESTS}ℹ️ Windows 32-bit (expected fail - no wheels)\n"
-          else
-            PASSED_TESTS="${PASSED_TESTS}⚠️ Windows 32-bit (unexpected success!)\n"
           fi
 
           # Save to output
