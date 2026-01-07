@@ -29,12 +29,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/Library/Caches/uv
+          key: uv-macos-15-curl-${{ github.run_id }}
+          restore-keys: |
+            uv-macos-15-curl-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -106,6 +121,15 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+          key: uv-macos-15-homebrew-${{ github.run_id }}
+          restore-keys: |
+            uv-macos-15-homebrew-
+
       - name: Install uv via Homebrew
         id: install-uv
         continue-on-error: true
@@ -181,12 +205,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/Library/Caches/uv
+          key: uv-macos-14-curl-${{ github.run_id }}
+          restore-keys: |
+            uv-macos-14-curl-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -258,6 +297,15 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+          key: uv-macos-14-homebrew-${{ github.run_id }}
+          restore-keys: |
+            uv-macos-14-homebrew-
+
       - name: Install uv via Homebrew
         id: install-uv
         continue-on-error: true
@@ -333,12 +381,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/.cache/uv
+          key: uv-ubuntu-24-${{ github.run_id }}
+          restore-keys: |
+            uv-ubuntu-24-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -410,12 +473,27 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/uv
+            ~/.local/bin/uvx
+            ~/.cache/uv
+          key: uv-ubuntu-22-${{ github.run_id }}
+          restore-keys: |
+            uv-ubuntu-22-
+
       - name: Install uv via curl
         id: install-uv
         continue-on-error: true
         timeout-minutes: 30
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          if [ -f "$HOME/.local/bin/uv" ]; then
+            echo "uv already cached, skipping download"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify uv installation
@@ -487,6 +565,17 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.local\bin\uv.exe
+            ~\.local\bin\uvx.exe
+            ${{ env.LOCALAPPDATA }}\uv\cache
+          key: uv-windows-x64-${{ github.run_id }}
+          restore-keys: |
+            uv-windows-x64-
+
       - name: Capture environment info
         shell: powershell
         run: |
@@ -501,7 +590,11 @@ jobs:
         timeout-minutes: 30
         shell: powershell
         run: |
-          irm https://astral.sh/uv/install.ps1 | iex
+          if (Test-Path "$env:USERPROFILE\.local\bin\uv.exe") {
+            Write-Host "uv already cached, skipping download"
+          } else {
+            irm https://astral.sh/uv/install.ps1 | iex
+          }
           echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Verify uv installation
@@ -582,6 +675,17 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.local\bin\uv.exe
+            ~\.local\bin\uvx.exe
+            ${{ env.LOCALAPPDATA }}\uv\cache
+          key: uv-windows-py312-${{ github.run_id }}
+          restore-keys: |
+            uv-windows-py312-
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
@@ -602,7 +706,11 @@ jobs:
         timeout-minutes: 30
         shell: powershell
         run: |
-          irm https://astral.sh/uv/install.ps1 | iex
+          if (Test-Path "$env:USERPROFILE\.local\bin\uv.exe") {
+            Write-Host "uv already cached, skipping download"
+          } else {
+            irm https://astral.sh/uv/install.ps1 | iex
+          }
           echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Verify uv installation
