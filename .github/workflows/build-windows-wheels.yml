@@ -1,8 +1,8 @@
 name: Build Windows Wheels for real_ladybug
 
-# This workflow builds Windows wheels for real_ladybug that aren't available on PyPI.
-# Currently PyPI only has win_amd64 wheels, but we need win_arm64 for Windows ARM devices.
-# We also host our own win_amd64 wheels as a fallback.
+# This workflow collects Windows wheels for real_ladybug that aren't all available on PyPI.
+# - x64 wheels: Downloaded directly from PyPI (they already exist)
+# - ARM64 wheels: Cross-compiled using cibuildwheel (PyPI doesn't have these)
 #
 # Triggers:
 # - Automatically on push to main when pyproject.toml changes (checks if wheels needed)
@@ -72,62 +72,66 @@ jobs:
             echo "needs_build=true" >> $GITHUB_OUTPUT
           fi
 
-  build-x64-wheels:
-    name: Build x64 Windows wheels
+  download-x64-wheels:
+    name: Download x64 wheels from PyPI
     needs: check-version
     if: needs.check-version.outputs.needs_build == 'true'
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        python-version: ['3.11', '3.12', '3.13']
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.12'
 
-      - name: Install build dependencies
+      - name: Download x64 wheels from PyPI
         run: |
-          python -m pip install --upgrade pip
-          pip install build wheel setuptools
+          mkdir -p dist
+          VERSION="${{ needs.check-version.outputs.version }}"
 
-      - name: Download and extract source
-        shell: powershell
-        run: |
-          pip download --no-binary :all: --no-deps real_ladybug==${{ needs.check-version.outputs.version }}
-          $tarball = Get-ChildItem -Filter "real_ladybug-*.tar.gz" | Select-Object -First 1
-          Write-Host "Found tarball: $($tarball.Name)"
-          tar -xzf $tarball.Name
-          Remove-Item $tarball.Name
-          # Find the extracted directory (could be real_ladybug-*, sdist, or something else)
-          $srcDir = Get-ChildItem -Directory | Select-Object -First 1
-          Write-Host "Source directory: $($srcDir.Name)"
-          Rename-Item $srcDir.Name "source"
+          # Download all win_amd64 wheels from PyPI
+          pip download \
+            --only-binary :all: \
+            --platform win_amd64 \
+            --python-version 3.11 \
+            --no-deps \
+            -d dist/ \
+            "real_ladybug==${VERSION}" || echo "No 3.11 wheel found"
 
-      - name: Build wheel
-        shell: powershell
-        run: |
-          cd source
-          pip wheel . --no-deps -w ../dist/
+          pip download \
+            --only-binary :all: \
+            --platform win_amd64 \
+            --python-version 3.12 \
+            --no-deps \
+            -d dist/ \
+            "real_ladybug==${VERSION}" || echo "No 3.12 wheel found"
 
-      - name: Verify wheel
-        shell: powershell
-        run: |
-          Get-ChildItem dist/*.whl | ForEach-Object { Write-Host "Built: $($_.Name)" }
+          pip download \
+            --only-binary :all: \
+            --platform win_amd64 \
+            --python-version 3.13 \
+            --no-deps \
+            -d dist/ \
+            "real_ladybug==${VERSION}" || echo "No 3.13 wheel found"
 
-      - name: Upload wheel artifact
+          echo "Downloaded wheels:"
+          ls -la dist/
+
+      - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-x64-py${{ matrix.python-version }}
+          name: wheels-x64
           path: dist/*.whl
+          if-no-files-found: warn
 
   build-arm64-wheels:
     name: Build ARM64 Windows wheels
     needs: check-version
     if: needs.check-version.outputs.needs_build == 'true'
     runs-on: windows-latest
+    continue-on-error: true  # ARM64 cross-compilation is experimental
     strategy:
+      fail-fast: false  # Try all Python versions even if some fail
       matrix:
         python-version: ['3.11', '3.12', '3.13']
 
@@ -176,8 +180,9 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [check-version, build-x64-wheels, build-arm64-wheels]
-    if: needs.check-version.outputs.needs_build == 'true'
+    needs: [check-version, download-x64-wheels, build-arm64-wheels]
+    # Run even if ARM64 builds fail (they're optional since cross-compilation is hard)
+    if: always() && needs.check-version.outputs.needs_build == 'true' && needs.download-x64-wheels.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -187,7 +192,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: wheels/
-          pattern: wheel-*
+          pattern: wheel*
           merge-multiple: true
 
       - name: List wheels
