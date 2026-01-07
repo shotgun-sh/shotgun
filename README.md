@@ -84,25 +84,15 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 </table>
 
 <details>
-<summary><strong>Windows Requirements</strong></summary>
+<summary><strong>Windows Installation</strong></summary>
 
-Shotgun supports both **x64 (Intel/AMD)** and **ARM64 (Surface Pro X, Parallels on Mac)** Windows.
-
-| Supported | Not Supported |
-|-----------|---------------|
-| Windows x64 (regular PCs) | 32-bit Python |
-| Windows ARM64 (see below) | Python 3.10 or older |
-| Python 3.11, 3.12, 3.13 from [python.org](https://www.python.org/downloads/windows/) | Microsoft Store Python |
-
-**Important:** Run installation in **PowerShell** (not VS Developer Command Prompt).
-
-#### Windows ARM64 Users (Surface Pro X, Parallels, etc.)
-
-PyPI doesn't have ARM64 Windows wheels for a dependency. Use this workaround:
+For reliable Windows installation, use our hosted wheels:
 
 ```powershell
-# Install the ARM64 wheel first, then shotgun
+# Set this before installing (recommended for all Windows users)
 $env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
+
+# Then install
 uvx shotgun-sh@latest
 ```
 
@@ -111,6 +101,14 @@ Or for permanent installation:
 $env:UV_FIND_LINKS = "https://github.com/shotgun-sh/shotgun/releases/expanded_assets/windows-wheels-v0.14.0"
 uv tool install shotgun-sh
 ```
+
+| Supported | Not Supported |
+|-----------|---------------|
+| Windows x64 (regular PCs) | 32-bit Python |
+| Windows ARM64 (Surface Pro X, Parallels) | Python 3.10 or older |
+| Python 3.11+ from [python.org](https://www.python.org/downloads/windows/) | Microsoft Store Python |
+
+**Important:** Run in **PowerShell**, not VS Developer Command Prompt or other specialized shells.
 
 </details>
 
