@@ -7,7 +7,12 @@ from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
 
+from shotgun.exceptions import SHOTGUN_CONTACT_EMAIL
+from shotgun.posthog_telemetry import track_event
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+
+# Discord invite link for support
+DISCORD_LINK = "https://discord.gg/5RmY6J2N7s"
 
 
 class DatabaseLockedDialog(ModalScreen[bool]):
@@ -30,8 +35,8 @@ class DatabaseLockedDialog(ModalScreen[bool]):
         }
 
         DatabaseLockedDialog > #dialog-container {
-            width: 60%;
-            max-width: 70;
+            width: 70%;
+            max-width: 80;
             height: auto;
             border: wide $warning;
             padding: 1 2;
@@ -87,11 +92,16 @@ class DatabaseLockedDialog(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         """Compose the dialog widgets."""
         with Container(id="dialog-container"):
-            yield Label("Database In Use", id="dialog-title")
+            yield Label("Codebase Index Unavailable", id="dialog-title")
             message = (
-                "Another shotgun instance has this codebase open.\n\n"
-                "Only one shotgun instance can access a codebase at a time. "
-                "Please close the other instance and try again."
+                "Unable to access the codebase index because another shotgun "
+                "instance appears to be running.\n\n"
+                "To resolve this:\n"
+                "1. Close any other shotgun instances and click Retry\n"
+                "2. If no other instance is running and you still see this error, "
+                f"contact support:\n"
+                f"   Email: {SHOTGUN_CONTACT_EMAIL}\n"
+                f"   Discord: {DISCORD_LINK}"
             )
             if self.codebase_name:
                 message = f"Codebase: {self.codebase_name}\n\n" + message
@@ -102,6 +112,12 @@ class DatabaseLockedDialog(ModalScreen[bool]):
 
     def on_mount(self) -> None:
         """Set up the dialog after mounting."""
+        # Track this event in PostHog
+        track_event(
+            "database_locked_dialog_shown",
+            {"codebase_name": self.codebase_name} if self.codebase_name else {},
+        )
+
         # Focus retry button - user likely wants to retry after closing other instance
         self.query_one("#retry", Button).focus()
 
