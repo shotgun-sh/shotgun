@@ -334,7 +334,9 @@ class ChatScreen(Screen[None]):
         manager = CodebaseGraphManager(storage_dir)
 
         # Handle locked databases first - show ONE dialog for all locked DBs
-        locked_issues = [i for i in pending_issues if i.error_type == KuzuErrorType.LOCKED]
+        locked_issues = [
+            i for i in pending_issues if i.error_type == KuzuErrorType.LOCKED
+        ]
         if locked_issues:
             # Show single locked dialog
             retry = await self.app.push_screen_wait(DatabaseLockedDialog())
@@ -345,7 +347,9 @@ class ChatScreen(Screen[None]):
 
             # User wants to retry - re-detect to see if locks are cleared
             new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
-            still_locked = [i for i in new_issues if i.error_type == KuzuErrorType.LOCKED]
+            still_locked = [
+                i for i in new_issues if i.error_type == KuzuErrorType.LOCKED
+            ]
             if still_locked:
                 # Still locked - show hint message
                 self.agent_manager.add_hint_message(
