@@ -8,18 +8,38 @@ from typing import Any
 _kuzu_module: Any = None
 _import_error: ImportError | None = None
 
+# Windows VC++ download URL
+_VC_REDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+
 # Windows VC++ installation instructions
-_WINDOWS_INSTALL_INSTRUCTIONS = """
+_WINDOWS_INSTALL_INSTRUCTIONS = f"""
 To fix this, install the Visual C++ Redistributable:
 
-1. Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe
+1. Download from: {_VC_REDIST_URL}
 2. Run the installer and follow the prompts
 3. Restart your terminal and try again
 
 Or run this PowerShell command (as Administrator):
-  Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "$env:TEMP\\vc_redist.x64.exe"
+  Invoke-WebRequest -Uri "{_VC_REDIST_URL}" -OutFile "$env:TEMP\\vc_redist.x64.exe"
   Start-Process -FilePath "$env:TEMP\\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
+
+TIP: Run 'shotgun codebase copy-vcpp-url' to copy the download URL to clipboard.
 """
+
+
+def copy_vcpp_instructions_to_clipboard() -> bool:
+    """Copy the VC++ Redistributable download URL to clipboard.
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import pyperclip
+
+        pyperclip.copy(_VC_REDIST_URL)
+        return True
+    except Exception:
+        return False
 
 
 class KuzuImportError(ImportError):
