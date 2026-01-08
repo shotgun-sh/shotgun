@@ -313,11 +313,14 @@ class ChatScreen(Screen[None]):
                 # Prevent the event from propagating (don't quit the app)
                 event.stop()
 
-    async def _handle_pending_database_issues(self) -> None:
+    async def _handle_pending_database_issues(self) -> bool:
         """Handle any database issues detected at startup.
 
         This method processes pending database issues (locked, corrupted, timeout)
         and shows appropriate dialogs to the user.
+
+        Returns:
+            True if should continue with normal startup, False if should abort
         """
         from shotgun.codebase.core.manager import CodebaseGraphManager
         from shotgun.utils import get_shotgun_home
@@ -325,36 +328,41 @@ class ChatScreen(Screen[None]):
         # Get pending issues from app
         pending_issues: list[DatabaseIssue] = getattr(self.app, "pending_db_issues", [])
         if not pending_issues:
-            return
+            return True
 
         storage_dir = get_shotgun_home() / "codebases"
         manager = CodebaseGraphManager(storage_dir)
 
-        # Process each issue
+        # Handle locked databases first - show ONE dialog for all locked DBs
+        locked_issues = [i for i in pending_issues if i.error_type == KuzuErrorType.LOCKED]
+        if locked_issues:
+            # Show single locked dialog
+            retry = await self.app.push_screen_wait(DatabaseLockedDialog())
+            if not retry:
+                # User cancelled - exit the app gracefully
+                await self.app.action_quit()
+                return False
+
+            # User wants to retry - re-detect to see if locks are cleared
+            new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
+            still_locked = [i for i in new_issues if i.error_type == KuzuErrorType.LOCKED]
+            if still_locked:
+                # Still locked - show hint message
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message="Database is still locked. "
+                        "Please close the other shotgun instance and restart."
+                    )
+                )
+                await self.app.action_quit()
+                return False
+
+        # Process non-locked issues
         for issue in pending_issues:
             if issue.error_type == KuzuErrorType.LOCKED:
-                # Show locked dialog
-                retry = await self.app.push_screen_wait(DatabaseLockedDialog())
-                if retry:
-                    # User wants to retry - re-detect to see if lock is cleared
-                    new_issues = await manager.detect_database_issues(
-                        timeout_seconds=10.0
-                    )
-                    still_locked = any(
-                        i.graph_id == issue.graph_id
-                        and i.error_type == KuzuErrorType.LOCKED
-                        for i in new_issues
-                    )
-                    if still_locked:
-                        # Still locked - show dialog again by re-adding to pending
-                        self.agent_manager.add_hint_message(
-                            HintMessage(
-                                message=f"Database '{issue.graph_id}' is still locked. "
-                                "Please close the other shotgun instance."
-                            )
-                        )
+                continue  # Already handled above
 
-            elif issue.error_type == KuzuErrorType.TIMEOUT:
+            if issue.error_type == KuzuErrorType.TIMEOUT:
                 # Show timeout dialog
                 action = await self.app.push_screen_wait(
                     DatabaseTimeoutDialog(
@@ -418,10 +426,14 @@ class ChatScreen(Screen[None]):
         if hasattr(self.app, "pending_db_issues"):
             self.app.pending_db_issues = []
 
+        return True
+
     @work
     async def check_if_codebase_is_indexed(self) -> None:
         # Handle any pending database issues from startup first
-        await self._handle_pending_database_issues()
+        should_continue = await self._handle_pending_database_issues()
+        if not should_continue:
+            return
 
         cur_dir = Path.cwd().resolve()
         is_empty = all(
