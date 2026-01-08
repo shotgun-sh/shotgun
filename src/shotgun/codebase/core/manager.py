@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import shutil
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -20,6 +21,11 @@ from shotgun.codebase.core.kuzu_compat import get_kuzu
 if TYPE_CHECKING:
     import real_ladybug as kuzu
 
+from shotgun.codebase.core.errors import (
+    DatabaseIssue,
+    KuzuErrorType,
+    classify_kuzu_error,
+)
 from shotgun.codebase.models import (
     CodebaseGraph,
     FileChange,
@@ -1228,8 +1234,19 @@ class CodebaseGraphManager:
                 indexed_from_cwds=indexed_from_cwds,
             )
         except Exception as e:
+            # Classify the error to determine if we should re-raise
+            error_type = classify_kuzu_error(e)
+
+            if error_type == KuzuErrorType.LOCKED:
+                # Don't mask lock errors - let caller handle them
+                logger.warning(
+                    f"Database locked - graph_id: {graph_id}, error: {str(e)}"
+                )
+                raise
+
             logger.error(
-                f"Failed to get graph metadata - graph_id: {graph_id}, error: {str(e)}"
+                f"Failed to get graph metadata - graph_id: {graph_id}, "
+                f"error_type: {error_type.value}, error: {str(e)}"
             )
             return None
 
@@ -1348,6 +1365,174 @@ class CodebaseGraphManager:
                     )
 
         return removed_graphs
+
+    async def _try_open_database(self, graph_id: str, db_path: Path) -> bool:
+        """Try to open a database and verify it has a Project node.
+
+        Args:
+            graph_id: The graph identifier
+            db_path: Path to the database file
+
+        Returns:
+            True if database opened and has Project node, False otherwise
+        """
+        lock = await self._get_lock()
+        async with lock:
+            # Close existing connections if any
+            if graph_id in self._connections:
+                try:
+                    self._connections[graph_id].close()
+                except Exception as e:
+                    logger.debug(f"Failed to close connection for {graph_id}: {e}")
+                del self._connections[graph_id]
+            if graph_id in self._databases:
+                try:
+                    self._databases[graph_id].close()
+                except Exception as e:
+                    logger.debug(f"Failed to close database for {graph_id}: {e}")
+                del self._databases[graph_id]
+
+            def _open_and_query() -> bool:
+                kuzu = get_kuzu()
+                db = kuzu.Database(str(db_path))
+                conn = kuzu.Connection(db)
+                try:
+                    result = conn.execute(
+                        "MATCH (p:Project {graph_id: $graph_id}) RETURN p",
+                        {"graph_id": graph_id},
+                    )
+                    return result.has_next() if hasattr(result, "has_next") else False
+                finally:
+                    conn.close()
+                    db.close()
+
+            return await anyio.to_thread.run_sync(_open_and_query)
+
+    async def _check_single_database(
+        self, graph_id: str, path: Path, timeout_seconds: float
+    ) -> DatabaseIssue | None:
+        """Check a single database for issues.
+
+        Args:
+            graph_id: The graph identifier
+            path: Path to the database file
+            timeout_seconds: How long to wait for the database to respond
+
+        Returns:
+            DatabaseIssue if problem found, None if database is healthy
+        """
+        try:
+            has_project = await asyncio.wait_for(
+                self._try_open_database(graph_id, path), timeout=timeout_seconds
+            )
+            if not has_project:
+                return DatabaseIssue(
+                    graph_id=graph_id,
+                    graph_path=path,
+                    error_type=KuzuErrorType.SCHEMA,
+                    message="Database has no Project node (incomplete build)",
+                )
+            return None
+
+        except asyncio.TimeoutError:
+            return DatabaseIssue(
+                graph_id=graph_id,
+                graph_path=path,
+                error_type=KuzuErrorType.TIMEOUT,
+                message=f"Database operation timed out after {timeout_seconds}s",
+            )
+
+        except Exception as e:
+            error_type = classify_kuzu_error(e)
+            logger.debug(f"Detected {error_type.value} issue with {graph_id}: {e}")
+            return DatabaseIssue(
+                graph_id=graph_id,
+                graph_path=path,
+                error_type=error_type,
+                message=str(e),
+            )
+
+    async def detect_database_issues(
+        self, timeout_seconds: float = 10.0
+    ) -> list[DatabaseIssue]:
+        """Detect issues with Kuzu databases without deleting them.
+
+        This method iterates through all .kuzu files in the storage directory,
+        attempts to open them, and returns information about any issues found.
+        Unlike cleanup_corrupted_databases(), this method does NOT delete anything -
+        it only detects and reports issues for the caller to handle.
+
+        Args:
+            timeout_seconds: How long to wait for each database to respond.
+                            Default is 10s; use 90s for retry with large codebases.
+
+        Returns:
+            List of DatabaseIssue objects describing any problems found
+        """
+        issues: list[DatabaseIssue] = []
+
+        for path in self.storage_dir.glob("*.kuzu"):
+            graph_id = path.stem
+            issue = await self._check_single_database(graph_id, path, timeout_seconds)
+            if issue:
+                issues.append(issue)
+
+        return issues
+
+    async def delete_database(self, graph_id: str) -> bool:
+        """Delete a database file and its WAL file.
+
+        Args:
+            graph_id: The ID of the graph to delete
+
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        graph_path = self.storage_dir / f"{graph_id}.kuzu"
+
+        try:
+            # Clean up any open connections
+            lock = await self._get_lock()
+            async with lock:
+                if graph_id in self._connections:
+                    try:
+                        self._connections[graph_id].close()
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to close connection during delete for {graph_id}: {e}"
+                        )
+                    del self._connections[graph_id]
+                if graph_id in self._databases:
+                    try:
+                        self._databases[graph_id].close()
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to close database during delete for {graph_id}: {e}"
+                        )
+                    del self._databases[graph_id]
+
+            # Remove the database (could be file or directory)
+            if graph_path.exists():
+                if graph_path.is_dir():
+                    await anyio.to_thread.run_sync(shutil.rmtree, graph_path)
+                else:
+                    await anyio.to_thread.run_sync(graph_path.unlink)
+
+                # Also delete WAL file if it exists
+                wal_path = graph_path.with_suffix(graph_path.suffix + ".wal")
+                if wal_path.exists():
+                    await anyio.to_thread.run_sync(wal_path.unlink)
+                    logger.debug(f"Deleted WAL file: {wal_path}")
+
+                logger.info(f"Deleted database: {graph_id}")
+                return True
+            else:
+                logger.warning(f"Database file not found for deletion: {graph_id}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to delete database {graph_id}: {e}")
+            return False
 
     async def list_graphs(self) -> list[CodebaseGraph]:
         """List all available graphs.

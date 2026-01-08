@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from shotgun.codebase.core.errors import DatabaseIssue
 
 from textual.app import App, SystemCommand
 from textual.binding import Binding
@@ -57,6 +62,7 @@ class ShotgunApp(App[None]):
         force_reindex: bool = False,
         show_pull_hint: bool = False,
         pull_version_id: str | None = None,
+        pending_db_issues: list[DatabaseIssue] | None = None,
     ) -> None:
         super().__init__()
         self.config_manager: ConfigManager = get_config_manager()
@@ -65,6 +71,9 @@ class ShotgunApp(App[None]):
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
         self.pull_version_id = pull_version_id
+        # Database issues detected at startup (locked, corrupted, timeout)
+        # These will be shown to the user via dialogs when ChatScreen mounts
+        self.pending_db_issues = pending_db_issues or []
 
         # Initialize dependency injection container
         self.container = TUIContainer()
@@ -265,24 +274,51 @@ def run(
         show_pull_hint: If True, show hint about recently pulled spec.
         pull_version_id: If provided, pull this spec version before showing ChatScreen.
     """
-    # Clean up any corrupted databases BEFORE starting the TUI
-    # This prevents crashes from corrupted databases during initialization
+    # Detect database issues BEFORE starting the TUI (but don't auto-delete)
+    # Issues will be presented to the user via dialogs once the TUI is running
     import asyncio
 
+    from shotgun.codebase.core.errors import KuzuErrorType
     from shotgun.codebase.core.manager import CodebaseGraphManager
     from shotgun.utils import get_shotgun_home
 
     storage_dir = get_shotgun_home() / "codebases"
     manager = CodebaseGraphManager(storage_dir)
 
+    pending_db_issues: list[DatabaseIssue] = []
     try:
-        removed = asyncio.run(manager.cleanup_corrupted_databases())
-        if removed:
-            logger.info(
-                f"Cleaned up {len(removed)} corrupted database(s) before TUI startup"
-            )
+        # First pass: 10-second timeout
+        issues = asyncio.run(manager.detect_database_issues(timeout_seconds=10.0))
+        if issues:
+            # Categorize issues for logging
+            for issue in issues:
+                logger.info(
+                    f"Detected database issue: {issue.graph_id} - "
+                    f"{issue.error_type.value}: {issue.message}"
+                )
+
+            # Only pass issues that require user interaction to the TUI
+            # Schema issues (incomplete builds) can be auto-cleaned silently
+            user_facing_issues = [
+                i
+                for i in issues
+                if i.error_type
+                in (
+                    KuzuErrorType.LOCKED,
+                    KuzuErrorType.CORRUPTION,
+                    KuzuErrorType.TIMEOUT,
+                )
+            ]
+
+            # Auto-delete schema issues (incomplete builds) - safe to remove
+            schema_issues = [i for i in issues if i.error_type == KuzuErrorType.SCHEMA]
+            for issue in schema_issues:
+                asyncio.run(manager.delete_database(issue.graph_id))
+                logger.info(f"Auto-removed incomplete database: {issue.graph_id}")
+
+            pending_db_issues = user_facing_issues
     except Exception as e:
-        logger.error(f"Failed to cleanup corrupted databases: {e}")
+        logger.error(f"Failed to detect database issues: {e}")
         # Continue anyway - the TUI can still function
 
     app = ShotgunApp(
@@ -291,6 +327,7 @@ def run(
         force_reindex=force_reindex,
         show_pull_hint=show_pull_hint,
         pull_version_id=pull_version_id,
+        pending_db_issues=pending_db_issues,
     )
     app.run(inline_no_clear=True)
 
@@ -313,12 +350,14 @@ def serve(
         continue_session: If True, continue from previous conversation.
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
     """
-    # Clean up any corrupted databases BEFORE starting the TUI
-    # This prevents crashes from corrupted databases during initialization
+    # Detect database issues BEFORE starting the TUI
+    # Note: In serve mode, issues are logged but user interaction happens in
+    # the spawned process via run()
     import asyncio
 
     from textual_serve.server import Server
 
+    from shotgun.codebase.core.errors import KuzuErrorType
     from shotgun.codebase.core.manager import CodebaseGraphManager
     from shotgun.utils import get_shotgun_home
 
@@ -326,13 +365,20 @@ def serve(
     manager = CodebaseGraphManager(storage_dir)
 
     try:
-        removed = asyncio.run(manager.cleanup_corrupted_databases())
-        if removed:
-            logger.info(
-                f"Cleaned up {len(removed)} corrupted database(s) before TUI startup"
-            )
+        issues = asyncio.run(manager.detect_database_issues(timeout_seconds=10.0))
+        if issues:
+            for issue in issues:
+                logger.info(
+                    f"Detected database issue: {issue.graph_id} - "
+                    f"{issue.error_type.value}: {issue.message}"
+                )
+            # Auto-delete only schema issues (incomplete builds)
+            schema_issues = [i for i in issues if i.error_type == KuzuErrorType.SCHEMA]
+            for issue in schema_issues:
+                asyncio.run(manager.delete_database(issue.graph_id))
+                logger.info(f"Auto-removed incomplete database: {issue.graph_id}")
     except Exception as e:
-        logger.error(f"Failed to cleanup corrupted databases: {e}")
+        logger.error(f"Failed to detect database issues: {e}")
         # Continue anyway - the TUI can still function
 
     # Create a new event loop after asyncio.run() closes the previous one

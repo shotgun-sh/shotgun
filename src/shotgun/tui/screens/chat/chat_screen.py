@@ -58,6 +58,11 @@ from shotgun.agents.router.models import (
     RouterMode,
 )
 from shotgun.agents.runner import AgentRunner
+from shotgun.codebase.core.errors import (
+    DatabaseIssue,
+    KuzuErrorType,
+    classify_kuzu_error,
+)
 from shotgun.codebase.core.kuzu_compat import KuzuImportError
 from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
@@ -112,6 +117,8 @@ from shotgun.tui.screens.chat_screen.messages import (
     SubAgentStarted,
 )
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
+from shotgun.tui.screens.database_locked_dialog import DatabaseLockedDialog
+from shotgun.tui.screens.database_timeout_dialog import DatabaseTimeoutDialog
 from shotgun.tui.screens.kuzu_error_dialog import KuzuErrorDialog
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
@@ -306,8 +313,132 @@ class ChatScreen(Screen[None]):
                 # Prevent the event from propagating (don't quit the app)
                 event.stop()
 
+    async def _handle_pending_database_issues(self) -> bool:
+        """Handle any database issues detected at startup.
+
+        This method processes pending database issues (locked, corrupted, timeout)
+        and shows appropriate dialogs to the user.
+
+        Returns:
+            True if should continue with normal startup, False if should abort
+        """
+        from shotgun.codebase.core.manager import CodebaseGraphManager
+        from shotgun.utils import get_shotgun_home
+
+        # Get pending issues from app
+        pending_issues: list[DatabaseIssue] = getattr(self.app, "pending_db_issues", [])
+        if not pending_issues:
+            return True
+
+        storage_dir = get_shotgun_home() / "codebases"
+        manager = CodebaseGraphManager(storage_dir)
+
+        # Handle locked databases first - show ONE dialog for all locked DBs
+        locked_issues = [
+            i for i in pending_issues if i.error_type == KuzuErrorType.LOCKED
+        ]
+        if locked_issues:
+            # Show single locked dialog
+            retry = await self.app.push_screen_wait(DatabaseLockedDialog())
+            if not retry:
+                # User cancelled - exit the app gracefully
+                await self.app.action_quit()
+                return False
+
+            # User wants to retry - re-detect to see if locks are cleared
+            new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
+            still_locked = [
+                i for i in new_issues if i.error_type == KuzuErrorType.LOCKED
+            ]
+            if still_locked:
+                # Still locked - show hint message
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message="Database is still locked. "
+                        "Please close the other shotgun instance and restart."
+                    )
+                )
+                await self.app.action_quit()
+                return False
+
+        # Process non-locked issues
+        for issue in pending_issues:
+            if issue.error_type == KuzuErrorType.LOCKED:
+                continue  # Already handled above
+
+            if issue.error_type == KuzuErrorType.TIMEOUT:
+                # Show timeout dialog
+                action = await self.app.push_screen_wait(
+                    DatabaseTimeoutDialog(
+                        codebase_name=issue.graph_id,
+                        timeout_seconds=10.0,
+                    )
+                )
+                if action == "retry":
+                    # Retry with longer timeout (90s)
+                    new_issues = await manager.detect_database_issues(
+                        timeout_seconds=90.0
+                    )
+                    still_timeout = any(
+                        i.graph_id == issue.graph_id
+                        and i.error_type == KuzuErrorType.TIMEOUT
+                        for i in new_issues
+                    )
+                    if still_timeout:
+                        self.agent_manager.add_hint_message(
+                            HintMessage(
+                                message=f"Database '{issue.graph_id}' still not responding. "
+                                "It may be corrupted or the codebase is extremely large."
+                            )
+                        )
+                elif action == "skip":
+                    # User chose to skip this database
+                    logger.info(f"User skipped timeout database: {issue.graph_id}")
+                # "cancel" - do nothing
+
+            elif issue.error_type == KuzuErrorType.CORRUPTION:
+                # Show corruption confirmation dialog
+                should_delete = await self.app.push_screen_wait(
+                    ConfirmationDialog(
+                        title="Database Corrupted",
+                        message=(
+                            f"The codebase index '{issue.graph_id}' appears to be corrupted.\n\n"
+                            f"Error: {issue.message}\n\n"
+                            "Would you like to delete it? You will need to re-index the codebase."
+                        ),
+                        confirm_label="Delete & Re-index",
+                        cancel_label="Keep (Skip)",
+                        confirm_variant="warning",
+                        danger=True,
+                    )
+                )
+                if should_delete:
+                    deleted = await manager.delete_database(issue.graph_id)
+                    if deleted:
+                        self.agent_manager.add_hint_message(
+                            HintMessage(
+                                message=f"Deleted corrupted database '{issue.graph_id}'. "
+                                "You can re-index using /index."
+                            )
+                        )
+                    else:
+                        logger.error(
+                            f"Failed to delete corrupted database: {issue.graph_id}"
+                        )
+
+        # Clear the pending issues after processing
+        if hasattr(self.app, "pending_db_issues"):
+            self.app.pending_db_issues = []
+
+        return True
+
     @work
     async def check_if_codebase_is_indexed(self) -> None:
+        # Handle any pending database issues from startup first
+        should_continue = await self._handle_pending_database_issues()
+        if not should_continue:
+            return
+
         cur_dir = Path.cwd().resolve()
         is_empty = all(
             dir.is_dir() and dir.name in ["__pycache__", ".git", ".shotgun"]
@@ -1341,6 +1472,17 @@ class ChatScreen(Screen[None]):
                 HintMessage(message=f"❌ Failed to delete codebase: {exc}")
             )
 
+    def _classify_kuzu_error(self, exception: Exception) -> KuzuErrorType:
+        """Classify a Kuzu database error.
+
+        Args:
+            exception: The exception to classify
+
+        Returns:
+            KuzuErrorType indicating the category of error
+        """
+        return classify_kuzu_error(exception)
+
     def _is_kuzu_corruption_error(self, exception: Exception) -> bool:
         """Check if error is related to kuzu database corruption.
 
@@ -1348,20 +1490,15 @@ class ChatScreen(Screen[None]):
             exception: The exception to check
 
         Returns:
-            True if the error indicates kuzu database corruption
+            True if the error indicates kuzu database corruption or lock issues
         """
-        error_str = str(exception).lower()
-        error_indicators = [
-            "not a directory",
-            "errno 20",
-            "corrupted",
-            ".kuzu",
-            "ioexception",
-            "unordered_map",  # C++ STL map errors from kuzu
-            "key not found",  # unordered_map::at errors
-            "std::exception",  # Generic C++ exceptions from kuzu
-        ]
-        return any(indicator in error_str for indicator in error_indicators)
+        error_type = classify_kuzu_error(exception)
+        # Consider corruption and lock errors as "kuzu errors" that need special handling
+        return error_type in (
+            KuzuErrorType.CORRUPTION,
+            KuzuErrorType.LOCKED,
+            KuzuErrorType.SCHEMA,
+        )
 
     @work
     async def index_codebase(self, selection: CodebaseIndexSelection) -> None:
