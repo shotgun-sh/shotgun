@@ -334,9 +334,7 @@ class ChatScreen(Screen[None]):
         for issue in pending_issues:
             if issue.error_type == KuzuErrorType.LOCKED:
                 # Show locked dialog
-                retry = await self.app.push_screen_wait(
-                    DatabaseLockedDialog(codebase_name=issue.graph_id)
-                )
+                retry = await self.app.push_screen_wait(DatabaseLockedDialog())
                 if retry:
                     # User wants to retry - re-detect to see if lock is cleared
                     new_issues = await manager.detect_database_issues(

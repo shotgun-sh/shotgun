@@ -1,8 +1,11 @@
 """Dialog shown when the database is locked by another process."""
 
+import webbrowser
+
+import pyperclip  # type: ignore[import-untyped]
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Horizontal
 from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Static
@@ -20,9 +23,6 @@ class DatabaseLockedDialog(ModalScreen[bool]):
 
     This modal informs the user that another shotgun instance has the database
     open, and offers options to retry (after closing the other instance) or cancel.
-
-    Args:
-        codebase_name: Name of the codebase that is locked
 
     Returns:
         True if user wants to retry, False if user cancels
@@ -55,6 +55,16 @@ class DatabaseLockedDialog(ModalScreen[bool]):
             color: $text-muted;
         }
 
+        #support-buttons {
+            layout: horizontal;
+            height: auto;
+            padding-bottom: 1;
+        }
+
+        #support-buttons Button {
+            margin-right: 1;
+        }
+
         #dialog-buttons {
             layout: horizontal;
             align-horizontal: right;
@@ -80,15 +90,6 @@ class DatabaseLockedDialog(ModalScreen[bool]):
         }
     """
 
-    def __init__(self, codebase_name: str = "") -> None:
-        """Initialize the dialog.
-
-        Args:
-            codebase_name: Name of the codebase that is locked
-        """
-        super().__init__()
-        self.codebase_name = codebase_name
-
     def compose(self) -> ComposeResult:
         """Compose the dialog widgets."""
         with Container(id="dialog-container"):
@@ -99,13 +100,12 @@ class DatabaseLockedDialog(ModalScreen[bool]):
                 "To resolve this:\n"
                 "1. Close any other shotgun instances and click Retry\n"
                 "2. If no other instance is running and you still see this error, "
-                f"contact support:\n"
-                f"   Email: {SHOTGUN_CONTACT_EMAIL}\n"
-                f"   Discord: {DISCORD_LINK}"
+                "contact support:"
             )
-            if self.codebase_name:
-                message = f"Codebase: {self.codebase_name}\n\n" + message
             yield Static(message, id="dialog-message")
+            with Horizontal(id="support-buttons"):
+                yield Button("Copy Email", id="copy-email")
+                yield Button("Open Discord", id="open-discord")
             with Container(id="dialog-buttons"):
                 yield Button("Retry", id="retry", variant="primary")
                 yield Button("Cancel", id="cancel")
@@ -113,10 +113,7 @@ class DatabaseLockedDialog(ModalScreen[bool]):
     def on_mount(self) -> None:
         """Set up the dialog after mounting."""
         # Track this event in PostHog
-        track_event(
-            "database_locked_dialog_shown",
-            {"codebase_name": self.codebase_name} if self.codebase_name else {},
-        )
+        track_event("database_locked_dialog_shown", {})
 
         # Focus retry button - user likely wants to retry after closing other instance
         self.query_one("#retry", Button).focus()
@@ -155,3 +152,18 @@ class DatabaseLockedDialog(ModalScreen[bool]):
         """Handle retry button press."""
         event.stop()
         self.dismiss(True)
+
+    @on(Button.Pressed, "#copy-email")
+    def handle_copy_email(self, event: Button.Pressed) -> None:
+        """Copy support email to clipboard."""
+        event.stop()
+        pyperclip.copy(SHOTGUN_CONTACT_EMAIL)
+        track_event("database_locked_dialog_copy_email", {})
+        self.notify("Email copied to clipboard", severity="information")
+
+    @on(Button.Pressed, "#open-discord")
+    def handle_open_discord(self, event: Button.Pressed) -> None:
+        """Open Discord link in browser."""
+        event.stop()
+        webbrowser.open(DISCORD_LINK)
+        track_event("database_locked_dialog_open_discord", {})
