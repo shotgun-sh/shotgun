@@ -32,7 +32,7 @@ def copy_vcpp_instructions_to_clipboard() -> bool:
         True if successful, False otherwise
     """
     try:
-        import pyperclip
+        import pyperclip  # type: ignore[import-untyped]
 
         pyperclip.copy(_VC_REDIST_URL)
         return True
