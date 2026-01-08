@@ -269,38 +269,3 @@ def reindex(
         )
         output_result(error_result, format_type)
         raise typer.Exit(1) from e
-
-
-@app.command(name="copy-vcpp-url")
-def copy_vcpp_url() -> None:
-    """Copy the Visual C++ Redistributable download URL to clipboard.
-
-    This is useful for Windows users who encounter DLL errors when using
-    codebase features. The VC++ Redistributable is required for the graph
-    database library to work on Windows.
-    """
-    import sys
-
-    from shotgun.codebase.core.kuzu_compat import (
-        _VC_REDIST_URL,
-        copy_vcpp_instructions_to_clipboard,
-    )
-
-    console = Console()
-
-    if sys.platform != "win32":
-        console.print(
-            "[yellow]Note: This command is primarily for Windows users.[/yellow]"
-        )
-
-    if copy_vcpp_instructions_to_clipboard():
-        console.print(
-            f"[green]✓[/green] Copied VC++ Redistributable URL to clipboard:\n"
-            f"  {_VC_REDIST_URL}"
-        )
-    else:
-        console.print(
-            f"[red]✗[/red] Could not copy to clipboard. URL:\n"
-            f"  {_VC_REDIST_URL}"
-        )
-        raise typer.Exit(1)

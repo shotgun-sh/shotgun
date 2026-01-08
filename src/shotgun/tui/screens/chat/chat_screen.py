@@ -58,6 +58,7 @@ from shotgun.agents.router.models import (
     RouterMode,
 )
 from shotgun.agents.runner import AgentRunner
+from shotgun.codebase.core.kuzu_compat import KuzuImportError
 from shotgun.codebase.core.manager import (
     CodebaseAlreadyIndexedError,
     CodebaseGraphManager,
@@ -111,6 +112,7 @@ from shotgun.tui.screens.chat_screen.messages import (
     SubAgentStarted,
 )
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
+from shotgun.tui.screens.kuzu_error_dialog import KuzuErrorDialog
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
     ShareSpecsAction,
@@ -1516,6 +1518,12 @@ class ChatScreen(Screen[None]):
                 progress_timer.stop()
                 logger.error(f"Invalid path error: {exc}")
                 self.agent_manager.add_hint_message(HintMessage(message=f"❌ {exc}"))
+                return
+            except KuzuImportError as exc:
+                progress_timer.stop()
+                logger.error(f"Kuzu import error (Windows DLL issue): {exc}")
+                # Show dialog with copy button for Windows users
+                await self.app.push_screen_wait(KuzuErrorDialog())
                 return
 
             except Exception as exc:  # pragma: no cover - defensive UI path

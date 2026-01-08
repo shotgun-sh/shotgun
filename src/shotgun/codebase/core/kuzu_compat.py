@@ -22,8 +22,6 @@ To fix this, install the Visual C++ Redistributable:
 Or run this PowerShell command (as Administrator):
   Invoke-WebRequest -Uri "{_VC_REDIST_URL}" -OutFile "$env:TEMP\\vc_redist.x64.exe"
   Start-Process -FilePath "$env:TEMP\\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
-
-TIP: Run 'shotgun codebase copy-vcpp-url' to copy the download URL to clipboard.
 """
 
 
