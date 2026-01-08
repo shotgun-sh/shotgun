@@ -1,6 +1,6 @@
 """Unit tests for Kuzu error classification."""
 
-import pytest
+from pathlib import Path
 
 from shotgun.codebase.core.errors import (
     DatabaseCorruptedError,
@@ -11,7 +11,6 @@ from shotgun.codebase.core.errors import (
     KuzuErrorType,
     classify_kuzu_error,
 )
-from pathlib import Path
 
 
 class TestClassifyKuzuError:
@@ -101,7 +100,7 @@ class TestClassifyKuzuError:
 
 
 class TestDatabaseIssue:
-    """Test cases for DatabaseIssue dataclass."""
+    """Test cases for DatabaseIssue model."""
 
     def test_create_database_issue(self):
         """DatabaseIssue should be created with all fields."""
