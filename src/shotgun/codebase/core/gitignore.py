@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import pathspec
 
+from shotgun.codebase.models import GitignoreStats
 from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -60,12 +61,7 @@ class GitignoreManager:
         self._root_spec: PathSpec | None = None
 
         # Statistics for debugging
-        self.stats = {
-            "gitignore_files_loaded": 0,
-            "patterns_loaded": 0,
-            "files_checked": 0,
-            "files_ignored": 0,
-        }
+        self.stats = GitignoreStats()
 
         if respect_gitignore:
             self._load_gitignore_files()
@@ -76,10 +72,10 @@ class GitignoreManager:
 
         if root_gitignore.exists():
             self._root_spec = self._load_gitignore_file(root_gitignore)
-            self.stats["gitignore_files_loaded"] += 1
+            self.stats.gitignore_files_loaded += 1
             logger.debug(
                 f"Loaded root .gitignore with patterns - "
-                f"path: {root_gitignore}, patterns: {self.stats['patterns_loaded']}"
+                f"path: {root_gitignore}, patterns: {self.stats.patterns_loaded}"
             )
 
         if self.load_nested:
@@ -91,7 +87,7 @@ class GitignoreManager:
                 spec = self._load_gitignore_file(gitignore_path)
                 if spec:
                     self._specs[gitignore_path.parent] = spec
-                    self.stats["gitignore_files_loaded"] += 1
+                    self.stats.gitignore_files_loaded += 1
 
             if self._specs:
                 logger.debug(f"Loaded {len(self._specs)} nested .gitignore files")
@@ -119,7 +115,7 @@ class GitignoreManager:
             if not valid_patterns:
                 return None
 
-            self.stats["patterns_loaded"] += len(valid_patterns)
+            self.stats.patterns_loaded += len(valid_patterns)
 
             return pathspec.PathSpec.from_lines("gitwildmatch", valid_patterns)
         except Exception as e:
@@ -138,7 +134,7 @@ class GitignoreManager:
         if not self.respect_gitignore:
             return False
 
-        self.stats["files_checked"] += 1
+        self.stats.files_checked += 1
 
         # Convert to Path and make relative to repo root
         path_obj = Path(path) if isinstance(path, str) else path
@@ -157,7 +153,7 @@ class GitignoreManager:
 
         # Check root gitignore first
         if self._root_spec and self._root_spec.match_file(path_str):
-            self.stats["files_ignored"] += 1
+            self.stats.files_ignored += 1
             return True
 
         # Check nested gitignore files
@@ -173,7 +169,7 @@ class GitignoreManager:
                         )
                         rel_path_str = str(rel_path).replace("\\", "/")
                         if self._specs[current_dir].match_file(rel_path_str):
-                            self.stats["files_ignored"] += 1
+                            self.stats.files_ignored += 1
                             return True
                     except ValueError:
                         pass
@@ -237,10 +233,10 @@ class GitignoreManager:
         """
         return (
             f"Gitignore stats: "
-            f"{self.stats['gitignore_files_loaded']} files loaded, "
-            f"{self.stats['patterns_loaded']} patterns, "
-            f"{self.stats['files_checked']} paths checked, "
-            f"{self.stats['files_ignored']} ignored"
+            f"{self.stats.gitignore_files_loaded} files loaded, "
+            f"{self.stats.patterns_loaded} patterns, "
+            f"{self.stats.files_checked} paths checked, "
+            f"{self.stats.files_ignored} ignored"
         )
 
 

@@ -17,6 +17,7 @@ from tree_sitter import Node, Parser, QueryCursor
 
 from shotgun.codebase.core.gitignore import GitignoreManager
 from shotgun.codebase.core.kuzu_compat import get_kuzu
+from shotgun.codebase.models import IgnoreReason, IndexingStats
 
 if TYPE_CHECKING:
     import real_ladybug as kuzu
@@ -614,16 +615,7 @@ class SimpleGraphBuilder:
         self._index_session_id = str(uuid.uuid4())[:8]
 
         # Statistics for tracking what was indexed vs skipped
-        self._index_stats = {
-            "dirs_scanned": 0,
-            "dirs_ignored_hardcoded": 0,
-            "dirs_ignored_gitignore": 0,
-            "files_scanned": 0,
-            "files_ignored_hardcoded": 0,
-            "files_ignored_gitignore": 0,
-            "files_ignored_no_parser": 0,
-            "files_processed": 0,
-        }
+        self._index_stats = IndexingStats()
 
         # Caches
         self.structural_elements: dict[Path, str | None] = {}
@@ -785,24 +777,24 @@ class SimpleGraphBuilder:
 
         # Log final indexing statistics
         logger.info("=== Indexing Statistics ===")
-        logger.info(f"  Directories scanned: {self._index_stats['dirs_scanned']}")
+        logger.info(f"  Directories scanned: {self._index_stats.dirs_scanned}")
         logger.info(
-            f"  Directories ignored (hardcoded patterns): {self._index_stats['dirs_ignored_hardcoded']}"
+            f"  Directories ignored (hardcoded patterns): {self._index_stats.dirs_ignored_hardcoded}"
         )
         logger.info(
-            f"  Directories ignored (gitignore): {self._index_stats['dirs_ignored_gitignore']}"
+            f"  Directories ignored (gitignore): {self._index_stats.dirs_ignored_gitignore}"
         )
-        logger.info(f"  Files scanned: {self._index_stats['files_scanned']}")
+        logger.info(f"  Files scanned: {self._index_stats.files_scanned}")
         logger.info(
-            f"  Files ignored (hardcoded patterns): {self._index_stats['files_ignored_hardcoded']}"
-        )
-        logger.info(
-            f"  Files ignored (gitignore): {self._index_stats['files_ignored_gitignore']}"
+            f"  Files ignored (hardcoded patterns): {self._index_stats.files_ignored_hardcoded}"
         )
         logger.info(
-            f"  Files ignored (no parser): {self._index_stats['files_ignored_no_parser']}"
+            f"  Files ignored (gitignore): {self._index_stats.files_ignored_gitignore}"
         )
-        logger.info(f"  Files processed: {self._index_stats['files_processed']}")
+        logger.info(
+            f"  Files ignored (no parser): {self._index_stats.files_ignored_no_parser}"
+        )
+        logger.info(f"  Files processed: {self._index_stats.files_processed}")
 
         # Log gitignore manager stats if available
         if self.gitignore_manager:
@@ -812,7 +804,7 @@ class SimpleGraphBuilder:
 
     def _should_ignore_directory(
         self, dir_path: Path, dir_name: str
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, IgnoreReason | None]:
         """Check if a directory should be ignored.
 
         Args:
@@ -824,18 +816,18 @@ class SimpleGraphBuilder:
         """
         # Check hardcoded patterns first (fastest)
         if should_ignore_directory(dir_name, self.ignore_dirs):
-            return True, "hardcoded"
+            return True, IgnoreReason.HARDCODED
 
         # Check gitignore patterns
         if self.gitignore_manager:
             try:
                 relative_path = dir_path.relative_to(self.repo_path)
                 if self.gitignore_manager.is_directory_ignored(relative_path):
-                    return True, "gitignore"
+                    return True, IgnoreReason.GITIGNORE
             except ValueError:
                 pass
 
-        return False, ""
+        return False, None
 
     def _identify_structure(self) -> None:
         """First pass: Walk directory to find packages and folders."""
@@ -847,14 +839,14 @@ class SimpleGraphBuilder:
                 dir_path = Path(root_str) / d
                 should_ignore, reason = self._should_ignore_directory(dir_path, d)
                 if should_ignore:
-                    if reason == "hardcoded":
-                        self._index_stats["dirs_ignored_hardcoded"] += 1
-                    elif reason == "gitignore":
-                        self._index_stats["dirs_ignored_gitignore"] += 1
+                    if reason == IgnoreReason.HARDCODED:
+                        self._index_stats.dirs_ignored_hardcoded += 1
+                    elif reason == IgnoreReason.GITIGNORE:
+                        self._index_stats.dirs_ignored_gitignore += 1
                         logger.debug(f"Skipping gitignored directory: {dir_path}")
                 else:
                     filtered_dirs.append(d)
-                    self._index_stats["dirs_scanned"] += 1
+                    self._index_stats.dirs_scanned += 1
 
             dirs[:] = filtered_dirs
             root = Path(root_str)
@@ -981,7 +973,7 @@ class SimpleGraphBuilder:
             phase_complete=True,
         )
 
-    def _should_ignore_file(self, filepath: Path) -> tuple[bool, str]:
+    def _should_ignore_file(self, filepath: Path) -> tuple[bool, IgnoreReason | None]:
         """Check if a file should be ignored.
 
         Args:
@@ -992,18 +984,18 @@ class SimpleGraphBuilder:
         """
         # Check hardcoded directory patterns in path
         if is_path_ignored(filepath, self.ignore_dirs):
-            return True, "hardcoded"
+            return True, IgnoreReason.HARDCODED
 
         # Check gitignore patterns
         if self.gitignore_manager:
             try:
                 relative_path = filepath.relative_to(self.repo_path)
                 if self.gitignore_manager.is_ignored(relative_path):
-                    return True, "gitignore"
+                    return True, IgnoreReason.GITIGNORE
             except ValueError:
                 pass
 
-        return False, ""
+        return False, None
 
     async def _process_files(self) -> None:
         """Second pass: Process files and extract definitions."""
@@ -1025,15 +1017,15 @@ class SimpleGraphBuilder:
 
             for filename in files:
                 filepath = root / filename
-                self._index_stats["files_scanned"] += 1
+                self._index_stats.files_scanned += 1
 
                 # Check if file should be ignored
                 should_ignore, reason = self._should_ignore_file(filepath)
                 if should_ignore:
-                    if reason == "hardcoded":
-                        self._index_stats["files_ignored_hardcoded"] += 1
-                    elif reason == "gitignore":
-                        self._index_stats["files_ignored_gitignore"] += 1
+                    if reason == IgnoreReason.HARDCODED:
+                        self._index_stats.files_ignored_hardcoded += 1
+                    elif reason == IgnoreReason.GITIGNORE:
+                        self._index_stats.files_ignored_gitignore += 1
                         logger.debug(f"Skipping gitignored file: {filepath}")
                     continue
 
@@ -1045,16 +1037,16 @@ class SimpleGraphBuilder:
                     files_to_process.append((filepath, lang_config.name))
                     total_files += 1
                 else:
-                    self._index_stats["files_ignored_no_parser"] += 1
+                    self._index_stats.files_ignored_no_parser += 1
 
         # Log what we're about to process
         logger.info(
             f"Index statistics: "
-            f"scanned {self._index_stats['files_scanned']} files, "
+            f"scanned {self._index_stats.files_scanned} files, "
             f"processing {total_files}, "
-            f"skipped {self._index_stats['files_ignored_hardcoded']} (hardcoded), "
-            f"{self._index_stats['files_ignored_gitignore']} (gitignore), "
-            f"{self._index_stats['files_ignored_no_parser']} (no parser)"
+            f"skipped {self._index_stats.files_ignored_hardcoded} (hardcoded), "
+            f"{self._index_stats.files_ignored_gitignore} (gitignore), "
+            f"{self._index_stats.files_ignored_no_parser} (no parser)"
         )
 
         # Second pass: Process files with progress reporting
@@ -1062,7 +1054,7 @@ class SimpleGraphBuilder:
         for filepath, language in files_to_process:
             await self._process_single_file(filepath, language)
             file_count += 1
-            self._index_stats["files_processed"] += 1
+            self._index_stats.files_processed += 1
 
             # Report progress after each file
             self._report_progress(

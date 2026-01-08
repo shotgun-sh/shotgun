@@ -14,8 +14,8 @@ def test_gitignore_manager_no_gitignore_file():
         # Nothing should be ignored
         assert not manager.is_ignored("test.py")
         assert not manager.is_ignored("src/main.py")
-        assert manager.stats["gitignore_files_loaded"] == 0
-        assert manager.stats["patterns_loaded"] == 0
+        assert manager.stats.gitignore_files_loaded == 0
+        assert manager.stats.patterns_loaded == 0
 
 
 def test_gitignore_manager_basic_patterns():
@@ -45,8 +45,8 @@ build/
         manager = GitignoreManager(tmpdir_path)
 
         # Check patterns were loaded
-        assert manager.stats["gitignore_files_loaded"] == 1
-        assert manager.stats["patterns_loaded"] > 0
+        assert manager.stats.gitignore_files_loaded == 1
+        assert manager.stats.patterns_loaded > 0
 
         # Check files that should be ignored
         assert manager.is_ignored("__pycache__/something.py")
@@ -181,7 +181,7 @@ def test_gitignore_manager_respect_gitignore_false():
         # Nothing should be ignored when respect_gitignore is False
         assert not manager.is_ignored("test.log")
         assert not manager.is_ignored("__pycache__/module.pyc")
-        assert manager.stats["gitignore_files_loaded"] == 0
+        assert manager.stats.gitignore_files_loaded == 0
 
 
 def test_gitignore_manager_filter_paths():
