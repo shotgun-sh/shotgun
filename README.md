@@ -110,6 +110,17 @@ uv tool install --python 3.12 shotgun-sh
 
 **Important:** Run in **PowerShell**, not Command Prompt or VS Developer shells.
 
+#### Optional: Enable Code Indexing
+
+Code indexing requires the Visual C++ Redistributable. Run this in PowerShell (as Administrator):
+
+```powershell
+# Download and install Visual C++ Redistributable
+Import-Module BitsTransfer
+Start-BitsTransfer -Source "https://aka.ms/vs/17/release/vc_redist.x64.exe" -Destination "$env:TEMP\vc_redist.x64.exe"
+Start-Process -FilePath "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
+```
+
 </details>
 
 _💡 Restart your terminal after installation_

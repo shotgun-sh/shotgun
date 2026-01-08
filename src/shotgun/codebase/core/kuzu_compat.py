@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import webbrowser
 from typing import Any
 
 _kuzu_module: Any = None
@@ -11,22 +12,29 @@ _import_error: ImportError | None = None
 # Windows VC++ download URL
 _VC_REDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
 
+# PowerShell installation script for VC++ Redistributable
+_VC_INSTALL_SCRIPT = f"""\
+# Download and install Visual C++ Redistributable (run as Administrator)
+Import-Module BitsTransfer
+Start-BitsTransfer -Source "{_VC_REDIST_URL}" -Destination "$env:TEMP\\vc_redist.x64.exe"
+Start-Process -FilePath "$env:TEMP\\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait\
+"""
+
 # Windows VC++ installation instructions
 _WINDOWS_INSTALL_INSTRUCTIONS = f"""
-To fix this, install the Visual C++ Redistributable:
+To fix this, install the Visual C++ Redistributable.
 
-1. Download from: {_VC_REDIST_URL}
-2. Run the installer and follow the prompts
-3. Restart your terminal and try again
+Option 1: Run this PowerShell script (as Administrator):
 
-Or run this PowerShell command (as Administrator):
-  Invoke-WebRequest -Uri "{_VC_REDIST_URL}" -OutFile "$env:TEMP\\vc_redist.x64.exe"
-  Start-Process -FilePath "$env:TEMP\\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
+{_VC_INSTALL_SCRIPT}
+
+Option 2: Download manually from:
+  {_VC_REDIST_URL}
 """
 
 
-def copy_vcpp_instructions_to_clipboard() -> bool:
-    """Copy the VC++ Redistributable download URL to clipboard.
+def copy_vcpp_script_to_clipboard() -> bool:
+    """Copy the VC++ installation PowerShell script to clipboard.
 
     Returns:
         True if successful, False otherwise
@@ -34,7 +42,20 @@ def copy_vcpp_instructions_to_clipboard() -> bool:
     try:
         import pyperclip  # type: ignore[import-untyped]
 
-        pyperclip.copy(_VC_REDIST_URL)
+        pyperclip.copy(_VC_INSTALL_SCRIPT)
+        return True
+    except Exception:
+        return False
+
+
+def open_vcpp_download_page() -> bool:
+    """Open the VC++ Redistributable download page in the default browser.
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        webbrowser.open(_VC_REDIST_URL)
         return True
     except Exception:
         return False
