@@ -29,7 +29,7 @@ class ChangeType(Enum):
 class ChangeDetector:
     """Detects changes in the codebase by comparing with FileMetadata nodes."""
 
-    def __init__(self, connection: "kuzu.Connection", repo_path: Path):
+    def __init__(self, connection: kuzu.Connection, repo_path: Path):
         """Initialize change detector.
 
         Args:

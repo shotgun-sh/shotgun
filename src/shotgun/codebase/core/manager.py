@@ -167,8 +167,8 @@ class CodebaseGraphManager:
     """Manages Kuzu code knowledge graphs with class-level connection pooling."""
 
     # Class-level storage to ensure single connection per graph
-    _connections: ClassVar[dict[str, "kuzu.Connection"]] = {}
-    _databases: ClassVar[dict[str, "kuzu.Database"]] = {}
+    _connections: ClassVar[dict[str, kuzu.Connection]] = {}
+    _databases: ClassVar[dict[str, kuzu.Database]] = {}
     _watchers: ClassVar[dict[str, Any]] = {}
     _handlers: ClassVar[dict[str, CodebaseFileHandler]] = {}
     _lock: ClassVar[anyio.Lock | None] = None

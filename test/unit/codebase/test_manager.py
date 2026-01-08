@@ -132,20 +132,23 @@ async def test_get_or_create_connection():
         storage_dir = Path(tmp_dir)
         repo_path = tmp_dir
 
+        # Create mock kuzu module
+        mock_db = Mock()
+        mock_conn = Mock()
+        mock_kuzu = Mock()
+        mock_kuzu.Database.return_value = mock_db
+        mock_kuzu.Connection.return_value = mock_conn
+
         with (
             patch("shotgun.codebase.core.manager.Path.mkdir"),
             patch.object(Path, "exists", return_value=False),
-            patch("shotgun.codebase.core.manager.kuzu.Database") as mock_db_class,
-            patch("shotgun.codebase.core.manager.kuzu.Connection") as mock_conn_class,
+            patch(
+                "shotgun.codebase.core.manager.get_kuzu", return_value=mock_kuzu
+            ),
             patch("shotgun.codebase.core.ingestor.CodebaseIngestor"),
             patch("shotgun.codebase.core.manager.logger"),
             patch("anyio.to_thread.run_sync"),
         ):
-            mock_db = Mock()
-            mock_conn = Mock()
-            mock_db_class.return_value = mock_db
-            mock_conn_class.return_value = mock_conn
-
             manager = CodebaseGraphManager(storage_dir)
 
             # Mock the _execute_query method to return empty results
@@ -157,8 +160,8 @@ async def test_get_or_create_connection():
                     graph_id = graph.graph_id
 
                     assert graph_id in CodebaseGraphManager._connections
-                    mock_db_class.assert_called()
-                    mock_conn_class.assert_called_with(mock_db)
+                    mock_kuzu.Database.assert_called()
+                    mock_kuzu.Connection.assert_called_with(mock_db)
 
 
 @pytest.mark.asyncio
@@ -615,12 +618,18 @@ async def test_update_graph_incremental():
                     return True
                 return False
 
+            # Create mock kuzu module
+            mock_kuzu = Mock()
+            mock_kuzu.Database.return_value = Mock()
+            mock_kuzu.Connection.return_value = Mock()
+
             with (
                 patch.object(manager, "get_graph", return_value=mock_graph),
                 patch.object(Path, "exists", mock_exists),
                 patch.object(Path, "is_dir", mock_is_dir),
-                patch("shotgun.codebase.core.manager.kuzu.Database"),
-                patch("shotgun.codebase.core.manager.kuzu.Connection"),
+                patch(
+                    "shotgun.codebase.core.manager.get_kuzu", return_value=mock_kuzu
+                ),
                 patch(
                     "shotgun.codebase.core.change_detector.ChangeDetector"
                 ) as mock_detector_class,

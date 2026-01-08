@@ -86,7 +86,7 @@ def is_path_ignored(path: Path, ignore_patterns: set[str] | None = None) -> bool
 class Ingestor:
     """Handles all communication and ingestion with the Kuzu database."""
 
-    def __init__(self, connection: "kuzu.Connection"):
+    def __init__(self, connection: kuzu.Connection):
         self.conn = connection
         self.node_buffer: list[tuple[str, dict[str, Any]]] = []
         self.relationship_buffer: list[

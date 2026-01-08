@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    import real_ladybug as kuzu
+from typing import Any
 
 _kuzu_module: Any = None
 _import_error: ImportError | None = None
+
+# Windows VC++ installation instructions
+_WINDOWS_INSTALL_INSTRUCTIONS = """
+To fix this, install the Visual C++ Redistributable:
+
+1. Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe
+2. Run the installer and follow the prompts
+3. Restart your terminal and try again
+
+Or run this PowerShell command (as Administrator):
+  Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "$env:TEMP\\vc_redist.x64.exe"
+  Start-Process -FilePath "$env:TEMP\\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
+"""
 
 
 class KuzuImportError(ImportError):
@@ -20,9 +30,9 @@ class KuzuImportError(ImportError):
         if sys.platform == "win32":
             message = (
                 "Failed to load the graph database library (real_ladybug).\n\n"
-                "This is a known issue on Windows. The codebase indexing feature "
-                "is not yet available on Windows.\n\n"
-                "You can still use shotgun for all other features.\n\n"
+                "This error typically occurs on Windows when the Visual C++ "
+                "Redistributable is not installed.\n"
+                f"{_WINDOWS_INSTALL_INSTRUCTIONS}\n"
                 f"Original error: {original_error}"
             )
         else:
