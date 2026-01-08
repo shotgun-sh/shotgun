@@ -108,7 +108,7 @@ class DatabaseLockedDialog(ModalScreen[bool]):
                 yield Button("Open Discord", id="open-discord")
             with Container(id="dialog-buttons"):
                 yield Button("Retry", id="retry", variant="primary")
-                yield Button("Cancel", id="cancel")
+                yield Button("Quit", id="cancel")
 
     def on_mount(self) -> None:
         """Set up the dialog after mounting."""
