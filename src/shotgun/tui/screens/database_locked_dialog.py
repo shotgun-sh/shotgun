@@ -104,8 +104,10 @@ class DatabaseLockedDialog(ModalScreen[bool]):
             )
             yield Static(message, id="dialog-message")
             with Horizontal(id="support-buttons"):
-                yield Button("Copy Email", id="copy-email")
-                yield Button("Open Discord", id="open-discord")
+                yield Button(
+                    f"Copy Support Email [{SHOTGUN_CONTACT_EMAIL}]", id="copy-email"
+                )
+                yield Button("Open Support Discord", id="open-discord")
             with Container(id="dialog-buttons"):
                 yield Button("Retry", id="retry", variant="primary")
                 yield Button("Quit", id="cancel")
