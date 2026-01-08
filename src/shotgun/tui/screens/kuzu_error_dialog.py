@@ -93,9 +93,7 @@ class KuzuErrorDialog(ModalScreen[bool]):
             yield Static(f"Download URL: {_VC_REDIST_URL}", id="url-display")
             yield Static("", id="status-label")
             with Horizontal(id="dialog-buttons"):
-                yield Button(
-                    "Copy Download URL", id="copy-btn", variant="primary"
-                )
+                yield Button("Copy Download URL", id="copy-btn", variant="primary")
                 yield Button("Close", id="close-btn")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
