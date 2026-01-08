@@ -1,15 +1,19 @@
 """Change detection for incremental graph updates."""
 
+from __future__ import annotations
+
 import hashlib
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aiofiles
-import real_ladybug as kuzu
 
 from shotgun.logging_config import get_logger
+
+if TYPE_CHECKING:
+    import real_ladybug as kuzu
 
 logger = get_logger(__name__)
 

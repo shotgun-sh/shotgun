@@ -9,12 +9,16 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import anyio
-import real_ladybug as kuzu
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
+
+from shotgun.codebase.core.kuzu_compat import get_kuzu
+
+if TYPE_CHECKING:
+    import real_ladybug as kuzu
 
 from shotgun.codebase.models import (
     CodebaseGraph,
@@ -265,7 +269,8 @@ class CodebaseGraphManager:
         """
         graph_path = self.storage_dir / f"{graph_id}.kuzu"
 
-        # Create database and connection
+        # Create database and connection (lazy import for Windows compatibility)
+        kuzu = get_kuzu()
         lock = await self._get_lock()
         async with lock:
             db = kuzu.Database(str(graph_path))
@@ -412,7 +417,8 @@ class CodebaseGraphManager:
         # Run build in thread pool
         await anyio.to_thread.run_sync(ingestor.build_graph_from_directory, repo_path)
 
-        # Get statistics
+        # Get statistics (lazy import for Windows compatibility)
+        kuzu = get_kuzu()
         lock = await self._get_lock()
         async with lock:
             db = kuzu.Database(str(graph_path))
@@ -554,6 +560,8 @@ class CodebaseGraphManager:
             "relationships_removed": 0,
         }
 
+        # Lazy import for Windows compatibility
+        kuzu = get_kuzu()
         lock = await self._get_lock()
         async with lock:
             if graph_id not in self._connections:
@@ -622,6 +630,8 @@ class CodebaseGraphManager:
         languages = build_options.get("languages")
         exclude_patterns = build_options.get("exclude_patterns")
 
+        # Lazy import for Windows compatibility
+        kuzu = get_kuzu()
         lock = await self._get_lock()
         async with lock:
             if graph_id not in self._connections:
@@ -1044,6 +1054,8 @@ class CodebaseGraphManager:
         self, graph_id: str, query: str, parameters: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
         """Internal query execution with connection management."""
+        # Lazy import for Windows compatibility
+        kuzu = get_kuzu()
         lock = await self._get_lock()
         async with lock:
             if graph_id not in self._connections:
@@ -1264,6 +1276,7 @@ class CodebaseGraphManager:
 
                         # Try to open the database
                         def _open_and_query(g: str = gid, p: Path = db_path) -> bool:
+                            kuzu = get_kuzu()
                             db = kuzu.Database(str(p))
                             conn = kuzu.Connection(db)
                             try:

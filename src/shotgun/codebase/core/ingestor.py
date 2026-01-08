@@ -1,5 +1,7 @@
 """Kuzu graph ingestor for building code knowledge graphs."""
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import os
@@ -8,11 +10,15 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiofiles
-import real_ladybug as kuzu
 from tree_sitter import Node, Parser, QueryCursor
+
+from shotgun.codebase.core.kuzu_compat import get_kuzu
+
+if TYPE_CHECKING:
+    import real_ladybug as kuzu
 
 from shotgun.codebase.core.language_config import LANGUAGE_CONFIGS, get_language_config
 from shotgun.codebase.core.parser_loader import load_parsers
@@ -1760,7 +1766,8 @@ class CodebaseIngestor:
             self.project_name = repo_path_obj.name
 
         try:
-            # Create database
+            # Create database (lazy import kuzu for Windows compatibility)
+            kuzu = get_kuzu()
             logger.info(f"Creating Kuzu database at: {self.db_path}")
             db = kuzu.Database(str(self.db_path))
             conn = kuzu.Connection(db)
