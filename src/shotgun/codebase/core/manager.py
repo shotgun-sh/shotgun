@@ -1366,6 +1366,92 @@ class CodebaseGraphManager:
 
         return removed_graphs
 
+    async def _try_open_database(self, graph_id: str, db_path: Path) -> bool:
+        """Try to open a database and verify it has a Project node.
+
+        Args:
+            graph_id: The graph identifier
+            db_path: Path to the database file
+
+        Returns:
+            True if database opened and has Project node, False otherwise
+        """
+        lock = await self._get_lock()
+        async with lock:
+            # Close existing connections if any
+            if graph_id in self._connections:
+                try:
+                    self._connections[graph_id].close()
+                except Exception as e:
+                    logger.debug(f"Failed to close connection for {graph_id}: {e}")
+                del self._connections[graph_id]
+            if graph_id in self._databases:
+                try:
+                    self._databases[graph_id].close()
+                except Exception as e:
+                    logger.debug(f"Failed to close database for {graph_id}: {e}")
+                del self._databases[graph_id]
+
+            def _open_and_query() -> bool:
+                kuzu = get_kuzu()
+                db = kuzu.Database(str(db_path))
+                conn = kuzu.Connection(db)
+                try:
+                    result = conn.execute(
+                        "MATCH (p:Project {graph_id: $graph_id}) RETURN p",
+                        {"graph_id": graph_id},
+                    )
+                    return result.has_next() if hasattr(result, "has_next") else False
+                finally:
+                    conn.close()
+                    db.close()
+
+            return await anyio.to_thread.run_sync(_open_and_query)
+
+    async def _check_single_database(
+        self, graph_id: str, path: Path, timeout_seconds: float
+    ) -> DatabaseIssue | None:
+        """Check a single database for issues.
+
+        Args:
+            graph_id: The graph identifier
+            path: Path to the database file
+            timeout_seconds: How long to wait for the database to respond
+
+        Returns:
+            DatabaseIssue if problem found, None if database is healthy
+        """
+        try:
+            has_project = await asyncio.wait_for(
+                self._try_open_database(graph_id, path), timeout=timeout_seconds
+            )
+            if not has_project:
+                return DatabaseIssue(
+                    graph_id=graph_id,
+                    graph_path=path,
+                    error_type=KuzuErrorType.SCHEMA,
+                    message="Database has no Project node (incomplete build)",
+                )
+            return None
+
+        except asyncio.TimeoutError:
+            return DatabaseIssue(
+                graph_id=graph_id,
+                graph_path=path,
+                error_type=KuzuErrorType.TIMEOUT,
+                message=f"Database operation timed out after {timeout_seconds}s",
+            )
+
+        except Exception as e:
+            error_type = classify_kuzu_error(e)
+            logger.debug(f"Detected {error_type.value} issue with {graph_id}: {e}")
+            return DatabaseIssue(
+                graph_id=graph_id,
+                graph_path=path,
+                error_type=error_type,
+                message=str(e),
+            )
+
     async def detect_database_issues(
         self, timeout_seconds: float = 10.0
     ) -> list[DatabaseIssue]:
@@ -1385,97 +1471,11 @@ class CodebaseGraphManager:
         """
         issues: list[DatabaseIssue] = []
 
-        # Find all .kuzu databases (files in v0.11.2, directories in newer versions)
         for path in self.storage_dir.glob("*.kuzu"):
             graph_id = path.stem
-
-            # Try to open and validate the database
-            try:
-
-                async def try_open_database(
-                    gid: str = graph_id, db_path: Path = path
-                ) -> bool:
-                    lock = await self._get_lock()
-                    async with lock:
-                        # Close existing connections if any
-                        if gid in self._connections:
-                            try:
-                                self._connections[gid].close()
-                            except Exception as e:
-                                logger.debug(
-                                    f"Failed to close connection for {gid}: {e}"
-                                )
-                            del self._connections[gid]
-                        if gid in self._databases:
-                            try:
-                                self._databases[gid].close()
-                            except Exception as e:
-                                logger.debug(f"Failed to close database for {gid}: {e}")
-                            del self._databases[gid]
-
-                        # Try to open the database
-                        def _open_and_query(g: str = gid, p: Path = db_path) -> bool:
-                            kuzu = get_kuzu()
-                            db = kuzu.Database(str(p))
-                            conn = kuzu.Connection(db)
-                            try:
-                                result = conn.execute(
-                                    "MATCH (p:Project {graph_id: $graph_id}) RETURN p",
-                                    {"graph_id": g},
-                                )
-                                has_results = (
-                                    result.has_next()
-                                    if hasattr(result, "has_next")
-                                    else False
-                                )
-                                return has_results
-                            finally:
-                                conn.close()
-                                db.close()
-
-                        return await anyio.to_thread.run_sync(_open_and_query)
-
-                # Try to open with configurable timeout
-                has_project = await asyncio.wait_for(
-                    try_open_database(), timeout=timeout_seconds
-                )
-
-                if not has_project:
-                    # Database exists but has no Project node - schema issue
-                    issues.append(
-                        DatabaseIssue(
-                            graph_id=graph_id,
-                            graph_path=path,
-                            error_type=KuzuErrorType.SCHEMA,
-                            message="Database has no Project node (incomplete build)",
-                        )
-                    )
-
-            except asyncio.TimeoutError:
-                # Database operation timed out
-                issues.append(
-                    DatabaseIssue(
-                        graph_id=graph_id,
-                        graph_path=path,
-                        error_type=KuzuErrorType.TIMEOUT,
-                        message=f"Database operation timed out after {timeout_seconds}s",
-                    )
-                )
-
-            except Exception as e:
-                # Classify the error
-                error_type = classify_kuzu_error(e)
-                issues.append(
-                    DatabaseIssue(
-                        graph_id=graph_id,
-                        graph_path=path,
-                        error_type=error_type,
-                        message=str(e),
-                    )
-                )
-                logger.debug(
-                    f"Detected {error_type.value} issue with database {graph_id}: {e}"
-                )
+            issue = await self._check_single_database(graph_id, path, timeout_seconds)
+            if issue:
+                issues.append(issue)
 
         return issues
 
