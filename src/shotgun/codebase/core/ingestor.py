@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 import aiofiles
 from tree_sitter import Node, Parser, QueryCursor
 
+from shotgun.codebase.core.gitignore import GitignoreManager
 from shotgun.codebase.core.kuzu_compat import get_kuzu
 
 if TYPE_CHECKING:
@@ -585,6 +586,7 @@ class SimpleGraphBuilder:
         queries: dict[str, Any],
         exclude_patterns: list[str] | None = None,
         progress_callback: Any | None = None,
+        respect_gitignore: bool = True,
     ):
         self.ingestor = ingestor
         self.repo_path = repo_path
@@ -596,8 +598,32 @@ class SimpleGraphBuilder:
             self.ignore_dirs = self.ignore_dirs.union(set(exclude_patterns))
         self.progress_callback = progress_callback
 
+        # Initialize gitignore support
+        self.respect_gitignore = respect_gitignore
+        self.gitignore_manager: GitignoreManager | None = None
+        if respect_gitignore:
+            self.gitignore_manager = GitignoreManager(repo_path)
+            if self.gitignore_manager.stats["patterns_loaded"] > 0:
+                logger.info(
+                    f"Loaded gitignore patterns - "
+                    f"files: {self.gitignore_manager.stats['gitignore_files_loaded']}, "
+                    f"patterns: {self.gitignore_manager.stats['patterns_loaded']}"
+                )
+
         # Generate unique session ID for correlating timing events in PostHog
         self._index_session_id = str(uuid.uuid4())[:8]
+
+        # Statistics for tracking what was indexed vs skipped
+        self._index_stats = {
+            "dirs_scanned": 0,
+            "dirs_ignored_hardcoded": 0,
+            "dirs_ignored_gitignore": 0,
+            "files_scanned": 0,
+            "files_ignored_hardcoded": 0,
+            "files_ignored_gitignore": 0,
+            "files_ignored_no_parser": 0,
+            "files_processed": 0,
+        }
 
         # Caches
         self.structural_elements: dict[Path, str | None] = {}
@@ -757,15 +783,80 @@ class SimpleGraphBuilder:
             total_relationships=rel_count,
         )
 
+        # Log final indexing statistics
+        logger.info("=== Indexing Statistics ===")
+        logger.info(f"  Directories scanned: {self._index_stats['dirs_scanned']}")
+        logger.info(
+            f"  Directories ignored (hardcoded patterns): {self._index_stats['dirs_ignored_hardcoded']}"
+        )
+        logger.info(
+            f"  Directories ignored (gitignore): {self._index_stats['dirs_ignored_gitignore']}"
+        )
+        logger.info(f"  Files scanned: {self._index_stats['files_scanned']}")
+        logger.info(
+            f"  Files ignored (hardcoded patterns): {self._index_stats['files_ignored_hardcoded']}"
+        )
+        logger.info(
+            f"  Files ignored (gitignore): {self._index_stats['files_ignored_gitignore']}"
+        )
+        logger.info(
+            f"  Files ignored (no parser): {self._index_stats['files_ignored_no_parser']}"
+        )
+        logger.info(f"  Files processed: {self._index_stats['files_processed']}")
+
+        # Log gitignore manager stats if available
+        if self.gitignore_manager:
+            logger.info(f"  {self.gitignore_manager.get_stats_summary()}")
+
         logger.info("Graph building complete!")
+
+    def _should_ignore_directory(
+        self, dir_path: Path, dir_name: str
+    ) -> tuple[bool, str]:
+        """Check if a directory should be ignored.
+
+        Args:
+            dir_path: Full path to the directory
+            dir_name: Name of the directory
+
+        Returns:
+            Tuple of (should_ignore, reason)
+        """
+        # Check hardcoded patterns first (fastest)
+        if should_ignore_directory(dir_name, self.ignore_dirs):
+            return True, "hardcoded"
+
+        # Check gitignore patterns
+        if self.gitignore_manager:
+            try:
+                relative_path = dir_path.relative_to(self.repo_path)
+                if self.gitignore_manager.is_directory_ignored(relative_path):
+                    return True, "gitignore"
+            except ValueError:
+                pass
+
+        return False, ""
 
     def _identify_structure(self) -> None:
         """First pass: Walk directory to find packages and folders."""
         dir_count = 0
         for root_str, dirs, _ in os.walk(self.repo_path, topdown=True):
-            dirs[:] = [
-                d for d in dirs if not should_ignore_directory(d, self.ignore_dirs)
-            ]
+            # Filter directories - modifying dirs in-place affects os.walk traversal
+            filtered_dirs = []
+            for d in dirs:
+                dir_path = Path(root_str) / d
+                should_ignore, reason = self._should_ignore_directory(dir_path, d)
+                if should_ignore:
+                    if reason == "hardcoded":
+                        self._index_stats["dirs_ignored_hardcoded"] += 1
+                    elif reason == "gitignore":
+                        self._index_stats["dirs_ignored_gitignore"] += 1
+                        logger.debug(f"Skipping gitignored directory: {dir_path}")
+                else:
+                    filtered_dirs.append(d)
+                    self._index_stats["dirs_scanned"] += 1
+
+            dirs[:] = filtered_dirs
             root = Path(root_str)
             relative_root = root.relative_to(self.repo_path)
 
@@ -890,55 +981,99 @@ class SimpleGraphBuilder:
             phase_complete=True,
         )
 
+    def _should_ignore_file(self, filepath: Path) -> tuple[bool, str]:
+        """Check if a file should be ignored.
+
+        Args:
+            filepath: Full path to the file
+
+        Returns:
+            Tuple of (should_ignore, reason)
+        """
+        # Check hardcoded directory patterns in path
+        if is_path_ignored(filepath, self.ignore_dirs):
+            return True, "hardcoded"
+
+        # Check gitignore patterns
+        if self.gitignore_manager:
+            try:
+                relative_path = filepath.relative_to(self.repo_path)
+                if self.gitignore_manager.is_ignored(relative_path):
+                    return True, "gitignore"
+            except ValueError:
+                pass
+
+        return False, ""
+
     async def _process_files(self) -> None:
         """Second pass: Process files and extract definitions."""
-        # First pass: Count total files
+        # First pass: Count total files (respecting all ignore patterns)
         total_files = 0
-        for root_str, _, files in os.walk(self.repo_path):
+        files_to_process: list[tuple[Path, str]] = []
+
+        for root_str, dirs, files in os.walk(self.repo_path, topdown=True):
             root = Path(root_str)
 
-            # Skip ignored directories
-            if is_path_ignored(root, self.ignore_dirs):
-                continue
+            # Filter directories in-place to prevent os.walk from descending
+            filtered_dirs = []
+            for d in dirs:
+                dir_path = root / d
+                should_ignore, _ = self._should_ignore_directory(dir_path, d)
+                if not should_ignore:
+                    filtered_dirs.append(d)
+            dirs[:] = filtered_dirs
 
             for filename in files:
                 filepath = root / filename
-                ext = filepath.suffix
-                lang_config = get_language_config(ext)
+                self._index_stats["files_scanned"] += 1
 
-                if lang_config and lang_config.name in self.parsers:
-                    total_files += 1
-
-        # Second pass: Process files with progress reporting
-        file_count = 0
-        for root_str, _, files in os.walk(self.repo_path):
-            root = Path(root_str)
-
-            # Skip ignored directories
-            if is_path_ignored(root, self.ignore_dirs):
-                continue
-
-            for filename in files:
-                filepath = root / filename
+                # Check if file should be ignored
+                should_ignore, reason = self._should_ignore_file(filepath)
+                if should_ignore:
+                    if reason == "hardcoded":
+                        self._index_stats["files_ignored_hardcoded"] += 1
+                    elif reason == "gitignore":
+                        self._index_stats["files_ignored_gitignore"] += 1
+                        logger.debug(f"Skipping gitignored file: {filepath}")
+                    continue
 
                 # Check if this is a supported file
                 ext = filepath.suffix
                 lang_config = get_language_config(ext)
 
                 if lang_config and lang_config.name in self.parsers:
-                    await self._process_single_file(filepath, lang_config.name)
-                    file_count += 1
+                    files_to_process.append((filepath, lang_config.name))
+                    total_files += 1
+                else:
+                    self._index_stats["files_ignored_no_parser"] += 1
 
-                    # Report progress after each file
-                    self._report_progress(
-                        "definitions",
-                        "Processing files and extracting definitions",
-                        file_count,
-                        total_files,
-                    )
+        # Log what we're about to process
+        logger.info(
+            f"Index statistics: "
+            f"scanned {self._index_stats['files_scanned']} files, "
+            f"processing {total_files}, "
+            f"skipped {self._index_stats['files_ignored_hardcoded']} (hardcoded), "
+            f"{self._index_stats['files_ignored_gitignore']} (gitignore), "
+            f"{self._index_stats['files_ignored_no_parser']} (no parser)"
+        )
 
-                    if file_count % 100 == 0:
-                        logger.info(f"  Processed {file_count}/{total_files} files...")
+        # Second pass: Process files with progress reporting
+        file_count = 0
+        for filepath, language in files_to_process:
+            await self._process_single_file(filepath, language)
+            file_count += 1
+            self._index_stats["files_processed"] += 1
+
+            # Report progress after each file
+            self._report_progress(
+                "definitions",
+                "Processing files and extracting definitions",
+                file_count,
+                total_files,
+            )
+
+            if file_count % 100 == 0:
+                logger.info(f"  Processed {file_count}/{total_files} files...")
 
         logger.info(f"  Total files processed: {file_count}/{total_files}")
 
