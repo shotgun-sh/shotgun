@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import shutil
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -1487,8 +1488,6 @@ class CodebaseGraphManager:
         Returns:
             True if deletion was successful, False otherwise
         """
-        import shutil
-
         graph_path = self.storage_dir / f"{graph_id}.kuzu"
 
         try:

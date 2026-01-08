@@ -5,9 +5,10 @@ allowing the application to distinguish between different failure modes
 (lock contention, corruption, permissions, etc.) and handle each appropriately.
 """
 
-from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+
+from pydantic import BaseModel
 
 
 class KuzuErrorType(StrEnum):
@@ -74,8 +75,7 @@ def classify_kuzu_error(exception: Exception) -> KuzuErrorType:
     return KuzuErrorType.UNKNOWN
 
 
-@dataclass
-class DatabaseIssue:
+class DatabaseIssue(BaseModel):
     """Structured information about a database issue.
 
     Attributes:
@@ -84,6 +84,8 @@ class DatabaseIssue:
         error_type: Classification of the error
         message: Human-readable error message
     """
+
+    model_config = {"arbitrary_types_allowed": True}
 
     graph_id: str
     graph_path: Path
