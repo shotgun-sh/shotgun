@@ -25,6 +25,10 @@ class KuzuErrorType(StrEnum):
 def classify_kuzu_error(exception: Exception) -> KuzuErrorType:
     """Classify a Kuzu RuntimeError by its message pattern.
 
+    Note: Kuzu only throws generic RuntimeError exceptions with no error codes
+    or custom exception types. String matching on the error message is the only
+    way to distinguish between different failure modes.
+
     Args:
         exception: The exception to classify
 
