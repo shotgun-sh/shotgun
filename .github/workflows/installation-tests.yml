@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/bin/uv
@@ -122,7 +122,7 @@ jobs:
 
     steps:
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Caches/uv
@@ -215,7 +215,7 @@ jobs:
 
     steps:
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/bin/uv
@@ -307,7 +307,7 @@ jobs:
 
     steps:
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/bin/uv
@@ -399,7 +399,7 @@ jobs:
 
     steps:
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~\.local\bin\uv.exe
@@ -509,7 +509,7 @@ jobs:
 
     steps:
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~\.local\bin\uv.exe
