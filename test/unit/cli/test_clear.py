@@ -35,8 +35,9 @@ def test_clear_conversation_success(tmp_path):
     # Verify file exists
     assert conversation_file.exists()
 
-    # Run clear command
-    with patch("shotgun.cli.clear.Path.home", return_value=tmp_path):
+    # Run clear command - patch get_shotgun_home to return the tmp_path/.shotgun-sh
+    shotgun_home = tmp_path / ".shotgun-sh"
+    with patch("shotgun.cli.clear.get_shotgun_home", return_value=shotgun_home):
         result = runner.invoke(app)
 
     assert result.exit_code == 0
@@ -50,11 +51,12 @@ def test_clear_conversation_success(tmp_path):
 def test_clear_conversation_no_file(tmp_path):
     """Test clearing when no conversation file exists."""
     # Ensure the file doesn't exist
-    conversation_file = tmp_path / ".shotgun-sh" / "conversation.json"
+    shotgun_home = tmp_path / ".shotgun-sh"
+    conversation_file = shotgun_home / "conversation.json"
     assert not conversation_file.exists()
 
     # Run clear command
-    with patch("shotgun.cli.clear.Path.home", return_value=tmp_path):
+    with patch("shotgun.cli.clear.get_shotgun_home", return_value=shotgun_home):
         result = runner.invoke(app)
 
     assert result.exit_code == 0
@@ -66,7 +68,8 @@ def test_clear_conversation_file_error(tmp_path):
     """Test error handling when file deletion fails."""
     import asyncio
 
-    conversation_file = tmp_path / ".shotgun-sh" / "conversation.json"
+    shotgun_home = tmp_path / ".shotgun-sh"
+    conversation_file = shotgun_home / "conversation.json"
     conversation_file.parent.mkdir(parents=True)
 
     # Create the file
@@ -76,7 +79,7 @@ def test_clear_conversation_file_error(tmp_path):
 
     # Mock ConversationManager.clear() to raise an error
     with (
-        patch("shotgun.cli.clear.Path.home", return_value=tmp_path),
+        patch("shotgun.cli.clear.get_shotgun_home", return_value=shotgun_home),
         patch.object(
             ConversationManager,
             "clear",
@@ -122,7 +125,7 @@ def test_clear_preserves_other_files(tmp_path):
     assert (logs_dir / "app.log").exists()
 
     # Run clear command
-    with patch("shotgun.cli.clear.Path.home", return_value=tmp_path):
+    with patch("shotgun.cli.clear.get_shotgun_home", return_value=shotgun_dir):
         result = runner.invoke(app)
 
     assert result.exit_code == 0

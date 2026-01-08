@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -19,6 +18,7 @@ from shotgun.agents.conversation import ConversationManager
 from shotgun.cli.models import OutputFormat
 from shotgun.llm_proxy import BudgetInfo, LiteLLMProxyClient
 from shotgun.logging_config import get_logger
+from shotgun.utils import get_shotgun_home
 
 app = typer.Typer(
     name="context", help="Analyze conversation context usage", no_args_is_help=False
@@ -74,7 +74,7 @@ async def analyze_context() -> ContextAnalysisOutput:
         ContextAnalysisOutput with both markdown and JSON representations of the analysis
     """
     # Get conversation file path
-    conversation_file = Path.home() / ".shotgun-sh" / "conversation.json"
+    conversation_file = get_shotgun_home() / "conversation.json"
 
     if not conversation_file.exists():
         raise FileNotFoundError(f"Conversation file not found at {conversation_file}")

@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from shotgun.logging_config import get_logger
+from shotgun.utils import get_shotgun_home
 
 logger = get_logger(__name__)
 
 # Backup directory location
-BACKUP_DIR = Path.home() / ".shotgun-sh" / "backups"
+BACKUP_DIR = get_shotgun_home() / "backups"
 
 
 async def create_backup(shotgun_dir: Path) -> str | None:
