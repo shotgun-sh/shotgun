@@ -5,8 +5,11 @@ during codebase indexing operations, as well as work distribution types
 for parallel file parsing.
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -34,7 +37,7 @@ class PhaseMetrics(BaseModel):
 
     # Worker-specific metrics (for parallel phases)
     worker_count: int | None = Field(None, description="Number of parallel workers")
-    worker_metrics: dict[int, "WorkerMetrics"] | None = Field(
+    worker_metrics: dict[int, WorkerMetrics] | None = Field(
         None, description="Per-worker performance metrics"
     )
 
@@ -169,4 +172,151 @@ class DistributionStats(BaseModel):
     )
     bytes_per_worker: list[int] = Field(
         ..., description="Total bytes assigned to each worker"
+    )
+
+
+# =============================================================================
+# Parallel Execution Types
+# =============================================================================
+
+
+class NodeData(BaseModel):
+    """Data for creating a graph node.
+
+    Used by workers to return extracted node information without
+    direct database access.
+    """
+
+    label: str = Field(..., description="Node type (Class, Function, Method, etc.)")
+    properties: dict[str, Any] = Field(..., description="Node properties")
+
+
+class RelationshipData(BaseModel):
+    """Data for creating a graph relationship.
+
+    Used by workers to return extracted relationship information
+    without direct database access.
+    """
+
+    from_label: str = Field(..., description="Source node type")
+    from_key: str = Field(..., description="Source node primary key field")
+    from_value: Any = Field(..., description="Source node primary key value")
+    rel_type: str = Field(..., description="Relationship type")
+    to_label: str = Field(..., description="Target node type")
+    to_key: str = Field(..., description="Target node primary key field")
+    to_value: Any = Field(..., description="Target node primary key value")
+    properties: dict[str, Any] | None = Field(
+        None, description="Relationship properties"
+    )
+
+
+class RawCallData(BaseModel):
+    """Raw call information extracted by worker (unresolved).
+
+    Call relationships cannot be fully resolved in workers because
+    they require the complete function_registry and simple_name_lookup
+    which are built by aggregating data from all workers.
+    """
+
+    caller_qn: str = Field(..., description="Qualified name of caller function/method")
+    callee_name: str = Field(..., description="Simple name of called function")
+    object_name: str | None = Field(
+        None, description="Object the method is called on (if method call)"
+    )
+    line_number: int = Field(..., description="Line number of the call")
+    module_qn: str = Field(..., description="Module qualified name for context")
+
+
+class InheritanceData(BaseModel):
+    """Raw inheritance information extracted by worker.
+
+    Inheritance relationships require resolution against the global
+    registry to find the actual parent class qualified names.
+    """
+
+    child_class_qn: str = Field(..., description="Qualified name of child class")
+    parent_simple_names: list[str] = Field(
+        ..., description="Simple names of parent classes (need resolution)"
+    )
+
+
+class FileParseResult(BaseModel):
+    """Result of parsing a single file.
+
+    Contains all data extracted by a worker from a single file,
+    including nodes, relationships, and deferred relationship data
+    that requires post-aggregation resolution.
+    """
+
+    task: FileParseTask = Field(..., description="Original task")
+    success: bool = Field(..., description="Whether parsing succeeded")
+    error: str | None = Field(None, description="Error message if failed")
+
+    # Extracted nodes and direct relationships
+    nodes: list[NodeData] = Field(
+        default_factory=list, description="Nodes extracted from file"
+    )
+    relationships: list[RelationshipData] = Field(
+        default_factory=list, description="Direct relationships extracted"
+    )
+
+    # Registry data for aggregation
+    function_registry_entries: dict[str, str] = Field(
+        default_factory=dict,
+        description="Map of qualified_name -> type (Class/Function/Method)",
+    )
+    simple_name_entries: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Map of simple_name -> list of qualified_names",
+    )
+
+    # Deferred relationship data (requires post-aggregation resolution)
+    raw_calls: list[RawCallData] = Field(
+        default_factory=list, description="Unresolved call data"
+    )
+    inheritance_data: list[InheritanceData] = Field(
+        default_factory=list, description="Unresolved inheritance data"
+    )
+
+    # File metadata
+    file_hash: str = Field(default="", description="SHA256 hash of file content")
+    mtime: int = Field(default=0, description="File modification time")
+
+    # Metrics
+    metrics: FileParseMetrics | None = Field(
+        None, description="Parsing metrics for this file"
+    )
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+class ParallelExecutionResult(BaseModel):
+    """Complete results from parallel execution.
+
+    Aggregates results from all workers including resolved relationships
+    and merged registries.
+    """
+
+    results: list[FileParseResult] = Field(
+        default_factory=list, description="Results from all files"
+    )
+    resolved_relationships: list[RelationshipData] = Field(
+        default_factory=list, description="Relationships resolved post-aggregation"
+    )
+    function_registry: dict[str, str] = Field(
+        default_factory=dict, description="Merged function registry from all workers"
+    )
+    simple_name_lookup: dict[str, list[str]] = Field(
+        default_factory=dict, description="Merged simple name lookup from all workers"
+    )
+
+    # Metrics
+    total_files: int = Field(default=0, description="Total files processed")
+    successful_files: int = Field(default=0, description="Files successfully parsed")
+    failed_files: int = Field(default=0, description="Files that failed to parse")
+    total_duration_seconds: float = Field(
+        default=0.0, description="Total execution duration"
+    )
+    worker_metrics: dict[int, WorkerMetrics] = Field(
+        default_factory=dict, description="Per-worker metrics"
     )
