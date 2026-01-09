@@ -4,7 +4,19 @@ These models define the data structures for tracking performance metrics
 during codebase indexing operations.
 """
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
+
+
+class IndexingPhase(StrEnum):
+    """Phase names for indexing operations."""
+
+    STRUCTURE = "structure"
+    DEFINITIONS = "definitions"
+    RELATIONSHIPS = "relationships"
+    FLUSH_NODES = "flush_nodes"
+    FLUSH_RELATIONSHIPS = "flush_relationships"
 
 
 class PhaseMetrics(BaseModel):

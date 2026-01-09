@@ -16,6 +16,7 @@ import psutil
 from shotgun.codebase.core.metrics_types import (
     FileParseMetrics,
     IndexingMetrics,
+    IndexingPhase,
     PhaseMetrics,
     WorkerMetrics,
 )
@@ -83,24 +84,26 @@ class MetricsCollector:
         except Exception:
             return 0.0
 
-    def start_phase(self, phase_name: str) -> None:
+    def start_phase(self, phase: IndexingPhase | str) -> None:
         """Mark the start of a processing phase.
 
         Args:
-            phase_name: Name of the phase (e.g., "structure", "definitions")
+            phase: The indexing phase (use IndexingPhase enum)
         """
+        phase_name = str(phase)
         with self._lock:
             start_time = time.perf_counter()
             start_memory = self._get_memory_mb()
             self._phase_starts[phase_name] = (start_time, start_memory)
 
-    def end_phase(self, phase_name: str, items_processed: int) -> None:
+    def end_phase(self, phase: IndexingPhase | str, items_processed: int) -> None:
         """Mark the end of a processing phase.
 
         Args:
-            phase_name: Name of the phase
+            phase: The indexing phase (use IndexingPhase enum)
             items_processed: Number of items processed in this phase
         """
+        phase_name = str(phase)
         end_time = time.perf_counter()
         end_memory = self._get_memory_mb()
 
@@ -131,7 +134,7 @@ class MetricsCollector:
             )
 
             # Track files for definitions phase
-            if phase_name == "definitions":
+            if phase_name == IndexingPhase.DEFINITIONS:
                 self._total_files = items_processed
 
     def record_file_parse(self, metrics: FileParseMetrics) -> None:
@@ -181,8 +184,9 @@ class MetricsCollector:
 
             # Calculate average throughput from definitions phase
             avg_throughput = 0.0
-            if "definitions" in self._phase_metrics:
-                avg_throughput = self._phase_metrics["definitions"].throughput
+            definitions_key = str(IndexingPhase.DEFINITIONS)
+            if definitions_key in self._phase_metrics:
+                avg_throughput = self._phase_metrics[definitions_key].throughput
 
             # Get peak memory across all phases
             peak_memory = max(

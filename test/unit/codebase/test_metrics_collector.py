@@ -12,6 +12,7 @@ from shotgun.codebase.core.metrics_collector import MetricsCollector
 from shotgun.codebase.core.metrics_types import (
     FileParseMetrics,
     IndexingMetrics,
+    IndexingPhase,
     WorkerMetrics,
 )
 
@@ -80,16 +81,20 @@ class TestPhaseMetrics:
         """Test collecting metrics for multiple phases."""
         collector = MetricsCollector("test-codebase")
 
-        phases = ["structure", "definitions", "relationships"]
-        for phase_name in phases:
-            collector.start_phase(phase_name)
+        phases = [
+            IndexingPhase.STRUCTURE,
+            IndexingPhase.DEFINITIONS,
+            IndexingPhase.RELATIONSHIPS,
+        ]
+        for phase in phases:
+            collector.start_phase(phase)
             time.sleep(0.01)
-            collector.end_phase(phase_name, 10)
+            collector.end_phase(phase, 10)
 
         metrics = collector.get_metrics()
         assert len(metrics.phase_metrics) == 3
-        for phase_name in phases:
-            assert phase_name in metrics.phase_metrics
+        for phase in phases:
+            assert str(phase) in metrics.phase_metrics
 
     def test_end_phase_without_start_is_noop(self) -> None:
         """Test that ending a phase without starting it does nothing."""
