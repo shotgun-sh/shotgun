@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import multiprocessing
 import os
-from pathlib import Path
 
-from pydantic import BaseModel, Field
-
+from shotgun.codebase.core.metrics_types import (
+    DistributionStats,
+    FileInfo,
+    FileParseTask,
+    WorkBatch,
+)
 from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -19,55 +22,17 @@ logger = get_logger(__name__)
 # Default values
 DEFAULT_BATCH_SIZE = 20
 
-
-class FileInfo(BaseModel):
-    """Information about a file for work distribution.
-
-    Used by WorkDistributor to calculate balanced work assignments
-    based on file size.
-    """
-
-    file_path: Path = Field(..., description="Absolute path to file")
-    relative_path: Path = Field(..., description="Path relative to repo root")
-    language: str = Field(..., description="Programming language")
-    module_qn: str = Field(..., description="Qualified name for the module")
-    container_qn: str | None = Field(
-        None, description="Parent package/folder qualified name"
-    )
-    file_size_bytes: int = Field(..., description="File size in bytes for balancing")
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-class FileParseTask(BaseModel):
-    """A task representing a file to be parsed by a worker.
-
-    This is the serializable unit of work sent to worker processes.
-    """
-
-    file_path: Path = Field(..., description="Absolute path to file")
-    relative_path: Path = Field(..., description="Path relative to repo root")
-    language: str = Field(..., description="Programming language")
-    module_qn: str = Field(..., description="Qualified name for the module")
-    container_qn: str | None = Field(
-        None, description="Parent package/folder qualified name"
-    )
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-class WorkBatch(BaseModel):
-    """A batch of file parse tasks for distribution to a worker.
-
-    Batches group multiple tasks together to reduce queue overhead
-    when distributing work across processes.
-    """
-
-    batch_id: int = Field(..., description="Unique batch identifier")
-    tasks: list[FileParseTask] = Field(..., description="Tasks in this batch")
-    estimated_duration_seconds: float | None = Field(
-        None, description="Estimated processing time"
-    )
+# Re-export types for convenience
+__all__ = [
+    "DEFAULT_BATCH_SIZE",
+    "DistributionStats",
+    "FileInfo",
+    "FileParseTask",
+    "WorkBatch",
+    "WorkDistributor",
+    "get_batch_size",
+    "get_worker_count",
+]
 
 
 def get_worker_count() -> int:
@@ -164,6 +129,41 @@ class WorkDistributor:
             f"batch size {self.batch_size}"
         )
 
+    def _distribute_files(
+        self, files: list[FileInfo]
+    ) -> list[tuple[int, list[FileInfo]]]:
+        """Distribute files across workers using size-balanced bin-packing.
+
+        Args:
+            files: List of files to distribute.
+
+        Returns:
+            List of (total_bytes, file_list) tuples, one per worker.
+        """
+        # Sort files by size descending (largest first)
+        sorted_files = sorted(files, key=lambda f: f.file_size_bytes, reverse=True)
+
+        # Initialize worker buckets with total work tracking
+        # Each bucket is (total_bytes, list_of_files)
+        worker_buckets: list[tuple[int, list[FileInfo]]] = [
+            (0, []) for _ in range(self.worker_count)
+        ]
+
+        # Assign each file to worker with least total work (bin-packing)
+        for file_info in sorted_files:
+            # Find worker with minimum total work
+            min_idx = min(
+                range(len(worker_buckets)), key=lambda i: worker_buckets[i][0]
+            )
+            total_work, files_list = worker_buckets[min_idx]
+            files_list.append(file_info)
+            worker_buckets[min_idx] = (
+                total_work + file_info.file_size_bytes,
+                files_list,
+            )
+
+        return worker_buckets
+
     def create_batches(self, files: list[FileInfo]) -> list[WorkBatch]:
         """Partition files into balanced batches for parallel processing.
 
@@ -187,27 +187,8 @@ class WorkDistributor:
             f"Distributing {len(files)} files across {self.worker_count} workers"
         )
 
-        # Sort files by size descending (largest first)
-        sorted_files = sorted(files, key=lambda f: f.file_size_bytes, reverse=True)
-
-        # Initialize worker buckets with total work tracking
-        # Each bucket is (total_bytes, list_of_files)
-        worker_buckets: list[tuple[int, list[FileInfo]]] = [
-            (0, []) for _ in range(self.worker_count)
-        ]
-
-        # Assign each file to worker with least total work (bin-packing)
-        for file_info in sorted_files:
-            # Find worker with minimum total work
-            min_idx = min(
-                range(len(worker_buckets)), key=lambda i: worker_buckets[i][0]
-            )
-            total_work, files_list = worker_buckets[min_idx]
-            files_list.append(file_info)
-            worker_buckets[min_idx] = (
-                total_work + file_info.file_size_bytes,
-                files_list,
-            )
+        # Distribute files across workers
+        worker_buckets = self._distribute_files(files)
 
         # Log distribution statistics
         for worker_id, (total_bytes, worker_files) in enumerate(worker_buckets):
@@ -255,7 +236,7 @@ class WorkDistributor:
             container_qn=file_info.container_qn,
         )
 
-    def get_distribution_stats(self, files: list[FileInfo]) -> dict[str, object]:
+    def get_distribution_stats(self, files: list[FileInfo]) -> DistributionStats:
         """Get statistics about how files would be distributed.
 
         Useful for debugging and verification without creating actual batches.
@@ -264,39 +245,26 @@ class WorkDistributor:
             files: List of files to analyze.
 
         Returns:
-            Dictionary with distribution statistics.
+            DistributionStats with distribution information.
         """
         if not files:
-            return {
-                "total_files": 0,
-                "total_bytes": 0,
-                "worker_count": self.worker_count,
-                "batch_size": self.batch_size,
-                "files_per_worker": [],
-                "bytes_per_worker": [],
-            }
-
-        # Simulate distribution
-        sorted_files = sorted(files, key=lambda f: f.file_size_bytes, reverse=True)
-        worker_buckets: list[tuple[int, int]] = [
-            (0, 0) for _ in range(self.worker_count)
-        ]
-
-        for file_info in sorted_files:
-            min_idx = min(
-                range(len(worker_buckets)), key=lambda i: worker_buckets[i][0]
-            )
-            total_bytes, file_count = worker_buckets[min_idx]
-            worker_buckets[min_idx] = (
-                total_bytes + file_info.file_size_bytes,
-                file_count + 1,
+            return DistributionStats(
+                total_files=0,
+                total_bytes=0,
+                worker_count=self.worker_count,
+                batch_size=self.batch_size,
+                files_per_worker=[0] * self.worker_count,
+                bytes_per_worker=[0] * self.worker_count,
             )
 
-        return {
-            "total_files": len(files),
-            "total_bytes": sum(f.file_size_bytes for f in files),
-            "worker_count": self.worker_count,
-            "batch_size": self.batch_size,
-            "files_per_worker": [count for _, count in worker_buckets],
-            "bytes_per_worker": [bytes_ for bytes_, _ in worker_buckets],
-        }
+        # Use shared distribution logic
+        worker_buckets = self._distribute_files(files)
+
+        return DistributionStats(
+            total_files=len(files),
+            total_bytes=sum(f.file_size_bytes for f in files),
+            worker_count=self.worker_count,
+            batch_size=self.batch_size,
+            files_per_worker=[len(file_list) for _, file_list in worker_buckets],
+            bytes_per_worker=[total_bytes for total_bytes, _ in worker_buckets],
+        )

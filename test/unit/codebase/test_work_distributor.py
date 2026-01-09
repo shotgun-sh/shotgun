@@ -7,6 +7,7 @@ import pytest
 
 from shotgun.codebase.core.work_distributor import (
     DEFAULT_BATCH_SIZE,
+    DistributionStats,
     FileInfo,
     FileParseTask,
     WorkBatch,
@@ -232,16 +233,14 @@ def test_create_batches_balanced_distribution(sample_files: list[FileInfo]) -> N
     stats = distributor.get_distribution_stats(sample_files)
 
     # Check that files are distributed across workers
-    files_per_worker = stats["files_per_worker"]
-    assert all(isinstance(count, int) for count in files_per_worker)
+    assert all(isinstance(count, int) for count in stats.files_per_worker)
 
     # Bytes should be somewhat balanced (not all in one worker)
-    bytes_per_worker = stats["bytes_per_worker"]
-    assert max(bytes_per_worker) <= sum(bytes_per_worker)  # No single worker has all
+    assert max(stats.bytes_per_worker) <= sum(stats.bytes_per_worker)
 
     # Verify batch distribution matches stats
     total_tasks_in_batches = sum(len(batch.tasks) for batch in batches)
-    assert total_tasks_in_batches == stats["total_files"]
+    assert total_tasks_in_batches == stats.total_files
 
 
 def test_create_batches_large_files_not_bottlenecked(
@@ -252,12 +251,11 @@ def test_create_batches_large_files_not_bottlenecked(
     distributor = WorkDistributor(worker_count=4, batch_size=20)
 
     stats = distributor.get_distribution_stats(sample_files)
-    bytes_per_worker = stats["bytes_per_worker"]
 
     # The two largest files (100KB, 50KB) should go to different workers
     # so max worker should have at most ~100KB + some small files
-    max_bytes = max(bytes_per_worker)
-    total_bytes = sum(bytes_per_worker)
+    max_bytes = max(stats.bytes_per_worker)
+    total_bytes = sum(stats.bytes_per_worker)
 
     # No single worker should have more than 60% of total work
     assert max_bytes <= total_bytes * 0.6
@@ -285,8 +283,7 @@ def test_create_batches_same_size_files() -> None:
 
     # Distribution should be even (3 files per worker)
     stats = distributor.get_distribution_stats(files)
-    files_per_worker = stats["files_per_worker"]
-    assert files_per_worker == [3, 3, 3, 3]
+    assert stats.files_per_worker == [3, 3, 3, 3]
 
 
 def test_create_batches_batch_size_respected(large_file_set: list[FileInfo]) -> None:
@@ -346,10 +343,12 @@ def test_get_distribution_stats_empty() -> None:
     distributor = WorkDistributor(worker_count=4, batch_size=10)
     stats = distributor.get_distribution_stats([])
 
-    assert stats["total_files"] == 0
-    assert stats["total_bytes"] == 0
-    assert stats["worker_count"] == 4
-    assert stats["batch_size"] == 10
+    assert stats.total_files == 0
+    assert stats.total_bytes == 0
+    assert stats.worker_count == 4
+    assert stats.batch_size == 10
+    assert stats.files_per_worker == [0, 0, 0, 0]
+    assert stats.bytes_per_worker == [0, 0, 0, 0]
 
 
 def test_get_distribution_stats_populated(sample_files: list[FileInfo]) -> None:
@@ -357,12 +356,20 @@ def test_get_distribution_stats_populated(sample_files: list[FileInfo]) -> None:
     distributor = WorkDistributor(worker_count=4, batch_size=10)
     stats = distributor.get_distribution_stats(sample_files)
 
-    assert stats["total_files"] == len(sample_files)
-    assert stats["total_bytes"] == sum(f.file_size_bytes for f in sample_files)
-    assert stats["worker_count"] == 4
-    assert stats["batch_size"] == 10
-    assert len(stats["files_per_worker"]) == 4
-    assert len(stats["bytes_per_worker"]) == 4
+    assert stats.total_files == len(sample_files)
+    assert stats.total_bytes == sum(f.file_size_bytes for f in sample_files)
+    assert stats.worker_count == 4
+    assert stats.batch_size == 10
+    assert len(stats.files_per_worker) == 4
+    assert len(stats.bytes_per_worker) == 4
+
+
+def test_get_distribution_stats_returns_pydantic_model() -> None:
+    """Test that get_distribution_stats returns a DistributionStats model."""
+    distributor = WorkDistributor(worker_count=2, batch_size=5)
+    stats = distributor.get_distribution_stats([])
+
+    assert isinstance(stats, DistributionStats)
 
 
 # =============================================================================

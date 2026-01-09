@@ -1,10 +1,12 @@
 """Type definitions for indexing metrics collection.
 
 These models define the data structures for tracking performance metrics
-during codebase indexing operations.
+during codebase indexing operations, as well as work distribution types
+for parallel file parsing.
 """
 
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -93,4 +95,78 @@ class IndexingMetrics(BaseModel):
     peak_memory_mb: float = Field(..., description="Peak memory usage")
     parallelism_efficiency: float | None = Field(
         None, description="Efficiency factor (0.0-1.0) of parallelization"
+    )
+
+
+# =============================================================================
+# Work Distribution Types
+# =============================================================================
+
+
+class FileInfo(BaseModel):
+    """Information about a file for work distribution.
+
+    Used by WorkDistributor to calculate balanced work assignments
+    based on file size.
+    """
+
+    file_path: Path = Field(..., description="Absolute path to file")
+    relative_path: Path = Field(..., description="Path relative to repo root")
+    language: str = Field(..., description="Programming language")
+    module_qn: str = Field(..., description="Qualified name for the module")
+    container_qn: str | None = Field(
+        None, description="Parent package/folder qualified name"
+    )
+    file_size_bytes: int = Field(..., description="File size in bytes for balancing")
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+class FileParseTask(BaseModel):
+    """A task representing a file to be parsed by a worker.
+
+    This is the serializable unit of work sent to worker processes.
+    """
+
+    file_path: Path = Field(..., description="Absolute path to file")
+    relative_path: Path = Field(..., description="Path relative to repo root")
+    language: str = Field(..., description="Programming language")
+    module_qn: str = Field(..., description="Qualified name for the module")
+    container_qn: str | None = Field(
+        None, description="Parent package/folder qualified name"
+    )
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+class WorkBatch(BaseModel):
+    """A batch of file parse tasks for distribution to a worker.
+
+    Batches group multiple tasks together to reduce queue overhead
+    when distributing work across processes.
+    """
+
+    batch_id: int = Field(..., description="Unique batch identifier")
+    tasks: list[FileParseTask] = Field(..., description="Tasks in this batch")
+    estimated_duration_seconds: float | None = Field(
+        None, description="Estimated processing time"
+    )
+
+
+class DistributionStats(BaseModel):
+    """Statistics about work distribution across workers.
+
+    Provides insight into how files are balanced across workers
+    for debugging and verification.
+    """
+
+    total_files: int = Field(..., description="Total number of files")
+    total_bytes: int = Field(..., description="Total size in bytes")
+    worker_count: int = Field(..., description="Number of workers")
+    batch_size: int = Field(..., description="Files per batch")
+    files_per_worker: list[int] = Field(
+        ..., description="Number of files assigned to each worker"
+    )
+    bytes_per_worker: list[int] = Field(
+        ..., description="Total bytes assigned to each worker"
     )
