@@ -15,6 +15,7 @@ from shotgun.codebase.core.work_distributor import (
     get_batch_size,
     get_worker_count,
 )
+from shotgun.settings import settings
 
 # =============================================================================
 # Fixtures
@@ -62,7 +63,7 @@ def large_file_set() -> list[FileInfo]:
 def test_get_worker_count_default_many_cores() -> None:
     """Test adaptive default for systems with 4+ cores."""
     with patch("multiprocessing.cpu_count", return_value=8):
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.object(settings.indexing, "index_workers", None):
             count = get_worker_count()
             assert count == 6  # 8 - 2 = 6
 
@@ -70,7 +71,7 @@ def test_get_worker_count_default_many_cores() -> None:
 def test_get_worker_count_default_few_cores() -> None:
     """Test adaptive default for systems with 1-3 cores."""
     with patch("multiprocessing.cpu_count", return_value=2):
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.object(settings.indexing, "index_workers", None):
             count = get_worker_count()
             assert count == 1  # max(1, 2 - 1) = 1
 
@@ -78,36 +79,36 @@ def test_get_worker_count_default_few_cores() -> None:
 def test_get_worker_count_default_minimum() -> None:
     """Test minimum worker count is 1."""
     with patch("multiprocessing.cpu_count", return_value=1):
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.object(settings.indexing, "index_workers", None):
             count = get_worker_count()
             assert count >= 1
 
 
 def test_get_worker_count_env_override() -> None:
-    """Test SHOTGUN_INDEX_WORKERS environment variable override."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_WORKERS": "4"}):
+    """Test SHOTGUN_INDEX_WORKERS setting override."""
+    with patch.object(settings.indexing, "index_workers", 4):
         count = get_worker_count()
         assert count == 4
 
 
 def test_get_worker_count_env_override_zero() -> None:
-    """Test that zero env var value is treated as 1."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_WORKERS": "0"}):
+    """Test that zero setting value is treated as 1."""
+    with patch.object(settings.indexing, "index_workers", 0):
         count = get_worker_count()
         assert count == 1
 
 
 def test_get_worker_count_env_override_negative() -> None:
-    """Test that negative env var value is treated as 1."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_WORKERS": "-5"}):
+    """Test that negative setting value is treated as 1."""
+    with patch.object(settings.indexing, "index_workers", -5):
         count = get_worker_count()
         assert count == 1
 
 
 def test_get_worker_count_invalid_env() -> None:
-    """Test that invalid env var is ignored and default is used."""
+    """Test that None setting falls back to adaptive default."""
     with patch("multiprocessing.cpu_count", return_value=8):
-        with patch.dict("os.environ", {"SHOTGUN_INDEX_WORKERS": "invalid"}):
+        with patch.object(settings.indexing, "index_workers", None):
             count = get_worker_count()
             assert count == 6  # Falls back to adaptive default
 
@@ -119,36 +120,36 @@ def test_get_worker_count_invalid_env() -> None:
 
 def test_get_batch_size_default() -> None:
     """Test default batch size is 20."""
-    with patch.dict("os.environ", {}, clear=True):
+    with patch.object(settings.indexing, "index_batch_size", None):
         size = get_batch_size()
         assert size == DEFAULT_BATCH_SIZE
         assert size == 20
 
 
 def test_get_batch_size_env_override() -> None:
-    """Test SHOTGUN_INDEX_BATCH_SIZE environment variable override."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_BATCH_SIZE": "50"}):
+    """Test SHOTGUN_INDEX_BATCH_SIZE setting override."""
+    with patch.object(settings.indexing, "index_batch_size", 50):
         size = get_batch_size()
         assert size == 50
 
 
 def test_get_batch_size_env_override_zero() -> None:
-    """Test that zero env var value is treated as 1."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_BATCH_SIZE": "0"}):
+    """Test that zero setting value is treated as 1."""
+    with patch.object(settings.indexing, "index_batch_size", 0):
         size = get_batch_size()
         assert size == 1
 
 
 def test_get_batch_size_env_override_negative() -> None:
-    """Test that negative env var value is treated as 1."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_BATCH_SIZE": "-10"}):
+    """Test that negative setting value is treated as 1."""
+    with patch.object(settings.indexing, "index_batch_size", -10):
         size = get_batch_size()
         assert size == 1
 
 
 def test_get_batch_size_invalid_env() -> None:
-    """Test that invalid env var is ignored and default is used."""
-    with patch.dict("os.environ", {"SHOTGUN_INDEX_BATCH_SIZE": "not_a_number"}):
+    """Test that None setting falls back to default."""
+    with patch.object(settings.indexing, "index_batch_size", None):
         size = get_batch_size()
         assert size == DEFAULT_BATCH_SIZE
 
@@ -161,7 +162,10 @@ def test_get_batch_size_invalid_env() -> None:
 def test_work_distributor_default_initialization() -> None:
     """Test WorkDistributor uses defaults when not specified."""
     with patch("multiprocessing.cpu_count", return_value=8):
-        with patch.dict("os.environ", {}, clear=True):
+        with (
+            patch.object(settings.indexing, "index_workers", None),
+            patch.object(settings.indexing, "index_batch_size", None),
+        ):
             distributor = WorkDistributor()
             assert distributor.worker_count == 6
             assert distributor.batch_size == 20

@@ -5,7 +5,6 @@ ParallelExecutor and handles parallel vs sequential mode selection.
 """
 
 import multiprocessing
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -14,6 +13,7 @@ import pytest
 
 from shotgun.codebase.core.ingestor import SimpleGraphBuilder
 from shotgun.codebase.core.parser_loader import load_parsers
+from shotgun.settings import settings
 
 
 @pytest.fixture
@@ -112,21 +112,19 @@ def test_parallel_mode_disabled_by_env(
     mock_ingestor: MagicMock,
     sample_repo: Path,
     parsers_and_queries: tuple[dict, dict],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that SHOTGUN_INDEX_PARALLEL=false disables parallel mode."""
-    monkeypatch.setenv("SHOTGUN_INDEX_PARALLEL", "false")
-
     parsers, queries = parsers_and_queries
 
-    builder = SimpleGraphBuilder(
-        ingestor=mock_ingestor,
-        repo_path=sample_repo,
-        parsers=parsers,
-        queries=queries,
-    )
+    with patch.object(settings.indexing, "index_parallel", False):
+        builder = SimpleGraphBuilder(
+            ingestor=mock_ingestor,
+            repo_path=sample_repo,
+            parsers=parsers,
+            queries=queries,
+        )
 
-    assert builder.parallel_executor is None
+        assert builder.parallel_executor is None
 
 
 def test_parallel_mode_disabled_by_parameter(
@@ -224,16 +222,15 @@ def test_sequential_fallback_on_few_files(
 
         parsers, queries = parsers_and_queries
 
-        builder = SimpleGraphBuilder(
+        # Even if parallel executor is available, with <10 files it should
+        # use sequential mode (tested via _process_files decision logic)
+        # This is verified by the decision in _process_files: total_files >= 10
+        _builder = SimpleGraphBuilder(
             ingestor=mock_ingestor,
             repo_path=root,
             parsers=parsers,
             queries=queries,
         )
-
-        # Even if parallel executor is available, with <10 files it should
-        # use sequential mode (tested via _process_files decision logic)
-        # This is verified by the decision in _process_files: total_files >= 10
 
 
 def test_progress_callback_receives_mode_info(
@@ -247,12 +244,14 @@ def test_progress_callback_receives_mode_info(
     progress_calls: list[dict] = []
 
     def progress_callback(progress) -> None:
-        progress_calls.append({
-            "phase": progress.phase,
-            "phase_name": progress.phase_name,
-            "current": progress.current,
-            "total": progress.total,
-        })
+        progress_calls.append(
+            {
+                "phase": progress.phase,
+                "phase_name": progress.phase_name,
+                "current": progress.current,
+                "total": progress.total,
+            }
+        )
 
     builder = SimpleGraphBuilder(
         ingestor=mock_ingestor,
@@ -300,25 +299,22 @@ def test_worker_count_from_env_variable(
     mock_ingestor: MagicMock,
     sample_repo: Path,
     parsers_and_queries: tuple[dict, dict],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that worker count can be set via SHOTGUN_INDEX_WORKERS env var."""
-    # Ensure parallel is enabled
-    monkeypatch.delenv("SHOTGUN_INDEX_PARALLEL", raising=False)
-
-    # Set specific worker count
-    monkeypatch.setenv("SHOTGUN_INDEX_WORKERS", "4")
-
+    """Test that worker count can be set via SHOTGUN_INDEX_WORKERS setting."""
     parsers, queries = parsers_and_queries
 
-    # Mock cpu_count to ensure parallel is enabled
+    # Mock cpu_count to ensure parallel is enabled and set worker count
     with patch("multiprocessing.cpu_count", return_value=8):
-        builder = SimpleGraphBuilder(
-            ingestor=mock_ingestor,
-            repo_path=sample_repo,
-            parsers=parsers,
-            queries=queries,
-        )
+        with (
+            patch.object(settings.indexing, "index_parallel", True),
+            patch.object(settings.indexing, "index_workers", 4),
+        ):
+            builder = SimpleGraphBuilder(
+                ingestor=mock_ingestor,
+                repo_path=sample_repo,
+                parsers=parsers,
+                queries=queries,
+            )
 
-        if builder.parallel_executor:
-            assert builder._worker_count == 4
+            if builder.parallel_executor:
+                assert builder._worker_count == 4

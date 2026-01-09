@@ -6,6 +6,7 @@ file parsing work across multiple processes using ProcessPoolExecutor.
 
 from __future__ import annotations
 
+import multiprocessing
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -107,9 +108,13 @@ class ParallelExecutor:
             f"{self.worker_count} workers"
         )
 
-        # Execute batches in parallel
+        # Execute batches in parallel using spawn context to avoid
+        # file descriptor inheritance issues when running from TUI
         completed = 0
-        with ProcessPoolExecutor(max_workers=self.worker_count) as executor:
+        mp_context = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(
+            max_workers=self.worker_count, mp_context=mp_context
+        ) as executor:
             # Submit all batches with worker_id based on submission order
             futures = {}
             for i, batch in enumerate(batches):

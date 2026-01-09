@@ -34,6 +34,7 @@ from shotgun.codebase.models import (
     ProgressPhase,
 )
 from shotgun.posthog_telemetry import track_event
+from shotgun.settings import settings
 
 if TYPE_CHECKING:
     import real_ladybug as kuzu
@@ -655,12 +656,11 @@ class SimpleGraphBuilder:
 
         Conditions for parallel execution:
         1. enable_parallel=True (constructor parameter)
-        2. SHOTGUN_INDEX_PARALLEL env var is not "false"
+        2. settings.indexing.index_parallel is True
         3. CPU count >= 4
         """
-        # Check environment variable override
-        parallel_env = os.environ.get("SHOTGUN_INDEX_PARALLEL", "").lower()
-        if parallel_env == "false":
+        # Check settings override
+        if not settings.indexing.index_parallel:
             logger.info("Parallel indexing disabled via SHOTGUN_INDEX_PARALLEL=false")
             return
 
