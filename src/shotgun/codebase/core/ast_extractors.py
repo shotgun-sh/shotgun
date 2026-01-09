@@ -74,9 +74,6 @@ def extract_docstring(node: Node, language: str) -> str | None:
                         docstring = docstring[1:-1]
                     return docstring.strip()
 
-    # JavaScript/TypeScript JSDoc support could be added here
-    # Go doc comments could be added here
-
     return None
 
 
@@ -103,9 +100,6 @@ def extract_inheritance(class_node: Node, language: str) -> list[str]:
                         _extract_full_name(arg, full_name_parts)
                         if full_name_parts:
                             parent_names.append(".".join(full_name_parts))
-
-    # JavaScript/TypeScript extends support could be added here
-    # Go embedding support could be added here
 
     return parent_names
 
