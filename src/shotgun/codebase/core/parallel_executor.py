@@ -60,7 +60,9 @@ class ParallelExecutor:
             batch_timeout_seconds: Timeout for batch processing.
             metrics_collector: Optional collector for recording metrics.
         """
-        self.worker_count = worker_count if worker_count is not None else get_worker_count()
+        self.worker_count = (
+            worker_count if worker_count is not None else get_worker_count()
+        )
         self.batch_timeout = batch_timeout_seconds
         self.metrics_collector = metrics_collector
 
@@ -456,7 +458,8 @@ class ParallelExecutor:
 
                     # Filter to only classes
                     class_parents = [
-                        p for p in possible_parents
+                        p
+                        for p in possible_parents
                         if function_registry.get(p) == "Class"
                     ]
 
