@@ -27,7 +27,13 @@ from shotgun.codebase.core.metrics_types import (
 )
 from shotgun.codebase.core.parallel_executor import ParallelExecutor
 from shotgun.codebase.core.work_distributor import WorkDistributor, get_worker_count
-from shotgun.codebase.models import IgnoreReason, IndexingStats
+from shotgun.codebase.models import (
+    IgnoreReason,
+    IndexingStats,
+    IndexProgress,
+    ProgressPhase,
+)
+from shotgun.posthog_telemetry import track_event
 
 if TYPE_CHECKING:
     import real_ladybug as kuzu
@@ -798,9 +804,6 @@ class SimpleGraphBuilder:
             return
 
         try:
-            # Import here to avoid circular dependency
-            from shotgun.codebase.models import IndexProgress, ProgressPhase
-
             progress = IndexProgress(
                 phase=ProgressPhase(phase),
                 phase_name=phase_name,
@@ -821,8 +824,6 @@ class SimpleGraphBuilder:
         extra_props: dict[str, Any] | None = None,
     ) -> None:
         """Log timing data to PostHog for analysis."""
-        from shotgun.posthog_telemetry import track_event
-
         properties: dict[str, Any] = {
             "session_id": self._index_session_id,
             "phase": phase,
@@ -842,8 +843,6 @@ class SimpleGraphBuilder:
         total_relationships: int,
     ) -> None:
         """Log indexing summary event to PostHog."""
-        from shotgun.posthog_telemetry import track_event
-
         track_event(
             "codebase_index_completed",
             {
@@ -1823,7 +1822,7 @@ class SimpleGraphBuilder:
         file_count = 0
         for filepath, (root_node, language) in self.ast_cache.items():
             self._process_calls(filepath, root_node, language)
-            # NOTE: Add import processing. wtf does this mean?
+            # TODO(future): Add import statement processing for IMPORTS relationships
 
             file_count += 1
             # Report progress after each file
