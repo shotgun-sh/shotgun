@@ -17,7 +17,6 @@ from shotgun.codebase.core.parallel_executor import (
     ParallelExecutor,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -101,13 +100,11 @@ def test_execute_processes_batches_with_real_file() -> None:
     """Test that execute processes batches with real files."""
     import tempfile
 
-    content = '''
+    content = """
 def my_func():
     pass
-'''
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         file_path = Path(f.name)
 
@@ -134,9 +131,7 @@ def test_execute_calls_progress_callback_with_real_file() -> None:
     import tempfile
 
     content = "def func(): pass"
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         file_path = Path(f.name)
 
@@ -640,9 +635,7 @@ def test_execute_handles_mixed_success_failure() -> None:
     import tempfile
 
     # Create a valid file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("def valid(): pass")
         valid_path = Path(f.name)
 
@@ -686,9 +679,7 @@ def test_execute_collects_worker_metrics_with_real_file() -> None:
     import tempfile
 
     content = "def func(): pass"
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         file_path = Path(f.name)
 

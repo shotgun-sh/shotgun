@@ -14,14 +14,7 @@ from typing import Any
 
 from tree_sitter import Node, Parser, Query, QueryCursor
 
-from shotgun.codebase.core.ast_extractors import (
-    count_ast_nodes,
-    extract_decorators,
-    extract_docstring,
-    extract_inheritance,
-    find_containing_function,
-    find_parent_class,
-)
+from shotgun.codebase.core.extractors import LanguageExtractor, get_extractor
 from shotgun.codebase.core.metrics_types import (
     FileParseMetrics,
     FileParseResult,
@@ -108,7 +101,8 @@ class ParserWorker:
 
             tree = self.parsers[task.language].parse(content)
             root_node = tree.root_node
-            ast_nodes_count = count_ast_nodes(root_node)
+            extractor = get_extractor(task.language)
+            ast_nodes_count = extractor.count_ast_nodes(root_node)
 
             self._create_file_node(task, relative_path_str, nodes, relationships)
             self._create_module_node(task, relative_path_str, nodes, relationships)
@@ -118,6 +112,7 @@ class ParserWorker:
                 task.module_qn,
                 task.language,
                 relative_path_str,
+                extractor,
                 nodes,
                 relationships,
                 function_registry,
@@ -126,7 +121,12 @@ class ParserWorker:
             )
 
             self._extract_calls(
-                root_node, task.module_qn, task.language, function_registry, raw_calls
+                root_node,
+                task.module_qn,
+                task.language,
+                extractor,
+                function_registry,
+                raw_calls,
             )
 
             return self._success_result(
@@ -240,6 +240,7 @@ class ParserWorker:
         module_qn: str,
         language: str,
         relative_path_str: str,
+        extractor: LanguageExtractor,
         nodes: list[NodeData],
         relationships: list[RelationshipData],
         function_registry: dict[str, str],
@@ -253,8 +254,8 @@ class ParserWorker:
             self._extract_classes(
                 root_node,
                 module_qn,
-                language,
                 relative_path_str,
+                extractor,
                 lang_queries["class_query"],
                 nodes,
                 relationships,
@@ -267,8 +268,8 @@ class ParserWorker:
             self._extract_functions(
                 root_node,
                 module_qn,
-                language,
                 relative_path_str,
+                extractor,
                 lang_queries["function_query"],
                 nodes,
                 relationships,
@@ -280,8 +281,8 @@ class ParserWorker:
         self,
         root_node: Node,
         module_qn: str,
-        language: str,
         relative_path_str: str,
+        extractor: LanguageExtractor,
         class_query: Query,
         nodes: list[NodeData],
         relationships: list[RelationshipData],
@@ -306,12 +307,12 @@ class ParserWorker:
                     properties={
                         "qualified_name": class_qn,
                         "name": class_name,
-                        "decorators": extract_decorators(class_node, language),
+                        "decorators": extractor.extract_decorators(class_node),
                         "line_start": class_node.start_point.row + 1,
                         "line_end": class_node.end_point.row + 1,
                         "created_at": current_time,
                         "updated_at": current_time,
-                        "docstring": extract_docstring(class_node, language),
+                        "docstring": extractor.extract_docstring(class_node),
                     },
                 )
             )
@@ -342,7 +343,7 @@ class ParserWorker:
             function_registry[class_qn] = "Class"
             simple_name_lookup.setdefault(class_name, []).append(class_qn)
 
-            parent_names = extract_inheritance(class_node, language)
+            parent_names = extractor.extract_inheritance(class_node)
             if parent_names:
                 inheritance_data.append(
                     InheritanceData(
@@ -355,8 +356,8 @@ class ParserWorker:
         self,
         root_node: Node,
         module_qn: str,
-        language: str,
         relative_path_str: str,
+        extractor: LanguageExtractor,
         function_query: Query,
         nodes: list[NodeData],
         relationships: list[RelationshipData],
@@ -371,7 +372,7 @@ class ParserWorker:
             if not func_node or not func_name:
                 continue
 
-            parent_class = find_parent_class(func_node, module_qn)
+            parent_class = extractor.find_parent_class(func_node, module_qn)
             current_time = int(time.time())
 
             if parent_class:
@@ -379,7 +380,7 @@ class ParserWorker:
                     func_node,
                     func_name,
                     parent_class,
-                    language,
+                    extractor,
                     relative_path_str,
                     current_time,
                     nodes,
@@ -392,7 +393,7 @@ class ParserWorker:
                     func_node,
                     func_name,
                     module_qn,
-                    language,
+                    extractor,
                     relative_path_str,
                     current_time,
                     nodes,
@@ -406,7 +407,7 @@ class ParserWorker:
         func_node: Node,
         func_name: str,
         parent_class: str,
-        language: str,
+        extractor: LanguageExtractor,
         relative_path_str: str,
         current_time: int,
         nodes: list[NodeData],
@@ -423,12 +424,12 @@ class ParserWorker:
                 properties={
                     "qualified_name": method_qn,
                     "name": func_name,
-                    "decorators": extract_decorators(func_node, language),
+                    "decorators": extractor.extract_decorators(func_node),
                     "line_start": func_node.start_point.row + 1,
                     "line_end": func_node.end_point.row + 1,
                     "created_at": current_time,
                     "updated_at": current_time,
-                    "docstring": extract_docstring(func_node, language),
+                    "docstring": extractor.extract_docstring(func_node),
                 },
             )
         )
@@ -464,7 +465,7 @@ class ParserWorker:
         func_node: Node,
         func_name: str,
         module_qn: str,
-        language: str,
+        extractor: LanguageExtractor,
         relative_path_str: str,
         current_time: int,
         nodes: list[NodeData],
@@ -481,12 +482,12 @@ class ParserWorker:
                 properties={
                     "qualified_name": func_qn,
                     "name": func_name,
-                    "decorators": extract_decorators(func_node, language),
+                    "decorators": extractor.extract_decorators(func_node),
                     "line_start": func_node.start_point.row + 1,
                     "line_end": func_node.end_point.row + 1,
                     "created_at": current_time,
                     "updated_at": current_time,
-                    "docstring": extract_docstring(func_node, language),
+                    "docstring": extractor.extract_docstring(func_node),
                 },
             )
         )
@@ -522,6 +523,7 @@ class ParserWorker:
         root_node: Node,
         module_qn: str,
         language: str,
+        extractor: LanguageExtractor,
         function_registry: dict[str, str],
         raw_calls: list[RawCallData],
     ) -> None:
@@ -536,23 +538,23 @@ class ParserWorker:
             call_node = self._get_call_from_match(match)
             if call_node:
                 self._extract_single_call(
-                    call_node, module_qn, language, function_registry, raw_calls
+                    call_node, module_qn, extractor, function_registry, raw_calls
                 )
 
     def _extract_single_call(
         self,
         call_node: Node,
         module_qn: str,
-        language: str,
+        extractor: LanguageExtractor,
         function_registry: dict[str, str],
         raw_calls: list[RawCallData],
     ) -> None:
         """Extract data from a single call expression."""
-        callee_name, object_name = self._parse_call_node(call_node, language)
+        callee_name, object_name = extractor.parse_call_node(call_node)
         if not callee_name:
             return
 
-        caller_qn = find_containing_function(call_node, module_qn)
+        caller_qn = extractor.find_containing_function(call_node, module_qn)
         if not caller_qn or caller_qn not in function_registry:
             return
 
@@ -565,29 +567,6 @@ class ParserWorker:
                 module_qn=module_qn,
             )
         )
-
-    def _parse_call_node(
-        self, call_node: Node, language: str
-    ) -> tuple[str | None, str | None]:
-        """Parse callee name and object from call node."""
-        callee_name = None
-        object_name = None
-
-        if language in ["python", "javascript", "typescript"]:
-            for child in call_node.children:
-                if child.type == "identifier" and child.text:
-                    callee_name = child.text.decode("utf-8")
-                    break
-                elif child.type == "attribute":
-                    obj_node = child.child_by_field_name("object")
-                    attr_node = child.child_by_field_name("attribute")
-                    if obj_node and obj_node.text:
-                        object_name = obj_node.text.decode("utf-8")
-                    if attr_node and attr_node.text:
-                        callee_name = attr_node.text.decode("utf-8")
-                        break
-
-        return callee_name, object_name
 
     def _get_class_from_match(
         self, match: tuple[int, dict[str, list[Node]]]

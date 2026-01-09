@@ -2,7 +2,6 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,7 +10,6 @@ from shotgun.codebase.core.metrics_types import (
     WorkBatch,
 )
 from shotgun.codebase.core.worker import ParserWorker, process_batch
-
 
 # =============================================================================
 # Fixtures
@@ -42,9 +40,7 @@ def caller():
     obj = MyClass()
     obj.my_method()
 '''
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         return Path(f.name), content
 
@@ -52,9 +48,7 @@ def caller():
 @pytest.fixture
 def temp_empty_file() -> Path:
     """Create a temporary empty file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("")
         return Path(f.name)
 
@@ -62,9 +56,7 @@ def temp_empty_file() -> Path:
 @pytest.fixture
 def temp_invalid_file() -> Path:
     """Create a temporary file with invalid Python syntax."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         # This is still valid Python, just unusual - tree-sitter parses it
         f.write("x = 1 + ")  # Incomplete expression
         return Path(f.name)
@@ -161,7 +153,10 @@ def test_process_file_extracts_method(sample_task: FileParseTask) -> None:
     method_nodes = [n for n in result.nodes if n.label == "Method"]
     assert len(method_nodes) == 1
     assert method_nodes[0].properties["name"] == "my_method"
-    assert method_nodes[0].properties["qualified_name"] == "project.test_module.MyClass.my_method"
+    assert (
+        method_nodes[0].properties["qualified_name"]
+        == "project.test_module.MyClass.my_method"
+    )
 
 
 def test_process_file_extracts_docstrings(sample_task: FileParseTask) -> None:
@@ -223,7 +218,9 @@ def test_process_file_creates_defines_relationships(sample_task: FileParseTask) 
     assert defines_rels[0].to_label == "Class"
 
 
-def test_process_file_creates_defines_method_relationships(sample_task: FileParseTask) -> None:
+def test_process_file_creates_defines_method_relationships(
+    sample_task: FileParseTask,
+) -> None:
     """Test that process_file creates DEFINES_METHOD relationships."""
     worker = ParserWorker()
     result = worker.process_file(sample_task)
@@ -237,7 +234,9 @@ def test_process_file_creates_defines_method_relationships(sample_task: FilePars
     assert method_rels[0].to_label == "Method"
 
 
-def test_process_file_creates_defines_func_relationships(sample_task: FileParseTask) -> None:
+def test_process_file_creates_defines_func_relationships(
+    sample_task: FileParseTask,
+) -> None:
     """Test that process_file creates DEFINES_FUNC relationships."""
     worker = ParserWorker()
     result = worker.process_file(sample_task)
@@ -383,9 +382,7 @@ def test_process_file_handles_empty_file(empty_task: FileParseTask) -> None:
 
 def test_process_file_handles_missing_language() -> None:
     """Test that process_file handles unsupported languages."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".xyz", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xyz", delete=False) as f:
         f.write("some content")
         file_path = Path(f.name)
 
@@ -459,9 +456,7 @@ def test_process_batch_function_entry_point(sample_task: FileParseTask) -> None:
 
 def test_process_batch_handles_mixed_success_failure() -> None:
     """Test that process_batch handles mix of successful and failed files."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write("def valid(): pass")
         valid_path = Path(f.name)
 
@@ -507,16 +502,14 @@ def test_process_batch_handles_mixed_success_failure() -> None:
 
 def test_process_file_extracts_inheritance() -> None:
     """Test that process_file extracts inheritance data."""
-    content = '''
+    content = """
 class Parent:
     pass
 
 class Child(Parent):
     pass
-'''
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         file_path = Path(f.name)
 
@@ -542,7 +535,7 @@ class Child(Parent):
 
 def test_process_file_handles_multiple_inheritance() -> None:
     """Test that process_file handles multiple inheritance."""
-    content = '''
+    content = """
 class A:
     pass
 
@@ -551,10 +544,8 @@ class B:
 
 class C(A, B):
     pass
-'''
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         file_path = Path(f.name)
 
@@ -591,7 +582,7 @@ def test_process_file_extracts_decorators() -> None:
     on the specific tree structure. This test verifies functions
     are still extracted even with decorators present.
     """
-    content = '''
+    content = """
 @decorator
 def decorated_func():
     pass
@@ -602,10 +593,8 @@ def static_func():
 
 def plain_func():
     pass
-'''
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as f:
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(content)
         file_path = Path(f.name)
 
