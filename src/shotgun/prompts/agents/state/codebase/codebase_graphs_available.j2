@@ -19,7 +19,11 @@ Note: Graphs marked [INDEXING - NOT AVAILABLE] are currently being built. Do not
 
 {% else -%}
 
-{% if is_tui_context -%}
+{% if indexing_graph_ids -%}
+A codebase is currently being indexed. This process can take a few minutes for large codebases. Once indexing completes, you will be able to query the code structure and answer questions about it.
+
+Please ask the user to wait for indexing to finish before asking questions about the codebase.
+{% elif is_tui_context -%}
 No codebase has been indexed yet. To enable code analysis, please tell the user to restart the TUI and follow the prompt to 'Index this codebase?' when it appears.
 {% else -%}
 No codebase has been indexed yet. If the user needs code analysis, ask them to index a codebase first.
