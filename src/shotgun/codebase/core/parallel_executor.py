@@ -1,15 +1,21 @@
 """Parallel execution framework for file parsing.
 
 This module provides the ParallelExecutor class for distributing
-file parsing work across multiple processes using ProcessPoolExecutor.
+file parsing work across multiple threads using ThreadPoolExecutor.
+
+Note: We use threads instead of processes because multiprocessing has
+file descriptor inheritance issues when running from TUI environments
+(Textual opens FDs that cause "bad value(s) in fds_to_keep" errors).
+Threads avoid this issue entirely and still provide concurrency benefits
+for I/O-bound operations like file reading.
 """
 
 from __future__ import annotations
 
-import multiprocessing
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
 from shotgun.codebase.core.metrics_types import (
@@ -34,68 +40,15 @@ logger = get_logger(__name__)
 DEFAULT_BATCH_TIMEOUT_SECONDS = 300.0
 
 
-def _process_batch_wrapper(args: tuple) -> list[FileParseResult]:
-    """Wrapper function for process_batch that unpacks tuple arguments.
-
-    This is needed because multiprocessing.Pool.imap requires a single-argument function.
-
-    Args:
-        args: Tuple of (batch, worker_id)
-
-    Returns:
-        List of FileParseResult from process_batch
-    """
-    batch, worker_id = args
-    return process_batch(batch, worker_id)
-
-
-def _create_pool(worker_count: int) -> multiprocessing.pool.Pool:
-    """Create a multiprocessing Pool with appropriate context.
-
-    Tries different multiprocessing start methods to find one that works
-    in the current environment. Order of preference:
-    1. forkserver - cleanest isolation, avoids TUI fd issues
-    2. spawn - good isolation but may fail with TUI fd issues
-    3. fork - works but may have issues with threads
-
-    Args:
-        worker_count: Number of worker processes
-
-    Returns:
-        A multiprocessing Pool instance
-
-    Raises:
-        RuntimeError: If no multiprocessing method works
-    """
-    import sys
-
-    # Try different start methods
-    methods = ["forkserver", "spawn"]
-    if sys.platform != "darwin":
-        methods.append("fork")  # fork is problematic on macOS with threads
-
-    last_error = None
-    for method in methods:
-        try:
-            ctx = multiprocessing.get_context(method)
-            pool = ctx.Pool(processes=worker_count)
-            logger.debug(f"Successfully created pool with '{method}' start method")
-            return pool
-        except (ValueError, OSError) as e:
-            logger.debug(f"Failed to create pool with '{method}': {e}")
-            last_error = e
-            continue
-
-    msg = f"Could not create multiprocessing pool: {last_error}"
-    raise RuntimeError(msg)
-
-
 class ParallelExecutor:
-    """Executes file parsing in parallel across multiple processes.
+    """Executes file parsing concurrently across multiple threads.
 
-    This class orchestrates parallel file parsing using ProcessPoolExecutor,
+    This class orchestrates concurrent file parsing using ThreadPoolExecutor,
     aggregates results from all workers, and resolves deferred relationships
     that require knowledge of the complete function registry.
+
+    Note: Uses threads instead of processes to avoid file descriptor issues
+    when running from TUI environments.
 
     Attributes:
         worker_count: Number of worker processes to use
@@ -159,29 +112,29 @@ class ParallelExecutor:
         )
 
         logger.info(
-            f"Starting parallel execution: {total_batches} batches, "
-            f"{self.worker_count} workers"
+            f"Starting threaded execution: {total_batches} batches, "
+            f"{self.worker_count} threads"
         )
 
-        # Execute batches in parallel using spawn context to avoid
-        # file descriptor inheritance issues when running from TUI
+        # Execute batches using threads (avoids multiprocessing fd issues)
         completed = 0
+        with ThreadPoolExecutor(max_workers=self.worker_count) as executor:
+            # Submit all batches with worker_id based on submission order
+            futures = {}
+            for i, batch in enumerate(batches):
+                worker_id = i % self.worker_count
+                future = executor.submit(process_batch, batch, worker_id)
+                futures[future] = (batch, worker_id)
 
-        # Prepare batch arguments with worker_id
-        batch_args = [(batch, i % self.worker_count) for i, batch in enumerate(batches)]
+            # Collect results as they complete
+            for future in as_completed(futures):
+                batch, worker_id = futures[future]
 
-        # Create pool - this may raise an error in certain environments (TUI)
-        pool = _create_pool(self.worker_count)
-        try:
-            # Use imap_unordered for better performance with progress tracking
-            results_iter = pool.imap_unordered(_process_batch_wrapper, batch_args)
-
-            for batch_results in results_iter:
-                if batch_results is not None:
+                try:
+                    batch_results = future.result(timeout=self.batch_timeout)
                     all_results.extend(batch_results)
 
-                    # Update worker stats (approximate since we don't track worker_id)
-                    worker_id = completed % self.worker_count
+                    # Update worker stats
                     for result in batch_results:
                         worker_stats[worker_id]["files_processed"] += 1
                         worker_stats[worker_id]["nodes_created"] += len(result.nodes)
@@ -191,12 +144,35 @@ class ParallelExecutor:
                         if not result.success:
                             worker_stats[worker_id]["error_count"] += 1
 
+                except TimeoutError:
+                    logger.warning(
+                        f"Batch {batch.batch_id} timed out after {self.batch_timeout}s"
+                    )
+                    for task in batch.tasks:
+                        all_results.append(
+                            FileParseResult(
+                                task=task,
+                                success=False,
+                                error=f"Timeout after {self.batch_timeout}s",
+                            )
+                        )
+                        worker_stats[worker_id]["error_count"] += 1
+
+                except Exception as e:
+                    logger.error(f"Batch {batch.batch_id} failed: {e}")
+                    for task in batch.tasks:
+                        all_results.append(
+                            FileParseResult(
+                                task=task,
+                                success=False,
+                                error=str(e),
+                            )
+                        )
+                        worker_stats[worker_id]["error_count"] += 1
+
                 completed += 1
                 if progress_callback:
                     progress_callback(completed, total_batches)
-        finally:
-            pool.close()
-            pool.join()
 
         total_duration = time.perf_counter() - start_time
         logger.info(f"Parallel execution completed in {total_duration:.2f}s")
