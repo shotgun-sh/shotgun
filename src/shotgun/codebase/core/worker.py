@@ -14,6 +14,14 @@ from typing import Any
 
 from tree_sitter import Node, Parser, Query, QueryCursor
 
+from shotgun.codebase.core.ast_extractors import (
+    count_ast_nodes,
+    extract_decorators,
+    extract_docstring,
+    extract_inheritance,
+    find_containing_function,
+    find_parent_class,
+)
 from shotgun.codebase.core.metrics_types import (
     FileParseMetrics,
     FileParseResult,
@@ -35,14 +43,7 @@ _queries: dict[str, dict[str, Query]] | None = None
 
 
 def _ensure_parsers() -> tuple[dict[str, Parser], dict[str, Any]]:
-    """Initialize parsers lazily in worker process.
-
-    This ensures parsers are only loaded once per worker process,
-    not once per file.
-
-    Returns:
-        Tuple of (parsers dict, queries dict)
-    """
+    """Initialize parsers lazily in worker process."""
     global _parsers, _queries
     if _parsers is None:
         logger.debug("Initializing tree-sitter parsers in worker process")
@@ -53,39 +54,20 @@ def _ensure_parsers() -> tuple[dict[str, Parser], dict[str, Any]]:
 class ParserWorker:
     """Handles file parsing in a worker process.
 
-    This class extracts all necessary data from source files:
-    - Node definitions (Module, Class, Function, Method)
-    - Direct relationships (DEFINES, DEFINES_METHOD, DEFINES_FUNC)
-    - Raw call data for later resolution
-    - Raw inheritance data for later resolution
-    - Registry entries for aggregation
-
-    The extracted data is returned without any database access,
-    allowing the main process to aggregate and write to the database.
+    Extracts definitions, relationships, and registry data from source files
+    without database access, allowing the main process to aggregate results.
     """
 
     def __init__(self, worker_id: int = 0) -> None:
-        """Initialize the worker.
-
-        Args:
-            worker_id: Unique identifier for this worker (for metrics)
-        """
+        """Initialize the worker."""
         self.worker_id = worker_id
         self.parsers, self.queries = _ensure_parsers()
 
     def process_file(self, task: FileParseTask) -> FileParseResult:
-        """Parse a single file and extract all data.
-
-        Args:
-            task: File parsing task with path and metadata
-
-        Returns:
-            FileParseResult containing all extracted data
-        """
+        """Parse a single file and extract all data."""
         start_time = time.perf_counter()
         relative_path_str = str(task.relative_path).replace(os.sep, "/")
 
-        # Initialize collections
         nodes: list[NodeData] = []
         relationships: list[RelationshipData] = []
         function_registry: dict[str, str] = {}
@@ -95,233 +77,162 @@ class ParserWorker:
         ast_nodes_count = 0
 
         try:
-            # Read file content
-            with open(task.file_path, "rb") as f:
-                content = f.read()
+            content, file_hash, mtime, file_size = self._read_file(task.file_path)
 
-            # Calculate hash and mtime
-            file_hash = hashlib.sha256(content).hexdigest()
-            mtime = int(task.file_path.stat().st_mtime)
-            file_size = len(content)
-
-            # Check for empty files
             if not content.strip():
-                return FileParseResult(
-                    task=task,
-                    success=True,
-                    error=None,
-                    nodes=nodes,
-                    relationships=relationships,
-                    function_registry_entries=function_registry,
-                    simple_name_entries=simple_name_lookup,
-                    raw_calls=raw_calls,
-                    inheritance_data=inheritance_data,
-                    file_hash=file_hash,
-                    mtime=mtime,
-                    metrics=FileParseMetrics(
-                        file_path=relative_path_str,
-                        language=task.language,
-                        file_size_bytes=file_size,
-                        parse_time_ms=(time.perf_counter() - start_time) * 1000,
-                        ast_nodes=0,
-                        definitions_extracted=0,
-                        relationships_found=0,
-                        worker_id=self.worker_id,
-                    ),
+                return self._empty_result(
+                    task,
+                    nodes,
+                    relationships,
+                    function_registry,
+                    simple_name_lookup,
+                    raw_calls,
+                    inheritance_data,
+                    file_hash,
+                    mtime,
+                    file_size,
+                    start_time,
+                    relative_path_str,
                 )
 
-            # Parse file
             if task.language not in self.parsers:
-                return FileParseResult(
-                    task=task,
-                    success=False,
-                    error=f"No parser for language: {task.language}",
-                    nodes=nodes,
-                    relationships=relationships,
-                    function_registry_entries=function_registry,
-                    simple_name_entries=simple_name_lookup,
-                    raw_calls=raw_calls,
-                    inheritance_data=inheritance_data,
-                    file_hash=file_hash,
-                    mtime=mtime,
-                    metrics=FileParseMetrics(
-                        file_path=relative_path_str,
-                        language=task.language,
-                        file_size_bytes=file_size,
-                        parse_time_ms=(time.perf_counter() - start_time) * 1000,
-                        ast_nodes=0,
-                        definitions_extracted=0,
-                        relationships_found=0,
-                        worker_id=self.worker_id,
-                    ),
+                return self._error_result(
+                    task,
+                    f"No parser for language: {task.language}",
+                    file_hash,
+                    mtime,
+                    file_size,
+                    start_time,
+                    relative_path_str,
                 )
 
-            parser = self.parsers[task.language]
-            tree = parser.parse(content)
+            tree = self.parsers[task.language].parse(content)
             root_node = tree.root_node
-            ast_nodes_count = self._count_ast_nodes(root_node)
+            ast_nodes_count = count_ast_nodes(root_node)
 
-            # Create File node
-            nodes.append(
-                NodeData(
-                    label="File",
-                    properties={
-                        "path": relative_path_str,
-                        "name": task.file_path.name,
-                        "extension": task.file_path.suffix,
-                    },
-                )
-            )
+            self._create_file_node(task, relative_path_str, nodes, relationships)
+            self._create_module_node(task, relative_path_str, nodes, relationships)
 
-            # Create File containment relationship
-            parent_rel_path = task.relative_path.parent
-            if parent_rel_path == Path("."):
-                # File in project root - will be linked to Project in main process
-                pass  # Project relationship handled in main process
-            else:
-                relationships.append(
-                    RelationshipData(
-                        from_label="Folder",
-                        from_key="path",
-                        from_value=str(parent_rel_path).replace(os.sep, "/"),
-                        rel_type="CONTAINS_FILE",
-                        to_label="File",
-                        to_key="path",
-                        to_value=relative_path_str,
-                    )
-                )
-
-            # Create Module node
-            current_time = int(time.time())
-            nodes.append(
-                NodeData(
-                    label="Module",
-                    properties={
-                        "qualified_name": task.module_qn,
-                        "name": task.file_path.stem,
-                        "path": relative_path_str,
-                        "created_at": current_time,
-                        "updated_at": current_time,
-                    },
-                )
-            )
-
-            # Create Module containment relationship
-            if task.container_qn:
-                relationships.append(
-                    RelationshipData(
-                        from_label="Package",
-                        from_key="qualified_name",
-                        from_value=task.container_qn,
-                        rel_type="CONTAINS_MODULE",
-                        to_label="Module",
-                        to_key="qualified_name",
-                        to_value=task.module_qn,
-                    )
-                )
-
-            # Extract definitions
             self._extract_definitions(
-                root_node=root_node,
-                module_qn=task.module_qn,
-                language=task.language,
-                relative_path_str=relative_path_str,
-                nodes=nodes,
-                relationships=relationships,
-                function_registry=function_registry,
-                simple_name_lookup=simple_name_lookup,
-                inheritance_data=inheritance_data,
+                root_node,
+                task.module_qn,
+                task.language,
+                relative_path_str,
+                nodes,
+                relationships,
+                function_registry,
+                simple_name_lookup,
+                inheritance_data,
             )
 
-            # Extract raw calls for later resolution
             self._extract_calls(
-                root_node=root_node,
-                module_qn=task.module_qn,
-                language=task.language,
-                function_registry=function_registry,
-                raw_calls=raw_calls,
+                root_node, task.module_qn, task.language, function_registry, raw_calls
             )
 
-            parse_time_ms = (time.perf_counter() - start_time) * 1000
-            definitions_count = sum(
-                1 for n in nodes if n.label in ["Class", "Function", "Method"]
-            )
-
-            return FileParseResult(
-                task=task,
-                success=True,
-                error=None,
-                nodes=nodes,
-                relationships=relationships,
-                function_registry_entries=function_registry,
-                simple_name_entries=simple_name_lookup,
-                raw_calls=raw_calls,
-                inheritance_data=inheritance_data,
-                file_hash=file_hash,
-                mtime=mtime,
-                metrics=FileParseMetrics(
-                    file_path=relative_path_str,
-                    language=task.language,
-                    file_size_bytes=file_size,
-                    parse_time_ms=parse_time_ms,
-                    ast_nodes=ast_nodes_count,
-                    definitions_extracted=definitions_count,
-                    relationships_found=len(relationships) + len(raw_calls),
-                    worker_id=self.worker_id,
-                ),
+            return self._success_result(
+                task,
+                nodes,
+                relationships,
+                function_registry,
+                simple_name_lookup,
+                raw_calls,
+                inheritance_data,
+                file_hash,
+                mtime,
+                file_size,
+                ast_nodes_count,
+                start_time,
+                relative_path_str,
             )
 
         except Exception as e:
             logger.error(f"Failed to process {task.file_path}: {e}")
-            parse_time_ms = (time.perf_counter() - start_time) * 1000
-
-            return FileParseResult(
-                task=task,
-                success=False,
-                error=str(e),
-                nodes=nodes,
-                relationships=relationships,
-                function_registry_entries=function_registry,
-                simple_name_entries=simple_name_lookup,
-                raw_calls=raw_calls,
-                inheritance_data=inheritance_data,
-                file_hash="",
-                mtime=0,
-                metrics=FileParseMetrics(
-                    file_path=relative_path_str,
-                    language=task.language,
-                    file_size_bytes=0,
-                    parse_time_ms=parse_time_ms,
-                    ast_nodes=ast_nodes_count,
-                    definitions_extracted=0,
-                    relationships_found=0,
-                    worker_id=self.worker_id,
-                ),
+            return self._error_result(
+                task, str(e), "", 0, 0, start_time, relative_path_str
             )
 
     def process_batch(self, batch: WorkBatch) -> list[FileParseResult]:
-        """Process all files in a batch.
+        """Process all files in a batch."""
+        return [self.process_file(task) for task in batch.tasks]
 
-        Args:
-            batch: Work batch containing file tasks
+    def _read_file(self, file_path: Path) -> tuple[bytes, str, int, int]:
+        """Read file and compute metadata."""
+        with open(file_path, "rb") as f:
+            content = f.read()
+        return (
+            content,
+            hashlib.sha256(content).hexdigest(),
+            int(file_path.stat().st_mtime),
+            len(content),
+        )
 
-        Returns:
-            List of results for each file in the batch
-        """
-        results: list[FileParseResult] = []
+    def _create_file_node(
+        self,
+        task: FileParseTask,
+        relative_path_str: str,
+        nodes: list[NodeData],
+        relationships: list[RelationshipData],
+    ) -> None:
+        """Create File node and containment relationship."""
+        nodes.append(
+            NodeData(
+                label="File",
+                properties={
+                    "path": relative_path_str,
+                    "name": task.file_path.name,
+                    "extension": task.file_path.suffix,
+                },
+            )
+        )
 
-        for task in batch.tasks:
-            result = self.process_file(task)
-            results.append(result)
+        parent_rel_path = task.relative_path.parent
+        if parent_rel_path != Path("."):
+            relationships.append(
+                RelationshipData(
+                    from_label="Folder",
+                    from_key="path",
+                    from_value=str(parent_rel_path).replace(os.sep, "/"),
+                    rel_type="CONTAINS_FILE",
+                    to_label="File",
+                    to_key="path",
+                    to_value=relative_path_str,
+                )
+            )
 
-        return results
+    def _create_module_node(
+        self,
+        task: FileParseTask,
+        relative_path_str: str,
+        nodes: list[NodeData],
+        relationships: list[RelationshipData],
+    ) -> None:
+        """Create Module node and containment relationship."""
+        current_time = int(time.time())
+        nodes.append(
+            NodeData(
+                label="Module",
+                properties={
+                    "qualified_name": task.module_qn,
+                    "name": task.file_path.stem,
+                    "path": relative_path_str,
+                    "created_at": current_time,
+                    "updated_at": current_time,
+                },
+            )
+        )
 
-    def _count_ast_nodes(self, node: Node) -> int:
-        """Count total AST nodes for metrics."""
-        count = 1
-        for child in node.children:
-            count += self._count_ast_nodes(child)
-        return count
+        if task.container_qn:
+            relationships.append(
+                RelationshipData(
+                    from_label="Package",
+                    from_key="qualified_name",
+                    from_value=task.container_qn,
+                    rel_type="CONTAINS_MODULE",
+                    to_label="Module",
+                    to_key="qualified_name",
+                    to_value=task.module_qn,
+                )
+            )
 
     def _extract_definitions(
         self,
@@ -338,33 +249,31 @@ class ParserWorker:
         """Extract class and function definitions from AST."""
         lang_queries = self.queries.get(language, {})
 
-        # Extract classes
         if "class_query" in lang_queries:
             self._extract_classes(
-                root_node=root_node,
-                module_qn=module_qn,
-                language=language,
-                relative_path_str=relative_path_str,
-                class_query=lang_queries["class_query"],
-                nodes=nodes,
-                relationships=relationships,
-                function_registry=function_registry,
-                simple_name_lookup=simple_name_lookup,
-                inheritance_data=inheritance_data,
+                root_node,
+                module_qn,
+                language,
+                relative_path_str,
+                lang_queries["class_query"],
+                nodes,
+                relationships,
+                function_registry,
+                simple_name_lookup,
+                inheritance_data,
             )
 
-        # Extract functions
         if "function_query" in lang_queries:
             self._extract_functions(
-                root_node=root_node,
-                module_qn=module_qn,
-                language=language,
-                relative_path_str=relative_path_str,
-                function_query=lang_queries["function_query"],
-                nodes=nodes,
-                relationships=relationships,
-                function_registry=function_registry,
-                simple_name_lookup=simple_name_lookup,
+                root_node,
+                module_qn,
+                language,
+                relative_path_str,
+                lang_queries["function_query"],
+                nodes,
+                relationships,
+                function_registry,
+                simple_name_lookup,
             )
 
     def _extract_classes(
@@ -384,45 +293,31 @@ class ParserWorker:
         cursor = QueryCursor(class_query)
 
         for match in cursor.matches(root_node):
-            class_node = None
-            class_name = None
+            class_node, class_name = self._get_class_from_match(match)
+            if not class_node or not class_name:
+                continue
 
-            captures = match[1]
-            for capture_name, capture_nodes in captures.items():
-                for node in capture_nodes:
-                    if capture_name in ["class", "interface", "type_alias"]:
-                        class_node = node
-                    elif capture_name == "class_name" and node.text:
-                        class_name = node.text.decode("utf-8")
+            class_qn = f"{module_qn}.{class_name}"
+            current_time = int(time.time())
 
-            if class_node and class_name:
-                class_qn = f"{module_qn}.{class_name}"
-
-                # Extract decorators
-                decorators = self._extract_decorators(class_node, language)
-
-                # Extract docstring
-                docstring = self._extract_docstring(class_node, language)
-
-                current_time = int(time.time())
-                nodes.append(
-                    NodeData(
-                        label="Class",
-                        properties={
-                            "qualified_name": class_qn,
-                            "name": class_name,
-                            "decorators": decorators,
-                            "line_start": class_node.start_point.row + 1,
-                            "line_end": class_node.end_point.row + 1,
-                            "created_at": current_time,
-                            "updated_at": current_time,
-                            "docstring": docstring,
-                        },
-                    )
+            nodes.append(
+                NodeData(
+                    label="Class",
+                    properties={
+                        "qualified_name": class_qn,
+                        "name": class_name,
+                        "decorators": extract_decorators(class_node, language),
+                        "line_start": class_node.start_point.row + 1,
+                        "line_end": class_node.end_point.row + 1,
+                        "created_at": current_time,
+                        "updated_at": current_time,
+                        "docstring": extract_docstring(class_node, language),
+                    },
                 )
+            )
 
-                # Create DEFINES relationship
-                relationships.append(
+            relationships.extend(
+                [
                     RelationshipData(
                         from_label="Module",
                         from_key="qualified_name",
@@ -431,11 +326,7 @@ class ParserWorker:
                         to_label="Class",
                         to_key="qualified_name",
                         to_value=class_qn,
-                    )
-                )
-
-                # Create TRACKS relationship
-                relationships.append(
+                    ),
                     RelationshipData(
                         from_label="FileMetadata",
                         from_key="path",
@@ -444,24 +335,21 @@ class ParserWorker:
                         to_label="Class",
                         to_key="qualified_name",
                         to_value=class_qn,
+                    ),
+                ]
+            )
+
+            function_registry[class_qn] = "Class"
+            simple_name_lookup.setdefault(class_name, []).append(class_qn)
+
+            parent_names = extract_inheritance(class_node, language)
+            if parent_names:
+                inheritance_data.append(
+                    InheritanceData(
+                        child_class_qn=class_qn,
+                        parent_simple_names=parent_names,
                     )
                 )
-
-                # Register for lookup
-                function_registry[class_qn] = "Class"
-                if class_name not in simple_name_lookup:
-                    simple_name_lookup[class_name] = []
-                simple_name_lookup[class_name].append(class_qn)
-
-                # Extract inheritance
-                parent_names = self._extract_inheritance(class_node, language)
-                if parent_names:
-                    inheritance_data.append(
-                        InheritanceData(
-                            child_class_qn=class_qn,
-                            parent_simple_names=parent_names,
-                        )
-                    )
 
     def _extract_functions(
         self,
@@ -477,132 +365,157 @@ class ParserWorker:
     ) -> None:
         """Extract function and method definitions."""
         cursor = QueryCursor(function_query)
-        matches = list(cursor.matches(root_node))
 
-        for match in matches:
-            func_node = None
-            func_name = None
+        for match in cursor.matches(root_node):
+            func_node, func_name = self._get_function_from_match(match)
+            if not func_node or not func_name:
+                continue
 
-            captures = match[1]
-            for capture_name, capture_nodes in captures.items():
-                for node in capture_nodes:
-                    if capture_name == "function":
-                        func_node = node
-                    elif capture_name == "function_name" and node.text:
-                        func_name = node.text.decode("utf-8")
+            parent_class = find_parent_class(func_node, module_qn)
+            current_time = int(time.time())
 
-            if func_node and func_name:
-                # Check if this is a method inside a class
-                parent_class = self._find_parent_class(func_node, module_qn)
+            if parent_class:
+                self._add_method(
+                    func_node,
+                    func_name,
+                    parent_class,
+                    language,
+                    relative_path_str,
+                    current_time,
+                    nodes,
+                    relationships,
+                    function_registry,
+                    simple_name_lookup,
+                )
+            else:
+                self._add_function(
+                    func_node,
+                    func_name,
+                    module_qn,
+                    language,
+                    relative_path_str,
+                    current_time,
+                    nodes,
+                    relationships,
+                    function_registry,
+                    simple_name_lookup,
+                )
 
-                if parent_class:
-                    # This is a method
-                    method_qn = f"{parent_class}.{func_name}"
-                    decorators = self._extract_decorators(func_node, language)
-                    docstring = self._extract_docstring(func_node, language)
+    def _add_method(
+        self,
+        func_node: Node,
+        func_name: str,
+        parent_class: str,
+        language: str,
+        relative_path_str: str,
+        current_time: int,
+        nodes: list[NodeData],
+        relationships: list[RelationshipData],
+        function_registry: dict[str, str],
+        simple_name_lookup: dict[str, list[str]],
+    ) -> None:
+        """Add a method node and relationships."""
+        method_qn = f"{parent_class}.{func_name}"
 
-                    current_time = int(time.time())
-                    nodes.append(
-                        NodeData(
-                            label="Method",
-                            properties={
-                                "qualified_name": method_qn,
-                                "name": func_name,
-                                "decorators": decorators,
-                                "line_start": func_node.start_point.row + 1,
-                                "line_end": func_node.end_point.row + 1,
-                                "created_at": current_time,
-                                "updated_at": current_time,
-                                "docstring": docstring,
-                            },
-                        )
-                    )
+        nodes.append(
+            NodeData(
+                label="Method",
+                properties={
+                    "qualified_name": method_qn,
+                    "name": func_name,
+                    "decorators": extract_decorators(func_node, language),
+                    "line_start": func_node.start_point.row + 1,
+                    "line_end": func_node.end_point.row + 1,
+                    "created_at": current_time,
+                    "updated_at": current_time,
+                    "docstring": extract_docstring(func_node, language),
+                },
+            )
+        )
 
-                    # Create DEFINES_METHOD relationship
-                    relationships.append(
-                        RelationshipData(
-                            from_label="Class",
-                            from_key="qualified_name",
-                            from_value=parent_class,
-                            rel_type="DEFINES_METHOD",
-                            to_label="Method",
-                            to_key="qualified_name",
-                            to_value=method_qn,
-                        )
-                    )
+        relationships.extend(
+            [
+                RelationshipData(
+                    from_label="Class",
+                    from_key="qualified_name",
+                    from_value=parent_class,
+                    rel_type="DEFINES_METHOD",
+                    to_label="Method",
+                    to_key="qualified_name",
+                    to_value=method_qn,
+                ),
+                RelationshipData(
+                    from_label="FileMetadata",
+                    from_key="path",
+                    from_value=relative_path_str,
+                    rel_type="TRACKS",
+                    to_label="Method",
+                    to_key="qualified_name",
+                    to_value=method_qn,
+                ),
+            ]
+        )
 
-                    # Create TRACKS relationship
-                    relationships.append(
-                        RelationshipData(
-                            from_label="FileMetadata",
-                            from_key="path",
-                            from_value=relative_path_str,
-                            rel_type="TRACKS",
-                            to_label="Method",
-                            to_key="qualified_name",
-                            to_value=method_qn,
-                        )
-                    )
+        function_registry[method_qn] = "Method"
+        simple_name_lookup.setdefault(func_name, []).append(method_qn)
 
-                    # Register for lookup
-                    function_registry[method_qn] = "Method"
-                    if func_name not in simple_name_lookup:
-                        simple_name_lookup[func_name] = []
-                    simple_name_lookup[func_name].append(method_qn)
-                else:
-                    # This is a standalone function
-                    func_qn = f"{module_qn}.{func_name}"
-                    decorators = self._extract_decorators(func_node, language)
-                    docstring = self._extract_docstring(func_node, language)
+    def _add_function(
+        self,
+        func_node: Node,
+        func_name: str,
+        module_qn: str,
+        language: str,
+        relative_path_str: str,
+        current_time: int,
+        nodes: list[NodeData],
+        relationships: list[RelationshipData],
+        function_registry: dict[str, str],
+        simple_name_lookup: dict[str, list[str]],
+    ) -> None:
+        """Add a function node and relationships."""
+        func_qn = f"{module_qn}.{func_name}"
 
-                    current_time = int(time.time())
-                    nodes.append(
-                        NodeData(
-                            label="Function",
-                            properties={
-                                "qualified_name": func_qn,
-                                "name": func_name,
-                                "decorators": decorators,
-                                "line_start": func_node.start_point.row + 1,
-                                "line_end": func_node.end_point.row + 1,
-                                "created_at": current_time,
-                                "updated_at": current_time,
-                                "docstring": docstring,
-                            },
-                        )
-                    )
+        nodes.append(
+            NodeData(
+                label="Function",
+                properties={
+                    "qualified_name": func_qn,
+                    "name": func_name,
+                    "decorators": extract_decorators(func_node, language),
+                    "line_start": func_node.start_point.row + 1,
+                    "line_end": func_node.end_point.row + 1,
+                    "created_at": current_time,
+                    "updated_at": current_time,
+                    "docstring": extract_docstring(func_node, language),
+                },
+            )
+        )
 
-                    # Create DEFINES_FUNC relationship
-                    relationships.append(
-                        RelationshipData(
-                            from_label="Module",
-                            from_key="qualified_name",
-                            from_value=module_qn,
-                            rel_type="DEFINES_FUNC",
-                            to_label="Function",
-                            to_key="qualified_name",
-                            to_value=func_qn,
-                        )
-                    )
+        relationships.extend(
+            [
+                RelationshipData(
+                    from_label="Module",
+                    from_key="qualified_name",
+                    from_value=module_qn,
+                    rel_type="DEFINES_FUNC",
+                    to_label="Function",
+                    to_key="qualified_name",
+                    to_value=func_qn,
+                ),
+                RelationshipData(
+                    from_label="FileMetadata",
+                    from_key="path",
+                    from_value=relative_path_str,
+                    rel_type="TRACKS",
+                    to_label="Function",
+                    to_key="qualified_name",
+                    to_value=func_qn,
+                ),
+            ]
+        )
 
-                    # Create TRACKS relationship
-                    relationships.append(
-                        RelationshipData(
-                            from_label="FileMetadata",
-                            from_key="path",
-                            from_value=relative_path_str,
-                            rel_type="TRACKS",
-                            to_label="Function",
-                            to_key="qualified_name",
-                            to_value=func_qn,
-                        )
-                    )
-
-                    # Register for lookup
-                    function_registry[func_qn] = "Function"
-                    if func_name not in simple_name_lookup:
-                        simple_name_lookup[func_name] = []
-                    simple_name_lookup[func_name].append(func_qn)
+        function_registry[func_qn] = "Function"
+        simple_name_lookup.setdefault(func_name, []).append(func_qn)
 
     def _extract_calls(
         self,
@@ -614,30 +527,16 @@ class ParserWorker:
     ) -> None:
         """Extract raw call data for later resolution."""
         lang_queries = self.queries.get(language, {})
-
         if "call_query" not in lang_queries:
             return
 
         cursor = QueryCursor(lang_queries["call_query"])
-        matches = list(cursor.matches(root_node))
 
-        for match in matches:
-            call_node = None
-
-            captures = match[1]
-            for capture_name, capture_nodes in captures.items():
-                for node in capture_nodes:
-                    if capture_name == "call":
-                        call_node = node
-                        break
-
+        for match in cursor.matches(root_node):
+            call_node = self._get_call_from_match(match)
             if call_node:
                 self._extract_single_call(
-                    call_node=call_node,
-                    module_qn=module_qn,
-                    language=language,
-                    function_registry=function_registry,
-                    raw_calls=raw_calls,
+                    call_node, module_qn, language, function_registry, raw_calls
                 )
 
     def _extract_single_call(
@@ -649,6 +548,28 @@ class ParserWorker:
         raw_calls: list[RawCallData],
     ) -> None:
         """Extract data from a single call expression."""
+        callee_name, object_name = self._parse_call_node(call_node, language)
+        if not callee_name:
+            return
+
+        caller_qn = find_containing_function(call_node, module_qn)
+        if not caller_qn or caller_qn not in function_registry:
+            return
+
+        raw_calls.append(
+            RawCallData(
+                caller_qn=caller_qn,
+                callee_name=callee_name,
+                object_name=object_name,
+                line_number=call_node.start_point.row + 1,
+                module_qn=module_qn,
+            )
+        )
+
+    def _parse_call_node(
+        self, call_node: Node, language: str
+    ) -> tuple[str | None, str | None]:
+        """Parse callee name and object from call node."""
         callee_name = None
         object_name = None
 
@@ -666,159 +587,164 @@ class ParserWorker:
                         callee_name = attr_node.text.decode("utf-8")
                         break
 
-        if not callee_name:
-            return
+        return callee_name, object_name
 
-        # Find caller function
-        caller_qn = self._find_containing_function(call_node, module_qn)
-        if not caller_qn:
-            return
+    def _get_class_from_match(
+        self, match: tuple[int, dict[str, list[Node]]]
+    ) -> tuple[Node | None, str | None]:
+        """Extract class node and name from query match."""
+        class_node = None
+        class_name = None
 
-        # Only record if caller is in our registry (we know about it)
-        if caller_qn not in function_registry:
-            return
+        for capture_name, capture_nodes in match[1].items():
+            for node in capture_nodes:
+                if capture_name in ["class", "interface", "type_alias"]:
+                    class_node = node
+                elif capture_name == "class_name" and node.text:
+                    class_name = node.text.decode("utf-8")
 
-        raw_calls.append(
-            RawCallData(
-                caller_qn=caller_qn,
-                callee_name=callee_name,
-                object_name=object_name,
-                line_number=call_node.start_point.row + 1,
-                module_qn=module_qn,
-            )
+        return class_node, class_name
+
+    def _get_function_from_match(
+        self, match: tuple[int, dict[str, list[Node]]]
+    ) -> tuple[Node | None, str | None]:
+        """Extract function node and name from query match."""
+        func_node = None
+        func_name = None
+
+        for capture_name, capture_nodes in match[1].items():
+            for node in capture_nodes:
+                if capture_name == "function":
+                    func_node = node
+                elif capture_name == "function_name" and node.text:
+                    func_name = node.text.decode("utf-8")
+
+        return func_node, func_name
+
+    def _get_call_from_match(
+        self, match: tuple[int, dict[str, list[Node]]]
+    ) -> Node | None:
+        """Extract call node from query match."""
+        for capture_name, capture_nodes in match[1].items():
+            for node in capture_nodes:
+                if capture_name == "call":
+                    return node
+        return None
+
+    def _empty_result(
+        self,
+        task: FileParseTask,
+        nodes: list[NodeData],
+        relationships: list[RelationshipData],
+        function_registry: dict[str, str],
+        simple_name_lookup: dict[str, list[str]],
+        raw_calls: list[RawCallData],
+        inheritance_data: list[InheritanceData],
+        file_hash: str,
+        mtime: int,
+        file_size: int,
+        start_time: float,
+        relative_path_str: str,
+    ) -> FileParseResult:
+        """Create result for empty file."""
+        return FileParseResult(
+            task=task,
+            success=True,
+            nodes=nodes,
+            relationships=relationships,
+            function_registry_entries=function_registry,
+            simple_name_entries=simple_name_lookup,
+            raw_calls=raw_calls,
+            inheritance_data=inheritance_data,
+            file_hash=file_hash,
+            mtime=mtime,
+            metrics=FileParseMetrics(
+                file_path=relative_path_str,
+                language=task.language,
+                file_size_bytes=file_size,
+                parse_time_ms=(time.perf_counter() - start_time) * 1000,
+                ast_nodes=0,
+                definitions_extracted=0,
+                relationships_found=0,
+                worker_id=self.worker_id,
+            ),
         )
 
-    def _extract_decorators(self, node: Node, language: str) -> list[str]:
-        """Extract decorators from a function/class node."""
-        decorators = []
+    def _error_result(
+        self,
+        task: FileParseTask,
+        error: str,
+        file_hash: str,
+        mtime: int,
+        file_size: int,
+        start_time: float,
+        relative_path_str: str,
+    ) -> FileParseResult:
+        """Create result for error case."""
+        return FileParseResult(
+            task=task,
+            success=False,
+            error=error,
+            file_hash=file_hash,
+            mtime=mtime,
+            metrics=FileParseMetrics(
+                file_path=relative_path_str,
+                language=task.language,
+                file_size_bytes=file_size,
+                parse_time_ms=(time.perf_counter() - start_time) * 1000,
+                ast_nodes=0,
+                definitions_extracted=0,
+                relationships_found=0,
+                worker_id=self.worker_id,
+            ),
+        )
 
-        if language == "python":
-            for child in node.children:
-                if child.type == "decorator":
-                    for grandchild in child.children:
-                        if grandchild.type == "identifier" and grandchild.text:
-                            decorators.append(grandchild.text.decode("utf-8"))
-                            break
-                        elif grandchild.type == "attribute":
-                            attr_node = grandchild.child_by_field_name("attribute")
-                            if attr_node and attr_node.text:
-                                decorators.append(attr_node.text.decode("utf-8"))
-                                break
+    def _success_result(
+        self,
+        task: FileParseTask,
+        nodes: list[NodeData],
+        relationships: list[RelationshipData],
+        function_registry: dict[str, str],
+        simple_name_lookup: dict[str, list[str]],
+        raw_calls: list[RawCallData],
+        inheritance_data: list[InheritanceData],
+        file_hash: str,
+        mtime: int,
+        file_size: int,
+        ast_nodes_count: int,
+        start_time: float,
+        relative_path_str: str,
+    ) -> FileParseResult:
+        """Create successful result."""
+        definitions_count = sum(
+            1 for n in nodes if n.label in ["Class", "Function", "Method"]
+        )
 
-        return decorators
-
-    def _extract_docstring(self, node: Node, language: str) -> str | None:
-        """Extract docstring from function/class node."""
-        if language == "python":
-            body_node = node.child_by_field_name("body")
-            if not body_node or not body_node.children:
-                return None
-
-            first_statement = body_node.children[0]
-            if first_statement.type == "expression_statement":
-                for child in first_statement.children:
-                    if child.type == "string" and child.text:
-                        docstring = child.text.decode("utf-8")
-                        docstring = docstring.strip()
-                        if (
-                            docstring.startswith('"""')
-                            and docstring.endswith('"""')
-                            or docstring.startswith("'''")
-                            and docstring.endswith("'''")
-                        ):
-                            docstring = docstring[3:-3]
-                        elif (
-                            docstring.startswith('"')
-                            and docstring.endswith('"')
-                            or docstring.startswith("'")
-                            and docstring.endswith("'")
-                        ):
-                            docstring = docstring[1:-1]
-                        return docstring.strip()
-        return None
-
-    def _extract_inheritance(self, class_node: Node, language: str) -> list[str]:
-        """Extract parent class names from class definition."""
-        parent_names = []
-
-        if language == "python":
-            for child in class_node.children:
-                if child.type == "argument_list":
-                    for arg in child.children:
-                        if arg.type == "identifier" and arg.text:
-                            parent_names.append(arg.text.decode("utf-8"))
-                        elif arg.type == "attribute":
-                            full_name_parts: list[str] = []
-                            self._extract_full_name(arg, full_name_parts)
-                            if full_name_parts:
-                                parent_names.append(".".join(full_name_parts))
-
-        return parent_names
-
-    def _extract_full_name(self, node: Node, parts: list[str]) -> None:
-        """Recursively extract full qualified name from attribute access."""
-        if node.type == "identifier" and node.text:
-            parts.insert(0, node.text.decode("utf-8"))
-        elif node.type == "attribute":
-            attr_node = node.child_by_field_name("attribute")
-            if attr_node and attr_node.text:
-                parts.insert(0, attr_node.text.decode("utf-8"))
-
-            obj_node = node.child_by_field_name("object")
-            if obj_node:
-                self._extract_full_name(obj_node, parts)
-
-    def _find_parent_class(self, func_node: Node, module_qn: str) -> str | None:
-        """Find the parent class of a function node."""
-        current = func_node.parent
-
-        while current:
-            if current.type in ["class_definition", "class_declaration"]:
-                for child in current.children:
-                    if child.type == "identifier" and child.text:
-                        class_name = child.text.decode("utf-8")
-                        return f"{module_qn}.{class_name}"
-
-            current = current.parent
-
-        return None
-
-    def _find_containing_function(self, node: Node, module_qn: str) -> str | None:
-        """Find the containing function/method of a node."""
-        current = node.parent
-
-        while current:
-            if current.type in [
-                "function_definition",
-                "method_definition",
-                "arrow_function",
-            ]:
-                for child in current.children:
-                    if child.type == "identifier" and child.text:
-                        func_name = child.text.decode("utf-8")
-
-                        parent_class = self._find_parent_class(current, module_qn)
-                        if parent_class:
-                            return f"{parent_class}.{func_name}"
-                        else:
-                            return f"{module_qn}.{func_name}"
-
-            current = current.parent
-
-        return None
+        return FileParseResult(
+            task=task,
+            success=True,
+            nodes=nodes,
+            relationships=relationships,
+            function_registry_entries=function_registry,
+            simple_name_entries=simple_name_lookup,
+            raw_calls=raw_calls,
+            inheritance_data=inheritance_data,
+            file_hash=file_hash,
+            mtime=mtime,
+            metrics=FileParseMetrics(
+                file_path=relative_path_str,
+                language=task.language,
+                file_size_bytes=file_size,
+                parse_time_ms=(time.perf_counter() - start_time) * 1000,
+                ast_nodes=ast_nodes_count,
+                definitions_extracted=definitions_count,
+                relationships_found=len(relationships) + len(raw_calls),
+                worker_id=self.worker_id,
+            ),
+        )
 
 
 def process_batch(batch: WorkBatch, worker_id: int = 0) -> list[FileParseResult]:
-    """Entry point for worker processes.
-
-    This is the top-level function called by ProcessPoolExecutor.
-
-    Args:
-        batch: Work batch to process
-        worker_id: Worker identifier for metrics
-
-    Returns:
-        List of parse results for all files in the batch
-    """
+    """Entry point for worker processes."""
     worker = ParserWorker(worker_id=worker_id)
     return worker.process_batch(batch)
