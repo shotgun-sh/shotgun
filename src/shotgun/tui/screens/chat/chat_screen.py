@@ -1500,8 +1500,9 @@ class ChatScreen(Screen[None]):
             KuzuErrorType.SCHEMA,
         )
 
-    @work
+    @work(group="indexing", exit_on_error=False)
     async def index_codebase(self, selection: CodebaseIndexSelection) -> None:
+        logger.debug(f"index_codebase worker starting for {selection.repo_path}")
         index_start_time = time.time()
 
         # Compute graph_id to track indexing state
@@ -1635,6 +1636,7 @@ class ChatScreen(Screen[None]):
                         indexed_from_cwd=str(Path.cwd().resolve()),
                         progress_callback=progress_callback,
                     )
+                    logger.debug("index_codebase SDK call completed successfully")
 
                     # Success! Stop progress animation
                     progress_timer.stop()
@@ -1663,6 +1665,12 @@ class ChatScreen(Screen[None]):
                         )
                     )
                     break  # Success - exit retry loop
+
+                except asyncio.CancelledError:
+                    logger.warning(
+                        "index_codebase worker was cancelled - this should not happen"
+                    )
+                    raise  # Re-raise to let finally block clean up
 
                 except CodebaseAlreadyIndexedError as exc:
                     progress_timer.stop()
