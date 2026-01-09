@@ -19,7 +19,9 @@ class GraphStatus(StrEnum):
 class IgnoreReason(StrEnum):
     """Reason why a file or directory was ignored during indexing."""
 
-    HARDCODED = "hardcoded"  # Matched hardcoded ignore patterns (venv, node_modules, etc.)
+    HARDCODED = (
+        "hardcoded"  # Matched hardcoded ignore patterns (venv, node_modules, etc.)
+    )
     GITIGNORE = "gitignore"  # Matched .gitignore pattern
 
 

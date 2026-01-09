@@ -604,11 +604,11 @@ class SimpleGraphBuilder:
         self.gitignore_manager: GitignoreManager | None = None
         if respect_gitignore:
             self.gitignore_manager = GitignoreManager(repo_path)
-            if self.gitignore_manager.stats["patterns_loaded"] > 0:
+            if self.gitignore_manager.stats.patterns_loaded > 0:
                 logger.info(
                     f"Loaded gitignore patterns - "
-                    f"files: {self.gitignore_manager.stats['gitignore_files_loaded']}, "
-                    f"patterns: {self.gitignore_manager.stats['patterns_loaded']}"
+                    f"files: {self.gitignore_manager.stats.gitignore_files_loaded}, "
+                    f"patterns: {self.gitignore_manager.stats.patterns_loaded}"
                 )
 
         # Generate unique session ID for correlating timing events in PostHog
