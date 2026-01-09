@@ -8,7 +8,8 @@ import os
 import time
 import uuid
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +18,8 @@ from tree_sitter import Node, Parser, QueryCursor
 
 from shotgun.codebase.core.gitignore import GitignoreManager
 from shotgun.codebase.core.kuzu_compat import get_kuzu
+from shotgun.codebase.core.metrics_collector import MetricsCollector
+from shotgun.codebase.core.metrics_types import IndexingPhase
 from shotgun.codebase.models import IgnoreReason, IndexingStats
 
 if TYPE_CHECKING:
@@ -588,6 +591,7 @@ class SimpleGraphBuilder:
         exclude_patterns: list[str] | None = None,
         progress_callback: Any | None = None,
         respect_gitignore: bool = True,
+        metrics_collector: MetricsCollector | None = None,
     ):
         self.ingestor = ingestor
         self.repo_path = repo_path
@@ -598,6 +602,7 @@ class SimpleGraphBuilder:
         if exclude_patterns:
             self.ignore_dirs = self.ignore_dirs.union(set(exclude_patterns))
         self.progress_callback = progress_callback
+        self.metrics_collector = metrics_collector
 
         # Initialize gitignore support
         self.respect_gitignore = respect_gitignore
@@ -694,6 +699,24 @@ class SimpleGraphBuilder:
             },
         )
 
+    @contextmanager
+    def _track_phase(
+        self, phase: IndexingPhase, get_items_count: Callable[[], int]
+    ) -> Generator[None, None, None]:
+        """Context manager for tracking phase metrics.
+
+        Args:
+            phase: The indexing phase to track
+            get_items_count: Callable that returns the items processed count
+        """
+        if self.metrics_collector:
+            self.metrics_collector.start_phase(phase)
+        try:
+            yield
+        finally:
+            if self.metrics_collector:
+                self.metrics_collector.end_phase(phase, get_items_count())
+
     async def run(self) -> None:
         """Run the three-pass graph building process."""
         logger.info(f"Building graph for project: {self.project_name}")
@@ -701,17 +724,25 @@ class SimpleGraphBuilder:
         # Pass 1: Structure
         logger.info("Pass 1: Identifying packages and folders...")
         t0 = time.time()
-        self._identify_structure()
+        with self._track_phase(
+            IndexingPhase.STRUCTURE, lambda: self._index_stats.dirs_scanned
+        ):
+            self._identify_structure()
         t1 = time.time()
-        self._log_timing("structure", t1 - t0, len(self.structural_elements))
+        self._log_timing(
+            IndexingPhase.STRUCTURE, t1 - t0, len(self.structural_elements)
+        )
 
         # Pass 2: Definitions
         logger.info("Pass 2: Processing files and extracting definitions...")
         t2 = time.time()
-        await self._process_files()
+        with self._track_phase(
+            IndexingPhase.DEFINITIONS, lambda: self._index_stats.files_processed
+        ):
+            await self._process_files()
         t3 = time.time()
         self._log_timing(
-            "definitions",
+            IndexingPhase.DEFINITIONS,
             t3 - t2,
             len(self.ast_cache),
             {"file_count": len(self.ast_cache)},
@@ -720,51 +751,70 @@ class SimpleGraphBuilder:
         # Pass 3: Relationships
         logger.info("Pass 3: Processing relationships (calls, imports)...")
         t4 = time.time()
-        self._process_relationships()
+        with self._track_phase(
+            IndexingPhase.RELATIONSHIPS, lambda: self._index_stats.files_processed
+        ):
+            self._process_relationships()
         t5 = time.time()
-        self._log_timing("relationships", t5 - t4, len(self.ast_cache))
+        self._log_timing(IndexingPhase.RELATIONSHIPS, t5 - t4, len(self.ast_cache))
 
         # Flush all pending operations
         logger.info("Flushing all data to database...")
-        t6 = time.time()
         node_count = len(self.ingestor.node_buffer)
 
         # Create progress callback for flush_nodes
         def node_progress(current: int, total: int) -> None:
             self._report_progress(
-                "flush_nodes", "Flushing nodes to database", current, total
+                IndexingPhase.FLUSH_NODES, "Flushing nodes to database", current, total
             )
 
-        self.ingestor.flush_nodes(progress_callback=node_progress)
-        self._report_progress(
-            "flush_nodes", "Flushing nodes to database", node_count, node_count, True
-        )
+        t6 = time.time()
+        with self._track_phase(IndexingPhase.FLUSH_NODES, lambda: node_count):
+            self.ingestor.flush_nodes(progress_callback=node_progress)
         t7 = time.time()
-        self._log_timing("flush_nodes", t7 - t6, node_count, {"node_count": node_count})
+        self._report_progress(
+            IndexingPhase.FLUSH_NODES,
+            "Flushing nodes to database",
+            node_count,
+            node_count,
+            True,
+        )
+        self._log_timing(
+            IndexingPhase.FLUSH_NODES, t7 - t6, node_count, {"node_count": node_count}
+        )
 
         rel_count = len(self.ingestor.relationship_buffer)
 
         # Create progress callback for flush_relationships
         def rel_progress(current: int, total: int) -> None:
             self._report_progress(
-                "flush_relationships",
+                IndexingPhase.FLUSH_RELATIONSHIPS,
                 "Flushing relationships to database",
                 current,
                 total,
             )
 
-        self.ingestor.flush_relationships(progress_callback=rel_progress)
+        t8_start = time.time()
+        with self._track_phase(IndexingPhase.FLUSH_RELATIONSHIPS, lambda: rel_count):
+            self.ingestor.flush_relationships(progress_callback=rel_progress)
+        t8 = time.time()
         self._report_progress(
-            "flush_relationships",
+            IndexingPhase.FLUSH_RELATIONSHIPS,
             "Flushing relationships to database",
             rel_count,
             rel_count,
             True,
         )
-        t8 = time.time()
         self._log_timing(
-            "flush_relationships", t8 - t7, rel_count, {"relationship_count": rel_count}
+            IndexingPhase.FLUSH_RELATIONSHIPS,
+            t8 - t8_start,
+            rel_count,
+            {"relationship_count": rel_count},
         )
+
+        # Update metrics collector with totals
+        if self.metrics_collector:
+            self.metrics_collector.set_totals(node_count, rel_count)
 
         # Track summary event with totals (no PII - only numeric metadata)
         total_duration = t8 - t0
