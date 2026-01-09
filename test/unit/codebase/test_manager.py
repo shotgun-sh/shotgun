@@ -142,9 +142,7 @@ async def test_get_or_create_connection():
         with (
             patch("shotgun.codebase.core.manager.Path.mkdir"),
             patch.object(Path, "exists", return_value=False),
-            patch(
-                "shotgun.codebase.core.manager.get_kuzu", return_value=mock_kuzu
-            ),
+            patch("shotgun.codebase.core.manager.get_kuzu", return_value=mock_kuzu),
             patch("shotgun.codebase.core.ingestor.CodebaseIngestor"),
             patch("shotgun.codebase.core.manager.logger"),
             patch("anyio.to_thread.run_sync"),
@@ -627,9 +625,7 @@ async def test_update_graph_incremental():
                 patch.object(manager, "get_graph", return_value=mock_graph),
                 patch.object(Path, "exists", mock_exists),
                 patch.object(Path, "is_dir", mock_is_dir),
-                patch(
-                    "shotgun.codebase.core.manager.get_kuzu", return_value=mock_kuzu
-                ),
+                patch("shotgun.codebase.core.manager.get_kuzu", return_value=mock_kuzu),
                 patch(
                     "shotgun.codebase.core.change_detector.ChangeDetector"
                 ) as mock_detector_class,
