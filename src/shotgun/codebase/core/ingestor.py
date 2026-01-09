@@ -664,9 +664,7 @@ class SimpleGraphBuilder:
 
         cpu_count = multiprocessing.cpu_count()
         if cpu_count < 4:
-            logger.info(
-                f"Parallel indexing disabled: CPU count ({cpu_count}) < 4"
-            )
+            logger.info(f"Parallel indexing disabled: CPU count ({cpu_count}) < 4")
             return
 
         worker_count = get_worker_count()

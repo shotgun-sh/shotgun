@@ -106,9 +106,7 @@ class ParserWorker:
 
             self._create_file_node(task, relative_path_str, nodes, relationships)
             self._create_module_node(task, relative_path_str, nodes, relationships)
-            self._create_file_metadata_node(
-                relative_path_str, file_hash, mtime, nodes
-            )
+            self._create_file_metadata_node(relative_path_str, file_hash, mtime, nodes)
 
             self._extract_definitions(
                 root_node,
