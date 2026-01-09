@@ -10,7 +10,6 @@ import multiprocessing
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
 from shotgun.codebase.core.metrics_types import (
@@ -31,8 +30,26 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# Get spawn context once at module level to avoid repeated context creation
+_spawn_context = multiprocessing.get_context("spawn")
+
 # Default timeout for batch processing (5 minutes)
 DEFAULT_BATCH_TIMEOUT_SECONDS = 300.0
+
+
+def _process_batch_wrapper(args: tuple[WorkBatch, int]) -> list[FileParseResult]:
+    """Wrapper function for process_batch that unpacks tuple arguments.
+
+    This is needed because multiprocessing.Pool.imap requires a single-argument function.
+
+    Args:
+        args: Tuple of (batch, worker_id)
+
+    Returns:
+        List of FileParseResult from process_batch
+    """
+    batch, worker_id = args
+    return process_batch(batch, worker_id)
 
 
 class ParallelExecutor:
@@ -111,26 +128,21 @@ class ParallelExecutor:
         # Execute batches in parallel using spawn context to avoid
         # file descriptor inheritance issues when running from TUI
         completed = 0
-        mp_context = multiprocessing.get_context("spawn")
-        with ProcessPoolExecutor(
-            max_workers=self.worker_count, mp_context=mp_context
-        ) as executor:
-            # Submit all batches with worker_id based on submission order
-            futures = {}
-            for i, batch in enumerate(batches):
-                worker_id = i % self.worker_count
-                future = executor.submit(process_batch, batch, worker_id)
-                futures[future] = (batch, worker_id)
 
-            # Collect results as they complete
-            for future in as_completed(futures):
-                batch, worker_id = futures[future]
+        # Prepare batch arguments with worker_id
+        batch_args = [(batch, i % self.worker_count) for i, batch in enumerate(batches)]
 
-                try:
-                    batch_results = future.result(timeout=self.batch_timeout)
+        # Use multiprocessing.Pool with spawn context for better isolation
+        with _spawn_context.Pool(processes=self.worker_count) as pool:
+            # Use imap_unordered for better performance with progress tracking
+            results_iter = pool.imap_unordered(_process_batch_wrapper, batch_args)
+
+            for batch_results in results_iter:
+                if batch_results is not None:
                     all_results.extend(batch_results)
 
-                    # Update worker stats
+                    # Update worker stats (approximate since we don't track worker_id)
+                    worker_id = completed % self.worker_count
                     for result in batch_results:
                         worker_stats[worker_id]["files_processed"] += 1
                         worker_stats[worker_id]["nodes_created"] += len(result.nodes)
@@ -139,34 +151,6 @@ class ParallelExecutor:
                         )
                         if not result.success:
                             worker_stats[worker_id]["error_count"] += 1
-
-                except TimeoutError:
-                    logger.warning(
-                        f"Batch {batch.batch_id} timed out after {self.batch_timeout}s"
-                    )
-                    # Create error results for timed-out tasks
-                    for task in batch.tasks:
-                        all_results.append(
-                            FileParseResult(
-                                task=task,
-                                success=False,
-                                error=f"Timeout after {self.batch_timeout}s",
-                            )
-                        )
-                        worker_stats[worker_id]["error_count"] += 1
-
-                except Exception as e:
-                    logger.error(f"Batch {batch.batch_id} failed: {e}")
-                    # Create error results for failed tasks
-                    for task in batch.tasks:
-                        all_results.append(
-                            FileParseResult(
-                                task=task,
-                                success=False,
-                                error=str(e),
-                            )
-                        )
-                        worker_stats[worker_id]["error_count"] += 1
 
                 completed += 1
                 if progress_callback:
