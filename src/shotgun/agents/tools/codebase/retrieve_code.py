@@ -8,6 +8,7 @@ from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.codebase.core.code_retrieval import retrieve_code_by_qualified_name
 from shotgun.codebase.core.language_config import get_language_config
+from shotgun.codebase.indexing_state import IndexingState
 from shotgun.logging_config import get_logger
 
 from .models import CodeSnippetResult
@@ -48,7 +49,7 @@ async def retrieve_code(
             return CodeSnippetResult(
                 found=False,
                 qualified_name=qualified_name,
-                error="This codebase is currently being indexed. Please wait for indexing to complete before retrieving code.",
+                error=IndexingState.INDEXING_IN_PROGRESS_ERROR,
             )
 
         # Use the existing code retrieval functionality

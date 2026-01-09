@@ -40,7 +40,7 @@ class CodebaseService:
         Returns:
             The graph_id that would be used for this repo path
         """
-        return self.manager._generate_graph_id(str(repo_path))
+        return self.manager.generate_graph_id(str(repo_path))
 
     async def list_graphs(self) -> list[CodebaseGraph]:
         """List all existing graphs.

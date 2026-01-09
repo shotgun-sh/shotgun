@@ -19,6 +19,12 @@ class IndexingState:
     This is similar to how CodebaseGraphManager shares connections.
     """
 
+    # Error message for when tools try to access a graph being indexed
+    INDEXING_IN_PROGRESS_ERROR = (
+        "This codebase is currently being indexed. "
+        "Please wait for indexing to complete before accessing it."
+    )
+
     # Class-level state shared across all instances
     _active_graphs: ClassVar[set[str]] = set()
     _lock: ClassVar[asyncio.Lock | None] = None

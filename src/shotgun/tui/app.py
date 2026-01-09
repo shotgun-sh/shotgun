@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import platform
+import sys
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
@@ -260,10 +263,7 @@ class ShotgunApp(App[None]):
 
 def _log_startup_info() -> None:
     """Log startup information for debugging purposes."""
-    import os
-    import platform
-    import sys
-
+    # Import here to avoid circular import (shotgun.__init__ imports from submodules)
     from shotgun import __version__
 
     logger.info("=" * 60)
