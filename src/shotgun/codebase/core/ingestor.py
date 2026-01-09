@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import multiprocessing
 import os
 import time
 import uuid
@@ -19,7 +20,13 @@ from tree_sitter import Node, Parser, QueryCursor
 from shotgun.codebase.core.gitignore import GitignoreManager
 from shotgun.codebase.core.kuzu_compat import get_kuzu
 from shotgun.codebase.core.metrics_collector import MetricsCollector
-from shotgun.codebase.core.metrics_types import IndexingPhase
+from shotgun.codebase.core.metrics_types import (
+    FileInfo,
+    IndexingPhase,
+    ParallelExecutionResult,
+)
+from shotgun.codebase.core.parallel_executor import ParallelExecutor
+from shotgun.codebase.core.work_distributor import WorkDistributor, get_worker_count
 from shotgun.codebase.models import IgnoreReason, IndexingStats
 
 if TYPE_CHECKING:
@@ -592,6 +599,7 @@ class SimpleGraphBuilder:
         progress_callback: Any | None = None,
         respect_gitignore: bool = True,
         metrics_collector: MetricsCollector | None = None,
+        enable_parallel: bool = True,
     ):
         self.ingestor = ingestor
         self.repo_path = repo_path
@@ -628,6 +636,156 @@ class SimpleGraphBuilder:
         self.function_registry: dict[str, str] = {}  # qualified_name -> type
         self.simple_name_lookup: dict[str, set[str]] = defaultdict(set)
         self.class_inheritance: dict[str, list[str]] = {}  # class_qn -> [parent_qns]
+
+        # Parallel execution support
+        self.enable_parallel = enable_parallel
+        self.parallel_executor: ParallelExecutor | None = None
+        self._parallel_mode_active = False  # Track if parallel was used for this run
+        self._worker_count = 0
+        self._init_parallel_executor()
+
+    def _init_parallel_executor(self) -> None:
+        """Initialize parallel executor if conditions are met.
+
+        Conditions for parallel execution:
+        1. enable_parallel=True (constructor parameter)
+        2. SHOTGUN_INDEX_PARALLEL env var is not "false"
+        3. CPU count >= 4
+        """
+        # Check environment variable override
+        parallel_env = os.environ.get("SHOTGUN_INDEX_PARALLEL", "").lower()
+        if parallel_env == "false":
+            logger.info("Parallel indexing disabled via SHOTGUN_INDEX_PARALLEL=false")
+            return
+
+        if not self.enable_parallel:
+            logger.debug("Parallel indexing disabled via enable_parallel=False")
+            return
+
+        cpu_count = multiprocessing.cpu_count()
+        if cpu_count < 4:
+            logger.info(
+                f"Parallel indexing disabled: CPU count ({cpu_count}) < 4"
+            )
+            return
+
+        worker_count = get_worker_count()
+        self.parallel_executor = ParallelExecutor(
+            worker_count=worker_count,
+            metrics_collector=self.metrics_collector,
+        )
+        self._worker_count = worker_count
+        logger.info(f"Parallel indexing enabled with {worker_count} workers")
+
+    def _build_file_infos(
+        self, files_to_process: list[tuple[Path, str]]
+    ) -> list[FileInfo]:
+        """Convert files_to_process list to FileInfo objects for parallel execution.
+
+        Args:
+            files_to_process: List of (filepath, language) tuples
+
+        Returns:
+            List of FileInfo objects ready for WorkDistributor
+        """
+        file_infos: list[FileInfo] = []
+
+        for filepath, language in files_to_process:
+            relative_path = filepath.relative_to(self.repo_path)
+
+            # Compute module_qn (same logic as _process_single_file)
+            if filepath.name == "__init__.py":
+                module_qn = ".".join(
+                    [self.project_name] + list(relative_path.parent.parts)
+                )
+            else:
+                module_qn = ".".join(
+                    [self.project_name] + list(relative_path.with_suffix("").parts)
+                )
+
+            # Get container qualified name from structural elements
+            parent_rel_path = relative_path.parent
+            container_qn = self.structural_elements.get(parent_rel_path)
+
+            try:
+                file_size = filepath.stat().st_size
+            except OSError:
+                file_size = 0
+
+            file_infos.append(
+                FileInfo(
+                    file_path=filepath,
+                    relative_path=relative_path,
+                    language=language,
+                    module_qn=module_qn,
+                    container_qn=container_qn,
+                    file_size_bytes=file_size,
+                )
+            )
+
+        return file_infos
+
+    def _merge_parallel_results(self, result: ParallelExecutionResult) -> None:
+        """Merge parallel execution results into Ingestor buffers and local caches.
+
+        Args:
+            result: ParallelExecutionResult containing all parsed file data
+        """
+        # Merge nodes and direct relationships from each file
+        for file_result in result.results:
+            if not file_result.success:
+                logger.warning(
+                    f"File {file_result.task.file_path} failed: {file_result.error}"
+                )
+                continue
+
+            # Add nodes to buffer
+            for node in file_result.nodes:
+                self.ingestor.ensure_node_batch(node.label, node.properties)
+
+            # Add direct relationships to buffer
+            for rel in file_result.relationships:
+                self.ingestor.ensure_relationship_batch(
+                    rel.from_label,
+                    rel.from_key,
+                    rel.from_value,
+                    rel.rel_type,
+                    rel.to_label,
+                    rel.to_key,
+                    rel.to_value,
+                    rel.properties,
+                )
+
+        # Add resolved relationships (calls, inheritance) from aggregation
+        for rel in result.resolved_relationships:
+            self.ingestor.ensure_relationship_batch(
+                rel.from_label,
+                rel.from_key,
+                rel.from_value,
+                rel.rel_type,
+                rel.to_label,
+                rel.to_key,
+                rel.to_value,
+                rel.properties,
+            )
+
+        # Merge registries into local caches
+        self.function_registry.update(result.function_registry)
+        for name, qns in result.simple_name_lookup.items():
+            for qn in qns:
+                self.simple_name_lookup[name].add(qn)
+
+        # Merge inheritance data for potential future use
+        for file_result in result.results:
+            if file_result.success:
+                for inh in file_result.inheritance_data:
+                    self.class_inheritance[inh.child_class_qn] = inh.parent_simple_names
+
+        logger.info(
+            f"Merged parallel results: {result.successful_files} files, "
+            f"{len(result.function_registry)} registry entries, "
+            f"{len(result.resolved_relationships)} resolved relationships"
+        )
 
     def _report_progress(
         self,
@@ -1097,7 +1255,97 @@ class SimpleGraphBuilder:
             f"{self._index_stats.files_ignored_no_parser} (no parser)"
         )
 
-        # Second pass: Process files with progress reporting
+        # Decide on parallel vs sequential execution
+        # Use parallel if executor available and enough files to benefit
+        if self.parallel_executor and total_files >= 10:
+            await self._process_files_parallel(files_to_process, total_files)
+        else:
+            await self._process_files_sequential(files_to_process, total_files)
+
+    async def _process_files_parallel(
+        self, files_to_process: list[tuple[Path, str]], total_files: int
+    ) -> None:
+        """Process files using parallel execution.
+
+        Args:
+            files_to_process: List of (filepath, language) tuples
+            total_files: Total number of files to process
+        """
+        logger.info(f"Using parallel execution with {self._worker_count} workers")
+        self._parallel_mode_active = True
+
+        try:
+            # Build FileInfo objects for WorkDistributor
+            file_infos = self._build_file_infos(files_to_process)
+
+            # Create work batches using WorkDistributor
+            distributor = WorkDistributor(worker_count=self._worker_count)
+            batches = distributor.create_batches(file_infos)
+
+            logger.info(f"Created {len(batches)} batches for {len(file_infos)} files")
+
+            # Track progress for UI
+            files_completed = 0
+
+            def parallel_progress(completed_batches: int, total_batches: int) -> None:
+                nonlocal files_completed
+                # Estimate files completed based on batch progress
+                if total_batches > 0:
+                    estimated = int((completed_batches / total_batches) * total_files)
+                    files_completed = estimated
+                    self._report_progress(
+                        "definitions",
+                        f"Processing files (Parallel, {self._worker_count} workers)",
+                        files_completed,
+                        total_files,
+                    )
+
+            # Execute in parallel - run blocking executor in thread pool
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self.parallel_executor.execute(batches, parallel_progress),  # type: ignore[union-attr]
+            )
+
+            # Merge results into Ingestor buffers and local caches
+            self._merge_parallel_results(result)
+
+            # Update stats
+            self._index_stats.files_processed = result.successful_files
+
+            # Report phase completion
+            self._report_progress(
+                "definitions",
+                f"Processing files (Parallel, {self._worker_count} workers)",
+                result.successful_files,
+                total_files,
+                phase_complete=True,
+            )
+
+            logger.info(
+                f"Parallel processing complete: {result.successful_files}/{total_files} "
+                f"files, {result.failed_files} failures"
+            )
+
+        except Exception as e:
+            logger.warning(
+                f"Parallel execution failed: {e}. Falling back to sequential."
+            )
+            self._parallel_mode_active = False
+            await self._process_files_sequential(files_to_process, total_files)
+
+    async def _process_files_sequential(
+        self, files_to_process: list[tuple[Path, str]], total_files: int
+    ) -> None:
+        """Process files using sequential execution (original behavior).
+
+        Args:
+            files_to_process: List of (filepath, language) tuples
+            total_files: Total number of files to process
+        """
+        logger.info("Using sequential execution")
+        self._parallel_mode_active = False
+
         file_count = 0
         for filepath, language in files_to_process:
             await self._process_single_file(filepath, language)
@@ -1107,7 +1355,7 @@ class SimpleGraphBuilder:
             # Report progress after each file
             self._report_progress(
                 "definitions",
-                "Processing files and extracting definitions",
+                "Processing files (Sequential)",
                 file_count,
                 total_files,
             )
@@ -1120,7 +1368,7 @@ class SimpleGraphBuilder:
         # Report phase completion
         self._report_progress(
             "definitions",
-            "Processing files and extracting definitions",
+            "Processing files (Sequential)",
             file_count,
             total_files,
             phase_complete=True,
@@ -1544,6 +1792,25 @@ class SimpleGraphBuilder:
 
     def _process_relationships(self) -> None:
         """Third pass: Process function calls and imports."""
+        # If parallel mode was used, relationships are already resolved
+        # by ParallelExecutor during the definitions phase
+        if self._parallel_mode_active:
+            logger.info(
+                "Skipping relationship processing "
+                "(already resolved during parallel execution)"
+            )
+            # Report progress as complete for UI consistency
+            total = len(self.function_registry)
+            self._report_progress(
+                "relationships",
+                "Relationships resolved during parallel execution",
+                total,
+                total,
+                phase_complete=True,
+            )
+            return
+
+        # Sequential mode - process relationships normally
         # Process inheritance relationships first
         self._process_inheritance()
 

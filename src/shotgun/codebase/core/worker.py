@@ -106,6 +106,9 @@ class ParserWorker:
 
             self._create_file_node(task, relative_path_str, nodes, relationships)
             self._create_module_node(task, relative_path_str, nodes, relationships)
+            self._create_file_metadata_node(
+                relative_path_str, file_hash, mtime, nodes
+            )
 
             self._extract_definitions(
                 root_node,
@@ -199,6 +202,27 @@ class ParserWorker:
                 )
             )
 
+    def _create_file_metadata_node(
+        self,
+        relative_path_str: str,
+        file_hash: str,
+        mtime: int,
+        nodes: list[NodeData],
+    ) -> None:
+        """Create FileMetadata node for tracking file state."""
+        current_time = int(time.time())
+        nodes.append(
+            NodeData(
+                label="FileMetadata",
+                properties={
+                    "filepath": relative_path_str,
+                    "mtime": mtime,
+                    "hash": file_hash,
+                    "last_updated": current_time,
+                },
+            )
+        )
+
     def _create_module_node(
         self,
         task: FileParseTask,
@@ -233,6 +257,19 @@ class ParserWorker:
                     to_value=task.module_qn,
                 )
             )
+
+        # Add TRACKS_Module relationship from FileMetadata to Module
+        relationships.append(
+            RelationshipData(
+                from_label="FileMetadata",
+                from_key="filepath",
+                from_value=relative_path_str,
+                rel_type="TRACKS_Module",
+                to_label="Module",
+                to_key="qualified_name",
+                to_value=task.module_qn,
+            )
+        )
 
     def _extract_definitions(
         self,
@@ -330,9 +367,9 @@ class ParserWorker:
                     ),
                     RelationshipData(
                         from_label="FileMetadata",
-                        from_key="path",
+                        from_key="filepath",
                         from_value=relative_path_str,
-                        rel_type="TRACKS",
+                        rel_type="TRACKS_Class",
                         to_label="Class",
                         to_key="qualified_name",
                         to_value=class_qn,
@@ -447,9 +484,9 @@ class ParserWorker:
                 ),
                 RelationshipData(
                     from_label="FileMetadata",
-                    from_key="path",
+                    from_key="filepath",
                     from_value=relative_path_str,
-                    rel_type="TRACKS",
+                    rel_type="TRACKS_Method",
                     to_label="Method",
                     to_key="qualified_name",
                     to_value=method_qn,
@@ -505,9 +542,9 @@ class ParserWorker:
                 ),
                 RelationshipData(
                     from_label="FileMetadata",
-                    from_key="path",
+                    from_key="filepath",
                     from_value=relative_path_str,
-                    rel_type="TRACKS",
+                    rel_type="TRACKS_Function",
                     to_label="Function",
                     to_key="qualified_name",
                     to_value=func_qn,
