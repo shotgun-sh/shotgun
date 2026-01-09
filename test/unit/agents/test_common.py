@@ -29,6 +29,9 @@ def mock_deps():
     deps.codebase_service = AsyncMock()
     deps.codebase_service.list_graphs.return_value = ["graph1", "graph2"]
     deps.codebase_service.list_graphs_for_directory.return_value = ["graph1", "graph2"]
+    # Mock indexing state - use MagicMock since get_active_ids is synchronous
+    deps.codebase_service.indexing = MagicMock()
+    deps.codebase_service.indexing.get_active_ids.return_value = set()
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt content")
     deps.queue = AsyncMock()
     deps.tasks = []
@@ -90,6 +93,7 @@ async def test_add_system_status_message_empty_history(mock_deps):
                     mock_loader.render.assert_called_once_with(
                         "agents/state/system_state.j2",
                         codebase_understanding_graphs=["graph1", "graph2"],
+                        indexing_graph_ids=set(),
                         is_tui_context=False,
                         existing_files=[],
                         markdown_toc=None,

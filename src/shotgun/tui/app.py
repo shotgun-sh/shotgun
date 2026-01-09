@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import platform
+import sys
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
@@ -258,6 +261,22 @@ class ShotgunApp(App[None]):
         self.push_screen(GitHubIssueScreen())
 
 
+def _log_startup_info() -> None:
+    """Log startup information for debugging purposes."""
+    # Import here to avoid circular import (shotgun.__init__ imports from submodules)
+    from shotgun import __version__
+
+    logger.info("=" * 60)
+    logger.info("Shotgun TUI Starting")
+    logger.info("=" * 60)
+    logger.info(f"  Version: {__version__}")
+    logger.info(f"  Python: {sys.version.split()[0]}")
+    logger.info(f"  Platform: {platform.system()} {platform.release()}")
+    logger.info(f"  Architecture: {platform.machine()}")
+    logger.info(f"  Working Directory: {os.getcwd()}")
+    logger.info("=" * 60)
+
+
 def run(
     no_update_check: bool = False,
     continue_session: bool = False,
@@ -274,6 +293,9 @@ def run(
         show_pull_hint: If True, show hint about recently pulled spec.
         pull_version_id: If provided, pull this spec version before showing ChatScreen.
     """
+    # Log startup information
+    _log_startup_info()
+
     # Detect database issues BEFORE starting the TUI (but don't auto-delete)
     # Issues will be presented to the user via dialogs once the TUI is running
     import asyncio

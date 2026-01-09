@@ -23,6 +23,9 @@ def mock_codebase_service():
     service.execute_query = AsyncMock()
     service.manager = MagicMock()
     service.manager._execute_query = AsyncMock()
+    # Add indexing state mock - defaults to not active
+    service.indexing = MagicMock()
+    service.indexing.is_active = MagicMock(return_value=False)
     return service
 
 

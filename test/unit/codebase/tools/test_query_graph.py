@@ -44,3 +44,19 @@ async def test_query_graph_no_service(mock_run_context):
     assert isinstance(result, QueryGraphResult)
     assert result.success is False
     assert result.error and "No codebase indexed" in result.error
+
+
+@pytest.mark.asyncio
+async def test_query_graph_while_indexing(mock_run_context, mock_codebase_service):
+    """Test query_graph returns error when graph is being indexed."""
+    # Mark graph as currently being indexed
+    mock_codebase_service.indexing.is_active.return_value = True
+
+    result = await query_graph(mock_run_context, "graph-id", "test query")
+
+    assert isinstance(result, QueryGraphResult)
+    assert result.success is False
+    assert result.error is not None
+    assert "currently being indexed" in result.error
+    # Verify execute_query was NOT called
+    mock_codebase_service.execute_query.assert_not_called()

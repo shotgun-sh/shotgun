@@ -7,6 +7,7 @@ from typing import Any
 from shotgun.codebase.core.cypher_models import CypherGenerationNotPossibleError
 from shotgun.codebase.core.manager import CodebaseGraphManager
 from shotgun.codebase.core.nl_query import generate_cypher
+from shotgun.codebase.indexing_state import IndexingState
 from shotgun.codebase.models import CodebaseGraph, QueryResult, QueryType
 from shotgun.logging_config import get_logger
 
@@ -28,6 +29,18 @@ class CodebaseService:
         self.storage_dir = storage_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.manager = CodebaseGraphManager(storage_dir)
+        self.indexing = IndexingState()
+
+    def compute_graph_id(self, repo_path: str | Path) -> str:
+        """Compute graph_id for a repo path without creating the graph.
+
+        Args:
+            repo_path: Path to the repository
+
+        Returns:
+            The graph_id that would be used for this repo path
+        """
+        return self.manager.generate_graph_id(str(repo_path))
 
     async def list_graphs(self) -> list[CodebaseGraph]:
         """List all existing graphs.

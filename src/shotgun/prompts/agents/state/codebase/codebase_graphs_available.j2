@@ -5,12 +5,25 @@
 You have access to the following codebase graphs:
 
 {% for graph in codebase_understanding_graphs -%}
+{% if indexing_graph_ids and graph.graph_id in indexing_graph_ids -%}
+- {{ graph.name }} ID: {{ graph.graph_id }} Path: {{ graph.repo_path }} **[INDEXING - NOT AVAILABLE]**
+{% else -%}
 - {{ graph.name }} ID: {{ graph.graph_id }} Path: {{ graph.repo_path }}
+{% endif -%}
 {% endfor -%}
+
+{% if indexing_graph_ids -%}
+
+Note: Graphs marked [INDEXING - NOT AVAILABLE] are currently being built. Do not attempt to query these graphs until indexing is complete.
+{% endif -%}
 
 {% else -%}
 
-{% if is_tui_context -%}
+{% if indexing_graph_ids -%}
+A codebase is currently being indexed. This process can take a few minutes for large codebases. Once indexing completes, you will be able to query the code structure and answer questions about it.
+
+Please ask the user to wait for indexing to finish before asking questions about the codebase.
+{% elif is_tui_context -%}
 No codebase has been indexed yet. To enable code analysis, please tell the user to restart the TUI and follow the prompt to 'Index this codebase?' when it appears.
 {% else -%}
 No codebase has been indexed yet. If the user needs code analysis, ask them to index a codebase first.

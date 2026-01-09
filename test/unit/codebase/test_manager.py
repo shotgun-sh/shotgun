@@ -183,7 +183,7 @@ async def test_get_or_create_connection_reuses_existing():
             assert CodebaseGraphManager._connections[graph_id] == mock_conn
 
 
-def test_generate_graph_id():
+def testgenerate_graph_id():
     """Test graph ID generation."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         storage_dir = Path(tmp_dir)
@@ -196,7 +196,7 @@ def test_generate_graph_id():
         normalized = str(Path(repo_path).resolve())
         expected_hash = hashlib.sha256(normalized.encode()).hexdigest()[:12]
 
-        graph_id = manager._generate_graph_id(repo_path)
+        graph_id = manager.generate_graph_id(repo_path)
 
         assert graph_id == expected_hash
         assert len(graph_id) == 12
@@ -415,7 +415,7 @@ async def test_build_graph(temp_storage_dir, unique_graph_id):
         with (
             patch.object(Path, "exists", mock_exists),
             patch.object(Path, "is_dir", mock_is_dir),
-            patch.object(manager, "_generate_graph_id", return_value="test-unique-id"),
+            patch.object(manager, "generate_graph_id", return_value="test-unique-id"),
             patch(
                 "anyio.to_thread.run_sync"
             ) as mock_run_sync,  # Mock threaded ingestor call
@@ -756,8 +756,8 @@ def test_hash_consistency():
             manager = CodebaseGraphManager(storage_dir)
 
         repo_path = "/path/to/repo"
-        hash1 = manager._generate_graph_id(repo_path)
-        hash2 = manager._generate_graph_id(repo_path)
+        hash1 = manager.generate_graph_id(repo_path)
+        hash2 = manager.generate_graph_id(repo_path)
 
         assert hash1 == hash2
 

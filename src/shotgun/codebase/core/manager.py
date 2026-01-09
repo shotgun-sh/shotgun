@@ -200,7 +200,7 @@ class CodebaseGraphManager:
         return cls._lock
 
     @classmethod
-    def _generate_graph_id(cls, repo_path: str) -> str:
+    def generate_graph_id(cls, repo_path: str) -> str:
         """Generate deterministic graph ID from repository path."""
         normalized = str(Path(repo_path).resolve())
         return hashlib.sha256(normalized.encode()).hexdigest()[:12]
@@ -359,7 +359,7 @@ class CodebaseGraphManager:
             Created graph metadata
         """
         repo_path = str(Path(repo_path).resolve())
-        graph_id = self._generate_graph_id(repo_path)
+        graph_id = self.generate_graph_id(repo_path)
 
         # Use repository name as default name
         if not name:
@@ -1979,7 +1979,7 @@ class CodebaseGraphManager:
             Graph ID of the graph being built
         """
         repo_path = str(Path(repo_path).resolve())
-        graph_id = self._generate_graph_id(repo_path)
+        graph_id = self.generate_graph_id(repo_path)
 
         # Use repository name as default name
         if not name:

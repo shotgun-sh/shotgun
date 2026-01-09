@@ -8,6 +8,7 @@ from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.codebase.core.code_retrieval import retrieve_code_by_qualified_name
 from shotgun.codebase.core.language_config import get_language_config
+from shotgun.codebase.indexing_state import IndexingState
 from shotgun.logging_config import get_logger
 
 from .models import CodeSnippetResult
@@ -41,6 +42,14 @@ async def retrieve_code(
                 found=False,
                 qualified_name=qualified_name,
                 error="No codebase indexed",
+            )
+
+        # Check if graph is currently being indexed
+        if ctx.deps.codebase_service.indexing.is_active(graph_id):
+            return CodeSnippetResult(
+                found=False,
+                qualified_name=qualified_name,
+                error=IndexingState.INDEXING_IN_PROGRESS_ERROR,
             )
 
         # Use the existing code retrieval functionality

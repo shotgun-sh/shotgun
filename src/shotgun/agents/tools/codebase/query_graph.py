@@ -4,6 +4,7 @@ from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
+from shotgun.codebase.indexing_state import IndexingState
 from shotgun.codebase.models import QueryType
 from shotgun.logging_config import get_logger
 
@@ -38,6 +39,14 @@ async def query_graph(
                 success=False,
                 query=query,
                 error="No codebase indexed",
+            )
+
+        # Check if graph is currently being indexed
+        if ctx.deps.codebase_service.indexing.is_active(graph_id):
+            return QueryGraphResult(
+                success=False,
+                query=query,
+                error=IndexingState.INDEXING_IN_PROGRESS_ERROR,
             )
 
         # Execute natural language query
