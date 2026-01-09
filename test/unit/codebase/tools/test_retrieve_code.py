@@ -69,3 +69,19 @@ async def test_retrieve_code_not_found(mock_run_context, mock_codebase_service):
         assert isinstance(result, CodeSnippetResult)
         assert result.found is False
         assert "Not Found" in str(result)
+
+
+@pytest.mark.asyncio
+async def test_retrieve_code_while_indexing(mock_run_context, mock_codebase_service):
+    """Test retrieve_code returns error when graph is being indexed."""
+    # Mark graph as currently being indexed
+    mock_codebase_service.indexing.is_active.return_value = True
+
+    result = await retrieve_code_module.retrieve_code(
+        mock_run_context, "graph-id", "test.module.Class"
+    )
+
+    assert isinstance(result, CodeSnippetResult)
+    assert result.found is False
+    assert result.error is not None
+    assert "currently being indexed" in result.error

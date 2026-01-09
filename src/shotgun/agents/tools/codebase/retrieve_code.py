@@ -43,6 +43,14 @@ async def retrieve_code(
                 error="No codebase indexed",
             )
 
+        # Check if graph is currently being indexed
+        if ctx.deps.codebase_service.indexing.is_active(graph_id):
+            return CodeSnippetResult(
+                found=False,
+                qualified_name=qualified_name,
+                error="This codebase is currently being indexed. Please wait for indexing to complete before retrieving code.",
+            )
+
         # Use the existing code retrieval functionality
         code_snippet = await retrieve_code_by_qualified_name(
             manager=ctx.deps.codebase_service.manager,

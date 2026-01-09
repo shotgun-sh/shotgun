@@ -40,6 +40,14 @@ async def query_graph(
                 error="No codebase indexed",
             )
 
+        # Check if graph is currently being indexed
+        if ctx.deps.codebase_service.indexing.is_active(graph_id):
+            return QueryGraphResult(
+                success=False,
+                query=query,
+                error="This codebase is currently being indexed. Please wait for indexing to complete before querying.",
+            )
+
         # Execute natural language query
         result = await ctx.deps.codebase_service.execute_query(
             graph_id=graph_id,

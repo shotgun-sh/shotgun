@@ -5,8 +5,17 @@
 You have access to the following codebase graphs:
 
 {% for graph in codebase_understanding_graphs -%}
+{% if indexing_graph_ids and graph.graph_id in indexing_graph_ids -%}
+- {{ graph.name }} ID: {{ graph.graph_id }} Path: {{ graph.repo_path }} **[INDEXING - NOT AVAILABLE]**
+{% else -%}
 - {{ graph.name }} ID: {{ graph.graph_id }} Path: {{ graph.repo_path }}
+{% endif -%}
 {% endfor -%}
+
+{% if indexing_graph_ids -%}
+
+Note: Graphs marked [INDEXING - NOT AVAILABLE] are currently being built. Do not attempt to query these graphs until indexing is complete.
+{% endif -%}
 
 {% else -%}
 

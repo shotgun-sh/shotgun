@@ -1504,203 +1504,227 @@ class ChatScreen(Screen[None]):
     async def index_codebase(self, selection: CodebaseIndexSelection) -> None:
         index_start_time = time.time()
 
+        # Compute graph_id to track indexing state
+        graph_id = self.codebase_sdk.service.compute_graph_id(selection.repo_path)
+
+        # Mark indexing as started and show hint
+        await self.codebase_sdk.service.indexing.start(graph_id)
+        self.agent_manager.add_hint_message(
+            HintMessage(
+                message="Indexing has started. The codebase graph will be "
+                "inaccessible to the AI Agents until this is completed."
+            )
+        )
+
         label = self.query_one("#indexing-job-display", Static)
         label.update(
             f"[$foreground-muted]Indexing codebase: [bold $text-accent]{selection.name}[/][/]"
         )
         label.refresh()
 
-        def create_progress_bar(percentage: float, width: int = 20) -> str:
-            """Create a visual progress bar using Unicode block characters."""
-            filled = int((percentage / 100) * width)
-            empty = width - filled
-            return "▓" * filled + "░" * empty
+        # Track progress timer for cleanup
+        progress_timer = None
 
-        # Spinner animation frames
-        spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        try:
 
-        # Progress state (shared between timer and progress callback)
-        progress_state: dict[str, int | float] = {
-            "frame_index": 0,
-            "percentage": 0.0,
-        }
+            def create_progress_bar(percentage: float, width: int = 20) -> str:
+                """Create a visual progress bar using Unicode block characters."""
+                filled = int((percentage / 100) * width)
+                empty = width - filled
+                return "▓" * filled + "░" * empty
 
-        def update_progress_display() -> None:
-            """Update progress bar on timer - runs every 100ms."""
-            # Advance spinner frame
-            frame_idx = int(progress_state["frame_index"])
-            progress_state["frame_index"] = (frame_idx + 1) % len(spinner_frames)
-            spinner = spinner_frames[frame_idx]
+            # Spinner animation frames
+            spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
-            # Get current state
-            pct = float(progress_state["percentage"])
-            bar = create_progress_bar(pct)
+            # Progress state (shared between timer and progress callback)
+            progress_state: dict[str, int | float] = {
+                "frame_index": 0,
+                "percentage": 0.0,
+            }
 
-            # Update label
-            label.update(
-                f"[$foreground-muted]Indexing codebase: {spinner} {bar} {pct:.0f}%[/]"
-            )
+            def update_progress_display() -> None:
+                """Update progress bar on timer - runs every 100ms."""
+                # Advance spinner frame
+                frame_idx = int(progress_state["frame_index"])
+                progress_state["frame_index"] = (frame_idx + 1) % len(spinner_frames)
+                spinner = spinner_frames[frame_idx]
 
-        def progress_callback(progress_info: IndexProgress) -> None:
-            """Update progress state (timer renders it independently)."""
-            # Calculate overall percentage with weights based on actual timing:
-            # Structure: 0-2%, Definitions: 2-18%, Relationships: 18-20%
-            # Flush nodes: 20-28%, Flush relationships: 28-100%
-            if progress_info.phase == ProgressPhase.STRUCTURE:
-                # Phase 1: 0-2% (actual: ~0%)
-                overall_pct = 2.0 if progress_info.phase_complete else 1.0
-            elif progress_info.phase == ProgressPhase.DEFINITIONS:
-                # Phase 2: 2-18% based on files processed (actual: ~16%)
-                if progress_info.total and progress_info.total > 0:
-                    phase_pct = (progress_info.current / progress_info.total) * 16.0
-                    overall_pct = 2.0 + phase_pct
-                else:
-                    overall_pct = 2.0
-            elif progress_info.phase == ProgressPhase.RELATIONSHIPS:
-                # Phase 3: 18-20% based on relationships processed (actual: ~0.3%)
-                if progress_info.total and progress_info.total > 0:
-                    phase_pct = (progress_info.current / progress_info.total) * 2.0
-                    overall_pct = 18.0 + phase_pct
-                else:
-                    overall_pct = 18.0
-            elif progress_info.phase == ProgressPhase.FLUSH_NODES:
-                # Phase 4: 20-28% based on nodes flushed (actual: ~7.5%)
-                if progress_info.total and progress_info.total > 0:
-                    phase_pct = (progress_info.current / progress_info.total) * 8.0
-                    overall_pct = 20.0 + phase_pct
-                else:
-                    overall_pct = 20.0
-            elif progress_info.phase == ProgressPhase.FLUSH_RELATIONSHIPS:
-                # Phase 5: 28-100% based on relationships flushed (actual: ~76%)
-                if progress_info.total and progress_info.total > 0:
-                    phase_pct = (progress_info.current / progress_info.total) * 72.0
-                    overall_pct = 28.0 + phase_pct
-                else:
-                    overall_pct = 28.0
-            else:
-                overall_pct = 0.0
+                # Get current state
+                pct = float(progress_state["percentage"])
+                bar = create_progress_bar(pct)
 
-            # Update shared state (timer will render it)
-            progress_state["percentage"] = overall_pct
-
-        # Start progress animation timer (10 fps = 100ms interval)
-        progress_timer = self.set_interval(0.1, update_progress_display)
-
-        # Retry logic for handling kuzu corruption
-        max_retries = 3
-
-        for attempt in range(max_retries):
-            try:
-                # Clean up corrupted DBs before retry (skip on first attempt)
-                if attempt > 0:
-                    logger.info(
-                        f"Retry attempt {attempt + 1}/{max_retries} - cleaning up corrupted databases"
-                    )
-                    manager = CodebaseGraphManager(
-                        self.codebase_sdk.service.storage_dir
-                    )
-                    cleaned = await manager.cleanup_corrupted_databases()
-                    logger.info(f"Cleaned up {len(cleaned)} corrupted database(s)")
-                    self.agent_manager.add_hint_message(
-                        HintMessage(
-                            message=f"🔄 Retrying indexing after cleanup (attempt {attempt + 1}/{max_retries})..."
-                        )
-                    )
-
-                # Pass the current working directory as the indexed_from_cwd
-                logger.debug(
-                    f"Starting indexing - repo_path: {selection.repo_path}, "
-                    f"name: {selection.name}, cwd: {Path.cwd().resolve()}"
-                )
-                result = await self.codebase_sdk.index_codebase(
-                    selection.repo_path,
-                    selection.name,
-                    indexed_from_cwd=str(Path.cwd().resolve()),
-                    progress_callback=progress_callback,
-                )
-
-                # Success! Stop progress animation
-                progress_timer.stop()
-
-                # Show 100% completion after indexing finishes
-                final_bar = create_progress_bar(100.0)
+                # Update label
                 label.update(
-                    f"[$foreground-muted]Indexing codebase: {final_bar} 100%[/]"
-                )
-                label.refresh()
-
-                # Calculate duration and format message
-                duration = time.time() - index_start_time
-                duration_str = _format_duration(duration)
-                entity_count = result.node_count + result.relationship_count
-                entity_str = _format_count(entity_count)
-
-                logger.info(
-                    f"Successfully indexed codebase '{result.name}' in {duration_str} "
-                    f"({entity_count} entities)"
-                )
-                self.agent_manager.add_hint_message(
-                    HintMessage(
-                        message=f"✓ Indexed '{result.name}' in {duration_str} ({entity_str} entities)"
-                    )
-                )
-                break  # Success - exit retry loop
-
-            except CodebaseAlreadyIndexedError as exc:
-                progress_timer.stop()
-                logger.warning(f"Codebase already indexed: {exc}")
-                self.agent_manager.add_hint_message(HintMessage(message=f"⚠️ {exc}"))
-                return
-            except InvalidPathError as exc:
-                progress_timer.stop()
-                logger.error(f"Invalid path error: {exc}")
-                self.agent_manager.add_hint_message(HintMessage(message=f"❌ {exc}"))
-                return
-            except KuzuImportError as exc:
-                progress_timer.stop()
-                logger.error(f"Kuzu import error (Windows DLL issue): {exc}")
-                # Show dialog with copy button for Windows users
-                await self.app.push_screen_wait(KuzuErrorDialog())
-                return
-
-            except Exception as exc:  # pragma: no cover - defensive UI path
-                # Check if this is a kuzu corruption error and we have retries left
-                if attempt < max_retries - 1 and self._is_kuzu_corruption_error(exc):
-                    logger.warning(
-                        f"Kuzu corruption detected on attempt {attempt + 1}/{max_retries}: {exc}. "
-                        f"Will retry after cleanup..."
-                    )
-                    # Exponential backoff: 1s, 2s
-                    await asyncio.sleep(2**attempt)
-                    continue
-
-                # Either final retry failed OR not a corruption error - show error
-                logger.exception(
-                    f"Failed to index codebase after {attempt + 1} attempts - "
-                    f"repo_path: {selection.repo_path}, name: {selection.name}, error: {exc}"
+                    f"[$foreground-muted]Indexing codebase: {spinner} {bar} {pct:.0f}%[/]"
                 )
 
-                # Provide helpful error message with correct path for kuzu errors
-                if self._is_kuzu_corruption_error(exc):
-                    storage_dir = self.codebase_sdk.service.storage_dir
-                    self.agent_manager.add_hint_message(
-                        HintMessage(
-                            message=(
-                                f"❌ Database error during indexing. "
-                                f"Try deleting files in: {storage_dir}"
+            def progress_callback(progress_info: IndexProgress) -> None:
+                """Update progress state (timer renders it independently)."""
+                # Calculate overall percentage with weights based on actual timing:
+                # Structure: 0-2%, Definitions: 2-18%, Relationships: 18-20%
+                # Flush nodes: 20-28%, Flush relationships: 28-100%
+                if progress_info.phase == ProgressPhase.STRUCTURE:
+                    # Phase 1: 0-2% (actual: ~0%)
+                    overall_pct = 2.0 if progress_info.phase_complete else 1.0
+                elif progress_info.phase == ProgressPhase.DEFINITIONS:
+                    # Phase 2: 2-18% based on files processed (actual: ~16%)
+                    if progress_info.total and progress_info.total > 0:
+                        phase_pct = (progress_info.current / progress_info.total) * 16.0
+                        overall_pct = 2.0 + phase_pct
+                    else:
+                        overall_pct = 2.0
+                elif progress_info.phase == ProgressPhase.RELATIONSHIPS:
+                    # Phase 3: 18-20% based on relationships processed (actual: ~0.3%)
+                    if progress_info.total and progress_info.total > 0:
+                        phase_pct = (progress_info.current / progress_info.total) * 2.0
+                        overall_pct = 18.0 + phase_pct
+                    else:
+                        overall_pct = 18.0
+                elif progress_info.phase == ProgressPhase.FLUSH_NODES:
+                    # Phase 4: 20-28% based on nodes flushed (actual: ~7.5%)
+                    if progress_info.total and progress_info.total > 0:
+                        phase_pct = (progress_info.current / progress_info.total) * 8.0
+                        overall_pct = 20.0 + phase_pct
+                    else:
+                        overall_pct = 20.0
+                elif progress_info.phase == ProgressPhase.FLUSH_RELATIONSHIPS:
+                    # Phase 5: 28-100% based on relationships flushed (actual: ~76%)
+                    if progress_info.total and progress_info.total > 0:
+                        phase_pct = (progress_info.current / progress_info.total) * 72.0
+                        overall_pct = 28.0 + phase_pct
+                    else:
+                        overall_pct = 28.0
+                else:
+                    overall_pct = 0.0
+
+                # Update shared state (timer will render it)
+                progress_state["percentage"] = overall_pct
+
+            # Start progress animation timer (10 fps = 100ms interval)
+            progress_timer = self.set_interval(0.1, update_progress_display)
+
+            # Retry logic for handling kuzu corruption
+            max_retries = 3
+
+            for attempt in range(max_retries):
+                try:
+                    # Clean up corrupted DBs before retry (skip on first attempt)
+                    if attempt > 0:
+                        logger.info(
+                            f"Retry attempt {attempt + 1}/{max_retries} - cleaning up corrupted databases"
+                        )
+                        manager = CodebaseGraphManager(
+                            self.codebase_sdk.service.storage_dir
+                        )
+                        cleaned = await manager.cleanup_corrupted_databases()
+                        logger.info(f"Cleaned up {len(cleaned)} corrupted database(s)")
+                        self.agent_manager.add_hint_message(
+                            HintMessage(
+                                message=f"🔄 Retrying indexing after cleanup (attempt {attempt + 1}/{max_retries})..."
                             )
                         )
-                    )
-                else:
-                    self.agent_manager.add_hint_message(
-                        HintMessage(message=f"❌ Failed to index codebase: {exc}")
-                    )
-                break
 
-        # Always stop the progress timer and clean up label
-        progress_timer.stop()
-        label.update("")
-        label.refresh()
+                    # Pass the current working directory as the indexed_from_cwd
+                    logger.debug(
+                        f"Starting indexing - repo_path: {selection.repo_path}, "
+                        f"name: {selection.name}, cwd: {Path.cwd().resolve()}"
+                    )
+                    result = await self.codebase_sdk.index_codebase(
+                        selection.repo_path,
+                        selection.name,
+                        indexed_from_cwd=str(Path.cwd().resolve()),
+                        progress_callback=progress_callback,
+                    )
+
+                    # Success! Stop progress animation
+                    progress_timer.stop()
+
+                    # Show 100% completion after indexing finishes
+                    final_bar = create_progress_bar(100.0)
+                    label.update(
+                        f"[$foreground-muted]Indexing codebase: {final_bar} 100%[/]"
+                    )
+                    label.refresh()
+
+                    # Calculate duration and format message
+                    duration = time.time() - index_start_time
+                    duration_str = _format_duration(duration)
+                    entity_count = result.node_count + result.relationship_count
+                    entity_str = _format_count(entity_count)
+
+                    logger.info(
+                        f"Successfully indexed codebase '{result.name}' in {duration_str} "
+                        f"({entity_count} entities)"
+                    )
+                    self.agent_manager.add_hint_message(
+                        HintMessage(
+                            message=f"✓ Indexed '{result.name}' in {duration_str} ({entity_str} entities). "
+                            "Codebase graph is now accessible."
+                        )
+                    )
+                    break  # Success - exit retry loop
+
+                except CodebaseAlreadyIndexedError as exc:
+                    progress_timer.stop()
+                    logger.warning(f"Codebase already indexed: {exc}")
+                    self.agent_manager.add_hint_message(HintMessage(message=f"⚠️ {exc}"))
+                    return
+                except InvalidPathError as exc:
+                    progress_timer.stop()
+                    logger.error(f"Invalid path error: {exc}")
+                    self.agent_manager.add_hint_message(
+                        HintMessage(message=f"❌ {exc}")
+                    )
+                    return
+                except KuzuImportError as exc:
+                    progress_timer.stop()
+                    logger.error(f"Kuzu import error (Windows DLL issue): {exc}")
+                    # Show dialog with copy button for Windows users
+                    await self.app.push_screen_wait(KuzuErrorDialog())
+                    return
+
+                except Exception as exc:  # pragma: no cover - defensive UI path
+                    # Check if this is a kuzu corruption error and we have retries left
+                    if attempt < max_retries - 1 and self._is_kuzu_corruption_error(
+                        exc
+                    ):
+                        logger.warning(
+                            f"Kuzu corruption detected on attempt {attempt + 1}/{max_retries}: {exc}. "
+                            f"Will retry after cleanup..."
+                        )
+                        # Exponential backoff: 1s, 2s
+                        await asyncio.sleep(2**attempt)
+                        continue
+
+                    # Either final retry failed OR not a corruption error - show error
+                    logger.exception(
+                        f"Failed to index codebase after {attempt + 1} attempts - "
+                        f"repo_path: {selection.repo_path}, name: {selection.name}, error: {exc}"
+                    )
+
+                    # Provide helpful error message with correct path for kuzu errors
+                    if self._is_kuzu_corruption_error(exc):
+                        storage_dir = self.codebase_sdk.service.storage_dir
+                        self.agent_manager.add_hint_message(
+                            HintMessage(
+                                message=(
+                                    f"❌ Database error during indexing. "
+                                    f"Try deleting files in: {storage_dir}"
+                                )
+                            )
+                        )
+                    else:
+                        self.agent_manager.add_hint_message(
+                            HintMessage(message=f"❌ Failed to index codebase: {exc}")
+                        )
+                    break
+        finally:
+            # Always stop the progress timer, clean up label, and mark indexing complete
+            if progress_timer:
+                progress_timer.stop()
+            label.update("")
+            label.refresh()
+            await self.codebase_sdk.service.indexing.complete(graph_id)
 
     @work
     async def run_agent(self, message: str) -> None:

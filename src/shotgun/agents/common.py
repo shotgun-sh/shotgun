@@ -69,6 +69,11 @@ async def add_system_status_message(
         await deps.codebase_service.list_graphs_for_directory()
     )
 
+    # Get graphs currently being indexed
+    indexing_graph_ids: set[str] = set()
+    if deps.codebase_service:
+        indexing_graph_ids = deps.codebase_service.indexing.get_active_ids()
+
     # Get existing files for the agent
     existing_files = get_agent_existing_files(deps.agent_mode)
 
@@ -94,6 +99,7 @@ async def add_system_status_message(
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
+        indexing_graph_ids=indexing_graph_ids,
         is_tui_context=deps.is_tui_context,
         existing_files=existing_files,
         markdown_toc=markdown_toc,
