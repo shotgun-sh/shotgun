@@ -30,14 +30,11 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# Get spawn context once at module level to avoid repeated context creation
-_spawn_context = multiprocessing.get_context("spawn")
-
 # Default timeout for batch processing (5 minutes)
 DEFAULT_BATCH_TIMEOUT_SECONDS = 300.0
 
 
-def _process_batch_wrapper(args: tuple[WorkBatch, int]) -> list[FileParseResult]:
+def _process_batch_wrapper(args: tuple) -> list[FileParseResult]:
     """Wrapper function for process_batch that unpacks tuple arguments.
 
     This is needed because multiprocessing.Pool.imap requires a single-argument function.
@@ -50,6 +47,47 @@ def _process_batch_wrapper(args: tuple[WorkBatch, int]) -> list[FileParseResult]
     """
     batch, worker_id = args
     return process_batch(batch, worker_id)
+
+
+def _create_pool(worker_count: int) -> multiprocessing.pool.Pool:
+    """Create a multiprocessing Pool with appropriate context.
+
+    Tries different multiprocessing start methods to find one that works
+    in the current environment. Order of preference:
+    1. forkserver - cleanest isolation, avoids TUI fd issues
+    2. spawn - good isolation but may fail with TUI fd issues
+    3. fork - works but may have issues with threads
+
+    Args:
+        worker_count: Number of worker processes
+
+    Returns:
+        A multiprocessing Pool instance
+
+    Raises:
+        RuntimeError: If no multiprocessing method works
+    """
+    import sys
+
+    # Try different start methods
+    methods = ["forkserver", "spawn"]
+    if sys.platform != "darwin":
+        methods.append("fork")  # fork is problematic on macOS with threads
+
+    last_error = None
+    for method in methods:
+        try:
+            ctx = multiprocessing.get_context(method)
+            pool = ctx.Pool(processes=worker_count)
+            logger.debug(f"Successfully created pool with '{method}' start method")
+            return pool
+        except (ValueError, OSError) as e:
+            logger.debug(f"Failed to create pool with '{method}': {e}")
+            last_error = e
+            continue
+
+    msg = f"Could not create multiprocessing pool: {last_error}"
+    raise RuntimeError(msg)
 
 
 class ParallelExecutor:
@@ -132,8 +170,9 @@ class ParallelExecutor:
         # Prepare batch arguments with worker_id
         batch_args = [(batch, i % self.worker_count) for i, batch in enumerate(batches)]
 
-        # Use multiprocessing.Pool with spawn context for better isolation
-        with _spawn_context.Pool(processes=self.worker_count) as pool:
+        # Create pool - this may raise an error in certain environments (TUI)
+        pool = _create_pool(self.worker_count)
+        try:
             # Use imap_unordered for better performance with progress tracking
             results_iter = pool.imap_unordered(_process_batch_wrapper, batch_args)
 
@@ -155,6 +194,9 @@ class ParallelExecutor:
                 completed += 1
                 if progress_callback:
                     progress_callback(completed, total_batches)
+        finally:
+            pool.close()
+            pool.join()
 
         total_duration = time.perf_counter() - start_time
         logger.info(f"Parallel execution completed in {total_duration:.2f}s")
