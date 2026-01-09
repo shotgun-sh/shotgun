@@ -5,6 +5,7 @@ from shotgun.codebase.core.code_retrieval import (
     retrieve_code_by_cypher,
     retrieve_code_by_qualified_name,
 )
+from shotgun.codebase.core.gitignore import GitignoreManager, load_gitignore_for_repo
 from shotgun.codebase.core.ingestor import (
     CodebaseIngestor,
     Ingestor,
@@ -29,6 +30,9 @@ __all__ = [
     "Ingestor",
     "SimpleGraphBuilder",
     "CodebaseGraphManager",
+    # Gitignore support
+    "GitignoreManager",
+    "load_gitignore_for_repo",
     # Language configuration
     "LanguageConfig",
     "LANGUAGE_CONFIGS",

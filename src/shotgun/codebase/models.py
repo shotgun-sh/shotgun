@@ -16,6 +16,15 @@ class GraphStatus(StrEnum):
     ERROR = "ERROR"  # Last operation failed
 
 
+class IgnoreReason(StrEnum):
+    """Reason why a file or directory was ignored during indexing."""
+
+    HARDCODED = (
+        "hardcoded"  # Matched hardcoded ignore patterns (venv, node_modules, etc.)
+    )
+    GITIGNORE = "gitignore"  # Matched .gitignore pattern
+
+
 class QueryType(StrEnum):
     """Type of query being executed."""
 
@@ -47,6 +56,42 @@ class IndexProgress(BaseModel):
 
 # Type alias for progress callback function
 ProgressCallback = Callable[[IndexProgress], None]
+
+
+class GitignoreStats(BaseModel):
+    """Statistics from gitignore pattern matching."""
+
+    gitignore_files_loaded: int = Field(
+        default=0, description="Number of .gitignore files loaded"
+    )
+    patterns_loaded: int = Field(default=0, description="Total patterns loaded")
+    files_checked: int = Field(default=0, description="Number of paths checked")
+    files_ignored: int = Field(
+        default=0, description="Number of paths ignored by gitignore"
+    )
+
+
+class IndexingStats(BaseModel):
+    """Statistics from codebase indexing."""
+
+    dirs_scanned: int = Field(default=0, description="Directories scanned")
+    dirs_ignored_hardcoded: int = Field(
+        default=0, description="Directories ignored by hardcoded patterns"
+    )
+    dirs_ignored_gitignore: int = Field(
+        default=0, description="Directories ignored by gitignore"
+    )
+    files_scanned: int = Field(default=0, description="Files scanned")
+    files_ignored_hardcoded: int = Field(
+        default=0, description="Files ignored by hardcoded patterns"
+    )
+    files_ignored_gitignore: int = Field(
+        default=0, description="Files ignored by gitignore"
+    )
+    files_ignored_no_parser: int = Field(
+        default=0, description="Files ignored due to no parser available"
+    )
+    files_processed: int = Field(default=0, description="Files successfully processed")
 
 
 class OperationStats(BaseModel):
