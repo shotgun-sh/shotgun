@@ -77,6 +77,8 @@ class Ingestor:
             tuple[str, str, Any, str, str, str, Any, dict[str, Any] | None]
         ] = []
         self.batch_size = 1000
+        # Track seen primary keys to avoid O(n²) duplicate checking
+        self._seen_node_keys: set[tuple[str, str]] = set()
 
     def create_schema(self) -> None:
         """Create the graph schema in Kuzu."""
@@ -149,10 +151,13 @@ class Ingestor:
 
     def ensure_node_batch(self, label: str, properties: dict[str, Any]) -> None:
         """Add a node to the buffer for batch insertion."""
-        # Check for duplicates based on primary key
+        # Check for duplicates based on primary key using O(1) set lookup
         primary_key = self._get_primary_key(label, properties)
-        if primary_key and self._is_duplicate_node(label, primary_key):
-            return
+        if primary_key:
+            key = (label, primary_key)
+            if key in self._seen_node_keys:
+                return
+            self._seen_node_keys.add(key)
 
         self.node_buffer.append((label, properties))
 
@@ -179,15 +184,6 @@ class Ingestor:
         elif label == "DeletionLog":
             return "id"
         return None
-
-    def _is_duplicate_node(self, label: str, primary_key: str) -> bool:
-        """Check if a node with the given primary key already exists in the buffer."""
-        for buffered_label, buffered_props in self.node_buffer:
-            if buffered_label == label:
-                buffered_key = self._get_primary_key(buffered_label, buffered_props)
-                if buffered_key == primary_key:
-                    return True
-        return False
 
     def flush_nodes(
         self,
@@ -262,6 +258,7 @@ class Ingestor:
             logger.info(f"  {label}: {count}")
 
         self.node_buffer.clear()
+        self._seen_node_keys.clear()
 
     def ensure_relationship_batch(
         self,
