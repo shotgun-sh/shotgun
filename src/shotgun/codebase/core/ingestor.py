@@ -843,7 +843,6 @@ class SimpleGraphBuilder:
                         self._index_stats.dirs_ignored_hardcoded += 1
                     elif reason == IgnoreReason.GITIGNORE:
                         self._index_stats.dirs_ignored_gitignore += 1
-                        logger.debug(f"Skipping gitignored directory: {dir_path}")
                 else:
                     filtered_dirs.append(d)
                     self._index_stats.dirs_scanned += 1
@@ -1026,7 +1025,6 @@ class SimpleGraphBuilder:
                         self._index_stats.files_ignored_hardcoded += 1
                     elif reason == IgnoreReason.GITIGNORE:
                         self._index_stats.files_ignored_gitignore += 1
-                        logger.debug(f"Skipping gitignored file: {filepath}")
                     continue
 
                 # Check if this is a supported file
@@ -1254,9 +1252,6 @@ class SimpleGraphBuilder:
                     )
 
                     # Create DEFINES relationship
-                    logger.debug(
-                        f"Creating DEFINES relationship: Module({module_qn}) -> Class({class_qn})"
-                    )
                     self.ingestor.ensure_relationship_batch(
                         "Module",
                         "qualified_name",
@@ -1285,7 +1280,6 @@ class SimpleGraphBuilder:
         if "function_query" in lang_queries:
             cursor = QueryCursor(lang_queries["function_query"])
             matches = list(cursor.matches(root_node))
-            logger.debug(f"Found {len(matches)} function matches in {filepath}")
             for match in matches:
                 func_node = None
                 func_name = None
@@ -1299,11 +1293,6 @@ class SimpleGraphBuilder:
                             func_name = node.text.decode("utf-8")
 
                 if func_node and func_name:
-                    # Log what we found
-                    logger.debug(
-                        f"Found function: {func_name} at line {func_node.start_point.row + 1}"
-                    )
-
                     # Check if this is a method inside a class
                     parent_class = self._find_parent_class(func_node, module_qn)
 
@@ -1516,14 +1505,6 @@ class SimpleGraphBuilder:
             f"Simple name lookup has {len(self.simple_name_lookup)} unique names"
         )
 
-        # Log some examples from simple_name_lookup
-        if self.simple_name_lookup:
-            example_names = list(self.simple_name_lookup.keys())[:5]
-            for name in example_names:
-                logger.debug(
-                    f"  Example: '{name}' -> {list(self.simple_name_lookup[name])[:3]}"
-                )
-
         file_count = 0
         for filepath, (root_node, language) in self.ast_cache.items():
             self._process_calls(filepath, root_node, language)
@@ -1565,9 +1546,6 @@ class SimpleGraphBuilder:
                         "qualified_name",
                         parent_qn,
                     )
-                    logger.debug(
-                        f"  Created inheritance: {child_qn} INHERITS {parent_qn}"
-                    )
                 else:
                     # Try to find parent by simple name lookup
                     parent_simple_name = parent_qn.split(".")[-1]
@@ -1586,13 +1564,6 @@ class SimpleGraphBuilder:
                             "Class",
                             "qualified_name",
                             actual_parent_qn,
-                        )
-                        logger.debug(
-                            f"  Created inheritance: {child_qn} INHERITS {actual_parent_qn}"
-                        )
-                    else:
-                        logger.debug(
-                            f"  Could not resolve parent class: {parent_qn} for {child_qn}"
                         )
 
     def _process_calls(self, filepath: Path, root_node: Node, language: str) -> None:
@@ -1614,7 +1585,6 @@ class SimpleGraphBuilder:
         # Find all call expressions
         cursor = QueryCursor(lang_queries["call_query"])
         matches = list(cursor.matches(root_node))
-        logger.debug(f"Found {len(matches)} call matches in {filepath}")
         for match in matches:
             call_node = None
 
@@ -1653,30 +1623,17 @@ class SimpleGraphBuilder:
                         break
 
         if not callee_name:
-            logger.debug(
-                f"  Could not extract callee name from call at line {call_node.start_point[0]}"
-            )
             return
-
-        logger.debug(f"  Processing call to {callee_name} (object: {object_name})")
 
         # Find caller function
         caller_qn = self._find_containing_function(call_node, module_qn)
         if not caller_qn:
-            logger.debug(
-                f"  Could not find containing function for call at line {call_node.start_point[0]}"
-            )
             return
 
         # Get all possible callees
         possible_callees = self.simple_name_lookup.get(callee_name, set())
         if not possible_callees:
-            logger.debug(f"  No functions found with name: {callee_name}")
             return
-
-        logger.debug(
-            f"  Found {len(possible_callees)} possible callees for {callee_name}"
-        )
 
         # Calculate confidence scores for each possible callee
         scored_callees = []
@@ -1706,26 +1663,6 @@ class SimpleGraphBuilder:
                 callee_type,
                 "qualified_name",
                 callee_qn,
-            )
-
-            # Log with confidence information
-            alternatives = len(scored_callees) - 1
-            logger.info(
-                f"  Created CALLS relationship: {caller_qn} -> {callee_qn} (confidence: {confidence:.2f}, alternatives: {alternatives})"
-            )
-
-            # If multiple alternatives exist with similar confidence, log them
-            if alternatives > 0 and confidence < 1.0:
-                similar_alternatives = [
-                    qn for qn, score in scored_callees[1:4] if score >= confidence * 0.8
-                ]  # Top 3 alternatives  # Within 80% of best score
-                if similar_alternatives:
-                    logger.debug(
-                        f"    Alternative matches: {', '.join(similar_alternatives)}"
-                    )
-        else:
-            logger.warning(
-                f"  Failed to create CALLS relationship - caller_type: {caller_type}, callee_type: {callee_type}"
             )
 
     def _calculate_callee_confidence(
