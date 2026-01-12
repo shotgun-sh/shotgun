@@ -1,7 +1,13 @@
 """Parallel execution framework for file parsing.
 
 This module provides the ParallelExecutor class for distributing
-file parsing work across multiple processes using ProcessPoolExecutor.
+file parsing work across multiple threads using ThreadPoolExecutor.
+
+Note: We use threads instead of processes because multiprocessing has
+file descriptor inheritance issues when running from TUI environments
+(Textual opens FDs that cause "bad value(s) in fds_to_keep" errors).
+Threads avoid this issue entirely and still provide concurrency benefits
+for I/O-bound operations like file reading.
 """
 
 from __future__ import annotations
@@ -9,9 +15,10 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
+from shotgun.codebase.core.call_resolution import calculate_callee_confidence
 from shotgun.codebase.core.metrics_types import (
     FileParseResult,
     InheritanceData,
@@ -35,11 +42,14 @@ DEFAULT_BATCH_TIMEOUT_SECONDS = 300.0
 
 
 class ParallelExecutor:
-    """Executes file parsing in parallel across multiple processes.
+    """Executes file parsing concurrently across multiple threads.
 
-    This class orchestrates parallel file parsing using ProcessPoolExecutor,
+    This class orchestrates concurrent file parsing using ThreadPoolExecutor,
     aggregates results from all workers, and resolves deferred relationships
     that require knowledge of the complete function registry.
+
+    Note: Uses threads instead of processes to avoid file descriptor issues
+    when running from TUI environments.
 
     Attributes:
         worker_count: Number of worker processes to use
@@ -103,13 +113,13 @@ class ParallelExecutor:
         )
 
         logger.info(
-            f"Starting parallel execution: {total_batches} batches, "
-            f"{self.worker_count} workers"
+            f"Starting threaded execution: {total_batches} batches, "
+            f"{self.worker_count} threads"
         )
 
-        # Execute batches in parallel
+        # Execute batches using threads (avoids multiprocessing fd issues)
         completed = 0
-        with ProcessPoolExecutor(max_workers=self.worker_count) as executor:
+        with ThreadPoolExecutor(max_workers=self.worker_count) as executor:
             # Submit all batches with worker_id based on submission order
             futures = {}
             for i, batch in enumerate(batches):
@@ -139,7 +149,6 @@ class ParallelExecutor:
                     logger.warning(
                         f"Batch {batch.batch_id} timed out after {self.batch_timeout}s"
                     )
-                    # Create error results for timed-out tasks
                     for task in batch.tasks:
                         all_results.append(
                             FileParseResult(
@@ -152,7 +161,6 @@ class ParallelExecutor:
 
                 except Exception as e:
                     logger.error(f"Batch {batch.batch_id} failed: {e}")
-                    # Create error results for failed tasks
                     for task in batch.tasks:
                         all_results.append(
                             FileParseResult(
@@ -319,7 +327,7 @@ class ParallelExecutor:
             # Calculate confidence scores and pick best match
             scored_callees = []
             for possible_qn in possible_callees:
-                score = self._calculate_callee_confidence(
+                score = calculate_callee_confidence(
                     caller_qn=call.caller_qn,
                     callee_qn=possible_qn,
                     module_qn=call.module_qn,
@@ -350,71 +358,6 @@ class ParallelExecutor:
                 )
 
         return resolved
-
-    def _calculate_callee_confidence(
-        self,
-        caller_qn: str,
-        callee_qn: str,
-        module_qn: str,
-        object_name: str | None,
-        simple_name_lookup: dict[str, list[str]],
-    ) -> float:
-        """Calculate confidence score for a potential callee match.
-
-        Args:
-            caller_qn: Qualified name of the calling function
-            callee_qn: Qualified name of the potential callee
-            module_qn: Qualified name of the current module
-            object_name: Object name for method calls
-            simple_name_lookup: Complete name lookup for disambiguation
-
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        score = 0.0
-
-        # Module locality - functions in the same module are most likely
-        if callee_qn.startswith(module_qn + "."):
-            score += 0.5
-
-            # Even higher if in the same class
-            caller_parts = caller_qn.split(".")
-            callee_parts = callee_qn.split(".")
-            if len(caller_parts) >= 3 and len(callee_parts) >= 3:
-                if caller_parts[:-1] == callee_parts[:-1]:
-                    score += 0.2
-
-        # Package locality
-        elif "." in module_qn:
-            package = module_qn.rsplit(".", 1)[0]
-            if callee_qn.startswith(package + "."):
-                score += 0.3
-
-        # Object/class match for method calls
-        if object_name:
-            callee_parts = callee_qn.split(".")
-            if len(callee_parts) >= 2:
-                class_name = callee_parts[-2]
-                if class_name.lower() == object_name.lower():
-                    score += 0.3
-                elif object_name == "self" and callee_qn.startswith(
-                    caller_qn.rsplit(".", 1)[0]
-                ):
-                    score += 0.4
-
-        # Standard library boost
-        if callee_qn.startswith(("builtins.", "typing.", "collections.")):
-            score += 0.1
-
-        # Name uniqueness boost
-        callee_simple_name = callee_qn.split(".")[-1]
-        possible_count = len(simple_name_lookup.get(callee_simple_name, []))
-        if possible_count == 1:
-            score += 0.2
-        elif possible_count <= 3:
-            score += 0.1
-
-        return min(score, 1.0)
 
     def _resolve_inheritance_relationships(
         self,

@@ -7,7 +7,6 @@ across workers with size-balanced distribution for optimal load balancing.
 from __future__ import annotations
 
 import multiprocessing
-import os
 
 from shotgun.codebase.core.metrics_types import (
     DistributionStats,
@@ -16,6 +15,7 @@ from shotgun.codebase.core.metrics_types import (
     WorkBatch,
 )
 from shotgun.logging_config import get_logger
+from shotgun.settings import settings
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ __all__ = [
 def get_worker_count() -> int:
     """Determine optimal worker count for parallel execution.
 
-    Uses environment variable override if set, otherwise uses adaptive
+    Uses settings override if set, otherwise uses adaptive
     defaults based on CPU count:
     - For 4+ cores: max(2, cpu_count - 2)
     - For 1-3 cores: max(1, cpu_count - 1)
@@ -46,18 +46,11 @@ def get_worker_count() -> int:
     Returns:
         Number of workers to use for parallel execution.
     """
-    # Check environment variable first
-    env_workers = os.environ.get("SHOTGUN_INDEX_WORKERS")
-    if env_workers:
-        try:
-            count = int(env_workers)
-            result = max(1, count)
-            logger.debug(f"Worker count from SHOTGUN_INDEX_WORKERS: {result}")
-            return result
-        except ValueError:
-            logger.warning(
-                f"Invalid SHOTGUN_INDEX_WORKERS value '{env_workers}', using default"
-            )
+    # Check settings override first
+    if settings.indexing.index_workers is not None:
+        result = max(1, settings.indexing.index_workers)
+        logger.debug(f"Worker count from SHOTGUN_INDEX_WORKERS: {result}")
+        return result
 
     cpu_count = multiprocessing.cpu_count()
     if cpu_count >= 4:
@@ -72,24 +65,15 @@ def get_worker_count() -> int:
 def get_batch_size() -> int:
     """Get the batch size for grouping file parsing tasks.
 
-    Checks SHOTGUN_INDEX_BATCH_SIZE environment variable for override,
-    otherwise returns the default of 20 files per batch.
+    Checks settings for override, otherwise returns the default of 20 files per batch.
 
     Returns:
         Number of files to include in each work batch.
     """
-    env_batch_size = os.environ.get("SHOTGUN_INDEX_BATCH_SIZE")
-    if env_batch_size:
-        try:
-            size = int(env_batch_size)
-            result = max(1, size)
-            logger.debug(f"Batch size from SHOTGUN_INDEX_BATCH_SIZE: {result}")
-            return result
-        except ValueError:
-            logger.warning(
-                f"Invalid SHOTGUN_INDEX_BATCH_SIZE value '{env_batch_size}', "
-                f"using default ({DEFAULT_BATCH_SIZE})"
-            )
+    if settings.indexing.index_batch_size is not None:
+        result = max(1, settings.indexing.index_batch_size)
+        logger.debug(f"Batch size from SHOTGUN_INDEX_BATCH_SIZE: {result}")
+        return result
 
     return DEFAULT_BATCH_SIZE
 

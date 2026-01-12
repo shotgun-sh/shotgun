@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import multiprocessing
 import os
 import time
 import uuid
@@ -16,11 +17,25 @@ from typing import TYPE_CHECKING, Any
 import aiofiles
 from tree_sitter import Node, Parser, QueryCursor
 
+from shotgun.codebase.core.call_resolution import calculate_callee_confidence
 from shotgun.codebase.core.gitignore import GitignoreManager
 from shotgun.codebase.core.kuzu_compat import get_kuzu
 from shotgun.codebase.core.metrics_collector import MetricsCollector
-from shotgun.codebase.core.metrics_types import IndexingPhase
-from shotgun.codebase.models import IgnoreReason, IndexingStats
+from shotgun.codebase.core.metrics_types import (
+    FileInfo,
+    IndexingPhase,
+    ParallelExecutionResult,
+)
+from shotgun.codebase.core.parallel_executor import ParallelExecutor
+from shotgun.codebase.core.work_distributor import WorkDistributor, get_worker_count
+from shotgun.codebase.models import (
+    IgnoreReason,
+    IndexingStats,
+    IndexProgress,
+    ProgressPhase,
+)
+from shotgun.posthog_telemetry import track_event
+from shotgun.settings import settings
 
 if TYPE_CHECKING:
     import real_ladybug as kuzu
@@ -63,6 +78,8 @@ class Ingestor:
             tuple[str, str, Any, str, str, str, Any, dict[str, Any] | None]
         ] = []
         self.batch_size = 1000
+        # Track seen primary keys to avoid O(n²) duplicate checking
+        self._seen_node_keys: set[tuple[str, str]] = set()
 
     def create_schema(self) -> None:
         """Create the graph schema in Kuzu."""
@@ -135,10 +152,13 @@ class Ingestor:
 
     def ensure_node_batch(self, label: str, properties: dict[str, Any]) -> None:
         """Add a node to the buffer for batch insertion."""
-        # Check for duplicates based on primary key
+        # Check for duplicates based on primary key using O(1) set lookup
         primary_key = self._get_primary_key(label, properties)
-        if primary_key and self._is_duplicate_node(label, primary_key):
-            return
+        if primary_key:
+            key = (label, primary_key)
+            if key in self._seen_node_keys:
+                return
+            self._seen_node_keys.add(key)
 
         self.node_buffer.append((label, properties))
 
@@ -165,15 +185,6 @@ class Ingestor:
         elif label == "DeletionLog":
             return "id"
         return None
-
-    def _is_duplicate_node(self, label: str, primary_key: str) -> bool:
-        """Check if a node with the given primary key already exists in the buffer."""
-        for buffered_label, buffered_props in self.node_buffer:
-            if buffered_label == label:
-                buffered_key = self._get_primary_key(buffered_label, buffered_props)
-                if buffered_key == primary_key:
-                    return True
-        return False
 
     def flush_nodes(
         self,
@@ -248,6 +259,7 @@ class Ingestor:
             logger.info(f"  {label}: {count}")
 
         self.node_buffer.clear()
+        self._seen_node_keys.clear()
 
     def ensure_relationship_batch(
         self,
@@ -592,6 +604,7 @@ class SimpleGraphBuilder:
         progress_callback: Any | None = None,
         respect_gitignore: bool = True,
         metrics_collector: MetricsCollector | None = None,
+        enable_parallel: bool = True,
     ):
         self.ingestor = ingestor
         self.repo_path = repo_path
@@ -629,6 +642,153 @@ class SimpleGraphBuilder:
         self.simple_name_lookup: dict[str, set[str]] = defaultdict(set)
         self.class_inheritance: dict[str, list[str]] = {}  # class_qn -> [parent_qns]
 
+        # Parallel execution support
+        self.enable_parallel = enable_parallel
+        self.parallel_executor: ParallelExecutor | None = None
+        self._parallel_mode_active = False  # Track if parallel was used for this run
+        self._worker_count = 0
+        self._init_parallel_executor()
+
+    def _init_parallel_executor(self) -> None:
+        """Initialize parallel executor if conditions are met.
+
+        Conditions for parallel execution:
+        1. enable_parallel=True (constructor parameter)
+        2. settings.indexing.index_parallel is True
+        3. CPU count >= 4
+        """
+        # Check settings override
+        if not settings.indexing.index_parallel:
+            logger.info("Parallel indexing disabled via SHOTGUN_INDEX_PARALLEL=false")
+            return
+
+        if not self.enable_parallel:
+            logger.debug("Parallel indexing disabled via enable_parallel=False")
+            return
+
+        cpu_count = multiprocessing.cpu_count()
+        if cpu_count < 4:
+            logger.info(f"Parallel indexing disabled: CPU count ({cpu_count}) < 4")
+            return
+
+        worker_count = get_worker_count()
+        self.parallel_executor = ParallelExecutor(
+            worker_count=worker_count,
+            metrics_collector=self.metrics_collector,
+        )
+        self._worker_count = worker_count
+        logger.info(f"Parallel indexing enabled with {worker_count} workers")
+
+    def _build_file_infos(
+        self, files_to_process: list[tuple[Path, str]]
+    ) -> list[FileInfo]:
+        """Convert files_to_process list to FileInfo objects for parallel execution.
+
+        Args:
+            files_to_process: List of (filepath, language) tuples
+
+        Returns:
+            List of FileInfo objects ready for WorkDistributor
+        """
+        file_infos: list[FileInfo] = []
+
+        for filepath, language in files_to_process:
+            relative_path = filepath.relative_to(self.repo_path)
+
+            # Compute module_qn (same logic as _process_single_file)
+            if filepath.name == "__init__.py":
+                module_qn = ".".join(
+                    [self.project_name] + list(relative_path.parent.parts)
+                )
+            else:
+                module_qn = ".".join(
+                    [self.project_name] + list(relative_path.with_suffix("").parts)
+                )
+
+            # Get container qualified name from structural elements
+            parent_rel_path = relative_path.parent
+            container_qn = self.structural_elements.get(parent_rel_path)
+
+            try:
+                file_size = filepath.stat().st_size
+            except OSError:
+                file_size = 0
+
+            file_infos.append(
+                FileInfo(
+                    file_path=filepath,
+                    relative_path=relative_path,
+                    language=language,
+                    module_qn=module_qn,
+                    container_qn=container_qn,
+                    file_size_bytes=file_size,
+                )
+            )
+
+        return file_infos
+
+    def _merge_parallel_results(self, result: ParallelExecutionResult) -> None:
+        """Merge parallel execution results into Ingestor buffers and local caches.
+
+        Args:
+            result: ParallelExecutionResult containing all parsed file data
+        """
+        # Merge nodes and direct relationships from each file
+        for file_result in result.results:
+            if not file_result.success:
+                logger.warning(
+                    f"File {file_result.task.file_path} failed: {file_result.error}"
+                )
+                continue
+
+            # Add nodes to buffer
+            for node in file_result.nodes:
+                self.ingestor.ensure_node_batch(node.label, node.properties)
+
+            # Add direct relationships to buffer
+            for rel in file_result.relationships:
+                self.ingestor.ensure_relationship_batch(
+                    rel.from_label,
+                    rel.from_key,
+                    rel.from_value,
+                    rel.rel_type,
+                    rel.to_label,
+                    rel.to_key,
+                    rel.to_value,
+                    rel.properties,
+                )
+
+        # Add resolved relationships (calls, inheritance) from aggregation
+        for rel in result.resolved_relationships:
+            self.ingestor.ensure_relationship_batch(
+                rel.from_label,
+                rel.from_key,
+                rel.from_value,
+                rel.rel_type,
+                rel.to_label,
+                rel.to_key,
+                rel.to_value,
+                rel.properties,
+            )
+
+        # Merge registries into local caches
+        self.function_registry.update(result.function_registry)
+        for name, qns in result.simple_name_lookup.items():
+            for qn in qns:
+                self.simple_name_lookup[name].add(qn)
+
+        # Merge inheritance data for potential future use
+        for file_result in result.results:
+            if file_result.success:
+                for inh in file_result.inheritance_data:
+                    self.class_inheritance[inh.child_class_qn] = inh.parent_simple_names
+
+        logger.info(
+            f"Merged parallel results: {result.successful_files} files, "
+            f"{len(result.function_registry)} registry entries, "
+            f"{len(result.resolved_relationships)} resolved relationships"
+        )
+
     def _report_progress(
         self,
         phase: str,
@@ -642,9 +802,6 @@ class SimpleGraphBuilder:
             return
 
         try:
-            # Import here to avoid circular dependency
-            from shotgun.codebase.models import IndexProgress, ProgressPhase
-
             progress = IndexProgress(
                 phase=ProgressPhase(phase),
                 phase_name=phase_name,
@@ -665,8 +822,6 @@ class SimpleGraphBuilder:
         extra_props: dict[str, Any] | None = None,
     ) -> None:
         """Log timing data to PostHog for analysis."""
-        from shotgun.posthog_telemetry import track_event
-
         properties: dict[str, Any] = {
             "session_id": self._index_session_id,
             "phase": phase,
@@ -686,8 +841,6 @@ class SimpleGraphBuilder:
         total_relationships: int,
     ) -> None:
         """Log indexing summary event to PostHog."""
-        from shotgun.posthog_telemetry import track_event
-
         track_event(
             "codebase_index_completed",
             {
@@ -1097,7 +1250,97 @@ class SimpleGraphBuilder:
             f"{self._index_stats.files_ignored_no_parser} (no parser)"
         )
 
-        # Second pass: Process files with progress reporting
+        # Decide on parallel vs sequential execution
+        # Use parallel if executor available and enough files to benefit
+        if self.parallel_executor and total_files >= 10:
+            await self._process_files_parallel(files_to_process, total_files)
+        else:
+            await self._process_files_sequential(files_to_process, total_files)
+
+    async def _process_files_parallel(
+        self, files_to_process: list[tuple[Path, str]], total_files: int
+    ) -> None:
+        """Process files using parallel execution.
+
+        Args:
+            files_to_process: List of (filepath, language) tuples
+            total_files: Total number of files to process
+        """
+        logger.info(f"Using parallel execution with {self._worker_count} workers")
+        self._parallel_mode_active = True
+
+        try:
+            # Build FileInfo objects for WorkDistributor
+            file_infos = self._build_file_infos(files_to_process)
+
+            # Create work batches using WorkDistributor
+            distributor = WorkDistributor(worker_count=self._worker_count)
+            batches = distributor.create_batches(file_infos)
+
+            logger.info(f"Created {len(batches)} batches for {len(file_infos)} files")
+
+            # Track progress for UI
+            files_completed = 0
+
+            def parallel_progress(completed_batches: int, total_batches: int) -> None:
+                nonlocal files_completed
+                # Estimate files completed based on batch progress
+                if total_batches > 0:
+                    estimated = int((completed_batches / total_batches) * total_files)
+                    files_completed = estimated
+                    self._report_progress(
+                        "definitions",
+                        f"Processing files (Parallel, {self._worker_count} workers)",
+                        files_completed,
+                        total_files,
+                    )
+
+            # Execute in parallel - run blocking executor in thread pool
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self.parallel_executor.execute(batches, parallel_progress),  # type: ignore[union-attr]
+            )
+
+            # Merge results into Ingestor buffers and local caches
+            self._merge_parallel_results(result)
+
+            # Update stats
+            self._index_stats.files_processed = result.successful_files
+
+            # Report phase completion
+            self._report_progress(
+                "definitions",
+                f"Processing files (Parallel, {self._worker_count} workers)",
+                result.successful_files,
+                total_files,
+                phase_complete=True,
+            )
+
+            logger.info(
+                f"Parallel processing complete: {result.successful_files}/{total_files} "
+                f"files, {result.failed_files} failures"
+            )
+
+        except Exception as e:
+            logger.warning(
+                f"Parallel execution failed: {e}. Falling back to sequential."
+            )
+            self._parallel_mode_active = False
+            await self._process_files_sequential(files_to_process, total_files)
+
+    async def _process_files_sequential(
+        self, files_to_process: list[tuple[Path, str]], total_files: int
+    ) -> None:
+        """Process files using sequential execution (original behavior).
+
+        Args:
+            files_to_process: List of (filepath, language) tuples
+            total_files: Total number of files to process
+        """
+        logger.info("Using sequential execution")
+        self._parallel_mode_active = False
+
         file_count = 0
         for filepath, language in files_to_process:
             await self._process_single_file(filepath, language)
@@ -1107,7 +1350,7 @@ class SimpleGraphBuilder:
             # Report progress after each file
             self._report_progress(
                 "definitions",
-                "Processing files and extracting definitions",
+                "Processing files (Sequential)",
                 file_count,
                 total_files,
             )
@@ -1120,7 +1363,7 @@ class SimpleGraphBuilder:
         # Report phase completion
         self._report_progress(
             "definitions",
-            "Processing files and extracting definitions",
+            "Processing files (Sequential)",
             file_count,
             total_files,
             phase_complete=True,
@@ -1544,6 +1787,25 @@ class SimpleGraphBuilder:
 
     def _process_relationships(self) -> None:
         """Third pass: Process function calls and imports."""
+        # If parallel mode was used, relationships are already resolved
+        # by ParallelExecutor during the definitions phase
+        if self._parallel_mode_active:
+            logger.info(
+                "Skipping relationship processing "
+                "(already resolved during parallel execution)"
+            )
+            # Report progress as complete for UI consistency
+            total = len(self.function_registry)
+            self._report_progress(
+                "relationships",
+                "Relationships resolved during parallel execution",
+                total,
+                total,
+                phase_complete=True,
+            )
+            return
+
+        # Sequential mode - process relationships normally
         # Process inheritance relationships first
         self._process_inheritance()
 
@@ -1558,7 +1820,7 @@ class SimpleGraphBuilder:
         file_count = 0
         for filepath, (root_node, language) in self.ast_cache.items():
             self._process_calls(filepath, root_node, language)
-            # NOTE: Add import processing. wtf does this mean?
+            # TODO(future): Add import statement processing for IMPORTS relationships
 
             file_count += 1
             # Report progress after each file
@@ -1688,8 +1950,8 @@ class SimpleGraphBuilder:
         # Calculate confidence scores for each possible callee
         scored_callees = []
         for possible_qn in possible_callees:
-            score = self._calculate_callee_confidence(
-                caller_qn, possible_qn, module_qn, object_name
+            score = calculate_callee_confidence(
+                caller_qn, possible_qn, module_qn, object_name, self.simple_name_lookup
             )
             scored_callees.append((possible_qn, score))
 
@@ -1714,73 +1976,6 @@ class SimpleGraphBuilder:
                 "qualified_name",
                 callee_qn,
             )
-
-    def _calculate_callee_confidence(
-        self, caller_qn: str, callee_qn: str, module_qn: str, object_name: str | None
-    ) -> float:
-        """Calculate confidence score for a potential callee match.
-
-        Args:
-            caller_qn: Qualified name of the calling function
-            callee_qn: Qualified name of the potential callee
-            module_qn: Qualified name of the current module
-            object_name: Object name for method calls (e.g., 'obj' in obj.method())
-
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        score = 0.0
-
-        # 1. Module locality - functions in the same module are most likely
-        if callee_qn.startswith(module_qn + "."):
-            score += 0.5
-
-            # Even higher if in the same class
-            caller_parts = caller_qn.split(".")
-            callee_parts = callee_qn.split(".")
-            if len(caller_parts) >= 3 and len(callee_parts) >= 3:
-                if caller_parts[:-1] == callee_parts[:-1]:  # Same class
-                    score += 0.2
-
-        # 2. Package locality - functions in the same package hierarchy
-        elif "." in module_qn:
-            package = module_qn.rsplit(".", 1)[0]
-            if callee_qn.startswith(package + "."):
-                score += 0.3
-
-        # 3. Object/class match for method calls
-        if object_name:
-            # Check if callee is a method of a class matching the object name
-            callee_parts = callee_qn.split(".")
-            if len(callee_parts) >= 2:
-                # Simple heuristic: check if class name matches object name
-                # (In reality, we'd need type inference for accuracy)
-                class_name = callee_parts[-2]
-                if class_name.lower() == object_name.lower():
-                    score += 0.3
-                elif object_name == "self" and callee_qn.startswith(
-                    caller_qn.rsplit(".", 1)[0]
-                ):
-                    # 'self' refers to the same class
-                    score += 0.4
-
-        # 4. Import presence check (simplified - would need import tracking)
-        # For now, we'll give a small boost to standard library functions
-        if callee_qn.startswith(("builtins.", "typing.", "collections.")):
-            score += 0.1
-
-        # 5. Name similarity for disambiguation
-        # If function names are unique enough, boost confidence
-        possible_count = len(
-            self.simple_name_lookup.get(callee_qn.split(".")[-1], set())
-        )
-        if possible_count == 1:
-            score += 0.2
-        elif possible_count <= 3:
-            score += 0.1
-
-        # Normalize to [0, 1]
-        return min(score, 1.0)
 
     def _find_containing_function(self, node: Node, module_qn: str) -> str | None:
         """Find the containing function/method of a node."""

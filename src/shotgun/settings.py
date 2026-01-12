@@ -198,6 +198,45 @@ class DevelopmentSettings(BaseSettings):
         return bool(v)
 
 
+class IndexingSettings(BaseSettings):
+    """Codebase indexing settings.
+
+    Controls parallel processing behavior for code indexing.
+    """
+
+    index_parallel: bool = Field(
+        default=True,
+        description="Enable parallel indexing (requires 4+ CPU cores)",
+    )
+    index_workers: int | None = Field(
+        default=None,
+        description="Number of worker processes for parallel indexing (default: CPU count - 1)",
+        ge=1,
+    )
+    index_batch_size: int | None = Field(
+        default=None,
+        description="Files per batch for parallel indexing (default: auto-calculated)",
+        ge=1,
+    )
+
+    model_config = SettingsConfigDict(
+        env_prefix="SHOTGUN_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    @field_validator("index_parallel", mode="before")
+    @classmethod
+    def parse_bool(cls, v: Any) -> bool:
+        """Parse boolean values from strings."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes")
+        return bool(v)
+
+
 class Settings(BaseSettings):
     """Main application settings with SHOTGUN_ prefix.
 
@@ -223,12 +262,17 @@ class Settings(BaseSettings):
         # Development settings
         settings.dev.home
         settings.dev.pipx_simulate
+
+        # Indexing settings
+        settings.indexing.index_parallel
+        settings.indexing.index_workers
     """
 
     telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
     dev: DevelopmentSettings = Field(default_factory=DevelopmentSettings)
+    indexing: IndexingSettings = Field(default_factory=IndexingSettings)
 
     model_config = SettingsConfigDict(
         env_prefix="SHOTGUN_",
