@@ -9,9 +9,14 @@ Note: These tests run on all platforms via GitHub Actions matrix.
 
 from __future__ import annotations
 
+import multiprocessing
 import os
 import sys
 import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 
 import psutil
@@ -22,7 +27,11 @@ from shotgun.codebase.core.metrics_types import (
     FileInfo,
 )
 from shotgun.codebase.core.parallel_executor import ParallelExecutor
-from shotgun.codebase.core.work_distributor import WorkDistributor, get_worker_count
+from shotgun.codebase.core.work_distributor import (
+    WorkDistributor,
+    get_worker_count,
+    settings,
+)
 
 # =============================================================================
 # Platform Detection Tests
@@ -47,8 +56,6 @@ def test_worker_count_platform_independent() -> None:
 @pytest.mark.integration
 def test_cpu_count_available() -> None:
     """Test that CPU count is available on all platforms."""
-    import multiprocessing
-
     cpu_count = multiprocessing.cpu_count()
     assert cpu_count >= 1
     assert isinstance(cpu_count, int)
@@ -244,8 +251,6 @@ def test_path_resolve_works(tmp_path: Path) -> None:
 @pytest.mark.integration
 def test_timeout_handling_works() -> None:
     """Test that ThreadPoolExecutor timeout works on all platforms."""
-    import time
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
     def slow_function():
         time.sleep(10)
@@ -254,15 +259,13 @@ def test_timeout_handling_works() -> None:
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(slow_function)
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(FuturesTimeoutError):
             future.result(timeout=0.1)
 
 
 @pytest.mark.integration
 def test_thread_creation_works() -> None:
     """Test that thread creation works on all platforms."""
-    import threading
-
     results = []
 
     def worker(value: int) -> None:
@@ -302,8 +305,6 @@ def test_environment_variable_access() -> None:
 @pytest.mark.integration
 def test_worker_count_env_override(monkeypatch) -> None:
     """Test that SHOTGUN_INDEX_WORKERS env var works via settings."""
-    from shotgun.codebase.core.work_distributor import settings
-
     # Patch the settings object directly since env vars are read at import time
     monkeypatch.setattr(settings.indexing, "index_workers", 4)
 

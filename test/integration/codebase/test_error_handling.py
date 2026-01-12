@@ -11,11 +11,13 @@ from unittest.mock import patch
 
 import pytest
 
+from shotgun.codebase import CodebaseService, QueryType
 from shotgun.codebase.core.metrics_types import (
     FileParseTask,
     WorkBatch,
 )
 from shotgun.codebase.core.parallel_executor import ParallelExecutor
+from shotgun.codebase.models import GraphStatus
 
 # =============================================================================
 # Worker Error Handling Tests
@@ -189,9 +191,6 @@ async def test_graceful_degradation_to_sequential(
     tmp_path: Path,
 ) -> None:
     """Test graceful degradation to sequential mode on errors."""
-    from shotgun.codebase import CodebaseService
-    from shotgun.codebase.models import GraphStatus
-
     # Mock parallel executor to raise an exception
     def failing_execute(self, batches):
         raise RuntimeError("Simulated parallel failure")
@@ -219,9 +218,6 @@ async def test_sequential_fallback_produces_valid_data(
     monkeypatch,
 ) -> None:
     """Test that sequential fallback produces valid indexed data."""
-    from shotgun.codebase import CodebaseService, QueryType
-    from shotgun.codebase.models import GraphStatus
-
     # Force sequential mode
     monkeypatch.setenv("SHOTGUN_INDEX_PARALLEL", "false")
 

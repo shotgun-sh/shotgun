@@ -8,36 +8,13 @@ Run with: pytest test/performance/ -m slow -v
 
 from __future__ import annotations
 
-import gc
-import hashlib
-import shutil
 from pathlib import Path
 
 import pytest
 
 from shotgun.codebase.benchmarks import BenchmarkRunner
-from shotgun.utils.file_system_utils import get_shotgun_home
 
-from .conftest import CPUSampler, MemorySampler
-
-
-async def cleanup_database(codebase_path: Path) -> None:
-    """Clean up database files between benchmark runs."""
-    storage_dir = get_shotgun_home() / "codebases"
-    graph_id = hashlib.sha256(str(codebase_path.resolve()).encode()).hexdigest()[:12]
-
-    graph_path = storage_dir / f"{graph_id}.kuzu"
-    if graph_path.exists():
-        if graph_path.is_dir():
-            shutil.rmtree(graph_path, ignore_errors=True)
-        else:
-            graph_path.unlink(missing_ok=True)
-
-    wal_path = storage_dir / f"{graph_id}.kuzu.wal"
-    if wal_path.exists():
-        wal_path.unlink(missing_ok=True)
-
-    gc.collect()
+from .conftest import CPUSampler, MemorySampler, cleanup_database_for_path
 
 
 @pytest.mark.slow
@@ -66,7 +43,7 @@ async def test_parallel_speedup_target(
     seq_duration = seq_results.avg_duration_seconds
 
     # Cleanup between runs
-    await cleanup_database(medium_python_codebase)
+    cleanup_database_for_path(medium_python_codebase)
 
     # Run parallel benchmark (8 workers)
     par_runner = BenchmarkRunner(

@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from shotgun.codebase import CodebaseService
-from shotgun.codebase.models import GraphStatus
+from shotgun.codebase import CodebaseService, QueryType
+from shotgun.codebase.models import GraphStatus, IndexProgress, ProgressPhase
 
 # =============================================================================
 # CLI Command Regression Tests
@@ -65,8 +65,6 @@ async def test_codebase_query_after_indexing(
     tmp_path: Path,
 ) -> None:
     """Test that querying works after indexing."""
-    from shotgun.codebase import QueryType
-
     service = CodebaseService(tmp_path / "storage")
 
     graph = await service.create_graph(
@@ -97,8 +95,6 @@ async def test_progress_reporting_format_compatible(
     tmp_path: Path,
 ) -> None:
     """Test progress reporting format is compatible with TUI."""
-    from shotgun.codebase.models import IndexProgress
-
     progress_events: list[IndexProgress] = []
 
     def progress_callback(progress: IndexProgress) -> None:
@@ -129,8 +125,6 @@ async def test_progress_shows_phase_transitions(
     tmp_path: Path,
 ) -> None:
     """Test that progress reporting shows phase transitions."""
-    from shotgun.codebase.models import IndexProgress
-
     progress_events: list[IndexProgress] = []
 
     def progress_callback(progress: IndexProgress) -> None:
@@ -181,8 +175,6 @@ async def test_sequential_mode_produces_results(
     assert graph.node_count > 0
 
     # Query to verify data was indexed
-    from shotgun.codebase import QueryType
-
     result = await service.execute_query(
         graph.graph_id,
         "MATCH (c:Class) RETURN c.name as name",
@@ -202,8 +194,6 @@ async def test_parallel_and_sequential_both_work(
     monkeypatch,
 ) -> None:
     """Test that both parallel and sequential modes produce valid results."""
-    from shotgun.codebase import QueryType
-
     # Test sequential mode
     monkeypatch.setenv("SHOTGUN_INDEX_PARALLEL", "false")
     seq_service = CodebaseService(tmp_path / "storage_seq")
@@ -271,8 +261,6 @@ async def test_codebase_service_api_unchanged(
 @pytest.mark.integration
 def test_index_progress_model_unchanged() -> None:
     """Test that IndexProgress model structure is unchanged."""
-    from shotgun.codebase.models import IndexProgress, ProgressPhase
-
     # Verify ProgressPhase enum has expected values
     assert hasattr(ProgressPhase, "STRUCTURE")
     assert hasattr(ProgressPhase, "DEFINITIONS")
@@ -296,8 +284,6 @@ def test_index_progress_model_unchanged() -> None:
 @pytest.mark.integration
 def test_graph_status_enum_unchanged() -> None:
     """Test that GraphStatus enum has expected values."""
-    from shotgun.codebase.models import GraphStatus
-
     # Verify expected status values exist
     assert hasattr(GraphStatus, "READY")
     assert hasattr(GraphStatus, "BUILDING")  # Building status for initial indexing
@@ -335,8 +321,6 @@ async def test_create_graph_with_progress_callback(
     tmp_path: Path,
 ) -> None:
     """Test that create_graph works with progress callback."""
-    from shotgun.codebase.models import IndexProgress
-
     callback_called = False
 
     def progress_callback(progress: IndexProgress) -> None:

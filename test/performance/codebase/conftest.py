@@ -148,15 +148,15 @@ def {func_name}(x: int, y: int = 0) -> int:
 '''
 
 
-@pytest.fixture
-def cleanup_benchmark_db(medium_python_codebase: Path):
-    """Clean up database files after benchmark tests."""
-    yield
+def cleanup_database_for_path(codebase_path: Path) -> None:
+    """Clean up database files for a given codebase path.
 
-    # Clean up any databases created during test
+    This is a shared utility that can be used both by fixtures and
+    within tests (e.g., between benchmark runs).
+    """
     storage_dir = get_shotgun_home() / "codebases"
     graph_id = hashlib.sha256(
-        str(medium_python_codebase.resolve()).encode()
+        str(codebase_path.resolve()).encode()
     ).hexdigest()[:12]
 
     graph_path = storage_dir / f"{graph_id}.kuzu"
@@ -172,6 +172,13 @@ def cleanup_benchmark_db(medium_python_codebase: Path):
 
     # Force garbage collection
     gc.collect()
+
+
+@pytest.fixture
+def cleanup_benchmark_db(medium_python_codebase: Path):
+    """Clean up database files after benchmark tests."""
+    yield
+    cleanup_database_for_path(medium_python_codebase)
 
 
 class CPUSampler:
