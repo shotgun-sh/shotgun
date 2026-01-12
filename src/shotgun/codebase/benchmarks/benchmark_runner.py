@@ -21,7 +21,10 @@ from shotgun.codebase.benchmarks.models import (
     BenchmarkResults,
     BenchmarkRun,
 )
+from shotgun.codebase.core import Ingestor, SimpleGraphBuilder
+from shotgun.codebase.core.kuzu_compat import get_kuzu
 from shotgun.codebase.core.metrics_collector import MetricsCollector
+from shotgun.codebase.core.parser_loader import load_parsers
 from shotgun.logging_config import get_logger
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils.file_system_utils import get_shotgun_home
@@ -165,10 +168,6 @@ class BenchmarkRunner:
         Returns:
             BenchmarkRun with collected metrics
         """
-        from shotgun.codebase.core import Ingestor, SimpleGraphBuilder
-        from shotgun.codebase.core.kuzu_compat import get_kuzu
-        from shotgun.codebase.core.parser_loader import load_parsers
-
         # Create metrics collector
         metrics_collector = MetricsCollector(
             codebase_name=self.codebase_name,
@@ -258,8 +257,6 @@ class BenchmarkRunner:
         This creates a Project node in the database with metadata that
         identifies the indexed codebase.
         """
-        from shotgun.codebase.core.kuzu_compat import get_kuzu
-
         graph_id = _compute_graph_id(self.codebase_path)
         graph_path = self._storage_dir / f"{graph_id}.kuzu"
 

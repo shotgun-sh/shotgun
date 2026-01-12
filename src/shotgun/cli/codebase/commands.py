@@ -93,9 +93,9 @@ def index(
         str,
         typer.Option(
             "--benchmark-output",
-            help="Benchmark output format: text|json|csv|markdown",
+            help="Benchmark output format: json|markdown",
         ),
-    ] = "text",
+    ] = "json",
     benchmark_export: Annotated[
         str | None,
         typer.Option("--benchmark-export", help="Export metrics to file"),

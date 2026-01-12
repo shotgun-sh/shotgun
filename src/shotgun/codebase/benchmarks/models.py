@@ -5,6 +5,7 @@ This module contains all data models used by the benchmark system.
 
 from __future__ import annotations
 
+import statistics
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -22,9 +23,7 @@ class BenchmarkMode(StrEnum):
 class OutputFormat(StrEnum):
     """Output format for benchmark results."""
 
-    TEXT = "text"
     JSON = "json"
-    CSV = "csv"
     MARKDOWN = "markdown"
 
 
@@ -82,8 +81,6 @@ class BenchmarkResults(BaseModel):
 
     def calculate_statistics(self) -> None:
         """Calculate aggregate statistics from measured runs."""
-        import statistics
-
         if not self.measured_runs:
             return
 

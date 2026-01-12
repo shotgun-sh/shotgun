@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -14,6 +15,7 @@ from shotgun.codebase.benchmarks import (
     MetricsExporter,
     get_formatter,
 )
+from shotgun.utils.file_system_utils import get_shotgun_home
 
 
 @pytest.fixture
@@ -78,10 +80,6 @@ def cleanup_db(sample_repo: Path) -> None:
     """Clean up database after test."""
     yield
     # Clean up any databases created during test
-    import hashlib
-
-    from shotgun.utils.file_system_utils import get_shotgun_home
-
     storage_dir = get_shotgun_home() / "codebases"
     graph_id = hashlib.sha256(str(sample_repo.resolve()).encode()).hexdigest()[:12]
 
