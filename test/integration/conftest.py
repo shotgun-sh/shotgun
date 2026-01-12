@@ -51,15 +51,15 @@ def event_loop():
 
 
 @pytest_asyncio.fixture
-async def service(temp_storage_dir: Path) -> CodebaseService:
+async def service(tmp_path: Path) -> CodebaseService:
     """Create a CodebaseService instance with temporary storage."""
-    return CodebaseService(temp_storage_dir / "storage")
+    return CodebaseService(tmp_path / "storage")
 
 
 @pytest.fixture
-def simple_python_codebase(temp_storage_dir: Path) -> Path:
+def simple_python_codebase(tmp_path: Path) -> Path:
     """Create a simple test codebase with basic Python files."""
-    codebase_dir = temp_storage_dir / "simple_codebase"
+    codebase_dir = tmp_path / "simple_codebase"
     codebase_dir.mkdir()
 
     # Create a simple Python file
@@ -95,9 +95,9 @@ def another_function(a: int, b: int) -> int:
 
 
 @pytest.fixture
-def calculator_codebase(temp_storage_dir: Path) -> Path:
+def calculator_codebase(tmp_path: Path) -> Path:
     """Create a calculator test codebase with multiple files."""
-    codebase_dir = temp_storage_dir / "calculator_codebase"
+    codebase_dir = tmp_path / "calculator_codebase"
     codebase_dir.mkdir()
 
     # Create calculator.py
