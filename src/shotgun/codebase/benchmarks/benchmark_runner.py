@@ -301,7 +301,9 @@ class BenchmarkRunner:
                     "indexed_from_cwds": json.dumps([str(Path.cwd())]),
                 },
             )
-            logger.info(f"Registered codebase '{self.codebase_name}' with graph_id: {graph_id}")
+            logger.info(
+                f"Registered codebase '{self.codebase_name}' with graph_id: {graph_id}"
+            )
         finally:
             del conn
             del db
