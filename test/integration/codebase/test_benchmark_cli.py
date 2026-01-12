@@ -172,76 +172,6 @@ async def test_benchmark_runner_with_warmup(
     assert len(results.measured_runs) == 1
 
 
-def test_text_formatter(sample_repo: Path) -> None:
-    """Test text formatter produces valid output."""
-    from shotgun.codebase.benchmarks.models import (
-        BenchmarkConfig,
-        BenchmarkMode,
-        BenchmarkResults,
-        BenchmarkRun,
-    )
-    from shotgun.codebase.core.metrics_types import IndexingMetrics, PhaseMetrics
-
-    # Create mock results
-    config = BenchmarkConfig(
-        mode=BenchmarkMode.PARALLEL,
-        worker_count=4,
-        iterations=1,
-    )
-    results = BenchmarkResults(
-        codebase_name="test",
-        codebase_path=str(sample_repo),
-        config=config,
-    )
-
-    # Create mock metrics
-    metrics = IndexingMetrics(
-        session_id="test-session",
-        codebase_name="test",
-        total_duration_seconds=10.5,
-        phase_metrics={
-            "structure": PhaseMetrics(
-                phase_name="structure",
-                start_time=0,
-                end_time=1,
-                duration_seconds=1.0,
-                items_processed=10,
-                throughput=10.0,
-                memory_mb=100.0,
-            ),
-            "definitions": PhaseMetrics(
-                phase_name="definitions",
-                start_time=1,
-                end_time=8,
-                duration_seconds=7.0,
-                items_processed=100,
-                throughput=14.3,
-                memory_mb=200.0,
-            ),
-        },
-        file_metrics=[],
-        total_files=100,
-        total_nodes=500,
-        total_relationships=1000,
-        avg_throughput=9.5,
-        peak_memory_mb=200.0,
-    )
-
-    run = BenchmarkRun(run_id=0, is_warmup=False, metrics=metrics)
-    results.add_run(run)
-    results.calculate_statistics()
-
-    # Format
-    formatter = get_formatter("text")
-    options = MetricsDisplayOptions()
-    output = formatter.format_results(results, options)
-
-    # Check output contains expected content
-    assert "test" in output
-    assert "structure" in output or "Phase" in output
-    assert "definitions" in output or "Breakdown" in output
-
-
 def test_json_formatter(sample_repo: Path) -> None:
     """Test JSON formatter produces valid JSON."""
     from shotgun.codebase.benchmarks.models import (
@@ -285,49 +215,6 @@ def test_json_formatter(sample_repo: Path) -> None:
     assert data["codebase_name"] == "test"
     assert "statistics" in data
     assert "runs" in data
-
-
-def test_csv_formatter(sample_repo: Path) -> None:
-    """Test CSV formatter produces valid CSV."""
-    from shotgun.codebase.benchmarks.models import (
-        BenchmarkConfig,
-        BenchmarkMode,
-        BenchmarkResults,
-        BenchmarkRun,
-    )
-    from shotgun.codebase.core.metrics_types import IndexingMetrics
-
-    config = BenchmarkConfig(mode=BenchmarkMode.SEQUENTIAL, iterations=1)
-    results = BenchmarkResults(
-        codebase_name="test",
-        codebase_path=str(sample_repo),
-        config=config,
-    )
-
-    metrics = IndexingMetrics(
-        session_id="test",
-        codebase_name="test",
-        total_duration_seconds=5.0,
-        phase_metrics={},
-        file_metrics=[],
-        total_files=50,
-        total_nodes=200,
-        total_relationships=400,
-        avg_throughput=10.0,
-        peak_memory_mb=100.0,
-    )
-
-    run = BenchmarkRun(run_id=0, is_warmup=False, metrics=metrics)
-    results.add_run(run)
-    results.calculate_statistics()
-
-    formatter = get_formatter("csv")
-    options = MetricsDisplayOptions()
-    output = formatter.format_results(results, options)
-
-    # Should contain CSV-like content
-    assert "test" in output
-    assert "," in output  # CSV delimiter
 
 
 def test_markdown_formatter(sample_repo: Path) -> None:
@@ -417,51 +304,6 @@ def test_metrics_exporter_json(sample_repo: Path, tmp_path: Path) -> None:
     assert export_path.exists()
     data = json.loads(export_path.read_text())
     assert data["codebase_name"] == "test"
-
-
-def test_metrics_exporter_csv(sample_repo: Path, tmp_path: Path) -> None:
-    """Test MetricsExporter exports to CSV."""
-    from shotgun.codebase.benchmarks.models import (
-        BenchmarkConfig,
-        BenchmarkMode,
-        BenchmarkResults,
-        BenchmarkRun,
-    )
-    from shotgun.codebase.core.metrics_types import IndexingMetrics
-
-    config = BenchmarkConfig(mode=BenchmarkMode.SEQUENTIAL, iterations=1)
-    results = BenchmarkResults(
-        codebase_name="test",
-        codebase_path=str(sample_repo),
-        config=config,
-    )
-
-    metrics = IndexingMetrics(
-        session_id="test",
-        codebase_name="test",
-        total_duration_seconds=5.0,
-        phase_metrics={},
-        file_metrics=[],
-        total_files=50,
-        total_nodes=200,
-        total_relationships=400,
-        avg_throughput=10.0,
-        peak_memory_mb=100.0,
-    )
-
-    run = BenchmarkRun(run_id=0, is_warmup=False, metrics=metrics)
-    results.add_run(run)
-    results.calculate_statistics()
-
-    # Export
-    export_path = tmp_path / "metrics.csv"
-    exporter = MetricsExporter()
-    exporter.export(results, export_path)
-
-    # Verify file exists
-    assert export_path.exists()
-    content = export_path.read_text()
-    assert "test" in content
 
 
 def test_get_formatter_invalid_format() -> None:

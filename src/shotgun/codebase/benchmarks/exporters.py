@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from shotgun.codebase.benchmarks.formatters import (
-    CsvFormatter,
     JsonFormatter,
     MarkdownFormatter,
     MetricsDisplayOptions,
@@ -30,7 +29,6 @@ class MetricsExporter:
         """Initialize metrics exporter."""
         self._format_map = {
             ".json": self._export_json,
-            ".csv": self._export_csv,
             ".md": self._export_markdown,
             ".markdown": self._export_markdown,
         }
@@ -49,7 +47,7 @@ class MetricsExporter:
         Args:
             results: Benchmark results to export
             filepath: Path to export file
-            format: Optional format override ("json", "csv", "markdown")
+            format: Optional format override ("json", "markdown")
             options: Display options for controlling what to include
 
         Raises:
@@ -64,8 +62,6 @@ class MetricsExporter:
             format_lower = format.lower()
             if format_lower == "json":
                 export_func = self._export_json
-            elif format_lower == "csv":
-                export_func = self._export_csv
             elif format_lower in ("markdown", "md"):
                 export_func = self._export_markdown
             else:
@@ -102,23 +98,6 @@ class MetricsExporter:
             options: Display options
         """
         formatter = JsonFormatter()
-        content = formatter.format_results(results, options)
-        filepath.write_text(content)
-
-    def _export_csv(
-        self,
-        results: BenchmarkResults,
-        filepath: Path,
-        options: MetricsDisplayOptions,
-    ) -> None:
-        """Export results to CSV file.
-
-        Args:
-            results: Benchmark results
-            filepath: Output path
-            options: Display options
-        """
-        formatter = CsvFormatter()
         content = formatter.format_results(results, options)
         filepath.write_text(content)
 

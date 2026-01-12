@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import gc
 import hashlib
+import json
 import shutil
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -136,6 +138,9 @@ class BenchmarkRunner:
             if i < self.iterations - 1:
                 await self._cleanup_database()
 
+        # Register the codebase so it persists after benchmark
+        await self._register_codebase()
+
         # Calculate statistics
         results.calculate_statistics()
 
@@ -246,3 +251,60 @@ class BenchmarkRunner:
 
         # Force garbage collection
         gc.collect()
+
+    async def _register_codebase(self) -> None:
+        """Register the codebase so it appears in `shotgun codebase list`.
+
+        This creates a Project node in the database with metadata that
+        identifies the indexed codebase.
+        """
+        from shotgun.codebase.core.kuzu_compat import get_kuzu
+
+        graph_id = _compute_graph_id(self.codebase_path)
+        graph_path = self._storage_dir / f"{graph_id}.kuzu"
+
+        if not graph_path.exists():
+            logger.warning("Cannot register codebase: database not found")
+            return
+
+        kuzu = get_kuzu()
+        db = kuzu.Database(str(graph_path))
+        conn = kuzu.Connection(db)
+
+        try:
+            # Check if Project node already exists
+            result = conn.execute("MATCH (p:Project) RETURN p.graph_id LIMIT 1")
+            if result.has_next():
+                logger.debug("Project node already exists, skipping registration")
+                return
+
+            # Create Project node with metadata
+            current_time = int(time.time())
+            conn.execute(
+                """
+                CREATE (p:Project {
+                    name: $name,
+                    repo_path: $repo_path,
+                    graph_id: $graph_id,
+                    created_at: $created_at,
+                    updated_at: $updated_at,
+                    schema_version: $schema_version,
+                    build_options: $build_options,
+                    indexed_from_cwds: $indexed_from_cwds
+                })
+                """,
+                {
+                    "name": self.codebase_name,
+                    "repo_path": str(self.codebase_path),
+                    "graph_id": graph_id,
+                    "created_at": current_time,
+                    "updated_at": current_time,
+                    "schema_version": "1.0.0",
+                    "build_options": json.dumps({}),
+                    "indexed_from_cwds": json.dumps([str(Path.cwd())]),
+                },
+            )
+            logger.info(f"Registered codebase '{self.codebase_name}' with graph_id: {graph_id}")
+        finally:
+            del conn
+            del db
