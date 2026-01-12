@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import aiofiles
 from tree_sitter import Node, Parser, QueryCursor
 
+from shotgun.codebase.core.call_resolution import calculate_callee_confidence
 from shotgun.codebase.core.gitignore import GitignoreManager
 from shotgun.codebase.core.kuzu_compat import get_kuzu
 from shotgun.codebase.core.metrics_collector import MetricsCollector
@@ -1949,8 +1950,8 @@ class SimpleGraphBuilder:
         # Calculate confidence scores for each possible callee
         scored_callees = []
         for possible_qn in possible_callees:
-            score = self._calculate_callee_confidence(
-                caller_qn, possible_qn, module_qn, object_name
+            score = calculate_callee_confidence(
+                caller_qn, possible_qn, module_qn, object_name, self.simple_name_lookup
             )
             scored_callees.append((possible_qn, score))
 
@@ -1975,73 +1976,6 @@ class SimpleGraphBuilder:
                 "qualified_name",
                 callee_qn,
             )
-
-    def _calculate_callee_confidence(
-        self, caller_qn: str, callee_qn: str, module_qn: str, object_name: str | None
-    ) -> float:
-        """Calculate confidence score for a potential callee match.
-
-        Args:
-            caller_qn: Qualified name of the calling function
-            callee_qn: Qualified name of the potential callee
-            module_qn: Qualified name of the current module
-            object_name: Object name for method calls (e.g., 'obj' in obj.method())
-
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        score = 0.0
-
-        # 1. Module locality - functions in the same module are most likely
-        if callee_qn.startswith(module_qn + "."):
-            score += 0.5
-
-            # Even higher if in the same class
-            caller_parts = caller_qn.split(".")
-            callee_parts = callee_qn.split(".")
-            if len(caller_parts) >= 3 and len(callee_parts) >= 3:
-                if caller_parts[:-1] == callee_parts[:-1]:  # Same class
-                    score += 0.2
-
-        # 2. Package locality - functions in the same package hierarchy
-        elif "." in module_qn:
-            package = module_qn.rsplit(".", 1)[0]
-            if callee_qn.startswith(package + "."):
-                score += 0.3
-
-        # 3. Object/class match for method calls
-        if object_name:
-            # Check if callee is a method of a class matching the object name
-            callee_parts = callee_qn.split(".")
-            if len(callee_parts) >= 2:
-                # Simple heuristic: check if class name matches object name
-                # (In reality, we'd need type inference for accuracy)
-                class_name = callee_parts[-2]
-                if class_name.lower() == object_name.lower():
-                    score += 0.3
-                elif object_name == "self" and callee_qn.startswith(
-                    caller_qn.rsplit(".", 1)[0]
-                ):
-                    # 'self' refers to the same class
-                    score += 0.4
-
-        # 4. Import presence check (simplified - would need import tracking)
-        # For now, we'll give a small boost to standard library functions
-        if callee_qn.startswith(("builtins.", "typing.", "collections.")):
-            score += 0.1
-
-        # 5. Name similarity for disambiguation
-        # If function names are unique enough, boost confidence
-        possible_count = len(
-            self.simple_name_lookup.get(callee_qn.split(".")[-1], set())
-        )
-        if possible_count == 1:
-            score += 0.2
-        elif possible_count <= 3:
-            score += 0.1
-
-        # Normalize to [0, 1]
-        return min(score, 1.0)
 
     def _find_containing_function(self, node: Node, module_qn: str) -> str | None:
         """Find the containing function/method of a node."""

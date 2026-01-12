@@ -18,6 +18,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
+from shotgun.codebase.core.call_resolution import calculate_callee_confidence
 from shotgun.codebase.core.metrics_types import (
     FileParseResult,
     InheritanceData,
@@ -326,7 +327,7 @@ class ParallelExecutor:
             # Calculate confidence scores and pick best match
             scored_callees = []
             for possible_qn in possible_callees:
-                score = self._calculate_callee_confidence(
+                score = calculate_callee_confidence(
                     caller_qn=call.caller_qn,
                     callee_qn=possible_qn,
                     module_qn=call.module_qn,
@@ -357,71 +358,6 @@ class ParallelExecutor:
                 )
 
         return resolved
-
-    def _calculate_callee_confidence(
-        self,
-        caller_qn: str,
-        callee_qn: str,
-        module_qn: str,
-        object_name: str | None,
-        simple_name_lookup: dict[str, list[str]],
-    ) -> float:
-        """Calculate confidence score for a potential callee match.
-
-        Args:
-            caller_qn: Qualified name of the calling function
-            callee_qn: Qualified name of the potential callee
-            module_qn: Qualified name of the current module
-            object_name: Object name for method calls
-            simple_name_lookup: Complete name lookup for disambiguation
-
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        score = 0.0
-
-        # Module locality - functions in the same module are most likely
-        if callee_qn.startswith(module_qn + "."):
-            score += 0.5
-
-            # Even higher if in the same class
-            caller_parts = caller_qn.split(".")
-            callee_parts = callee_qn.split(".")
-            if len(caller_parts) >= 3 and len(callee_parts) >= 3:
-                if caller_parts[:-1] == callee_parts[:-1]:
-                    score += 0.2
-
-        # Package locality
-        elif "." in module_qn:
-            package = module_qn.rsplit(".", 1)[0]
-            if callee_qn.startswith(package + "."):
-                score += 0.3
-
-        # Object/class match for method calls
-        if object_name:
-            callee_parts = callee_qn.split(".")
-            if len(callee_parts) >= 2:
-                class_name = callee_parts[-2]
-                if class_name.lower() == object_name.lower():
-                    score += 0.3
-                elif object_name == "self" and callee_qn.startswith(
-                    caller_qn.rsplit(".", 1)[0]
-                ):
-                    score += 0.4
-
-        # Standard library boost
-        if callee_qn.startswith(("builtins.", "typing.", "collections.")):
-            score += 0.1
-
-        # Name uniqueness boost
-        callee_simple_name = callee_qn.split(".")[-1]
-        possible_count = len(simple_name_lookup.get(callee_simple_name, []))
-        if possible_count == 1:
-            score += 0.2
-        elif possible_count <= 3:
-            score += 0.1
-
-        return min(score, 1.0)
 
     def _resolve_inheritance_relationships(
         self,
