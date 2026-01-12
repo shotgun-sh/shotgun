@@ -459,10 +459,11 @@ jobs:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SHOTGUN_ALPHA_WEBHOOK }}
+          # Pass changelog via env var to avoid shell interpretation of backticks in commit messages
+          CHANGELOG_RAW: ${{ steps.changelog.outputs.changelog }}
         run: |
           VERSION="${{ needs.build-and-package.outputs.version }}"
           IS_DEV="${{ needs.build-and-package.outputs.is_dev }}"
-          CHANGELOG_RAW="${{ steps.changelog.outputs.changelog }}"
 
           # Properly escape changelog for JSON using printf and jq
           # This ensures all special characters are properly escaped
