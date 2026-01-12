@@ -13,6 +13,28 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from shotgun.codebase.models import NodeLabel, RelationshipType
+
+__all__ = [
+    "DistributionStats",
+    "FileInfo",
+    "FileParseMetrics",
+    "FileParseResult",
+    "FileParseTask",
+    "IndexingMetrics",
+    "IndexingPhase",
+    "InheritanceData",
+    "NodeData",
+    "NodeLabel",
+    "ParallelExecutionResult",
+    "PhaseMetrics",
+    "RawCallData",
+    "RelationshipData",
+    "RelationshipType",
+    "WorkBatch",
+    "WorkerMetrics",
+]
+
 
 class IndexingPhase(StrEnum):
     """Phase names for indexing operations."""
@@ -184,10 +206,10 @@ class NodeData(BaseModel):
     """Data for creating a graph node.
 
     Used by workers to return extracted node information without
-    direct database access.
+    direct database access. Use NodeLabel enum values for the label field.
     """
 
-    label: str = Field(..., description="Node type (Class, Function, Method, etc.)")
+    label: str = Field(..., description="Node type from NodeLabel enum")
     properties: dict[str, Any] = Field(..., description="Node properties")
 
 
@@ -195,14 +217,17 @@ class RelationshipData(BaseModel):
     """Data for creating a graph relationship.
 
     Used by workers to return extracted relationship information
-    without direct database access.
+    without direct database access. Use NodeLabel enum for label fields
+    and RelationshipType enum for rel_type.
     """
 
-    from_label: str = Field(..., description="Source node type")
+    from_label: str = Field(..., description="Source node type from NodeLabel enum")
     from_key: str = Field(..., description="Source node primary key field")
     from_value: Any = Field(..., description="Source node primary key value")
-    rel_type: str = Field(..., description="Relationship type")
-    to_label: str = Field(..., description="Target node type")
+    rel_type: str = Field(
+        ..., description="Relationship type from RelationshipType enum"
+    )
+    to_label: str = Field(..., description="Target node type from NodeLabel enum")
     to_key: str = Field(..., description="Target node primary key field")
     to_value: Any = Field(..., description="Target node primary key value")
     properties: dict[str, Any] | None = Field(

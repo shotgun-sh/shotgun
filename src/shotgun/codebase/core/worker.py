@@ -21,8 +21,10 @@ from shotgun.codebase.core.metrics_types import (
     FileParseTask,
     InheritanceData,
     NodeData,
+    NodeLabel,
     RawCallData,
     RelationshipData,
+    RelationshipType,
     WorkBatch,
 )
 from shotgun.codebase.core.parser_loader import load_parsers
@@ -177,7 +179,7 @@ class ParserWorker:
         """Create File node and containment relationship."""
         nodes.append(
             NodeData(
-                label="File",
+                label=NodeLabel.FILE,
                 properties={
                     "path": relative_path_str,
                     "name": task.file_path.name,
@@ -190,11 +192,11 @@ class ParserWorker:
         if parent_rel_path != Path("."):
             relationships.append(
                 RelationshipData(
-                    from_label="Folder",
+                    from_label=NodeLabel.FOLDER,
                     from_key="path",
                     from_value=str(parent_rel_path).replace(os.sep, "/"),
-                    rel_type="CONTAINS_FILE",
-                    to_label="File",
+                    rel_type=RelationshipType.CONTAINS_FILE,
+                    to_label=NodeLabel.FILE,
                     to_key="path",
                     to_value=relative_path_str,
                 )
@@ -211,7 +213,7 @@ class ParserWorker:
         current_time = int(time.time())
         nodes.append(
             NodeData(
-                label="FileMetadata",
+                label=NodeLabel.FILE_METADATA,
                 properties={
                     "filepath": relative_path_str,
                     "mtime": mtime,
@@ -232,7 +234,7 @@ class ParserWorker:
         current_time = int(time.time())
         nodes.append(
             NodeData(
-                label="Module",
+                label=NodeLabel.MODULE,
                 properties={
                     "qualified_name": task.module_qn,
                     "name": task.file_path.stem,
@@ -246,11 +248,11 @@ class ParserWorker:
         if task.container_qn:
             relationships.append(
                 RelationshipData(
-                    from_label="Package",
+                    from_label=NodeLabel.PACKAGE,
                     from_key="qualified_name",
                     from_value=task.container_qn,
-                    rel_type="CONTAINS_MODULE",
-                    to_label="Module",
+                    rel_type=RelationshipType.CONTAINS_MODULE,
+                    to_label=NodeLabel.MODULE,
                     to_key="qualified_name",
                     to_value=task.module_qn,
                 )
@@ -259,11 +261,11 @@ class ParserWorker:
         # Add TRACKS_Module relationship from FileMetadata to Module
         relationships.append(
             RelationshipData(
-                from_label="FileMetadata",
+                from_label=NodeLabel.FILE_METADATA,
                 from_key="filepath",
                 from_value=relative_path_str,
-                rel_type="TRACKS_Module",
-                to_label="Module",
+                rel_type=RelationshipType.TRACKS_MODULE,
+                to_label=NodeLabel.MODULE,
                 to_key="qualified_name",
                 to_value=task.module_qn,
             )
@@ -338,7 +340,7 @@ class ParserWorker:
 
             nodes.append(
                 NodeData(
-                    label="Class",
+                    label=NodeLabel.CLASS,
                     properties={
                         "qualified_name": class_qn,
                         "name": class_name,
@@ -355,27 +357,27 @@ class ParserWorker:
             relationships.extend(
                 [
                     RelationshipData(
-                        from_label="Module",
+                        from_label=NodeLabel.MODULE,
                         from_key="qualified_name",
                         from_value=module_qn,
-                        rel_type="DEFINES",
-                        to_label="Class",
+                        rel_type=RelationshipType.DEFINES,
+                        to_label=NodeLabel.CLASS,
                         to_key="qualified_name",
                         to_value=class_qn,
                     ),
                     RelationshipData(
-                        from_label="FileMetadata",
+                        from_label=NodeLabel.FILE_METADATA,
                         from_key="filepath",
                         from_value=relative_path_str,
-                        rel_type="TRACKS_Class",
-                        to_label="Class",
+                        rel_type=RelationshipType.TRACKS_CLASS,
+                        to_label=NodeLabel.CLASS,
                         to_key="qualified_name",
                         to_value=class_qn,
                     ),
                 ]
             )
 
-            function_registry[class_qn] = "Class"
+            function_registry[class_qn] = NodeLabel.CLASS
             simple_name_lookup.setdefault(class_name, []).append(class_qn)
 
             parent_names = extractor.extract_inheritance(class_node)
@@ -455,7 +457,7 @@ class ParserWorker:
 
         nodes.append(
             NodeData(
-                label="Method",
+                label=NodeLabel.METHOD,
                 properties={
                     "qualified_name": method_qn,
                     "name": func_name,
@@ -472,27 +474,27 @@ class ParserWorker:
         relationships.extend(
             [
                 RelationshipData(
-                    from_label="Class",
+                    from_label=NodeLabel.CLASS,
                     from_key="qualified_name",
                     from_value=parent_class,
-                    rel_type="DEFINES_METHOD",
-                    to_label="Method",
+                    rel_type=RelationshipType.DEFINES_METHOD,
+                    to_label=NodeLabel.METHOD,
                     to_key="qualified_name",
                     to_value=method_qn,
                 ),
                 RelationshipData(
-                    from_label="FileMetadata",
+                    from_label=NodeLabel.FILE_METADATA,
                     from_key="filepath",
                     from_value=relative_path_str,
-                    rel_type="TRACKS_Method",
-                    to_label="Method",
+                    rel_type=RelationshipType.TRACKS_METHOD,
+                    to_label=NodeLabel.METHOD,
                     to_key="qualified_name",
                     to_value=method_qn,
                 ),
             ]
         )
 
-        function_registry[method_qn] = "Method"
+        function_registry[method_qn] = NodeLabel.METHOD
         simple_name_lookup.setdefault(func_name, []).append(method_qn)
 
     def _add_function(
@@ -513,7 +515,7 @@ class ParserWorker:
 
         nodes.append(
             NodeData(
-                label="Function",
+                label=NodeLabel.FUNCTION,
                 properties={
                     "qualified_name": func_qn,
                     "name": func_name,
@@ -530,27 +532,27 @@ class ParserWorker:
         relationships.extend(
             [
                 RelationshipData(
-                    from_label="Module",
+                    from_label=NodeLabel.MODULE,
                     from_key="qualified_name",
                     from_value=module_qn,
-                    rel_type="DEFINES_FUNC",
-                    to_label="Function",
+                    rel_type=RelationshipType.DEFINES_FUNC,
+                    to_label=NodeLabel.FUNCTION,
                     to_key="qualified_name",
                     to_value=func_qn,
                 ),
                 RelationshipData(
-                    from_label="FileMetadata",
+                    from_label=NodeLabel.FILE_METADATA,
                     from_key="filepath",
                     from_value=relative_path_str,
-                    rel_type="TRACKS_Function",
-                    to_label="Function",
+                    rel_type=RelationshipType.TRACKS_FUNCTION,
+                    to_label=NodeLabel.FUNCTION,
                     to_key="qualified_name",
                     to_value=func_qn,
                 ),
             ]
         )
 
-        function_registry[func_qn] = "Function"
+        function_registry[func_qn] = NodeLabel.FUNCTION
         simple_name_lookup.setdefault(func_name, []).append(func_qn)
 
     def _extract_calls(
@@ -731,7 +733,9 @@ class ParserWorker:
     ) -> FileParseResult:
         """Create successful result."""
         definitions_count = sum(
-            1 for n in nodes if n.label in ["Class", "Function", "Method"]
+            1
+            for n in nodes
+            if n.label in [NodeLabel.CLASS, NodeLabel.FUNCTION, NodeLabel.METHOD]
         )
 
         return FileParseResult(

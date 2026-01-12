@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import aiofiles
 
+from shotgun.codebase.models import NodeLabel, RelationshipType
 from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -336,10 +337,10 @@ class ChangeDetector:
 
         # Query each TRACKS relationship type
         for node_type, rel_type in [
-            ("Module", "TRACKS_Module"),
-            ("Class", "TRACKS_Class"),
-            ("Function", "TRACKS_Function"),
-            ("Method", "TRACKS_Method"),
+            (NodeLabel.MODULE, RelationshipType.TRACKS_MODULE),
+            (NodeLabel.CLASS, RelationshipType.TRACKS_CLASS),
+            (NodeLabel.FUNCTION, RelationshipType.TRACKS_FUNCTION),
+            (NodeLabel.METHOD, RelationshipType.TRACKS_METHOD),
         ]:
             try:
                 result = self.conn.execute(

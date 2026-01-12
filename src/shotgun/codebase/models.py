@@ -42,6 +42,55 @@ class ProgressPhase(StrEnum):
     FLUSH_RELATIONSHIPS = "flush_relationships"  # Flushing relationships to database
 
 
+class NodeLabel(StrEnum):
+    """Node type labels for the code knowledge graph."""
+
+    PROJECT = "Project"  # Top-level project node
+    PACKAGE = "Package"  # Python package/namespace
+    FOLDER = "Folder"  # Directory structure
+    FILE = "File"  # Source file
+    MODULE = "Module"  # Python module
+    CLASS = "Class"  # Class definition
+    FUNCTION = "Function"  # Function definition
+    METHOD = "Method"  # Method definition (inside a class)
+    FILE_METADATA = "FileMetadata"  # File tracking metadata (hash, mtime)
+    EXTERNAL_PACKAGE = "ExternalPackage"  # External dependency
+    DELETION_LOG = "DeletionLog"  # Deletion audit trail
+
+
+class RelationshipType(StrEnum):
+    """Relationship types for the code knowledge graph."""
+
+    # Containment relationships (used with suffixes _PKG, _FOLDER in tables)
+    CONTAINS_PACKAGE = "CONTAINS_PACKAGE"  # Container to Package
+    CONTAINS_FOLDER = "CONTAINS_FOLDER"  # Container to Folder
+    CONTAINS_FILE = "CONTAINS_FILE"  # Container to File
+    CONTAINS_MODULE = "CONTAINS_MODULE"  # Container to Module
+
+    # Definition relationships
+    DEFINES = "DEFINES"  # Module to Class
+    DEFINES_FUNC = "DEFINES_FUNC"  # Module to Function
+    DEFINES_METHOD = "DEFINES_METHOD"  # Class to Method
+
+    # Call relationships
+    CALLS = "CALLS"  # Function to Function
+    CALLS_FM = "CALLS_FM"  # Function to Method
+    CALLS_MF = "CALLS_MF"  # Method to Function
+    CALLS_MM = "CALLS_MM"  # Method to Method
+
+    # Tracking relationships (FileMetadata to entity)
+    TRACKS_MODULE = "TRACKS_Module"  # FileMetadata to Module
+    TRACKS_CLASS = "TRACKS_Class"  # FileMetadata to Class
+    TRACKS_FUNCTION = "TRACKS_Function"  # FileMetadata to Function
+    TRACKS_METHOD = "TRACKS_Method"  # FileMetadata to Method
+
+    # Other relationships
+    INHERITS = "INHERITS"  # Child Class to Parent Class
+    OVERRIDES = "OVERRIDES"  # Method to Method (override)
+    IMPORTS = "IMPORTS"  # Module to Module
+    DEPENDS_ON_EXTERNAL = "DEPENDS_ON_EXTERNAL"  # Project to ExternalPackage
+
+
 class IndexProgress(BaseModel):
     """Progress information for codebase indexing."""
 
