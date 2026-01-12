@@ -22,9 +22,11 @@ from shotgun.codebase.core.call_resolution import calculate_callee_confidence
 from shotgun.codebase.core.metrics_types import (
     FileParseResult,
     InheritanceData,
+    NodeLabel,
     ParallelExecutionResult,
     RawCallData,
     RelationshipData,
+    RelationshipType,
     WorkBatch,
     WorkerMetrics,
 )
@@ -350,7 +352,7 @@ class ParallelExecutor:
                         from_label=caller_type,
                         from_key="qualified_name",
                         from_value=call.caller_qn,
-                        rel_type="CALLS",
+                        rel_type=RelationshipType.CALLS,
                         to_label=callee_type,
                         to_key="qualified_name",
                         to_value=callee_qn,
@@ -385,11 +387,11 @@ class ParallelExecutor:
                 if parent_name in function_registry:
                     resolved.append(
                         RelationshipData(
-                            from_label="Class",
+                            from_label=NodeLabel.CLASS,
                             from_key="qualified_name",
                             from_value=child_qn,
-                            rel_type="INHERITS",
-                            to_label="Class",
+                            rel_type=RelationshipType.INHERITS,
+                            to_label=NodeLabel.CLASS,
                             to_key="qualified_name",
                             to_value=parent_name,
                         )
@@ -403,17 +405,17 @@ class ParallelExecutor:
                     class_parents = [
                         p
                         for p in possible_parents
-                        if function_registry.get(p) == "Class"
+                        if function_registry.get(p) == NodeLabel.CLASS
                     ]
 
                     if len(class_parents) == 1:
                         resolved.append(
                             RelationshipData(
-                                from_label="Class",
+                                from_label=NodeLabel.CLASS,
                                 from_key="qualified_name",
                                 from_value=child_qn,
-                                rel_type="INHERITS",
-                                to_label="Class",
+                                rel_type=RelationshipType.INHERITS,
+                                to_label=NodeLabel.CLASS,
                                 to_key="qualified_name",
                                 to_value=class_parents[0],
                             )

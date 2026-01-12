@@ -30,7 +30,9 @@ from shotgun.codebase.models import (
     CodebaseGraph,
     FileChange,
     GraphStatus,
+    NodeLabel,
     OperationStats,
+    RelationshipType,
 )
 from shotgun.logging_config import get_logger
 
@@ -1675,20 +1677,20 @@ class CodebaseGraphManager:
         Returns:
             Tuple of (node_stats, relationship_stats)
         """
-        node_stats = {}
+        node_stats: dict[str, int] = {}
 
-        # Count each node type
+        # Count each node type (excluding ExternalPackage which is rarely needed)
         node_types = [
-            "Project",
-            "Package",
-            "Module",
-            "Class",
-            "Function",
-            "Method",
-            "File",
-            "Folder",
-            "FileMetadata",
-            "DeletionLog",
+            NodeLabel.PROJECT,
+            NodeLabel.PACKAGE,
+            NodeLabel.MODULE,
+            NodeLabel.CLASS,
+            NodeLabel.FUNCTION,
+            NodeLabel.METHOD,
+            NodeLabel.FILE,
+            NodeLabel.FOLDER,
+            NodeLabel.FILE_METADATA,
+            NodeLabel.DELETION_LOG,
         ]
 
         for node_type in node_types:
@@ -1703,14 +1705,14 @@ class CodebaseGraphManager:
                 logger.debug(f"Failed to count {node_type} nodes: {e}")
 
         # Count relationships - need to handle multiple tables for each type
-        rel_counts = {}
+        rel_counts: dict[str, int] = {}
 
         # CONTAINS relationships
         for prefix in [
-            "CONTAINS_PACKAGE",
-            "CONTAINS_FOLDER",
-            "CONTAINS_FILE",
-            "CONTAINS_MODULE",
+            RelationshipType.CONTAINS_PACKAGE,
+            RelationshipType.CONTAINS_FOLDER,
+            RelationshipType.CONTAINS_FILE,
+            RelationshipType.CONTAINS_MODULE,
         ]:
             count = 0
             for suffix in ["", "_PKG", "_FOLDER"]:
@@ -1728,13 +1730,13 @@ class CodebaseGraphManager:
 
         # Other relationships
         for rel_type in [
-            "DEFINES",
-            "DEFINES_FUNC",
-            "DEFINES_METHOD",
-            "INHERITS",
-            "OVERRIDES",
-            "DEPENDS_ON_EXTERNAL",
-            "IMPORTS",
+            RelationshipType.DEFINES,
+            RelationshipType.DEFINES_FUNC,
+            RelationshipType.DEFINES_METHOD,
+            RelationshipType.INHERITS,
+            RelationshipType.OVERRIDES,
+            RelationshipType.DEPENDS_ON_EXTERNAL,
+            RelationshipType.IMPORTS,
         ]:
             try:
                 result = await self._execute_query(
@@ -1747,7 +1749,12 @@ class CodebaseGraphManager:
 
         # CALLS relationships (multiple tables)
         calls_count = 0
-        for table in ["CALLS", "CALLS_FM", "CALLS_MF", "CALLS_MM"]:
+        for table in [
+            RelationshipType.CALLS,
+            RelationshipType.CALLS_FM,
+            RelationshipType.CALLS_MF,
+            RelationshipType.CALLS_MM,
+        ]:
             try:
                 result = await self._execute_query(
                     graph_id, f"MATCH ()-[r:{table}]->() RETURN COUNT(r) as count"
@@ -1761,16 +1768,21 @@ class CodebaseGraphManager:
 
         # TRACKS relationships
         tracks_count = 0
-        for entity in ["Module", "Class", "Function", "Method"]:
+        for tracks_rel in [
+            RelationshipType.TRACKS_MODULE,
+            RelationshipType.TRACKS_CLASS,
+            RelationshipType.TRACKS_FUNCTION,
+            RelationshipType.TRACKS_METHOD,
+        ]:
             try:
                 result = await self._execute_query(
                     graph_id,
-                    f"MATCH ()-[r:TRACKS_{entity}]->() RETURN COUNT(r) as count",
+                    f"MATCH ()-[r:{tracks_rel}]->() RETURN COUNT(r) as count",
                 )
                 if result:
                     tracks_count += result[0]["count"]
             except Exception as e:
-                logger.debug(f"Failed to count TRACKS_{entity} relationships: {e}")
+                logger.debug(f"Failed to count {tracks_rel} relationships: {e}")
         if tracks_count > 0:
             rel_counts["TRACKS (total)"] = tracks_count
 
@@ -1784,16 +1796,16 @@ class CodebaseGraphManager:
 
         # Print node stats
         for node_type in [
-            "Project",
-            "Package",
-            "Module",
-            "Class",
-            "Function",
-            "Method",
-            "File",
-            "Folder",
-            "FileMetadata",
-            "DeletionLog",
+            NodeLabel.PROJECT,
+            NodeLabel.PACKAGE,
+            NodeLabel.MODULE,
+            NodeLabel.CLASS,
+            NodeLabel.FUNCTION,
+            NodeLabel.METHOD,
+            NodeLabel.FILE,
+            NodeLabel.FOLDER,
+            NodeLabel.FILE_METADATA,
+            NodeLabel.DELETION_LOG,
         ]:
             count = node_stats.get(node_type, 0)
             logger.info(f"{node_type}: {count}")

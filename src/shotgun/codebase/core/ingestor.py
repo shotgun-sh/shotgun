@@ -32,7 +32,9 @@ from shotgun.codebase.models import (
     IgnoreReason,
     IndexingStats,
     IndexProgress,
+    NodeLabel,
     ProgressPhase,
+    RelationshipType,
 )
 from shotgun.posthog_telemetry import track_event
 from shotgun.settings import settings
@@ -172,17 +174,23 @@ class Ingestor:
 
     def _get_primary_key_field(self, label: str) -> str | None:
         """Get the primary key field name for a node type."""
-        if label == "Project":
+        if label == NodeLabel.PROJECT:
             return "name"
-        elif label in ["Package", "Module", "Class", "Function", "Method"]:
+        elif label in [
+            NodeLabel.PACKAGE,
+            NodeLabel.MODULE,
+            NodeLabel.CLASS,
+            NodeLabel.FUNCTION,
+            NodeLabel.METHOD,
+        ]:
             return "qualified_name"
-        elif label in ["Folder", "File"]:
+        elif label in [NodeLabel.FOLDER, NodeLabel.FILE]:
             return "path"
-        elif label == "FileMetadata":
+        elif label == NodeLabel.FILE_METADATA:
             return "filepath"
-        elif label == "ExternalPackage":
+        elif label == NodeLabel.EXTERNAL_PACKAGE:
             return "name"
-        elif label == "DeletionLog":
+        elif label == NodeLabel.DELETION_LOG:
             return "id"
         return None
 
@@ -398,45 +406,46 @@ class Ingestor:
     ) -> str | None:
         """Determine the actual relationship table name based on source and target."""
         # Mapping of relationship types and from_labels to table names
-        table_mapping = {
-            "CONTAINS_PACKAGE": {
-                "Project": "CONTAINS_PACKAGE",
-                "Package": "CONTAINS_PACKAGE_PKG",
-                "Folder": "CONTAINS_PACKAGE_FOLDER",
+        # Keys use enum values for type-safe comparisons
+        table_mapping: dict[str, dict[str, str]] = {
+            RelationshipType.CONTAINS_PACKAGE: {
+                NodeLabel.PROJECT: "CONTAINS_PACKAGE",
+                NodeLabel.PACKAGE: "CONTAINS_PACKAGE_PKG",
+                NodeLabel.FOLDER: "CONTAINS_PACKAGE_FOLDER",
             },
-            "CONTAINS_FOLDER": {
-                "Project": "CONTAINS_FOLDER",
-                "Package": "CONTAINS_FOLDER_PKG",
-                "Folder": "CONTAINS_FOLDER_FOLDER",
+            RelationshipType.CONTAINS_FOLDER: {
+                NodeLabel.PROJECT: "CONTAINS_FOLDER",
+                NodeLabel.PACKAGE: "CONTAINS_FOLDER_PKG",
+                NodeLabel.FOLDER: "CONTAINS_FOLDER_FOLDER",
             },
-            "CONTAINS_FILE": {
-                "Project": "CONTAINS_FILE",
-                "Package": "CONTAINS_FILE_PKG",
-                "Folder": "CONTAINS_FILE_FOLDER",
+            RelationshipType.CONTAINS_FILE: {
+                NodeLabel.PROJECT: "CONTAINS_FILE",
+                NodeLabel.PACKAGE: "CONTAINS_FILE_PKG",
+                NodeLabel.FOLDER: "CONTAINS_FILE_FOLDER",
             },
-            "CONTAINS_MODULE": {
-                "Project": "CONTAINS_MODULE",
-                "Package": "CONTAINS_MODULE_PKG",
-                "Folder": "CONTAINS_MODULE_FOLDER",
+            RelationshipType.CONTAINS_MODULE: {
+                NodeLabel.PROJECT: "CONTAINS_MODULE",
+                NodeLabel.PACKAGE: "CONTAINS_MODULE_PKG",
+                NodeLabel.FOLDER: "CONTAINS_MODULE_FOLDER",
             },
         }
 
         if rel_type in table_mapping:
             return table_mapping[rel_type].get(from_label)
-        elif rel_type == "DEFINES":
-            if to_label == "Function":
-                return "DEFINES_FUNC"
+        elif rel_type == RelationshipType.DEFINES:
+            if to_label == NodeLabel.FUNCTION:
+                return RelationshipType.DEFINES_FUNC
             else:
-                return "DEFINES"
-        elif rel_type == "CALLS":
-            if from_label == "Function" and to_label == "Function":
-                return "CALLS"
-            elif from_label == "Function" and to_label == "Method":
-                return "CALLS_FM"
-            elif from_label == "Method" and to_label == "Function":
-                return "CALLS_MF"
-            elif from_label == "Method" and to_label == "Method":
-                return "CALLS_MM"
+                return RelationshipType.DEFINES
+        elif rel_type == RelationshipType.CALLS:
+            if from_label == NodeLabel.FUNCTION and to_label == NodeLabel.FUNCTION:
+                return RelationshipType.CALLS
+            elif from_label == NodeLabel.FUNCTION and to_label == NodeLabel.METHOD:
+                return RelationshipType.CALLS_FM
+            elif from_label == NodeLabel.METHOD and to_label == NodeLabel.FUNCTION:
+                return RelationshipType.CALLS_MF
+            elif from_label == NodeLabel.METHOD and to_label == NodeLabel.METHOD:
+                return RelationshipType.CALLS_MM
         elif rel_type.startswith("TRACKS_"):
             # TRACKS relationships already have the correct table name
             return rel_type
@@ -536,10 +545,10 @@ class Ingestor:
 
         # Delete each type of node tracked by this file
         for node_type, rel_type, stat_key in [
-            ("Module", "TRACKS_Module", "modules"),
-            ("Class", "TRACKS_Class", "classes"),
-            ("Function", "TRACKS_Function", "functions"),
-            ("Method", "TRACKS_Method", "methods"),
+            (NodeLabel.MODULE, RelationshipType.TRACKS_MODULE, "modules"),
+            (NodeLabel.CLASS, RelationshipType.TRACKS_CLASS, "classes"),
+            (NodeLabel.FUNCTION, RelationshipType.TRACKS_FUNCTION, "functions"),
+            (NodeLabel.METHOD, RelationshipType.TRACKS_METHOD, "methods"),
         ]:
             try:
                 # First get the nodes to delete (for logging)
@@ -1087,7 +1096,7 @@ class SimpleGraphBuilder:
                 # Create package
                 package_qn = ".".join([self.project_name] + list(relative_root.parts))
                 self.ingestor.ensure_node_batch(
-                    "Package",
+                    NodeLabel.PACKAGE,
                     {
                         "qualified_name": package_qn,
                         "name": relative_root.name,
@@ -1099,22 +1108,22 @@ class SimpleGraphBuilder:
                 if parent_container_qn:
                     # Parent is a package
                     self.ingestor.ensure_relationship_batch(
-                        "Package",
+                        NodeLabel.PACKAGE,
                         "qualified_name",
                         parent_container_qn,
-                        "CONTAINS_PACKAGE",
-                        "Package",
+                        RelationshipType.CONTAINS_PACKAGE,
+                        NodeLabel.PACKAGE,
                         "qualified_name",
                         package_qn,
                     )
                 else:
                     # Parent is project root
                     self.ingestor.ensure_relationship_batch(
-                        "Project",
+                        NodeLabel.PROJECT,
                         "name",
                         self.project_name,
-                        "CONTAINS_PACKAGE",
-                        "Package",
+                        RelationshipType.CONTAINS_PACKAGE,
+                        NodeLabel.PACKAGE,
                         "qualified_name",
                         package_qn,
                     )
@@ -1123,7 +1132,7 @@ class SimpleGraphBuilder:
             else:
                 # Create folder
                 self.ingestor.ensure_node_batch(
-                    "Folder",
+                    NodeLabel.FOLDER,
                     {
                         "path": str(relative_root).replace(os.sep, "/"),
                         "name": relative_root.name,
@@ -1134,33 +1143,33 @@ class SimpleGraphBuilder:
                 if parent_container_qn:
                     # Parent is a package
                     self.ingestor.ensure_relationship_batch(
-                        "Package",
+                        NodeLabel.PACKAGE,
                         "qualified_name",
                         parent_container_qn,
-                        "CONTAINS_FOLDER",
-                        "Folder",
+                        RelationshipType.CONTAINS_FOLDER,
+                        NodeLabel.FOLDER,
                         "path",
                         str(relative_root).replace(os.sep, "/"),
                     )
                 elif parent_rel_path == Path("."):
                     # Parent is project root
                     self.ingestor.ensure_relationship_batch(
-                        "Project",
+                        NodeLabel.PROJECT,
                         "name",
                         self.project_name,
-                        "CONTAINS_FOLDER",
-                        "Folder",
+                        RelationshipType.CONTAINS_FOLDER,
+                        NodeLabel.FOLDER,
                         "path",
                         str(relative_root).replace(os.sep, "/"),
                     )
                 else:
                     # Parent is another folder
                     self.ingestor.ensure_relationship_batch(
-                        "Folder",
+                        NodeLabel.FOLDER,
                         "path",
                         str(parent_rel_path).replace(os.sep, "/"),
-                        "CONTAINS_FOLDER",
-                        "Folder",
+                        RelationshipType.CONTAINS_FOLDER,
+                        NodeLabel.FOLDER,
                         "path",
                         str(relative_root).replace(os.sep, "/"),
                     )
@@ -1376,7 +1385,7 @@ class SimpleGraphBuilder:
 
         # Create File node
         self.ingestor.ensure_node_batch(
-            "File",
+            NodeLabel.FILE,
             {
                 "path": relative_path_str,
                 "name": filepath.name,
@@ -1389,21 +1398,21 @@ class SimpleGraphBuilder:
         if parent_rel_path == Path("."):
             # File in project root
             self.ingestor.ensure_relationship_batch(
-                "Project",
+                NodeLabel.PROJECT,
                 "name",
                 self.project_name,
-                "CONTAINS_FILE",
-                "File",
+                RelationshipType.CONTAINS_FILE,
+                NodeLabel.FILE,
                 "path",
                 relative_path_str,
             )
         else:
             self.ingestor.ensure_relationship_batch(
-                "Folder",
+                NodeLabel.FOLDER,
                 "path",
                 str(parent_rel_path).replace(os.sep, "/"),
-                "CONTAINS_FILE",
-                "File",
+                RelationshipType.CONTAINS_FILE,
+                NodeLabel.FILE,
                 "path",
                 relative_path_str,
             )
@@ -1432,7 +1441,7 @@ class SimpleGraphBuilder:
 
             current_time = int(time.time())
             self.ingestor.ensure_node_batch(
-                "Module",
+                NodeLabel.MODULE,
                 {
                     "qualified_name": module_qn,
                     "name": filepath.stem,
@@ -1447,33 +1456,33 @@ class SimpleGraphBuilder:
             if parent_container:
                 # Parent is a package
                 self.ingestor.ensure_relationship_batch(
-                    "Package",
+                    NodeLabel.PACKAGE,
                     "qualified_name",
                     parent_container,
-                    "CONTAINS_MODULE",
-                    "Module",
+                    RelationshipType.CONTAINS_MODULE,
+                    NodeLabel.MODULE,
                     "qualified_name",
                     module_qn,
                 )
             elif parent_rel_path == Path("."):
                 # Parent is project root
                 self.ingestor.ensure_relationship_batch(
-                    "Project",
+                    NodeLabel.PROJECT,
                     "name",
                     self.project_name,
-                    "CONTAINS_MODULE",
-                    "Module",
+                    RelationshipType.CONTAINS_MODULE,
+                    NodeLabel.MODULE,
                     "qualified_name",
                     module_qn,
                 )
             else:
                 # Parent is a folder
                 self.ingestor.ensure_relationship_batch(
-                    "Folder",
+                    NodeLabel.FOLDER,
                     "path",
                     str(parent_rel_path).replace(os.sep, "/"),
-                    "CONTAINS_MODULE",
-                    "Module",
+                    RelationshipType.CONTAINS_MODULE,
+                    NodeLabel.MODULE,
                     "qualified_name",
                     module_qn,
                 )
@@ -1487,7 +1496,7 @@ class SimpleGraphBuilder:
 
             # Track module
             self.ingestor.ensure_tracks_relationship(
-                relative_path_str, "Module", module_qn
+                relative_path_str, NodeLabel.MODULE, module_qn
             )
 
             # Extract definitions
@@ -1531,7 +1540,7 @@ class SimpleGraphBuilder:
 
                     current_time = int(time.time())
                     self.ingestor.ensure_node_batch(
-                        "Class",
+                        NodeLabel.CLASS,
                         {
                             "qualified_name": class_qn,
                             "name": class_name,
@@ -1546,22 +1555,22 @@ class SimpleGraphBuilder:
 
                     # Create DEFINES relationship
                     self.ingestor.ensure_relationship_batch(
-                        "Module",
+                        NodeLabel.MODULE,
                         "qualified_name",
                         module_qn,
-                        "DEFINES",
-                        "Class",
+                        RelationshipType.DEFINES,
+                        NodeLabel.CLASS,
                         "qualified_name",
                         class_qn,
                     )
 
                     # Track class
                     self.ingestor.ensure_tracks_relationship(
-                        relative_path_str, "Class", class_qn
+                        relative_path_str, NodeLabel.CLASS, class_qn
                     )
 
                     # Register for lookup
-                    self.function_registry[class_qn] = "Class"
+                    self.function_registry[class_qn] = NodeLabel.CLASS
                     self.simple_name_lookup[class_name].add(class_qn)
 
                     # Extract inheritance
@@ -1599,7 +1608,7 @@ class SimpleGraphBuilder:
 
                         current_time = int(time.time())
                         self.ingestor.ensure_node_batch(
-                            "Method",
+                            NodeLabel.METHOD,
                             {
                                 "qualified_name": method_qn,
                                 "name": func_name,
@@ -1614,22 +1623,22 @@ class SimpleGraphBuilder:
 
                         # Create DEFINES_METHOD relationship
                         self.ingestor.ensure_relationship_batch(
-                            "Class",
+                            NodeLabel.CLASS,
                             "qualified_name",
                             parent_class,
-                            "DEFINES_METHOD",
-                            "Method",
+                            RelationshipType.DEFINES_METHOD,
+                            NodeLabel.METHOD,
                             "qualified_name",
                             method_qn,
                         )
 
                         # Track method
                         self.ingestor.ensure_tracks_relationship(
-                            relative_path_str, "Method", method_qn
+                            relative_path_str, NodeLabel.METHOD, method_qn
                         )
 
                         # Register for lookup
-                        self.function_registry[method_qn] = "Method"
+                        self.function_registry[method_qn] = NodeLabel.METHOD
                         self.simple_name_lookup[func_name].add(method_qn)
                     else:
                         # This is a standalone function
@@ -1641,7 +1650,7 @@ class SimpleGraphBuilder:
 
                         current_time = int(time.time())
                         self.ingestor.ensure_node_batch(
-                            "Function",
+                            NodeLabel.FUNCTION,
                             {
                                 "qualified_name": func_qn,
                                 "name": func_name,
@@ -1656,22 +1665,22 @@ class SimpleGraphBuilder:
 
                         # Create DEFINES relationship
                         self.ingestor.ensure_relationship_batch(
-                            "Module",
+                            NodeLabel.MODULE,
                             "qualified_name",
                             module_qn,
-                            "DEFINES_FUNC",
-                            "Function",
+                            RelationshipType.DEFINES_FUNC,
+                            NodeLabel.FUNCTION,
                             "qualified_name",
                             func_qn,
                         )
 
                         # Track function
                         self.ingestor.ensure_tracks_relationship(
-                            relative_path_str, "Function", func_qn
+                            relative_path_str, NodeLabel.FUNCTION, func_qn
                         )
 
                         # Register for lookup
-                        self.function_registry[func_qn] = "Function"
+                        self.function_registry[func_qn] = NodeLabel.FUNCTION
                         self.simple_name_lookup[func_name].add(func_qn)
 
     def _extract_decorators(self, node: Node, language: str) -> list[str]:
@@ -1850,11 +1859,11 @@ class SimpleGraphBuilder:
                 if parent_qn in self.function_registry:
                     # Create INHERITS relationship
                     self.ingestor.ensure_relationship_batch(
-                        "Class",
+                        NodeLabel.CLASS,
                         "qualified_name",
                         child_qn,
-                        "INHERITS",
-                        "Class",
+                        RelationshipType.INHERITS,
+                        NodeLabel.CLASS,
                         "qualified_name",
                         parent_qn,
                     )
@@ -1869,11 +1878,11 @@ class SimpleGraphBuilder:
                     if len(possible_parents) == 1:
                         actual_parent_qn = list(possible_parents)[0]
                         self.ingestor.ensure_relationship_batch(
-                            "Class",
+                            NodeLabel.CLASS,
                             "qualified_name",
                             child_qn,
-                            "INHERITS",
-                            "Class",
+                            RelationshipType.INHERITS,
+                            NodeLabel.CLASS,
                             "qualified_name",
                             actual_parent_qn,
                         )
