@@ -18,7 +18,7 @@ from shotgun.codebase.benchmarks.formatters import (
 from shotgun.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from shotgun.codebase.benchmarks.benchmark_runner import BenchmarkResults
+    from shotgun.codebase.benchmarks.models import BenchmarkResults
 
 logger = get_logger(__name__)
 

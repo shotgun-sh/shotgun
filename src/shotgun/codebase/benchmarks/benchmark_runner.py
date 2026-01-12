@@ -7,158 +7,36 @@ and collecting performance statistics.
 from __future__ import annotations
 
 import gc
+import hashlib
 import shutil
-import statistics
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from shotgun.codebase.benchmarks.models import (
+    BenchmarkConfig,
+    BenchmarkMode,
+    BenchmarkResults,
+    BenchmarkRun,
+)
 from shotgun.codebase.core.metrics_collector import MetricsCollector
-from shotgun.codebase.core.metrics_types import IndexingMetrics
 from shotgun.logging_config import get_logger
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils.file_system_utils import get_shotgun_home
 
-if TYPE_CHECKING:
-    pass
-
 logger = get_logger(__name__)
 
 
-class BenchmarkConfig:
-    """Configuration for benchmark execution."""
+def _compute_graph_id(codebase_path: Path) -> str:
+    """Compute a unique graph ID from the codebase path.
 
-    def __init__(
-        self,
-        mode: str = "parallel",
-        worker_count: int | None = None,
-        iterations: int = 1,
-        warmup_iterations: int = 0,
-        collect_file_metrics: bool = True,
-        collect_worker_metrics: bool = True,
-    ) -> None:
-        """Initialize benchmark configuration.
+    Args:
+        codebase_path: Path to the codebase
 
-        Args:
-            mode: Execution mode - "parallel" or "sequential"
-            worker_count: Number of workers for parallel mode (None = auto)
-            iterations: Number of measured benchmark runs
-            warmup_iterations: Number of warmup runs (not measured)
-            collect_file_metrics: Whether to collect per-file metrics
-            collect_worker_metrics: Whether to collect per-worker metrics
-        """
-        self.mode = mode
-        self.worker_count = worker_count
-        self.iterations = iterations
-        self.warmup_iterations = warmup_iterations
-        self.collect_file_metrics = collect_file_metrics
-        self.collect_worker_metrics = collect_worker_metrics
-
-
-class BenchmarkRun:
-    """Results from a single benchmark run."""
-
-    def __init__(
-        self,
-        run_id: int,
-        is_warmup: bool,
-        metrics: IndexingMetrics,
-    ) -> None:
-        """Initialize benchmark run results.
-
-        Args:
-            run_id: Run number (0 for first warmup, etc.)
-            is_warmup: Whether this was a warmup run
-            metrics: Collected metrics from this run
-        """
-        self.run_id = run_id
-        self.is_warmup = is_warmup
-        self.metrics = metrics
-
-
-class BenchmarkResults:
-    """Complete results from benchmark execution."""
-
-    def __init__(
-        self,
-        codebase_name: str,
-        codebase_path: str,
-        config: BenchmarkConfig,
-    ) -> None:
-        """Initialize benchmark results.
-
-        Args:
-            codebase_name: Name of the benchmarked codebase
-            codebase_path: Path to the codebase
-            config: Benchmark configuration used
-        """
-        self.codebase_name = codebase_name
-        self.codebase_path = codebase_path
-        self.config = config
-        self.warmup_runs: list[BenchmarkRun] = []
-        self.measured_runs: list[BenchmarkRun] = []
-
-        # Aggregate statistics (calculated after runs)
-        self.avg_duration_seconds: float = 0.0
-        self.min_duration_seconds: float = 0.0
-        self.max_duration_seconds: float = 0.0
-        self.std_dev_seconds: float = 0.0
-        self.avg_throughput: float = 0.0
-        self.avg_memory_mb: float = 0.0
-
-        # Comparison data
-        self.baseline_duration: float | None = None
-        self.speedup_factor: float | None = None
-        self.efficiency: float | None = None
-
-    def add_run(self, run: BenchmarkRun) -> None:
-        """Add a benchmark run to results.
-
-        Args:
-            run: Benchmark run to add
-        """
-        if run.is_warmup:
-            self.warmup_runs.append(run)
-        else:
-            self.measured_runs.append(run)
-
-    def calculate_statistics(self) -> None:
-        """Calculate aggregate statistics from measured runs."""
-        if not self.measured_runs:
-            return
-
-        durations = [r.metrics.total_duration_seconds for r in self.measured_runs]
-        throughputs = [r.metrics.avg_throughput for r in self.measured_runs]
-        memories = [r.metrics.peak_memory_mb for r in self.measured_runs]
-
-        self.avg_duration_seconds = statistics.mean(durations)
-        self.min_duration_seconds = min(durations)
-        self.max_duration_seconds = max(durations)
-        self.std_dev_seconds = (
-            statistics.stdev(durations) if len(durations) > 1 else 0.0
-        )
-        self.avg_throughput = statistics.mean(throughputs)
-        self.avg_memory_mb = statistics.mean(memories)
-
-        # Calculate efficiency if parallel mode with known worker count
-        if (
-            self.config.mode == "parallel"
-            and self.config.worker_count
-            and self.baseline_duration
-        ):
-            speedup = self.baseline_duration / self.avg_duration_seconds
-            self.speedup_factor = speedup
-            self.efficiency = speedup / self.config.worker_count
-
-    def get_last_metrics(self) -> IndexingMetrics | None:
-        """Get metrics from the last measured run.
-
-        Returns:
-            IndexingMetrics from last run, or None if no runs
-        """
-        if self.measured_runs:
-            return self.measured_runs[-1].metrics
-        return None
+    Returns:
+        A 12-character hex string identifying this codebase
+    """
+    return hashlib.sha256(str(codebase_path).encode()).hexdigest()[:12]
 
 
 class BenchmarkRunner:
@@ -201,7 +79,7 @@ class BenchmarkRunner:
 
         # Configuration object
         self.config = BenchmarkConfig(
-            mode="parallel" if parallel else "sequential",
+            mode=BenchmarkMode.PARALLEL if parallel else BenchmarkMode.SEQUENTIAL,
             worker_count=worker_count,
             iterations=iterations,
             warmup_iterations=warmup_iterations,
@@ -294,9 +172,7 @@ class BenchmarkRunner:
         )
 
         # Generate unique graph ID for this run
-        import hashlib
-
-        graph_id = hashlib.sha256(str(self.codebase_path).encode()).hexdigest()[:12]
+        graph_id = _compute_graph_id(self.codebase_path)
 
         # Create database
         kuzu = get_kuzu()
@@ -351,9 +227,7 @@ class BenchmarkRunner:
 
     async def _cleanup_database(self) -> None:
         """Delete database files and clear caches between runs."""
-        import hashlib
-
-        graph_id = hashlib.sha256(str(self.codebase_path).encode()).hexdigest()[:12]
+        graph_id = _compute_graph_id(self.codebase_path)
 
         # Delete database file
         graph_path = self._storage_dir / f"{graph_id}.kuzu"

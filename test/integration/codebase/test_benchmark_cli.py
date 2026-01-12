@@ -8,8 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from shotgun.codebase.benchmarks import BenchmarkRunner, MetricsExporter, get_formatter
-from shotgun.codebase.benchmarks.formatters import MetricsDisplayOptions
+from shotgun.codebase.benchmarks import (
+    BenchmarkRunner,
+    MetricsDisplayOptions,
+    MetricsExporter,
+    get_formatter,
+)
 
 
 @pytest.fixture
@@ -170,8 +174,9 @@ async def test_benchmark_runner_with_warmup(
 
 def test_text_formatter(sample_repo: Path) -> None:
     """Test text formatter produces valid output."""
-    from shotgun.codebase.benchmarks.benchmark_runner import (
+    from shotgun.codebase.benchmarks.models import (
         BenchmarkConfig,
+        BenchmarkMode,
         BenchmarkResults,
         BenchmarkRun,
     )
@@ -179,7 +184,7 @@ def test_text_formatter(sample_repo: Path) -> None:
 
     # Create mock results
     config = BenchmarkConfig(
-        mode="parallel",
+        mode=BenchmarkMode.PARALLEL,
         worker_count=4,
         iterations=1,
     )
@@ -239,14 +244,15 @@ def test_text_formatter(sample_repo: Path) -> None:
 
 def test_json_formatter(sample_repo: Path) -> None:
     """Test JSON formatter produces valid JSON."""
-    from shotgun.codebase.benchmarks.benchmark_runner import (
+    from shotgun.codebase.benchmarks.models import (
         BenchmarkConfig,
+        BenchmarkMode,
         BenchmarkResults,
         BenchmarkRun,
     )
     from shotgun.codebase.core.metrics_types import IndexingMetrics
 
-    config = BenchmarkConfig(mode="sequential", iterations=1)
+    config = BenchmarkConfig(mode=BenchmarkMode.SEQUENTIAL, iterations=1)
     results = BenchmarkResults(
         codebase_name="test",
         codebase_path=str(sample_repo),
@@ -283,14 +289,15 @@ def test_json_formatter(sample_repo: Path) -> None:
 
 def test_csv_formatter(sample_repo: Path) -> None:
     """Test CSV formatter produces valid CSV."""
-    from shotgun.codebase.benchmarks.benchmark_runner import (
+    from shotgun.codebase.benchmarks.models import (
         BenchmarkConfig,
+        BenchmarkMode,
         BenchmarkResults,
         BenchmarkRun,
     )
     from shotgun.codebase.core.metrics_types import IndexingMetrics
 
-    config = BenchmarkConfig(mode="sequential", iterations=1)
+    config = BenchmarkConfig(mode=BenchmarkMode.SEQUENTIAL, iterations=1)
     results = BenchmarkResults(
         codebase_name="test",
         codebase_path=str(sample_repo),
@@ -325,14 +332,15 @@ def test_csv_formatter(sample_repo: Path) -> None:
 
 def test_markdown_formatter(sample_repo: Path) -> None:
     """Test Markdown formatter produces valid markdown."""
-    from shotgun.codebase.benchmarks.benchmark_runner import (
+    from shotgun.codebase.benchmarks.models import (
         BenchmarkConfig,
+        BenchmarkMode,
         BenchmarkResults,
         BenchmarkRun,
     )
     from shotgun.codebase.core.metrics_types import IndexingMetrics
 
-    config = BenchmarkConfig(mode="parallel", worker_count=4, iterations=1)
+    config = BenchmarkConfig(mode=BenchmarkMode.PARALLEL, worker_count=4, iterations=1)
     results = BenchmarkResults(
         codebase_name="test",
         codebase_path=str(sample_repo),
@@ -368,14 +376,15 @@ def test_markdown_formatter(sample_repo: Path) -> None:
 
 def test_metrics_exporter_json(sample_repo: Path, tmp_path: Path) -> None:
     """Test MetricsExporter exports to JSON."""
-    from shotgun.codebase.benchmarks.benchmark_runner import (
+    from shotgun.codebase.benchmarks.models import (
         BenchmarkConfig,
+        BenchmarkMode,
         BenchmarkResults,
         BenchmarkRun,
     )
     from shotgun.codebase.core.metrics_types import IndexingMetrics
 
-    config = BenchmarkConfig(mode="sequential", iterations=1)
+    config = BenchmarkConfig(mode=BenchmarkMode.SEQUENTIAL, iterations=1)
     results = BenchmarkResults(
         codebase_name="test",
         codebase_path=str(sample_repo),
@@ -412,14 +421,15 @@ def test_metrics_exporter_json(sample_repo: Path, tmp_path: Path) -> None:
 
 def test_metrics_exporter_csv(sample_repo: Path, tmp_path: Path) -> None:
     """Test MetricsExporter exports to CSV."""
-    from shotgun.codebase.benchmarks.benchmark_runner import (
+    from shotgun.codebase.benchmarks.models import (
         BenchmarkConfig,
+        BenchmarkMode,
         BenchmarkResults,
         BenchmarkRun,
     )
     from shotgun.codebase.core.metrics_types import IndexingMetrics
 
-    config = BenchmarkConfig(mode="sequential", iterations=1)
+    config = BenchmarkConfig(mode=BenchmarkMode.SEQUENTIAL, iterations=1)
     results = BenchmarkResults(
         codebase_name="test",
         codebase_path=str(sample_repo),
