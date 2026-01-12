@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from shotgun.codebase.core.call_resolution import calculate_callee_confidence
 from shotgun.codebase.core.metrics_types import (
     FileParseResult,
     FileParseTask,
@@ -527,16 +528,14 @@ def test_resolve_inheritance_handles_unknown_parent() -> None:
 
 
 # =============================================================================
-# Tests for _calculate_callee_confidence()
+# Tests for calculate_callee_confidence() (shared utility)
 # =============================================================================
 
 
 def test_calculate_confidence_boosts_same_module() -> None:
     """Test that confidence calculation boosts same-module callees."""
-    executor = ParallelExecutor()
-
     # Same module
-    score_same = executor._calculate_callee_confidence(
+    score_same = calculate_callee_confidence(
         caller_qn="project.mod.caller",
         callee_qn="project.mod.callee",
         module_qn="project.mod",
@@ -545,7 +544,7 @@ def test_calculate_confidence_boosts_same_module() -> None:
     )
 
     # Different module
-    score_diff = executor._calculate_callee_confidence(
+    score_diff = calculate_callee_confidence(
         caller_qn="project.mod.caller",
         callee_qn="project.other.callee",
         module_qn="project.mod",
@@ -558,10 +557,8 @@ def test_calculate_confidence_boosts_same_module() -> None:
 
 def test_calculate_confidence_boosts_self_calls() -> None:
     """Test that confidence calculation boosts self.method() calls."""
-    executor = ParallelExecutor()
-
     # self call to same class method
-    score = executor._calculate_callee_confidence(
+    score = calculate_callee_confidence(
         caller_qn="project.mod.MyClass.caller",
         callee_qn="project.mod.MyClass.callee",
         module_qn="project.mod",
@@ -575,10 +572,8 @@ def test_calculate_confidence_boosts_self_calls() -> None:
 
 def test_calculate_confidence_boosts_unique_names() -> None:
     """Test that confidence calculation boosts unique function names."""
-    executor = ParallelExecutor()
-
     # Unique name
-    score_unique = executor._calculate_callee_confidence(
+    score_unique = calculate_callee_confidence(
         caller_qn="project.mod.caller",
         callee_qn="project.other.unique_func",
         module_qn="project.mod",
@@ -587,7 +582,7 @@ def test_calculate_confidence_boosts_unique_names() -> None:
     )
 
     # Common name (multiple matches)
-    score_common = executor._calculate_callee_confidence(
+    score_common = calculate_callee_confidence(
         caller_qn="project.mod.caller",
         callee_qn="project.other.common",
         module_qn="project.mod",
