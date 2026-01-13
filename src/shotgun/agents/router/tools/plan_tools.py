@@ -45,7 +45,7 @@ def _notify_plan_changed(deps: RouterDeps) -> None:
 
 @register_tool(
     category=ToolCategory.PLANNING,
-    display_text="Creating execution plan",
+    display_text="Creating a Drafting plan",
     key_arg="input",
 )
 async def create_plan(
@@ -63,7 +63,7 @@ async def create_plan(
     Returns:
         ToolResult indicating success or failure
     """
-    logger.debug("Creating execution plan with goal: %s", input.goal)
+    logger.debug("Creating a Drafting plan with goal: %s", input.goal)
 
     # Convert step inputs to ExecutionStep objects
     steps = [
