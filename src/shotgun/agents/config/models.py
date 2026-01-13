@@ -28,7 +28,6 @@ class ModelName(StrEnum):
     GPT_5_1 = "gpt-5.1"
     GPT_5_2 = "gpt-5.2"
     CLAUDE_OPUS_4_5 = "claude-opus-4-5"
-    CLAUDE_SONNET_4 = "claude-sonnet-4"
     CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
     GEMINI_2_5_PRO = "gemini-2.5-pro"
@@ -156,14 +155,6 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_output_tokens=64_000,
         litellm_proxy_model_name="anthropic/claude-opus-4-5",
         short_name="Opus 4.5",
-    ),
-    ModelName.CLAUDE_SONNET_4: ModelSpec(
-        name=ModelName.CLAUDE_SONNET_4,
-        provider=ProviderType.ANTHROPIC,
-        max_input_tokens=200_000,
-        max_output_tokens=64_000,
-        litellm_proxy_model_name="anthropic/claude-sonnet-4",
-        short_name="Sonnet 4",
     ),
     ModelName.GEMINI_2_5_FLASH_LITE: ModelSpec(
         name=ModelName.GEMINI_2_5_FLASH_LITE,

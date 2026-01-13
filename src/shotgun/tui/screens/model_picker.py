@@ -328,7 +328,6 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             ModelName.GPT_5_1: "GPT-5.1 (OpenAI)",
             ModelName.GPT_5_2: "GPT-5.2 (OpenAI)",
             ModelName.CLAUDE_OPUS_4_5: "Claude Opus 4.5 (Anthropic)",
-            ModelName.CLAUDE_SONNET_4: "Claude Sonnet 4 (Anthropic)",
             ModelName.CLAUDE_SONNET_4_5: "Claude Sonnet 4.5 (Anthropic)",
             ModelName.CLAUDE_HAIKU_4_5: "Claude Haiku 4.5 (Anthropic)",
             ModelName.GEMINI_2_5_PRO: "Gemini 2.5 Pro (Google)",

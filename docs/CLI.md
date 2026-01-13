@@ -105,9 +105,9 @@ shotgun config --provider gemini --api-key "your-key"
 
 #### Update Model Selection
 ```bash
-shotgun config --model "claude-sonnet-4"
-shotgun config --model "gpt-4"
-shotgun config --model "gemini-2.0-flash-exp"
+shotgun config --model "claude-sonnet-4-5"
+shotgun config --model "gpt-5.1"
+shotgun config --model "gemini-2.5-pro"
 ```
 
 ### Codebase Graph Management
