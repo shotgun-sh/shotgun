@@ -1,5 +1,6 @@
 """Markdown manipulation tools for Pydantic AI agents."""
 
+from .insert_section import insert_markdown_section
 from .models import CloseMatch, HeadingList, HeadingMatch, MarkdownHeading
 from .replace_section import replace_markdown_section
 from .utils import (
@@ -15,6 +16,7 @@ from .utils import (
 __all__ = [
     # Tools
     "replace_markdown_section",
+    "insert_markdown_section",
     # Models
     "MarkdownHeading",
     "HeadingList",

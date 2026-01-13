@@ -1,4 +1,4 @@
-"""Tool for replacing markdown sections."""
+"""Tool for inserting content into markdown sections."""
 
 import aiofiles
 import aiofiles.os
@@ -23,36 +23,35 @@ logger = get_logger(__name__)
 
 @register_tool(
     category=ToolCategory.ARTIFACT_MANAGEMENT,
-    display_text="Replacing section",
+    display_text="Inserting content",
     key_arg="filename",
 )
-async def replace_markdown_section(
+async def insert_markdown_section(
     ctx: RunContext[AgentDeps],
     filename: str,
-    section_heading: str,
-    new_contents: str,
+    after_heading: str,
+    content: str,
     new_heading: str | None = None,
 ) -> str:
-    """Replace an entire section in a Markdown file.
+    """Insert content at the end of a Markdown section.
 
     PREFER THIS TOOL over rewriting the entire file - it is faster, less costly,
-    and less error-prone.
+    and less error-prone. Use this to append content to an existing section.
 
     Uses fuzzy matching on headings so minor typos are tolerated.
-    Replaces from the target heading down to (but not including) the next
-    heading at the same or higher level.
+    Inserts content just before the next heading at the same or higher level.
 
     Args:
         ctx: Run context with agent dependencies
         filename: Path to the Markdown file (relative to .shotgun directory)
-        section_heading: The heading to find (e.g., '## Requirements'). Fuzzy matched.
-        new_contents: The new content for the section body (not including the heading)
-        new_heading: Optional new heading text to replace the old one
+        after_heading: The heading to insert after (e.g., '## Requirements'). Fuzzy matched.
+        content: The content to insert at the end of the section
+        new_heading: Optional heading for the inserted content (creates a subsection)
 
     Returns:
         Success message or error message
     """
-    logger.debug("Replacing section '%s' in: %s", section_heading, filename)
+    logger.debug("Inserting content into section '%s' in: %s", after_heading, filename)
 
     try:
         # Validate path with agent scoping
@@ -64,29 +63,29 @@ async def replace_markdown_section(
 
         # Read file content (newline="" preserves original line endings)
         async with aiofiles.open(file_path, encoding="utf-8", newline="") as f:
-            content = await f.read()
+            file_content = await f.read()
 
         # Detect line ending style
-        line_ending = detect_line_ending(content)
-        lines = content.split("\n")
+        line_ending = detect_line_ending(file_content)
+        lines = file_content.split("\n")
 
         # Remove \r from lines if CRLF
         if line_ending == "\r\n":
             lines = [line.rstrip("\r") for line in lines]
 
         # Extract headings
-        headings = extract_headings(content)
+        headings = extract_headings(file_content)
 
         if not headings:
-            return f"Error: No headings found in '{filename}'. Cannot replace sections in files without headings."
+            return f"Error: No headings found in '{filename}'. Cannot insert into files without headings."
 
         # Find matching heading
-        match_result = find_matching_heading(headings, section_heading)
+        match_result = find_matching_heading(headings, after_heading)
 
         if match_result is None:
             # No match found - provide helpful error with available headings
             available = [h.text for h in headings]
-            close = find_close_matches(headings, section_heading)
+            close = find_close_matches(headings, after_heading)
 
             if close and close[0].confidence >= 0.6:
                 # There are close matches but below threshold
@@ -94,7 +93,7 @@ async def replace_markdown_section(
                     f"'{m.heading_text}' ({int(m.confidence * 100)}%)" for m in close
                 )
                 return (
-                    f"No section matching '{section_heading}' found in {filename}. "
+                    f"No section matching '{after_heading}' found in {filename}. "
                     f"Did you mean: {close_display}"
                 )
             else:
@@ -103,7 +102,7 @@ async def replace_markdown_section(
                 if len(available) > 5:
                     available_display += f" (+{len(available) - 5} more)"
                 return (
-                    f"No section matching '{section_heading}' found in {filename}. "
+                    f"No section matching '{after_heading}' found in {filename}. "
                     f"Available headings: {available_display}"
                 )
 
@@ -113,7 +112,7 @@ async def replace_markdown_section(
         # Check for ambiguous matches (multiple close matches)
         if confidence < 1.0:
             close = find_close_matches(
-                headings, section_heading, threshold=confidence - 0.1
+                headings, after_heading, threshold=confidence - 0.1
             )
             if len(close) > 1 and close[1].confidence >= confidence - 0.05:
                 # Second match is very close to first - ambiguous
@@ -122,36 +121,37 @@ async def replace_markdown_section(
                     for m in close[:3]
                 )
                 return (
-                    f"Multiple sections closely match '{section_heading}' in {filename}: "
+                    f"Multiple sections closely match '{after_heading}' in {filename}: "
                     f"{close_display}. Please be more specific."
                 )
 
         # Find section boundaries
-        start_line, end_line = find_section_bounds(
+        _start_line, end_line = find_section_bounds(
             lines, matched.line_number, matched.level
         )
-        old_section_lines = end_line - start_line
 
-        # Build new section
-        final_heading = new_heading if new_heading else matched.text
-        normalized_content = normalize_section_content(new_contents)
-
-        # Split new content into lines
-        new_content_lines = normalized_content.split("\n")
+        # Build insert content
+        normalized_content = normalize_section_content(content)
+        insert_content_lines = normalized_content.split("\n")
         # Remove empty last line from split (since we added \n)
-        if new_content_lines and new_content_lines[-1] == "":
-            new_content_lines.pop()
+        if insert_content_lines and insert_content_lines[-1] == "":
+            insert_content_lines.pop()
 
-        # Build the new section: heading + blank line + content
-        new_section_lines = [final_heading, ""]
-        new_section_lines.extend(new_content_lines)
+        # Build the insert lines
+        insert_lines: list[str] = [""]  # Blank line separator before new content
+
+        if new_heading:
+            insert_lines.append(new_heading)
+            insert_lines.append("")  # Blank line after heading
+
+        insert_lines.extend(insert_content_lines)
 
         # Add trailing blank line if not at EOF
         if end_line < len(lines):
-            new_section_lines.append("")
+            insert_lines.append("")
 
-        # Replace section
-        new_lines = lines[:start_line] + new_section_lines + lines[end_line:]
+        # Insert before section end (before next heading or EOF)
+        new_lines = lines[:end_line] + insert_lines + lines[end_line:]
 
         # Join with detected line ending
         new_content = line_ending.join(new_lines)
@@ -163,24 +163,33 @@ async def replace_markdown_section(
         # Track the file operation
         ctx.deps.file_tracker.add_operation(file_path, FileOperationType.UPDATED)
 
-        logger.debug("Successfully replaced section '%s' in %s", matched.text, filename)
+        logger.debug(
+            "Successfully inserted content into section '%s' in %s",
+            matched.text,
+            filename,
+        )
 
-        new_section_line_count = len(new_section_lines)
+        lines_added = len(insert_lines)
         confidence_display = f"{int(confidence * 100)}%"
 
-        return (
-            f"Successfully replaced section '{matched.text}' in {filename} "
-            f"(matched with {confidence_display} confidence, "
-            f"{old_section_lines} lines -> {new_section_line_count} lines)"
-        )
+        if new_heading:
+            return (
+                f"Successfully inserted '{new_heading}' into '{matched.text}' in {filename} "
+                f"(matched with {confidence_display} confidence, {lines_added} lines added)"
+            )
+        else:
+            return (
+                f"Successfully inserted content into '{matched.text}' in {filename} "
+                f"(matched with {confidence_display} confidence, {lines_added} lines added)"
+            )
 
     except ValueError as e:
         # Path validation errors
-        error_msg = f"Error replacing section in '{filename}': {e}"
-        logger.error("Section replacement failed: %s", error_msg)
+        error_msg = f"Error inserting into '{filename}': {e}"
+        logger.error("Section insertion failed: %s", error_msg)
         return error_msg
 
     except Exception as e:
-        error_msg = f"Error replacing section in '{filename}': {e}"
-        logger.error("Section replacement failed: %s", error_msg)
+        error_msg = f"Error inserting into '{filename}': {e}"
+        logger.error("Section insertion failed: %s", error_msg)
         return error_msg

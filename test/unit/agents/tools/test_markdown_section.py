@@ -13,6 +13,7 @@ from shotgun.agents.tools.markdown_tools import (
     find_matching_heading,
     find_section_bounds,
     get_heading_level,
+    insert_markdown_section,
     replace_markdown_section,
 )
 
@@ -611,3 +612,777 @@ async def test_export_agent_cannot_replace_protected_files(
 
     assert "Error" in result
     assert "cannot write to protected file" in result
+
+
+# =============================================================================
+# Tests for insert_markdown_section
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_basic_insert(mock_context, tmp_path, monkeypatch):
+    """Test basic content insertion at end of section."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+- Existing req 1
+- Existing req 2
+
+## Technical Notes
+
+Some technical details
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Requirements",
+        "- New req 3\n- New req 4",
+    )
+
+    assert "Successfully inserted" in result
+    assert "## Requirements" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # Original content preserved
+    assert "- Existing req 1" in new_content
+    assert "- Existing req 2" in new_content
+    # New content added
+    assert "- New req 3" in new_content
+    assert "- New req 4" in new_content
+    # Other sections preserved
+    assert "## Technical Notes" in new_content
+    assert "Some technical details" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_with_new_heading(mock_context, tmp_path, monkeypatch):
+    """Test insertion with a new subsection heading."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+- Existing req
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Requirements",
+        "- Technical req 1",
+        new_heading="### Technical Requirements",
+    )
+
+    assert "Successfully inserted" in result
+    assert "### Technical Requirements" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "### Technical Requirements" in new_content
+    assert "- Technical req 1" in new_content
+    assert "- Existing req" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_at_eof(mock_context, tmp_path, monkeypatch):
+    """Test insertion into section at end of file."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Last Section
+
+Existing content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Last Section",
+        "New appended content",
+    )
+
+    assert "Successfully inserted" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "Existing content" in new_content
+    assert "New appended content" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_into_empty_section(mock_context, tmp_path, monkeypatch):
+    """Test insertion into an empty section."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Empty Section
+## Next Section
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Empty Section",
+        "Now has content",
+    )
+
+    assert "Successfully inserted" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "Now has content" in new_content
+    assert "## Next Section" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_fuzzy_matching(mock_context, tmp_path, monkeypatch):
+    """Test that fuzzy matching works for insert."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+Existing
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Requirments",  # typo
+        "New content",
+    )
+
+    assert "Successfully inserted" in result
+    assert "%" in result  # confidence shown
+
+
+@pytest.mark.asyncio
+async def test_insert_file_not_found(mock_context, tmp_path, monkeypatch):
+    """Test insert file not found error."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+        "Content",
+    )
+
+    assert "Error" in result
+    assert "not found" in result
+
+
+@pytest.mark.asyncio
+async def test_insert_no_headings(mock_context, tmp_path, monkeypatch):
+    """Test insert error when file has no headings."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    (tmp_path / "plan.md").write_text("Just some text without headings")
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+        "Content",
+    )
+
+    assert "Error" in result
+    assert "No headings found" in result
+
+
+@pytest.mark.asyncio
+async def test_insert_agent_scoping(mock_context, tmp_path, monkeypatch):
+    """Test that insert respects agent scoping restrictions."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    (tmp_path / "research.md").write_text("# Research\n\n## Findings\n\nData")
+
+    result = await insert_markdown_section(
+        mock_context,
+        "research.md",
+        "## Findings",
+        "New findings",
+    )
+
+    assert "Error" in result
+    assert "Plan agent can only write to" in result
+
+
+@pytest.mark.asyncio
+async def test_insert_file_operation_tracking(mock_context, tmp_path, monkeypatch):
+    """Test that insert file operations are tracked."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    (tmp_path / "plan.md").write_text("# Plan\n\n## Section\n\nContent")
+
+    await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+        "New content",
+    )
+
+    assert len(mock_context.deps.file_tracker.operations) == 1
+
+
+@pytest.mark.asyncio
+async def test_insert_crlf_preserved(mock_context, tmp_path, monkeypatch):
+    """Test that insert preserves CRLF line endings."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = "# Plan\r\n\r\n## Section\r\n\r\nExisting\r\n"
+    (tmp_path / "plan.md").write_bytes(initial_content.encode("utf-8"))
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+        "New content",
+    )
+
+    assert "Successfully inserted" in result
+    new_content = (tmp_path / "plan.md").read_bytes().decode("utf-8")
+    assert "\r\n" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_no_match_shows_available(mock_context, tmp_path, monkeypatch):
+    """Test that insert with no match shows available headings."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+Content
+
+## Technical Notes
+
+More content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Nonexistent Section",
+        "New content",
+    )
+
+    assert "No section matching" in result
+    assert "plan.md" in result
+
+
+# =============================================================================
+# Varied content tests for both tools
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_replace_with_code_block(mock_context, tmp_path, monkeypatch):
+    """Test replacing section containing fenced code blocks."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Implementation
+
+Old code here
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    new_code = """```python
+def hello():
+    print("Hello, world!")
+```
+
+```javascript
+console.log("Also JS");
+```"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Implementation",
+        new_code,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "```python" in new_content
+    assert 'print("Hello, world!")' in new_content
+    assert "```javascript" in new_content
+    assert "## Notes" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_with_code_block(mock_context, tmp_path, monkeypatch):
+    """Test inserting content containing fenced code blocks."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Implementation
+
+Existing implementation
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    new_code = """```python
+def new_function():
+    return 42
+```"""
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Implementation",
+        new_code,
+    )
+
+    assert "Successfully inserted" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "Existing implementation" in new_content
+    assert "```python" in new_content
+    assert "return 42" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_nested_bullet_list(mock_context, tmp_path, monkeypatch):
+    """Test replacing section with nested bullet lists."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+Old requirements
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    nested_list = """- Parent item 1
+  - Child item 1.1
+  - Child item 1.2
+    - Grandchild 1.2.1
+- Parent item 2
+  - Child item 2.1"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Requirements",
+        nested_list,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "- Parent item 1" in new_content
+    assert "  - Child item 1.1" in new_content
+    assert "    - Grandchild 1.2.1" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_numbered_list(mock_context, tmp_path, monkeypatch):
+    """Test replacing section with numbered lists."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Steps
+
+Old steps
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    numbered_list = """1. First step
+2. Second step
+   1. Substep 2.1
+   2. Substep 2.2
+3. Third step"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Steps",
+        numbered_list,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "1. First step" in new_content
+    assert "   1. Substep 2.1" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_table(mock_context, tmp_path, monkeypatch):
+    """Test replacing section with markdown tables."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Data
+
+Old data
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    table = """| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Data A   | Data B   | Data C   |
+| Data D   | Data E   | Data F   |"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Data",
+        table,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "| Column 1 |" in new_content
+    assert "|----------|" in new_content
+    assert "| Data A   |" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_links_and_images(mock_context, tmp_path, monkeypatch):
+    """Test replacing section with links and images."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Resources
+
+Old resources
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    links_content = """Check out [this link](https://example.com) for more info.
+
+![Alt text](./image.png "Image title")
+
+Also see [reference link][ref].
+
+[ref]: https://reference.com "Reference"
+"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Resources",
+        links_content,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "[this link](https://example.com)" in new_content
+    assert "![Alt text](./image.png" in new_content
+    assert "[ref]: https://reference.com" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_blockquote(mock_context, tmp_path, monkeypatch):
+    """Test replacing section with blockquotes."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Quotes
+
+Old quote
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    blockquote = """> This is a blockquote.
+>
+> It has multiple lines.
+>
+> > And nested quotes too.
+"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Quotes",
+        blockquote,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "> This is a blockquote." in new_content
+    assert "> > And nested quotes too." in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_horizontal_rule(mock_context, tmp_path, monkeypatch):
+    """Test replacing section containing horizontal rules."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Sections
+
+Old content
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    hr_content = """Part 1 content
+
+---
+
+Part 2 content
+
+***
+
+Part 3 content"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Sections",
+        hr_content,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "---" in new_content
+    assert "***" in new_content
+    assert "Part 1 content" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_with_unicode(mock_context, tmp_path, monkeypatch):
+    """Test replacing section with unicode content (emoji, CJK, etc.)."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Content
+
+Old content
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    unicode_content = """🚀 Launch features:
+- 日本語のテスト (Japanese test)
+- 中文测试 (Chinese test)
+- Émojis: 🎉 🔥 ✨ 💻
+- Special: — « » • † ‡ © ® ™
+- Math: α β γ δ ∑ ∏ √ ∞"""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Content",
+        unicode_content,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "🚀" in new_content
+    assert "日本語のテスト" in new_content
+    assert "中文测试" in new_content
+    assert "∞" in new_content
+
+
+@pytest.mark.asyncio
+async def test_replace_deeply_nested_headings(mock_context, tmp_path, monkeypatch):
+    """Test replacing with deeply nested headings (h1 -> h6)."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Top Section
+
+Old content
+
+## Another Section
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    nested_headings = """Level 2 intro
+
+### Level 3
+
+#### Level 4
+
+##### Level 5
+
+###### Level 6
+
+Deepest content here."""
+
+    result = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Top Section",
+        nested_headings,
+    )
+
+    assert "Successfully replaced" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "### Level 3" in new_content
+    assert "###### Level 6" in new_content
+    assert "Deepest content here." in new_content
+    assert "## Another Section" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_with_table(mock_context, tmp_path, monkeypatch):
+    """Test inserting content with tables."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Data
+
+Existing data
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    table = """| New Col | Values |
+|---------|--------|
+| Row 1   | 100    |"""
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Data",
+        table,
+    )
+
+    assert "Successfully inserted" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "Existing data" in new_content
+    assert "| New Col |" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_with_unicode(mock_context, tmp_path, monkeypatch):
+    """Test inserting unicode content."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Features
+
+Existing features
+
+## Notes
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Features",
+        "🎯 新機能: ダークモード",
+    )
+
+    assert "Successfully inserted" in result
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "Existing features" in new_content
+    assert "🎯" in new_content
+    assert "新機能" in new_content
