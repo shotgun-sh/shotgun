@@ -120,6 +120,7 @@ from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.database_locked_dialog import DatabaseLockedDialog
 from shotgun.tui.screens.database_timeout_dialog import DatabaseTimeoutDialog
 from shotgun.tui.screens.kuzu_error_dialog import KuzuErrorDialog
+from shotgun.tui.screens.models import LockedDialogAction
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
     ShareSpecsAction,
@@ -339,13 +340,33 @@ class ChatScreen(Screen[None]):
         ]
         if locked_issues:
             # Show single locked dialog
-            retry = await self.app.push_screen_wait(DatabaseLockedDialog())
-            if not retry:
+            locked_action = await self.app.push_screen_wait(DatabaseLockedDialog())
+
+            if locked_action == LockedDialogAction.QUIT:
                 # User cancelled - exit the app gracefully
                 await self.app.action_quit()
                 return False
 
-            # User wants to retry - re-detect to see if locks are cleared
+            if locked_action == LockedDialogAction.DELETE:
+                # User confirmed deletion of locked databases
+                for issue in locked_issues:
+                    deleted = await manager.delete_database(issue.graph_id)
+                    if deleted:
+                        logger.info(f"Deleted locked database: {issue.graph_id}")
+                        self.agent_manager.add_hint_message(
+                            HintMessage(
+                                message=f"Deleted locked database '{issue.graph_id}'. "
+                                "You can re-index using /index."
+                            )
+                        )
+                    else:
+                        logger.error(
+                            f"Failed to delete locked database: {issue.graph_id}"
+                        )
+                # Continue with startup after deletion
+                return True
+
+            # locked_action == LockedDialogAction.RETRY - re-detect to see if locks are cleared
             new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
             still_locked = [
                 i for i in new_issues if i.error_type == KuzuErrorType.LOCKED

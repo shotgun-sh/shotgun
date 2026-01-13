@@ -13,19 +13,24 @@ from textual.widgets import Button, Label, Static
 from shotgun.exceptions import SHOTGUN_CONTACT_EMAIL
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
+from shotgun.tui.screens.models import LockedDialogAction
 
 # Discord invite link for support
 DISCORD_LINK = "https://discord.gg/5RmY6J2N7s"
 
 
-class DatabaseLockedDialog(ModalScreen[bool]):
+class DatabaseLockedDialog(ModalScreen[LockedDialogAction]):
     """Dialog shown when the database is locked by another process.
 
-    This modal informs the user that another shotgun instance has the database
-    open, and offers options to retry (after closing the other instance) or cancel.
+    This modal informs the user that the database is locked, which could mean
+    another instance is running OR a previous instance shut down unsafely
+    without releasing the lock.
 
     Returns:
-        True if user wants to retry, False if user cancels
+        LockedDialogAction.RETRY if user wants to retry after closing other instances
+        LockedDialogAction.DELETE if user wants to delete the locked database
+        LockedDialogAction.QUIT if user wants to quit the application
     """
 
     DEFAULT_CSS = """
@@ -75,6 +80,22 @@ class DatabaseLockedDialog(ModalScreen[bool]):
             margin-left: 1;
         }
 
+        #delete-section {
+            layout: horizontal;
+            height: auto;
+            padding-top: 1;
+            border-top: solid $warning-darken-2;
+        }
+
+        #delete-section Static {
+            width: 1fr;
+            color: $text-muted;
+        }
+
+        #delete-section Button {
+            margin-left: 1;
+        }
+
         /* Compact styles for short terminals */
         #dialog-container.compact {
             padding: 0 2;
@@ -95,12 +116,13 @@ class DatabaseLockedDialog(ModalScreen[bool]):
         with Container(id="dialog-container"):
             yield Label("Codebase Index Unavailable", id="dialog-title")
             message = (
-                "Unable to access the codebase index because another shotgun "
-                "instance appears to be running.\n\n"
+                "Unable to access the codebase index because it is locked.\n\n"
+                "We can't determine if another shotgun instance is currently running "
+                "or if a previous instance shut down unsafely without releasing the lock.\n\n"
                 "To resolve this:\n"
                 "1. Close any other shotgun instances and click Retry\n"
-                "2. If no other instance is running and you still see this error, "
-                "contact support:"
+                "2. If no other instance is running, you can delete the index\n\n"
+                "Need help? Contact support:"
             )
             yield Static(message, id="dialog-message")
             with Horizontal(id="support-buttons"):
@@ -111,6 +133,9 @@ class DatabaseLockedDialog(ModalScreen[bool]):
             with Container(id="dialog-buttons"):
                 yield Button("Retry", id="retry", variant="primary")
                 yield Button("Quit", id="cancel")
+            with Horizontal(id="delete-section"):
+                yield Static("Caution: Only delete if no other instance is running.")
+                yield Button("Delete Index", id="delete", variant="error")
 
     def on_mount(self) -> None:
         """Set up the dialog after mounting."""
@@ -147,13 +172,36 @@ class DatabaseLockedDialog(ModalScreen[bool]):
     def handle_cancel(self, event: Button.Pressed) -> None:
         """Handle cancel button press."""
         event.stop()
-        self.dismiss(False)
+        self.dismiss(LockedDialogAction.QUIT)
 
     @on(Button.Pressed, "#retry")
     def handle_retry(self, event: Button.Pressed) -> None:
         """Handle retry button press."""
         event.stop()
-        self.dismiss(True)
+        self.dismiss(LockedDialogAction.RETRY)
+
+    @on(Button.Pressed, "#delete")
+    async def handle_delete(self, event: Button.Pressed) -> None:
+        """Handle delete button press with confirmation."""
+        event.stop()
+        # Show confirmation dialog before proceeding
+        confirmed = await self.app.push_screen_wait(
+            ConfirmationDialog(
+                title="Delete Codebase Index?",
+                message=(
+                    "Have you checked that no other shotgun instance is running?\n\n"
+                    "Deleting while another instance is open could cause data loss. "
+                    "You will need to re-index the codebase after deletion."
+                ),
+                confirm_label="Delete Index",
+                cancel_label="Cancel",
+                confirm_variant="error",
+                danger=True,
+            )
+        )
+        if confirmed:
+            track_event("database_locked_dialog_delete", {})
+            self.dismiss(LockedDialogAction.DELETE)
 
     @on(Button.Pressed, "#copy-email")
     def handle_copy_email(self, event: Button.Pressed) -> None:
