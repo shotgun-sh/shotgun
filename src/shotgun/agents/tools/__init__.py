@@ -8,7 +8,11 @@ from .codebase import (
     retrieve_code,
 )
 from .file_management import append_file, read_file, write_file
-from .markdown_tools import insert_markdown_section, replace_markdown_section
+from .markdown_tools import (
+    insert_markdown_section,
+    remove_markdown_section,
+    replace_markdown_section,
+)
 from .web_search import (
     anthropic_web_search_tool,
     gemini_web_search_tool,
@@ -26,6 +30,7 @@ __all__ = [
     "append_file",
     "replace_markdown_section",
     "insert_markdown_section",
+    "remove_markdown_section",
     # Codebase understanding tools
     "query_graph",
     "retrieve_code",
