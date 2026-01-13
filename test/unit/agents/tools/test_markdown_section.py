@@ -80,9 +80,15 @@ More content
         headings = extract_headings(content)
         assert len(headings) == 4
         assert headings[0] == MarkdownHeading(line_number=0, text="# Title", level=1)
-        assert headings[1] == MarkdownHeading(line_number=3, text="## Section 1", level=2)
-        assert headings[2] == MarkdownHeading(line_number=7, text="### Subsection", level=3)
-        assert headings[3] == MarkdownHeading(line_number=9, text="## Section 2", level=2)
+        assert headings[1] == MarkdownHeading(
+            line_number=3, text="## Section 1", level=2
+        )
+        assert headings[2] == MarkdownHeading(
+            line_number=7, text="### Subsection", level=3
+        )
+        assert headings[3] == MarkdownHeading(
+            line_number=9, text="## Section 2", level=2
+        )
 
     def test_empty_content(self):
         assert extract_headings("") == []
@@ -1502,7 +1508,9 @@ class TestRenumberHeadingsAfter:
             "Content",
             "## 3. Third",
         ]
-        result = renumber_headings_after(lines, start_line=3, heading_level=2, increment=True)
+        result = renumber_headings_after(
+            lines, start_line=3, heading_level=2, increment=True
+        )
         assert result[3] == "## 3. Second"
         assert result[5] == "## 4. Third"
         # First section unchanged
@@ -1515,7 +1523,9 @@ class TestRenumberHeadingsAfter:
             "## 3. Third",
             "## 4. Fourth",
         ]
-        result = renumber_headings_after(lines, start_line=2, heading_level=2, increment=False)
+        result = renumber_headings_after(
+            lines, start_line=2, heading_level=2, increment=False
+        )
         assert result[2] == "## 2. Third"
         assert result[3] == "## 3. Fourth"
         # First section unchanged
@@ -1531,7 +1541,9 @@ class TestRenumberHeadingsAfter:
             "### 5.1 Sub",
         ]
         # Increment ### level sections starting from line 3
-        result = renumber_headings_after(lines, start_line=3, heading_level=3, increment=True)
+        result = renumber_headings_after(
+            lines, start_line=3, heading_level=3, increment=True
+        )
         # 4.2 -> 4.3
         assert result[3] == "### 4.3 Second"
         # 5.1 should NOT be changed (different parent section)
@@ -1544,7 +1556,9 @@ class TestRenumberHeadingsAfter:
             "## Unnumbered",
             "## 2. Second",
         ]
-        result = renumber_headings_after(lines, start_line=2, heading_level=2, increment=True)
+        result = renumber_headings_after(
+            lines, start_line=2, heading_level=2, increment=True
+        )
         # Unnumbered stays unnumbered
         assert result[2] == "## Unnumbered"
         # 2. -> 3.
@@ -1558,7 +1572,9 @@ class TestRenumberHeadingsAfter:
             "### 4.2 Another Sub",
         ]
         # Increment ### level starting from line 3
-        result = renumber_headings_after(lines, start_line=3, heading_level=3, increment=True)
+        result = renumber_headings_after(
+            lines, start_line=3, heading_level=3, increment=True
+        )
         # #### line should be unchanged
         assert result[2] == "#### 4.1.1 Subsub"
         # ### line should be incremented
@@ -2010,7 +2026,9 @@ async def test_remove_crlf_preserved(mock_context, tmp_path, monkeypatch):
         "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
     )
 
-    initial_content = "# Plan\r\n\r\n## Section\r\n\r\nContent\r\n\r\n## Other\r\n\r\nMore\r\n"
+    initial_content = (
+        "# Plan\r\n\r\n## Section\r\n\r\nContent\r\n\r\n## Other\r\n\r\nMore\r\n"
+    )
     (tmp_path / "plan.md").write_bytes(initial_content.encode("utf-8"))
 
     result = await remove_markdown_section(
@@ -2025,7 +2043,9 @@ async def test_remove_crlf_preserved(mock_context, tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_remove_unnumbered_does_not_affect_others(mock_context, tmp_path, monkeypatch):
+async def test_remove_unnumbered_does_not_affect_others(
+    mock_context, tmp_path, monkeypatch
+):
     """Test that removing an unnumbered section does not trigger renumbering."""
     mock_context.deps.agent_mode = AgentType.PLAN
     monkeypatch.setattr(

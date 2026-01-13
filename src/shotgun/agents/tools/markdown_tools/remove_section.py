@@ -156,7 +156,9 @@ async def remove_markdown_section(
         # Track the file operation
         ctx.deps.file_tracker.add_operation(file_path, FileOperationType.UPDATED)
 
-        logger.debug("Successfully removed section '%s' from %s", matched.text, filename)
+        logger.debug(
+            "Successfully removed section '%s' from %s", matched.text, filename
+        )
 
         confidence_display = f"{int(confidence * 100)}%"
 
