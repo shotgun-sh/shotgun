@@ -4,7 +4,7 @@ from pydantic import SecretStr
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -130,7 +130,7 @@ def get_or_create_model(
                 # OpenAI and Google: Use LiteLLMProvider (OpenAI-compatible format)
                 # Google's GoogleProvider doesn't support base_url, so use LiteLLM
                 litellm_provider = create_litellm_provider(api_key)
-                _model_cache[cache_key] = OpenAIChatModel(
+                _model_cache[cache_key] = OpenAIResponsesModel(
                     litellm_model_name,
                     provider=litellm_provider,
                     settings=ModelSettings(max_tokens=max_tokens),
@@ -139,7 +139,7 @@ def get_or_create_model(
             # Use native provider implementations with user's API keys
             if provider == ProviderType.OPENAI:
                 openai_provider = OpenAIProvider(api_key=api_key)
-                _model_cache[cache_key] = OpenAIChatModel(
+                _model_cache[cache_key] = OpenAIResponsesModel(
                     model_name,
                     provider=openai_provider,
                     settings=ModelSettings(max_tokens=max_tokens),
