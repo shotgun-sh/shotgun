@@ -10,7 +10,7 @@ from shotgun.logging_config import get_logger
 from .utils import (
     find_and_validate_section,
     load_markdown_file,
-    normalize_section_content,
+    split_normalized_content,
     write_markdown_file,
 )
 
@@ -68,13 +68,7 @@ async def replace_markdown_section(
 
         # Build new section
         final_heading = new_heading if new_heading else match.heading.text  # type: ignore[union-attr]
-        normalized_content = normalize_section_content(new_contents)
-
-        # Split new content into lines
-        new_content_lines = normalized_content.split("\n")
-        # Remove empty last line from split (since we added \n)
-        if new_content_lines and new_content_lines[-1] == "":
-            new_content_lines.pop()
+        new_content_lines = split_normalized_content(new_contents)
 
         # Build the new section: heading + blank line + content
         new_section_lines = [final_heading, ""]

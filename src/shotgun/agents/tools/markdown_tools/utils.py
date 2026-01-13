@@ -169,6 +169,26 @@ def normalize_section_content(content: str) -> str:
     return content.strip() + "\n"
 
 
+def split_normalized_content(content: str) -> list[str]:
+    """Normalize content and split into lines for insertion.
+
+    Strips whitespace, ensures consistent formatting, and splits into lines
+    ready for insertion into a markdown file.
+
+    Args:
+        content: The content to normalize and split
+
+    Returns:
+        List of lines (without trailing empty line from split)
+    """
+    normalized = normalize_section_content(content)
+    lines = normalized.split("\n")
+    # Remove empty last line from split (since normalize_section_content adds \n)
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
 def parse_section_number(heading_text: str) -> SectionNumber | None:
     """Parse section number from heading text.
 

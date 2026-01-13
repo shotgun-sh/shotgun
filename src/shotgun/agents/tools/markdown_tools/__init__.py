@@ -26,6 +26,7 @@ from .utils import (
     normalize_section_content,
     parse_section_number,
     renumber_headings_after,
+    split_normalized_content,
     write_markdown_file,
 )
 
@@ -50,6 +51,7 @@ __all__ = [
     "find_section_bounds",
     "detect_line_ending",
     "normalize_section_content",
+    "split_normalized_content",
     "parse_section_number",
     "increment_section_number",
     "decrement_section_number",

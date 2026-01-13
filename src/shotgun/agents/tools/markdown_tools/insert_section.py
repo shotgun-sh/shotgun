@@ -11,9 +11,9 @@ from .utils import (
     find_and_validate_section,
     get_heading_level,
     load_markdown_file,
-    normalize_section_content,
     parse_section_number,
     renumber_headings_after,
+    split_normalized_content,
     write_markdown_file,
 )
 
@@ -71,11 +71,7 @@ async def insert_markdown_section(
             return match.error  # type: ignore[return-value]
 
         # Build insert content
-        normalized_content = normalize_section_content(content)
-        insert_content_lines = normalized_content.split("\n")
-        # Remove empty last line from split (since we added \n)
-        if insert_content_lines and insert_content_lines[-1] == "":
-            insert_content_lines.pop()
+        insert_content_lines = split_normalized_content(content)
 
         # Build the insert lines
         insert_lines: list[str] = [""]  # Blank line separator before new content
