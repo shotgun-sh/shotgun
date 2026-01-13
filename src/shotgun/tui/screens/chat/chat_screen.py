@@ -120,6 +120,7 @@ from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.database_locked_dialog import DatabaseLockedDialog
 from shotgun.tui.screens.database_timeout_dialog import DatabaseTimeoutDialog
 from shotgun.tui.screens.kuzu_error_dialog import KuzuErrorDialog
+from shotgun.tui.screens.models import LockedDialogAction
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
     ShareSpecsAction,
@@ -341,12 +342,12 @@ class ChatScreen(Screen[None]):
             # Show single locked dialog
             locked_action = await self.app.push_screen_wait(DatabaseLockedDialog())
 
-            if locked_action == "quit":
+            if locked_action == LockedDialogAction.QUIT:
                 # User cancelled - exit the app gracefully
                 await self.app.action_quit()
                 return False
 
-            if locked_action == "delete":
+            if locked_action == LockedDialogAction.DELETE:
                 # User confirmed deletion of locked databases
                 for issue in locked_issues:
                     deleted = await manager.delete_database(issue.graph_id)
@@ -365,7 +366,7 @@ class ChatScreen(Screen[None]):
                 # Continue with startup after deletion
                 return True
 
-            # locked_action == "retry" - re-detect to see if locks are cleared
+            # locked_action == LockedDialogAction.RETRY - re-detect to see if locks are cleared
             new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
             still_locked = [
                 i for i in new_issues if i.error_type == KuzuErrorType.LOCKED

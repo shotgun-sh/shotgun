@@ -1,7 +1,6 @@
 """Dialog shown when the database is locked by another process."""
 
 import webbrowser
-from typing import Literal
 
 import pyperclip  # type: ignore[import-untyped]
 from textual import on
@@ -15,12 +14,13 @@ from shotgun.exceptions import SHOTGUN_CONTACT_EMAIL
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
+from shotgun.tui.screens.models import LockedDialogAction
 
 # Discord invite link for support
 DISCORD_LINK = "https://discord.gg/5RmY6J2N7s"
 
 
-class DatabaseLockedDialog(ModalScreen[Literal["retry", "delete", "quit"]]):
+class DatabaseLockedDialog(ModalScreen[LockedDialogAction]):
     """Dialog shown when the database is locked by another process.
 
     This modal informs the user that the database is locked, which could mean
@@ -28,9 +28,9 @@ class DatabaseLockedDialog(ModalScreen[Literal["retry", "delete", "quit"]]):
     without releasing the lock.
 
     Returns:
-        "retry" if user wants to retry after closing other instances
-        "delete" if user wants to delete the locked database
-        "quit" if user wants to quit the application
+        LockedDialogAction.RETRY if user wants to retry after closing other instances
+        LockedDialogAction.DELETE if user wants to delete the locked database
+        LockedDialogAction.QUIT if user wants to quit the application
     """
 
     DEFAULT_CSS = """
@@ -172,13 +172,13 @@ class DatabaseLockedDialog(ModalScreen[Literal["retry", "delete", "quit"]]):
     def handle_cancel(self, event: Button.Pressed) -> None:
         """Handle cancel button press."""
         event.stop()
-        self.dismiss("quit")
+        self.dismiss(LockedDialogAction.QUIT)
 
     @on(Button.Pressed, "#retry")
     def handle_retry(self, event: Button.Pressed) -> None:
         """Handle retry button press."""
         event.stop()
-        self.dismiss("retry")
+        self.dismiss(LockedDialogAction.RETRY)
 
     @on(Button.Pressed, "#delete")
     async def handle_delete(self, event: Button.Pressed) -> None:
@@ -201,7 +201,7 @@ class DatabaseLockedDialog(ModalScreen[Literal["retry", "delete", "quit"]]):
         )
         if confirmed:
             track_event("database_locked_dialog_delete", {})
-            self.dismiss("delete")
+            self.dismiss(LockedDialogAction.DELETE)
 
     @on(Button.Pressed, "#copy-email")
     def handle_copy_email(self, event: Button.Pressed) -> None:
