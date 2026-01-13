@@ -71,6 +71,7 @@ from shotgun.codebase.core.manager import (
 from shotgun.codebase.models import IndexProgress, ProgressPhase
 from shotgun.exceptions import (
     SHOTGUN_CONTACT_EMAIL,
+    AgentCancelledException,
     ErrorNotPickedUpBySentry,
     ShotgunAccountException,
 )
@@ -1881,6 +1882,12 @@ class ChatScreen(Screen[None]):
             else:
                 # Fallback if message format is unexpected
                 self.mount_hint(e.to_markdown())
+        except AgentCancelledException as e:
+            # Reset execution state on cancellation so user can switch modes
+            if isinstance(self.deps, RouterDeps):
+                self.deps.is_executing = False
+                self.deps.active_sub_agent = None
+            self.mount_hint(e.to_markdown())
         except ErrorNotPickedUpBySentry as e:
             # All other user-actionable errors - display with markdown
             self.mount_hint(e.to_markdown())
