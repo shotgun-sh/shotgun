@@ -2083,7 +2083,9 @@ Content
 
 
 @pytest.mark.asyncio
-async def test_sequential_replace_operations_no_corruption(tmp_path, mock_context, monkeypatch):
+async def test_sequential_replace_operations_no_corruption(
+    tmp_path, mock_context, monkeypatch
+):
     """Test that multiple sequential replace operations don't corrupt the file.
 
     This tests the fix for a bug where write_markdown_file didn't add a trailing
