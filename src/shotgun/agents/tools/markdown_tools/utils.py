@@ -3,7 +3,13 @@
 import re
 from difflib import SequenceMatcher
 
-from .models import CloseMatch, HeadingList, HeadingMatch, MarkdownHeading
+from .models import (
+    CloseMatch,
+    HeadingList,
+    HeadingMatch,
+    MarkdownHeading,
+    SectionNumber,
+)
 
 
 def get_heading_level(line: str) -> int | None:
@@ -155,3 +161,127 @@ def normalize_section_content(content: str) -> str:
         Normalized content
     """
     return content.strip() + "\n"
+
+
+def parse_section_number(heading_text: str) -> SectionNumber | None:
+    """Parse section number from heading text.
+
+    Matches patterns like:
+    - "## 3. Title" -> prefix="3", has_trailing_dot=True
+    - "### 4.4 Title" -> prefix="4.4", has_trailing_dot=False
+    - "### 4.4. Title" -> prefix="4.4", has_trailing_dot=True
+    - "## 10.2.3 Title" -> prefix="10.2.3", has_trailing_dot=False
+
+    Args:
+        heading_text: The full heading line (e.g., "### 4.4 Title")
+
+    Returns:
+        SectionNumber if a number is found, None otherwise
+    """
+    # Pattern: ## <number>[.<number>...][.] <title>
+    # The number must be at the start after the hashes
+    match = re.match(r"^#{1,6}\s+(\d+(?:\.\d+)*)(\.?)\s+", heading_text)
+    if match:
+        return SectionNumber(
+            prefix=match.group(1),
+            has_trailing_dot=bool(match.group(2)),
+        )
+    return None
+
+
+def increment_section_number(section_num: SectionNumber) -> str:
+    """Increment the last component of a section number.
+
+    Examples:
+        - "4.4" -> "4.5"
+        - "3" with trailing dot -> "4."
+        - "10.2.3" -> "10.2.4"
+
+    Args:
+        section_num: The parsed section number
+
+    Returns:
+        The incremented number string (with trailing dot if original had one)
+    """
+    parts = section_num.prefix.split(".")
+    parts[-1] = str(int(parts[-1]) + 1)
+    result = ".".join(parts)
+    if section_num.has_trailing_dot:
+        result += "."
+    return result
+
+
+def decrement_section_number(section_num: SectionNumber) -> str:
+    """Decrement the last component of a section number.
+
+    Examples:
+        - "4.5" -> "4.4"
+        - "4" with trailing dot -> "3."
+
+    Args:
+        section_num: The parsed section number
+
+    Returns:
+        The decremented number string (with trailing dot if original had one)
+    """
+    parts = section_num.prefix.split(".")
+    parts[-1] = str(int(parts[-1]) - 1)
+    result = ".".join(parts)
+    if section_num.has_trailing_dot:
+        result += "."
+    return result
+
+
+def renumber_headings_after(
+    lines: list[str],
+    start_line: int,
+    heading_level: int,
+    increment: bool = True,
+) -> list[str]:
+    """Renumber all numbered headings at the given level after start_line.
+
+    Only renumbers headings at exactly the same level.
+    Stops when encountering a heading at a higher level (lower number).
+
+    Args:
+        lines: All lines of the file
+        start_line: Line number to start renumbering from (inclusive)
+        heading_level: The heading level to renumber (1-6)
+        increment: True to increment numbers, False to decrement
+
+    Returns:
+        New list of lines with renumbered headings
+    """
+    new_lines = lines.copy()
+
+    for i in range(start_line, len(new_lines)):
+        level = get_heading_level(new_lines[i])
+        if level is None:
+            continue
+
+        # Stop if we hit a higher-level heading (parent section ended)
+        if level < heading_level:
+            break
+
+        # Only renumber headings at the exact same level
+        if level != heading_level:
+            continue
+
+        section_num = parse_section_number(new_lines[i])
+        if section_num is None:
+            continue
+
+        # Calculate new number
+        if increment:
+            new_num = increment_section_number(section_num)
+        else:
+            new_num = decrement_section_number(section_num)
+
+        # Replace the number in the heading
+        new_lines[i] = re.sub(
+            r"^(#{1,6}\s+)\d+(?:\.\d+)*\.?\s+",
+            f"\\g<1>{new_num} ",
+            new_lines[i],
+        )
+
+    return new_lines

@@ -15,7 +15,10 @@ from .utils import (
     find_close_matches,
     find_matching_heading,
     find_section_bounds,
+    get_heading_level,
     normalize_section_content,
+    parse_section_number,
+    renumber_headings_after,
 )
 
 logger = get_logger(__name__)
@@ -40,6 +43,10 @@ async def insert_markdown_section(
 
     Uses fuzzy matching on headings so minor typos are tolerated.
     Inserts content just before the next heading at the same or higher level.
+
+    Note: If new_heading contains a section number (e.g., "### 4.4 New Section"),
+    subsequent numbered sections at the same level will be automatically incremented
+    to maintain proper numbering order.
 
     Args:
         ctx: Run context with agent dependencies
@@ -152,6 +159,22 @@ async def insert_markdown_section(
 
         # Insert before section end (before next heading or EOF)
         new_lines = lines[:end_line] + insert_lines + lines[end_line:]
+
+        # If new_heading has a section number, renumber subsequent sections
+        if new_heading:
+            new_heading_level = get_heading_level(new_heading)
+            if new_heading_level:
+                section_num = parse_section_number(new_heading)
+                if section_num:
+                    # Calculate the line number where subsequent sections start
+                    # (after the inserted content)
+                    renumber_start = end_line + len(insert_lines)
+                    new_lines = renumber_headings_after(
+                        new_lines,
+                        start_line=renumber_start,
+                        heading_level=new_heading_level,
+                        increment=True,
+                    )
 
         # Join with detected line ending
         new_content = line_ending.join(new_lines)

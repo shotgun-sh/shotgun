@@ -31,3 +31,16 @@ class CloseMatch(BaseModel):
 
     heading_text: str
     confidence: float
+
+
+class SectionNumber(BaseModel):
+    """Parsed section number from a heading.
+
+    Examples:
+        - "## 3. Title" -> prefix="3", has_trailing_dot=True
+        - "### 4.4 Title" -> prefix="4.4", has_trailing_dot=False
+        - "#### 1.2.3.4 Title" -> prefix="1.2.3.4", has_trailing_dot=False
+    """
+
+    prefix: str  # The number part, e.g., "4.4" or "3"
+    has_trailing_dot: bool  # Whether it ends with a dot before the title
