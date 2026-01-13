@@ -445,5 +445,9 @@ async def write_markdown_file(ctx: MarkdownFileContext, new_lines: list[str]) ->
         new_lines: The new lines to write
     """
     new_content = ctx.line_ending.join(new_lines)
+    # Ensure file ends with a newline (standard for text files, prevents corruption
+    # when multiple operations are performed sequentially)
+    if new_content and not new_content.endswith(ctx.line_ending):
+        new_content += ctx.line_ending
     async with aiofiles.open(ctx.file_path, "w", encoding="utf-8", newline="") as f:
         await f.write(new_content)

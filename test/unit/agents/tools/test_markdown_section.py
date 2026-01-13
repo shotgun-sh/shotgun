@@ -2080,3 +2080,90 @@ Content
     # Numbered sections unchanged (Notes was unnumbered)
     assert "### 4.1 First" in new_content
     assert "### 4.2 Second" in new_content
+
+
+@pytest.mark.asyncio
+async def test_sequential_replace_operations_no_corruption(tmp_path, mock_context, monkeypatch):
+    """Test that multiple sequential replace operations don't corrupt the file.
+
+    This tests the fix for a bug where write_markdown_file didn't add a trailing
+    newline, causing subsequent operations to corrupt content.
+    """
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Document
+
+## Section 1
+
+First section content.
+
+## Section 2
+
+Second section content with `.jpeg` extension reference.
+
+## Section 3
+
+Third section content.
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    # First replace operation
+    result1 = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section 1",
+        "Updated first section.",
+    )
+    assert "Successfully replaced" in result1
+
+    # Second replace operation (should not corrupt Section 2)
+    result2 = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section 2",
+        "Updated second section with `.jpeg` extension.",
+    )
+    assert "Successfully replaced" in result2
+
+    # Read final content and verify no corruption
+    final_content = (tmp_path / "plan.md").read_text()
+
+    # Section 1 should be updated
+    assert "Updated first section." in final_content
+    # Section 2 should be updated and not corrupted
+    assert "Updated second section with `.jpeg` extension." in final_content
+    # .jpeg should NOT be split across lines
+    assert ".jp\neg" not in final_content
+    # Section 3 should be intact
+    assert "## Section 3" in final_content
+    assert "Third section content." in final_content
+
+
+@pytest.mark.asyncio
+async def test_written_files_end_with_newline(tmp_path, mock_context, monkeypatch):
+    """Verify that files written by markdown tools end with a newline."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Document
+
+## Section 1
+
+Content here.
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section 1",
+        "New content.",
+    )
+
+    final_content = (tmp_path / "plan.md").read_text()
+    assert final_content.endswith("\n"), "File should end with a newline"
