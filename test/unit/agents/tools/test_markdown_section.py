@@ -8,12 +8,18 @@ from pydantic_ai import RunContext
 from shotgun.agents.models import AgentDeps, AgentType, FileOperationTracker
 from shotgun.agents.tools.markdown_tools import (
     MarkdownHeading,
+    SectionNumber,
+    decrement_section_number,
     extract_headings,
     find_close_matches,
     find_matching_heading,
     find_section_bounds,
     get_heading_level,
+    increment_section_number,
     insert_markdown_section,
+    parse_section_number,
+    remove_markdown_section,
+    renumber_headings_after,
     replace_markdown_section,
 )
 
@@ -74,9 +80,15 @@ More content
         headings = extract_headings(content)
         assert len(headings) == 4
         assert headings[0] == MarkdownHeading(line_number=0, text="# Title", level=1)
-        assert headings[1] == MarkdownHeading(line_number=3, text="## Section 1", level=2)
-        assert headings[2] == MarkdownHeading(line_number=7, text="### Subsection", level=3)
-        assert headings[3] == MarkdownHeading(line_number=9, text="## Section 2", level=2)
+        assert headings[1] == MarkdownHeading(
+            line_number=3, text="## Section 1", level=2
+        )
+        assert headings[2] == MarkdownHeading(
+            line_number=7, text="### Subsection", level=3
+        )
+        assert headings[3] == MarkdownHeading(
+            line_number=9, text="## Section 2", level=2
+        )
 
     def test_empty_content(self):
         assert extract_headings("") == []
@@ -1386,3 +1398,774 @@ Existing features
     assert "Existing features" in new_content
     assert "🎯" in new_content
     assert "新機能" in new_content
+
+
+# =============================================================================
+# Tests for section number parsing utilities
+# =============================================================================
+
+
+class TestParseSectionNumber:
+    """Tests for parse_section_number utility."""
+
+    def test_simple_number_with_trailing_dot(self):
+        result = parse_section_number("## 3. Title")
+        assert result is not None
+        assert result.prefix == "3"
+        assert result.has_trailing_dot is True
+
+    def test_dotted_number_no_trailing_dot(self):
+        result = parse_section_number("### 4.4 Title")
+        assert result is not None
+        assert result.prefix == "4.4"
+        assert result.has_trailing_dot is False
+
+    def test_dotted_number_with_trailing_dot(self):
+        result = parse_section_number("### 4.4. Title")
+        assert result is not None
+        assert result.prefix == "4.4"
+        assert result.has_trailing_dot is True
+
+    def test_deep_nesting(self):
+        result = parse_section_number("#### 1.2.3.4 Title")
+        assert result is not None
+        assert result.prefix == "1.2.3.4"
+        assert result.has_trailing_dot is False
+
+    def test_no_number(self):
+        assert parse_section_number("## Title") is None
+
+    def test_h1_with_number(self):
+        result = parse_section_number("# 1. Introduction")
+        assert result is not None
+        assert result.prefix == "1"
+        assert result.has_trailing_dot is True
+
+    def test_h6_with_number(self):
+        result = parse_section_number("###### 1.2.3.4.5.6 Deep")
+        assert result is not None
+        assert result.prefix == "1.2.3.4.5.6"
+
+    def test_large_numbers(self):
+        result = parse_section_number("## 10.20.30 Title")
+        assert result is not None
+        assert result.prefix == "10.20.30"
+
+
+class TestIncrementSectionNumber:
+    """Tests for increment_section_number utility."""
+
+    def test_simple_increment(self):
+        section = SectionNumber(prefix="3", has_trailing_dot=False)
+        assert increment_section_number(section) == "4"
+
+    def test_simple_increment_with_dot(self):
+        section = SectionNumber(prefix="3", has_trailing_dot=True)
+        assert increment_section_number(section) == "4."
+
+    def test_dotted_increment(self):
+        section = SectionNumber(prefix="4.4", has_trailing_dot=False)
+        assert increment_section_number(section) == "4.5"
+
+    def test_dotted_increment_with_trailing_dot(self):
+        section = SectionNumber(prefix="4.4", has_trailing_dot=True)
+        assert increment_section_number(section) == "4.5."
+
+    def test_deep_nesting_increment(self):
+        section = SectionNumber(prefix="1.2.3", has_trailing_dot=False)
+        assert increment_section_number(section) == "1.2.4"
+
+
+class TestDecrementSectionNumber:
+    """Tests for decrement_section_number utility."""
+
+    def test_simple_decrement(self):
+        section = SectionNumber(prefix="4", has_trailing_dot=False)
+        assert decrement_section_number(section) == "3"
+
+    def test_simple_decrement_with_dot(self):
+        section = SectionNumber(prefix="4", has_trailing_dot=True)
+        assert decrement_section_number(section) == "3."
+
+    def test_dotted_decrement(self):
+        section = SectionNumber(prefix="4.5", has_trailing_dot=False)
+        assert decrement_section_number(section) == "4.4"
+
+    def test_deep_nesting_decrement(self):
+        section = SectionNumber(prefix="1.2.4", has_trailing_dot=False)
+        assert decrement_section_number(section) == "1.2.3"
+
+
+class TestRenumberHeadingsAfter:
+    """Tests for renumber_headings_after utility."""
+
+    def test_increment_same_level(self):
+        lines = [
+            "# Doc",
+            "## 1. First",
+            "Content",
+            "## 2. Second",
+            "Content",
+            "## 3. Third",
+        ]
+        result = renumber_headings_after(
+            lines, start_line=3, heading_level=2, increment=True
+        )
+        assert result[3] == "## 3. Second"
+        assert result[5] == "## 4. Third"
+        # First section unchanged
+        assert result[1] == "## 1. First"
+
+    def test_decrement_same_level(self):
+        lines = [
+            "# Doc",
+            "## 1. First",
+            "## 3. Third",
+            "## 4. Fourth",
+        ]
+        result = renumber_headings_after(
+            lines, start_line=2, heading_level=2, increment=False
+        )
+        assert result[2] == "## 2. Third"
+        assert result[3] == "## 3. Fourth"
+        # First section unchanged
+        assert result[1] == "## 1. First"
+
+    def test_stops_at_higher_level(self):
+        lines = [
+            "# Doc",
+            "## 4. Overview",
+            "### 4.1 First",
+            "### 4.2 Second",
+            "## 5. Next Chapter",
+            "### 5.1 Sub",
+        ]
+        # Increment ### level sections starting from line 3
+        result = renumber_headings_after(
+            lines, start_line=3, heading_level=3, increment=True
+        )
+        # 4.2 -> 4.3
+        assert result[3] == "### 4.3 Second"
+        # 5.1 should NOT be changed (different parent section)
+        assert result[5] == "### 5.1 Sub"
+
+    def test_skips_unnumbered_headings(self):
+        lines = [
+            "# Doc",
+            "## 1. First",
+            "## Unnumbered",
+            "## 2. Second",
+        ]
+        result = renumber_headings_after(
+            lines, start_line=2, heading_level=2, increment=True
+        )
+        # Unnumbered stays unnumbered
+        assert result[2] == "## Unnumbered"
+        # 2. -> 3.
+        assert result[3] == "## 3. Second"
+
+    def test_skips_different_levels(self):
+        lines = [
+            "### 4.1 Sub",
+            "Content",
+            "#### 4.1.1 Subsub",
+            "### 4.2 Another Sub",
+        ]
+        # Increment ### level starting from line 3
+        result = renumber_headings_after(
+            lines, start_line=3, heading_level=3, increment=True
+        )
+        # #### line should be unchanged
+        assert result[2] == "#### 4.1.1 Subsub"
+        # ### line should be incremented
+        assert result[3] == "### 4.3 Another Sub"
+
+
+# =============================================================================
+# Tests for insert_markdown_section auto-increment
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_insert_increments_subsequent_numbered_sections(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that inserting a numbered section increments following sections."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Doc
+
+## 4. Overview
+
+Content
+
+### 4.1 First
+
+Content
+
+### 4.2 Second
+
+Content
+
+### 4.3 Third
+
+Content
+
+## 5. Next Chapter
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    # Insert new "### 4.2 New Section" after "### 4.1 First"
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "### 4.1 First",
+        "New content here",
+        new_heading="### 4.2 New Section",
+    )
+
+    assert "Successfully inserted" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # New section is at 4.2
+    assert "### 4.2 New Section" in new_content
+    # Old 4.2 -> 4.3
+    assert "### 4.3 Second" in new_content
+    # Old 4.3 -> 4.4
+    assert "### 4.4 Third" in new_content
+    # ## 5 should not be changed (different level)
+    assert "## 5. Next Chapter" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_does_not_increment_unnumbered_sections(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that inserting a numbered section does not affect unnumbered sections."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Doc
+
+## Overview
+
+### 4.1 First
+
+Content
+
+### Unnumbered Section
+
+Content
+
+### 4.2 Second
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "### 4.1 First",
+        "New content",
+        new_heading="### 4.2 New",
+    )
+
+    assert "Successfully inserted" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # Unnumbered section stays unchanged
+    assert "### Unnumbered Section" in new_content
+    # Old 4.2 -> 4.3
+    assert "### 4.3 Second" in new_content
+
+
+@pytest.mark.asyncio
+async def test_insert_without_numbered_heading_does_not_renumber(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that inserting without a numbered heading does not trigger renumbering."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Doc
+
+## 4. Overview
+
+### 4.1 First
+
+Content
+
+### 4.2 Second
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    # Insert with unnumbered heading
+    result = await insert_markdown_section(
+        mock_context,
+        "plan.md",
+        "### 4.1 First",
+        "New content",
+        new_heading="### Notes",
+    )
+
+    assert "Successfully inserted" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # 4.2 should stay 4.2 (unnumbered heading was inserted)
+    assert "### 4.2 Second" in new_content
+
+
+# =============================================================================
+# Tests for remove_markdown_section
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_basic_remove(mock_context, tmp_path, monkeypatch):
+    """Test basic section removal."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+- Req 1
+- Req 2
+
+## Technical Notes
+
+Some technical details
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Requirements",
+    )
+
+    assert "Successfully removed" in result
+    assert "## Requirements" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # Requirements section removed
+    assert "## Requirements" not in new_content
+    assert "- Req 1" not in new_content
+    # Other sections preserved
+    assert "## Technical Notes" in new_content
+    assert "Some technical details" in new_content
+
+
+@pytest.mark.asyncio
+async def test_remove_decrements_numbered_sections(mock_context, tmp_path, monkeypatch):
+    """Test that removing a numbered section decrements following sections."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Doc
+
+### 4.1 First
+
+Content
+
+### 4.2 Second
+
+Content
+
+### 4.3 Third
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "### 4.2 Second",
+    )
+
+    assert "Successfully removed" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # 4.1 stays 4.1
+    assert "### 4.1 First" in new_content
+    # 4.2 is removed
+    assert "### 4.2 Second" not in new_content
+    # 4.3 -> 4.2
+    assert "### 4.2 Third" in new_content
+
+
+@pytest.mark.asyncio
+async def test_remove_fuzzy_matching(mock_context, tmp_path, monkeypatch):
+    """Test that remove uses fuzzy matching."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    # Use typo
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Requirments",  # typo
+    )
+
+    assert "Successfully removed" in result
+    assert "%" in result  # confidence shown
+
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "## Requirements" not in new_content
+
+
+@pytest.mark.asyncio
+async def test_remove_at_eof(mock_context, tmp_path, monkeypatch):
+    """Test removing section at end of file."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## First Section
+
+Content
+
+## Last Section
+
+Last content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Last Section",
+    )
+
+    assert "Successfully removed" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "## Last Section" not in new_content
+    assert "Last content" not in new_content
+    assert "## First Section" in new_content
+
+
+@pytest.mark.asyncio
+async def test_remove_with_subsections(mock_context, tmp_path, monkeypatch):
+    """Test that removing a section removes its subsections too."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Parent Section
+
+Intro
+
+### Child Section 1
+
+Child content
+
+### Child Section 2
+
+More child content
+
+## Next Section
+
+Other content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Parent Section",
+    )
+
+    assert "Successfully removed" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    assert "## Parent Section" not in new_content
+    assert "### Child Section" not in new_content
+    assert "## Next Section" in new_content
+
+
+@pytest.mark.asyncio
+async def test_remove_file_not_found(mock_context, tmp_path, monkeypatch):
+    """Test remove file not found error."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+    )
+
+    assert "Error" in result
+    assert "not found" in result
+
+
+@pytest.mark.asyncio
+async def test_remove_no_headings(mock_context, tmp_path, monkeypatch):
+    """Test remove error when file has no headings."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    (tmp_path / "plan.md").write_text("Just some text without headings")
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+    )
+
+    assert "Error" in result
+    assert "No headings found" in result
+
+
+@pytest.mark.asyncio
+async def test_remove_no_match(mock_context, tmp_path, monkeypatch):
+    """Test remove with no matching section."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Plan
+
+## Requirements
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Nonexistent",
+    )
+
+    assert "No section matching" in result
+
+
+@pytest.mark.asyncio
+async def test_remove_agent_scoping(mock_context, tmp_path, monkeypatch):
+    """Test that remove respects agent scoping restrictions."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    (tmp_path / "research.md").write_text("# Research\n\n## Findings\n\nData")
+
+    result = await remove_markdown_section(
+        mock_context,
+        "research.md",
+        "## Findings",
+    )
+
+    assert "Error" in result
+    assert "Plan agent can only write to" in result
+
+
+@pytest.mark.asyncio
+async def test_remove_file_operation_tracking(mock_context, tmp_path, monkeypatch):
+    """Test that remove file operations are tracked."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    (tmp_path / "plan.md").write_text("# Plan\n\n## Section\n\nContent")
+
+    await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+    )
+
+    assert len(mock_context.deps.file_tracker.operations) == 1
+
+
+@pytest.mark.asyncio
+async def test_remove_crlf_preserved(mock_context, tmp_path, monkeypatch):
+    """Test that remove preserves CRLF line endings."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = (
+        "# Plan\r\n\r\n## Section\r\n\r\nContent\r\n\r\n## Other\r\n\r\nMore\r\n"
+    )
+    (tmp_path / "plan.md").write_bytes(initial_content.encode("utf-8"))
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section",
+    )
+
+    assert "Successfully removed" in result
+    new_content = (tmp_path / "plan.md").read_bytes().decode("utf-8")
+    assert "\r\n" in new_content
+
+
+@pytest.mark.asyncio
+async def test_remove_unnumbered_does_not_affect_others(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that removing an unnumbered section does not trigger renumbering."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Doc
+
+### 4.1 First
+
+Content
+
+### Notes
+
+Content
+
+### 4.2 Second
+
+Content
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    result = await remove_markdown_section(
+        mock_context,
+        "plan.md",
+        "### Notes",
+    )
+
+    assert "Successfully removed" in result
+
+    new_content = (tmp_path / "plan.md").read_text()
+    # Numbered sections unchanged (Notes was unnumbered)
+    assert "### 4.1 First" in new_content
+    assert "### 4.2 Second" in new_content
+
+
+@pytest.mark.asyncio
+async def test_sequential_replace_operations_no_corruption(
+    tmp_path, mock_context, monkeypatch
+):
+    """Test that multiple sequential replace operations don't corrupt the file.
+
+    This tests the fix for a bug where write_markdown_file didn't add a trailing
+    newline, causing subsequent operations to corrupt content.
+    """
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Document
+
+## Section 1
+
+First section content.
+
+## Section 2
+
+Second section content with `.jpeg` extension reference.
+
+## Section 3
+
+Third section content.
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    # First replace operation
+    result1 = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section 1",
+        "Updated first section.",
+    )
+    assert "Successfully replaced" in result1
+
+    # Second replace operation (should not corrupt Section 2)
+    result2 = await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section 2",
+        "Updated second section with `.jpeg` extension.",
+    )
+    assert "Successfully replaced" in result2
+
+    # Read final content and verify no corruption
+    final_content = (tmp_path / "plan.md").read_text()
+
+    # Section 1 should be updated
+    assert "Updated first section." in final_content
+    # Section 2 should be updated and not corrupted
+    assert "Updated second section with `.jpeg` extension." in final_content
+    # .jpeg should NOT be split across lines
+    assert ".jp\neg" not in final_content
+    # Section 3 should be intact
+    assert "## Section 3" in final_content
+    assert "Third section content." in final_content
+
+
+@pytest.mark.asyncio
+async def test_written_files_end_with_newline(tmp_path, mock_context, monkeypatch):
+    """Verify that files written by markdown tools end with a newline."""
+    mock_context.deps.agent_mode = AgentType.PLAN
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    initial_content = """# Document
+
+## Section 1
+
+Content here.
+"""
+    (tmp_path / "plan.md").write_text(initial_content)
+
+    await replace_markdown_section(
+        mock_context,
+        "plan.md",
+        "## Section 1",
+        "New content.",
+    )
+
+    final_content = (tmp_path / "plan.md").read_text()
+    assert final_content.endswith("\n"), "File should end with a newline"
