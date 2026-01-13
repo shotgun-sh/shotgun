@@ -1,7 +1,5 @@
 """Tool for replacing markdown sections."""
 
-import aiofiles
-import aiofiles.os
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps, FileOperationType
@@ -10,12 +8,10 @@ from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 
 from .utils import (
-    detect_line_ending,
-    extract_headings,
-    find_close_matches,
-    find_matching_heading,
-    find_section_bounds,
+    find_and_validate_section,
+    load_markdown_file,
     normalize_section_content,
+    write_markdown_file,
 )
 
 logger = get_logger(__name__)
@@ -58,82 +54,20 @@ async def replace_markdown_section(
         # Validate path with agent scoping
         file_path = _validate_agent_scoped_path(filename, ctx.deps.agent_mode)
 
-        # Check if file exists
-        if not await aiofiles.os.path.exists(file_path):
-            return f"Error: File '{filename}' not found"
+        # Load and parse the markdown file
+        file_ctx = await load_markdown_file(file_path, filename)
+        if isinstance(file_ctx, str):
+            return file_ctx  # Error message
 
-        # Read file content (newline="" preserves original line endings)
-        async with aiofiles.open(file_path, encoding="utf-8", newline="") as f:
-            content = await f.read()
+        # Find and validate the target section
+        match = find_and_validate_section(file_ctx, section_heading)
+        if not match.is_success:
+            return match.error  # type: ignore[return-value]
 
-        # Detect line ending style
-        line_ending = detect_line_ending(content)
-        lines = content.split("\n")
-
-        # Remove \r from lines if CRLF
-        if line_ending == "\r\n":
-            lines = [line.rstrip("\r") for line in lines]
-
-        # Extract headings
-        headings = extract_headings(content)
-
-        if not headings:
-            return f"Error: No headings found in '{filename}'. Cannot replace sections in files without headings."
-
-        # Find matching heading
-        match_result = find_matching_heading(headings, section_heading)
-
-        if match_result is None:
-            # No match found - provide helpful error with available headings
-            available = [h.text for h in headings]
-            close = find_close_matches(headings, section_heading)
-
-            if close and close[0].confidence >= 0.6:
-                # There are close matches but below threshold
-                close_display = ", ".join(
-                    f"'{m.heading_text}' ({int(m.confidence * 100)}%)" for m in close
-                )
-                return (
-                    f"No section matching '{section_heading}' found in {filename}. "
-                    f"Did you mean: {close_display}"
-                )
-            else:
-                # List available headings
-                available_display = ", ".join(available[:5])
-                if len(available) > 5:
-                    available_display += f" (+{len(available) - 5} more)"
-                return (
-                    f"No section matching '{section_heading}' found in {filename}. "
-                    f"Available headings: {available_display}"
-                )
-
-        matched = match_result.heading
-        confidence = match_result.confidence
-
-        # Check for ambiguous matches (multiple close matches)
-        if confidence < 1.0:
-            close = find_close_matches(
-                headings, section_heading, threshold=confidence - 0.1
-            )
-            if len(close) > 1 and close[1].confidence >= confidence - 0.05:
-                # Second match is very close to first - ambiguous
-                close_display = ", ".join(
-                    f"'{m.heading_text}' ({int(m.confidence * 100)}%)"
-                    for m in close[:3]
-                )
-                return (
-                    f"Multiple sections closely match '{section_heading}' in {filename}: "
-                    f"{close_display}. Please be more specific."
-                )
-
-        # Find section boundaries
-        start_line, end_line = find_section_bounds(
-            lines, matched.line_number, matched.level
-        )
-        old_section_lines = end_line - start_line
+        old_section_lines = match.end_line - match.start_line
 
         # Build new section
-        final_heading = new_heading if new_heading else matched.text
+        final_heading = new_heading if new_heading else match.heading.text  # type: ignore[union-attr]
         normalized_content = normalize_section_content(new_contents)
 
         # Split new content into lines
@@ -147,29 +81,33 @@ async def replace_markdown_section(
         new_section_lines.extend(new_content_lines)
 
         # Add trailing blank line if not at EOF
-        if end_line < len(lines):
+        if match.end_line < len(file_ctx.lines):
             new_section_lines.append("")
 
         # Replace section
-        new_lines = lines[:start_line] + new_section_lines + lines[end_line:]
+        new_lines = (
+            file_ctx.lines[: match.start_line]
+            + new_section_lines
+            + file_ctx.lines[match.end_line :]
+        )
 
-        # Join with detected line ending
-        new_content = line_ending.join(new_lines)
-
-        # Write file (newline="" preserves our chosen line endings)
-        async with aiofiles.open(file_path, "w", encoding="utf-8", newline="") as f:
-            await f.write(new_content)
+        # Write the modified file
+        await write_markdown_file(file_ctx, new_lines)
 
         # Track the file operation
         ctx.deps.file_tracker.add_operation(file_path, FileOperationType.UPDATED)
 
-        logger.debug("Successfully replaced section '%s' in %s", matched.text, filename)
+        logger.debug(
+            "Successfully replaced section '%s' in %s",
+            match.heading.text,  # type: ignore[union-attr]
+            filename,
+        )
 
         new_section_line_count = len(new_section_lines)
-        confidence_display = f"{int(confidence * 100)}%"
+        confidence_display = f"{int(match.confidence * 100)}%"
 
         return (
-            f"Successfully replaced section '{matched.text}' in {filename} "
+            f"Successfully replaced section '{match.heading.text}' in {filename} "  # type: ignore[union-attr]
             f"(matched with {confidence_display} confidence, "
             f"{old_section_lines} lines -> {new_section_line_count} lines)"
         )

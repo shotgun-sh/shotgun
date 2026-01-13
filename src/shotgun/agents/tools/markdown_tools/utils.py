@@ -2,12 +2,18 @@
 
 import re
 from difflib import SequenceMatcher
+from pathlib import Path
+
+import aiofiles
+import aiofiles.os
 
 from .models import (
     CloseMatch,
     HeadingList,
     HeadingMatch,
+    MarkdownFileContext,
     MarkdownHeading,
+    SectionMatchResult,
     SectionNumber,
 )
 
@@ -285,3 +291,139 @@ def renumber_headings_after(
         )
 
     return new_lines
+
+
+async def load_markdown_file(
+    file_path: Path,
+    filename: str,
+) -> MarkdownFileContext | str:
+    """Load a markdown file and prepare it for section operations.
+
+    Handles file reading, line ending detection, CRLF normalization,
+    and heading extraction.
+
+    Args:
+        file_path: Absolute path to the file
+        filename: Original filename for error messages
+
+    Returns:
+        MarkdownFileContext on success, or error message string on failure
+    """
+    # Check if file exists
+    if not await aiofiles.os.path.exists(file_path):
+        return f"Error: File '{filename}' not found"
+
+    # Read file content (newline="" preserves original line endings)
+    async with aiofiles.open(file_path, encoding="utf-8", newline="") as f:
+        content = await f.read()
+
+    # Detect line ending style
+    line_ending = detect_line_ending(content)
+    lines = content.split("\n")
+
+    # Remove \r from lines if CRLF
+    if line_ending == "\r\n":
+        lines = [line.rstrip("\r") for line in lines]
+
+    # Extract headings
+    headings = extract_headings(content)
+
+    if not headings:
+        return f"Error: No headings found in '{filename}'. Cannot manipulate sections in files without headings."
+
+    return MarkdownFileContext(
+        file_path=file_path,
+        filename=filename,
+        lines=lines,
+        line_ending=line_ending,
+        headings=headings,
+    )
+
+
+def find_and_validate_section(
+    ctx: MarkdownFileContext,
+    target_heading: str,
+) -> SectionMatchResult:
+    """Find a section by heading with fuzzy matching and validate the match.
+
+    Handles:
+    - Finding the best matching heading
+    - Detecting "no match" with helpful suggestions
+    - Detecting ambiguous matches
+    - Finding section boundaries
+
+    Args:
+        ctx: The loaded markdown file context
+        target_heading: The heading to search for (fuzzy matched)
+
+    Returns:
+        SectionMatchResult with either success data or error message
+    """
+    # Find matching heading
+    match_result = find_matching_heading(ctx.headings, target_heading)
+
+    if match_result is None:
+        # No match found - provide helpful error with available headings
+        available = [h.text for h in ctx.headings]
+        close = find_close_matches(ctx.headings, target_heading)
+
+        if close and close[0].confidence >= 0.6:
+            # There are close matches but below threshold
+            close_display = ", ".join(
+                f"'{m.heading_text}' ({int(m.confidence * 100)}%)" for m in close
+            )
+            return SectionMatchResult(
+                error=f"No section matching '{target_heading}' found in {ctx.filename}. "
+                f"Did you mean: {close_display}"
+            )
+        else:
+            # List available headings
+            available_display = ", ".join(available[:5])
+            if len(available) > 5:
+                available_display += f" (+{len(available) - 5} more)"
+            return SectionMatchResult(
+                error=f"No section matching '{target_heading}' found in {ctx.filename}. "
+                f"Available headings: {available_display}"
+            )
+
+    matched = match_result.heading
+    confidence = match_result.confidence
+
+    # Check for ambiguous matches (multiple close matches)
+    if confidence < 1.0:
+        close = find_close_matches(
+            ctx.headings, target_heading, threshold=confidence - 0.1
+        )
+        if len(close) > 1 and close[1].confidence >= confidence - 0.05:
+            # Second match is very close to first - ambiguous
+            close_display = ", ".join(
+                f"'{m.heading_text}' ({int(m.confidence * 100)}%)" for m in close[:3]
+            )
+            return SectionMatchResult(
+                error=f"Multiple sections closely match '{target_heading}' in {ctx.filename}: "
+                f"{close_display}. Please be more specific."
+            )
+
+    # Find section boundaries
+    start_line, end_line = find_section_bounds(
+        ctx.lines, matched.line_number, matched.level
+    )
+
+    return SectionMatchResult(
+        heading=matched,
+        confidence=confidence,
+        start_line=start_line,
+        end_line=end_line,
+    )
+
+
+async def write_markdown_file(ctx: MarkdownFileContext, new_lines: list[str]) -> None:
+    """Write modified lines back to a markdown file.
+
+    Args:
+        ctx: The markdown file context (provides path and line ending)
+        new_lines: The new lines to write
+    """
+    new_content = ctx.line_ending.join(new_lines)
+    async with aiofiles.open(ctx.file_path, "w", encoding="utf-8", newline="") as f:
+        await f.write(new_content)

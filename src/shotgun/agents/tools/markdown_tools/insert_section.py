@@ -1,7 +1,5 @@
 """Tool for inserting content into markdown sections."""
 
-import aiofiles
-import aiofiles.os
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps, FileOperationType
@@ -10,15 +8,13 @@ from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 
 from .utils import (
-    detect_line_ending,
-    extract_headings,
-    find_close_matches,
-    find_matching_heading,
-    find_section_bounds,
+    find_and_validate_section,
     get_heading_level,
+    load_markdown_file,
     normalize_section_content,
     parse_section_number,
     renumber_headings_after,
+    write_markdown_file,
 )
 
 logger = get_logger(__name__)
@@ -64,78 +60,15 @@ async def insert_markdown_section(
         # Validate path with agent scoping
         file_path = _validate_agent_scoped_path(filename, ctx.deps.agent_mode)
 
-        # Check if file exists
-        if not await aiofiles.os.path.exists(file_path):
-            return f"Error: File '{filename}' not found"
+        # Load and parse the markdown file
+        file_ctx = await load_markdown_file(file_path, filename)
+        if isinstance(file_ctx, str):
+            return file_ctx  # Error message
 
-        # Read file content (newline="" preserves original line endings)
-        async with aiofiles.open(file_path, encoding="utf-8", newline="") as f:
-            file_content = await f.read()
-
-        # Detect line ending style
-        line_ending = detect_line_ending(file_content)
-        lines = file_content.split("\n")
-
-        # Remove \r from lines if CRLF
-        if line_ending == "\r\n":
-            lines = [line.rstrip("\r") for line in lines]
-
-        # Extract headings
-        headings = extract_headings(file_content)
-
-        if not headings:
-            return f"Error: No headings found in '{filename}'. Cannot insert into files without headings."
-
-        # Find matching heading
-        match_result = find_matching_heading(headings, after_heading)
-
-        if match_result is None:
-            # No match found - provide helpful error with available headings
-            available = [h.text for h in headings]
-            close = find_close_matches(headings, after_heading)
-
-            if close and close[0].confidence >= 0.6:
-                # There are close matches but below threshold
-                close_display = ", ".join(
-                    f"'{m.heading_text}' ({int(m.confidence * 100)}%)" for m in close
-                )
-                return (
-                    f"No section matching '{after_heading}' found in {filename}. "
-                    f"Did you mean: {close_display}"
-                )
-            else:
-                # List available headings
-                available_display = ", ".join(available[:5])
-                if len(available) > 5:
-                    available_display += f" (+{len(available) - 5} more)"
-                return (
-                    f"No section matching '{after_heading}' found in {filename}. "
-                    f"Available headings: {available_display}"
-                )
-
-        matched = match_result.heading
-        confidence = match_result.confidence
-
-        # Check for ambiguous matches (multiple close matches)
-        if confidence < 1.0:
-            close = find_close_matches(
-                headings, after_heading, threshold=confidence - 0.1
-            )
-            if len(close) > 1 and close[1].confidence >= confidence - 0.05:
-                # Second match is very close to first - ambiguous
-                close_display = ", ".join(
-                    f"'{m.heading_text}' ({int(m.confidence * 100)}%)"
-                    for m in close[:3]
-                )
-                return (
-                    f"Multiple sections closely match '{after_heading}' in {filename}: "
-                    f"{close_display}. Please be more specific."
-                )
-
-        # Find section boundaries
-        _start_line, end_line = find_section_bounds(
-            lines, matched.line_number, matched.level
-        )
+        # Find and validate the target section
+        match = find_and_validate_section(file_ctx, after_heading)
+        if not match.is_success:
+            return match.error  # type: ignore[return-value]
 
         # Build insert content
         normalized_content = normalize_section_content(content)
@@ -154,11 +87,15 @@ async def insert_markdown_section(
         insert_lines.extend(insert_content_lines)
 
         # Add trailing blank line if not at EOF
-        if end_line < len(lines):
+        if match.end_line < len(file_ctx.lines):
             insert_lines.append("")
 
         # Insert before section end (before next heading or EOF)
-        new_lines = lines[:end_line] + insert_lines + lines[end_line:]
+        new_lines = (
+            file_ctx.lines[: match.end_line]
+            + insert_lines
+            + file_ctx.lines[match.end_line :]
+        )
 
         # If new_heading has a section number, renumber subsequent sections
         if new_heading:
@@ -168,7 +105,7 @@ async def insert_markdown_section(
                 if section_num:
                     # Calculate the line number where subsequent sections start
                     # (after the inserted content)
-                    renumber_start = end_line + len(insert_lines)
+                    renumber_start = match.end_line + len(insert_lines)
                     new_lines = renumber_headings_after(
                         new_lines,
                         start_line=renumber_start,
@@ -176,33 +113,29 @@ async def insert_markdown_section(
                         increment=True,
                     )
 
-        # Join with detected line ending
-        new_content = line_ending.join(new_lines)
-
-        # Write file (newline="" preserves our chosen line endings)
-        async with aiofiles.open(file_path, "w", encoding="utf-8", newline="") as f:
-            await f.write(new_content)
+        # Write the modified file
+        await write_markdown_file(file_ctx, new_lines)
 
         # Track the file operation
         ctx.deps.file_tracker.add_operation(file_path, FileOperationType.UPDATED)
 
         logger.debug(
             "Successfully inserted content into section '%s' in %s",
-            matched.text,
+            match.heading.text,  # type: ignore[union-attr]
             filename,
         )
 
         lines_added = len(insert_lines)
-        confidence_display = f"{int(confidence * 100)}%"
+        confidence_display = f"{int(match.confidence * 100)}%"
 
         if new_heading:
             return (
-                f"Successfully inserted '{new_heading}' into '{matched.text}' in {filename} "
+                f"Successfully inserted '{new_heading}' into '{match.heading.text}' in {filename} "  # type: ignore[union-attr]
                 f"(matched with {confidence_display} confidence, {lines_added} lines added)"
             )
         else:
             return (
-                f"Successfully inserted content into '{matched.text}' in {filename} "
+                f"Successfully inserted content into '{match.heading.text}' in {filename} "  # type: ignore[union-attr]
                 f"(matched with {confidence_display} confidence, {lines_added} lines added)"
             )
 
