@@ -38,8 +38,10 @@ from .tools import (
     codebase_shell,
     directory_lister,
     file_read,
+    insert_markdown_section,
     query_graph,
     read_file,
+    replace_markdown_section,
     retrieve_code,
     write_file,
 )
@@ -204,6 +206,8 @@ async def create_base_agent(
     agent.tool(write_file)
     agent.tool(append_file)
     agent.tool(read_file)
+    agent.tool(replace_markdown_section)
+    agent.tool(insert_markdown_section)
 
     # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:

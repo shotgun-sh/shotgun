@@ -5,7 +5,7 @@ tmp/
 playground/
 
 # Output directory
-.shotgun/
+.shotgun*
 
 # Generated build files
 src/shotgun/build_constants.py
