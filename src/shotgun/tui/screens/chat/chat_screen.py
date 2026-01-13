@@ -339,13 +339,33 @@ class ChatScreen(Screen[None]):
         ]
         if locked_issues:
             # Show single locked dialog
-            retry = await self.app.push_screen_wait(DatabaseLockedDialog())
-            if not retry:
+            locked_action = await self.app.push_screen_wait(DatabaseLockedDialog())
+
+            if locked_action == "quit":
                 # User cancelled - exit the app gracefully
                 await self.app.action_quit()
                 return False
 
-            # User wants to retry - re-detect to see if locks are cleared
+            if locked_action == "delete":
+                # User confirmed deletion of locked databases
+                for issue in locked_issues:
+                    deleted = await manager.delete_database(issue.graph_id)
+                    if deleted:
+                        logger.info(f"Deleted locked database: {issue.graph_id}")
+                        self.agent_manager.add_hint_message(
+                            HintMessage(
+                                message=f"Deleted locked database '{issue.graph_id}'. "
+                                "You can re-index using /index."
+                            )
+                        )
+                    else:
+                        logger.error(
+                            f"Failed to delete locked database: {issue.graph_id}"
+                        )
+                # Continue with startup after deletion
+                return True
+
+            # locked_action == "retry" - re-detect to see if locks are cleared
             new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
             still_locked = [
                 i for i in new_issues if i.error_type == KuzuErrorType.LOCKED
