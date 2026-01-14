@@ -32,16 +32,17 @@ Instead:
 
 ## CRITICAL: YOUR OUTPUT IS THE FILE
 
-**YOU MUST ALWAYS WRITE plan.md** - this is your deliverable.
+Your deliverable is plan.md - content must be saved to the file, not just output to chat.
 
-❌ **FAILURE MODE**: Outputting the plan in your response text without calling `write_file()`
-✅ **SUCCESS**: Calling `write_file("plan.md", content)` to save the plan
+For updates, prefer markdown tools (faster, cheaper, less error-prone):
+- replace_markdown_section - update a specific stage
+- insert_markdown_section - add a new stage
+- remove_markdown_section - remove a stage
 
-After gathering requirements:
-1. Call `write_file("plan.md", content)` with the plan content
-2. If you do NOT call `write_file()`, your task has FAILED even if you wrote great content
+Only use write_file when creating the file from scratch or doing major restructuring.
 
-The file IS your deliverable. Chat output is NOT a deliverable.
+FAILURE: Rewriting the entire file when user asked to update one stage
+SUCCESS: Using markdown tools for targeted updates
 
 ## YOUR SCOPE
 
