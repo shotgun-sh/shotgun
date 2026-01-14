@@ -1861,6 +1861,9 @@ class ChatScreen(Screen[None]):
         self.processing_state.start_processing("Processing...")
         self.processing_state.bind_worker(get_current_worker())
 
+        # Pass cancellation event to deps for responsive ESC handling
+        self.deps.cancellation_event = self.processing_state.cancellation_event
+
         # Start context indicator animation immediately
         self.widget_coordinator.set_context_streaming(True)
 

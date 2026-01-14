@@ -255,6 +255,9 @@ async def _run_sub_agent(
     # Set up SubAgentContext so sub-agent knows it's being orchestrated
     sub_agent_deps.sub_agent_context = _build_sub_agent_context(deps)
 
+    # Propagate cancellation event for responsive ESC handling in sub-agents
+    sub_agent_deps.cancellation_event = deps.cancellation_event
+
     # Clear sub-agent's file tracker for fresh tracking
     sub_agent_deps.file_tracker.clear()
 

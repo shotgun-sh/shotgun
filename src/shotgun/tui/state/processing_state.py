@@ -7,6 +7,7 @@ This module provides centralized management of processing state including:
 - Providing clean cancellation API
 """
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from shotgun.logging_config import get_logger
@@ -61,6 +62,7 @@ class ProcessingStateManager:
         self._spinner_widget: Spinner | None = None
         self._default_spinner_text = "Processing..."
         self._telemetry_context = telemetry_context or {}
+        self._cancellation_event: asyncio.Event | None = None
 
     @property
     def is_working(self) -> bool:
@@ -70,6 +72,15 @@ class ProcessingStateManager:
             True if processing, False if idle
         """
         return self._working
+
+    @property
+    def cancellation_event(self) -> asyncio.Event | None:
+        """Get the current cancellation event for agent deps.
+
+        Returns:
+            The cancellation event for the current operation, or None if not processing
+        """
+        return self._cancellation_event
 
     def bind_spinner(self, spinner: "Spinner") -> None:
         """Bind a spinner widget for state coordination.
@@ -95,6 +106,9 @@ class ProcessingStateManager:
         self._working = True
         text = spinner_text or self._default_spinner_text
 
+        # Create a new cancellation event for this operation
+        self._cancellation_event = asyncio.Event()
+
         # Update screen's reactive working state
         if hasattr(self.screen, "working"):
             self.screen.working = True
@@ -113,6 +127,7 @@ class ProcessingStateManager:
 
         self._working = False
         self._current_worker = None
+        self._cancellation_event = None
 
         # Update screen's reactive working state
         if hasattr(self.screen, "working"):
@@ -151,6 +166,10 @@ class ProcessingStateManager:
             return False
 
         try:
+            # Set the cancellation event first for immediate effect on streaming
+            if self._cancellation_event:
+                self._cancellation_event.set()
+
             self._current_worker.cancel()
             logger.info("Operation cancelled successfully")
 

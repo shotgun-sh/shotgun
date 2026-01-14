@@ -60,6 +60,7 @@ def mock_router_deps():
     deps.tasks = []
     deps.parent_stream_handler = None  # For streaming support
     deps.pending_approval = None  # No pending approval by default
+    deps.cancellation_event = None  # For ESC cancellation support
     return deps
 
 

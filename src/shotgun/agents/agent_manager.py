@@ -46,6 +46,7 @@ from pydantic_ai.messages import (
 from textual.message import Message
 from textual.widget import Widget
 
+from shotgun.agents.cancellation import CancellableStreamIterator
 from shotgun.agents.common import add_system_prompt_message, add_system_status_message
 from shotgun.agents.config.models import (
     KeyProvider,
@@ -1101,6 +1102,11 @@ class AgentManager(Widget):
             )
         else:
             partial_parts = []
+
+        # Wrap stream with cancellable iterator for responsive ESC handling
+        deps = _ctx.deps
+        if deps.cancellation_event:
+            stream = CancellableStreamIterator(stream, deps.cancellation_event)
 
         async for event in stream:
             try:
