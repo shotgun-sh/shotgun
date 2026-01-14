@@ -22,6 +22,7 @@ logger = get_logger(__name__)
     category=ToolCategory.ARTIFACT_MANAGEMENT,
     display_text="Removing section",
     key_arg="filename",
+    secondary_key_arg="section_heading",
 )
 async def remove_markdown_section(
     ctx: RunContext[AgentDeps],

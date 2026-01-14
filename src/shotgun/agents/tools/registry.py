@@ -41,11 +41,13 @@ class ToolDisplayConfig(BaseModel):
     Attributes:
         display_text: Text to show (e.g., "Reading file", "Querying code")
         key_arg: Primary argument to extract from tool args for display
+        secondary_key_arg: Optional secondary argument to display alongside primary
         hide: Whether to completely hide this tool call from the UI
     """
 
     display_text: str
     key_arg: str
+    secondary_key_arg: str | None = None
     hide: bool = False
 
 
@@ -70,6 +72,27 @@ def register_tool(
     display_text: str,
     key_arg: str,
     *,
+    secondary_key_arg: str,
+) -> Callable[[F], F]: ...
+
+
+@overload
+def register_tool(
+    category: ToolCategory,
+    display_text: str,
+    key_arg: str,
+    *,
+    hide: bool,
+) -> Callable[[F], F]: ...
+
+
+@overload
+def register_tool(
+    category: ToolCategory,
+    display_text: str,
+    key_arg: str,
+    *,
+    secondary_key_arg: str,
     hide: bool,
 ) -> Callable[[F], F]: ...
 
@@ -79,6 +102,7 @@ def register_tool(
     display_text: str,
     key_arg: str,
     *,
+    secondary_key_arg: str | None = None,
     hide: bool = False,
 ) -> Callable[[F], F]:
     """Decorator to register a tool's category and display configuration.
@@ -87,6 +111,7 @@ def register_tool(
         category: The ToolCategory enum value for this tool
         display_text: Text to show (e.g., "Reading file", "Querying code")
         key_arg: Primary argument name to extract for display (e.g., "query", "filename")
+        secondary_key_arg: Optional secondary argument to display alongside primary
         hide: Whether to hide this tool call completely from the UI (default: False)
 
     Returns:
@@ -95,6 +120,7 @@ def register_tool(
     Display Format:
         - When key_arg value is missing: Shows just display_text (e.g., "Reading file")
         - When key_arg value is present: Shows "display_text: key_arg_value" (e.g., "Reading file: foo.py")
+        - With secondary_key_arg: Shows "display_text: key_arg_value → secondary_value"
 
     Example:
         @register_tool(
@@ -103,6 +129,15 @@ def register_tool(
             key_arg="query",
         )
         async def query_graph(ctx: RunContext[AgentDeps], query: str) -> str:
+            ...
+
+        @register_tool(
+            category=ToolCategory.ARTIFACT_MANAGEMENT,
+            display_text="Replacing section",
+            key_arg="filename",
+            secondary_key_arg="section_heading",
+        )
+        async def replace_markdown_section(...) -> str:
             ...
     """
 
@@ -115,6 +150,7 @@ def register_tool(
         config = ToolDisplayConfig(
             display_text=display_text,
             key_arg=key_arg,
+            secondary_key_arg=secondary_key_arg,
             hide=hide,
         )
         _TOOL_DISPLAY_REGISTRY[tool_name] = config
@@ -185,6 +221,7 @@ def register_tool_display(
     display_text: str,
     key_arg: str,
     *,
+    secondary_key_arg: str | None = None,
     hide: bool = False,
 ) -> None:
     """Register a display config for a special tool that doesn't have a decorator.
@@ -195,11 +232,13 @@ def register_tool_display(
         tool_name: Name of the special tool
         display_text: Text to show (e.g., "Reading file", "Querying code")
         key_arg: Primary argument name to extract for display
+        secondary_key_arg: Optional secondary argument to display alongside primary
         hide: Whether to hide this tool call completely
     """
     config = ToolDisplayConfig(
         display_text=display_text,
         key_arg=key_arg,
+        secondary_key_arg=secondary_key_arg,
         hide=hide,
     )
     _TOOL_DISPLAY_REGISTRY[tool_name] = config

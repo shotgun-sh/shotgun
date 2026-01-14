@@ -24,6 +24,7 @@ logger = get_logger(__name__)
     category=ToolCategory.ARTIFACT_MANAGEMENT,
     display_text="Inserting content",
     key_arg="filename",
+    secondary_key_arg="new_heading",
 )
 async def insert_markdown_section(
     ctx: RunContext[AgentDeps],
