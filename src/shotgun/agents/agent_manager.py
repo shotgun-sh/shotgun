@@ -26,9 +26,11 @@ from pydantic_ai import (
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     AgentStreamEvent,
+    DocumentUrl,
     FinalResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    ImageUrl,
     ModelMessage,
     ModelRequest,
     ModelRequestPart,
@@ -69,6 +71,7 @@ from shotgun.agents.models import (
     RouterAgent,
     ShotgunAgent,
 )
+from shotgun.attachments import FileAttachment, is_image_type
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
@@ -587,7 +590,7 @@ class AgentManager(Widget):
     async def _run_agent_with_retry(
         self,
         agent: AnyAgent,
-        prompt: str | None,
+        prompt: str | Sequence[UserContent] | None,
         deps: AgentDeps,
         usage_limits: UsageLimits | None,
         message_history: list[ModelMessage],
@@ -598,7 +601,8 @@ class AgentManager(Widget):
 
         Args:
             agent: The agent to run (ShotgunAgent or RouterAgent).
-            prompt: Optional prompt to send to the agent.
+            prompt: Optional prompt to send to the agent. Can be a string,
+                a sequence of UserContent (for multimodal), or None.
             deps: Agent dependencies (AgentDeps or RouterDeps).
             usage_limits: Optional usage limits.
             message_history: Message history to provide to agent.
@@ -632,6 +636,7 @@ class AgentManager(Widget):
         self,
         prompt: str | None = None,
         *,
+        attachment: FileAttachment | None = None,
         deps: AgentDeps | None = None,
         usage_limits: UsageLimits | None = None,
         **kwargs: Any,
@@ -643,6 +648,7 @@ class AgentManager(Widget):
 
         Args:
             prompt: Optional prompt to send to the agent.
+            attachment: Optional file attachment to include as multimodal content.
             deps: Optional dependencies override (defaults to manager's deps).
             usage_limits: Optional usage limits for the agent run.
             **kwargs: Additional keyword arguments to pass to the agent.
@@ -771,13 +777,35 @@ class AgentManager(Widget):
             {
                 "has_prompt": prompt is not None,
                 "model_name": model_name,
+                "has_attachment": attachment is not None,
             },
         )
+
+        # Construct multimodal prompt if attachment is provided
+        user_prompt: str | Sequence[UserContent] | None = prompt
+        if attachment and attachment.content_base64:
+            media_url: ImageUrl | DocumentUrl
+            if is_image_type(attachment.file_type):
+                media_url = ImageUrl(
+                    url=f"data:{attachment.mime_type};base64,{attachment.content_base64}"
+                )
+            else:
+                media_url = DocumentUrl(
+                    url=f"data:{attachment.mime_type};base64,{attachment.content_base64}"
+                )
+            user_prompt = [prompt or "", media_url]
+            logger.debug(
+                "Constructed multimodal prompt with attachment",
+                extra={
+                    "attachment_type": attachment.file_type.value,
+                    "attachment_size": attachment.file_size_bytes,
+                },
+            )
 
         try:
             result: AgentRunResult[AgentResponse] = await self._run_agent_with_retry(
                 agent=self.current_agent,
-                prompt=prompt,
+                prompt=user_prompt,
                 deps=deps,
                 usage_limits=usage_limits,
                 message_history=message_history,

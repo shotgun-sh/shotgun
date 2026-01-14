@@ -58,6 +58,11 @@ from shotgun.agents.router.models import (
     RouterMode,
 )
 from shotgun.agents.runner import AgentRunner
+from shotgun.attachments import (
+    FileAttachment,
+    parse_attachment_reference,
+    process_attachment,
+)
 from shotgun.codebase.core.errors import (
     DatabaseIssue,
     KuzuErrorType,
@@ -1464,6 +1469,30 @@ class ChatScreen(Screen[None]):
             return
 
         # Not a command, process as normal
+
+        # Parse for @path attachment references
+        parse_result = parse_attachment_reference(text)
+
+        if parse_result.error_message:
+            self.mount_hint(f"\u26a0\ufe0f {parse_result.error_message}")
+            self.widget_coordinator.update_prompt_input(clear=True)
+            self.value = ""
+            return
+
+        # Process attachment if found (encode to base64, validate size)
+        attachment: FileAttachment | None = None
+        if parse_result.attachment:
+            processed_attachment, error = await process_attachment(
+                parse_result.attachment,
+                self.deps.llm_model.provider,
+            )
+            if error:
+                self.mount_hint(f"\u26a0\ufe0f {error}")
+                self.widget_coordinator.update_prompt_input(clear=True)
+                self.value = ""
+                return
+            attachment = processed_attachment
+
         self.history.append(message.text)
 
         # Add user message to agent_manager's history BEFORE running the agent
@@ -1474,7 +1503,7 @@ class ChatScreen(Screen[None]):
 
         # Clear the input
         self.value = ""
-        self.run_agent(text)  # Use stripped text
+        self.run_agent(text, attachment=attachment)  # Use stripped text
 
         self.widget_coordinator.update_prompt_input(clear=True)
 
@@ -1854,7 +1883,11 @@ class ChatScreen(Screen[None]):
             await self.codebase_sdk.service.indexing.complete(graph_id)
 
     @work
-    async def run_agent(self, message: str) -> None:
+    async def run_agent(
+        self,
+        message: str,
+        attachment: FileAttachment | None = None,
+    ) -> None:
         # Start processing with spinner
         from textual.worker import get_current_worker
 
@@ -1870,7 +1903,7 @@ class ChatScreen(Screen[None]):
         try:
             # Use unified agent runner - exceptions propagate for handling
             runner = AgentRunner(self.agent_manager)
-            await runner.run(message)
+            await runner.run(message, attachment=attachment)
         except ShotgunAccountException as e:
             # Shotgun Account errors show contact email UI
             message_parts = e.to_markdown().split("**Need help?**")

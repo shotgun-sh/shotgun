@@ -13,6 +13,7 @@ from openai import APIStatusError as OpenAIAPIStatusError
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 
 from shotgun.agents.error.models import AgentErrorContext
+from shotgun.attachments import FileAttachment
 from shotgun.exceptions import (
     AgentCancelledException,
     BudgetExceededException,
@@ -66,11 +67,16 @@ class AgentRunner:
         """
         self.agent_manager = agent_manager
 
-    async def run(self, prompt: str) -> None:
+    async def run(
+        self,
+        prompt: str,
+        attachment: FileAttachment | None = None,
+    ) -> None:
         """Run the agent with the given prompt.
 
         Args:
             prompt: The user's prompt/query
+            attachment: Optional file attachment to include as multimodal content.
 
         Raises:
             Custom exceptions for different error types:
@@ -88,7 +94,7 @@ class AgentRunner:
             - UnknownAgentException: Unknown/unclassified error
         """
         try:
-            await self.agent_manager.run(prompt=prompt)
+            await self.agent_manager.run(prompt=prompt, attachment=attachment)
 
         except asyncio.CancelledError as e:
             # User cancelled - wrap and re-raise as our custom exception
