@@ -95,6 +95,17 @@ class ToolFormatter:
                 args, display_config.key_arg, part.tool_name
             )
             if key_value:
+                # Check for secondary key arg
+                if display_config.secondary_key_arg:
+                    secondary_value = cls._extract_key_arg(
+                        args, display_config.secondary_key_arg, part.tool_name
+                    )
+                    if secondary_value:
+                        # Format: "display_text: key_value → secondary_value"
+                        return (
+                            f"{display_config.display_text}: "
+                            f"{cls.truncate(key_value)} → {cls.truncate(secondary_value)}"
+                        )
                 # Format: "display_text: key_value"
                 return f"{display_config.display_text}: {cls.truncate(key_value)}"
             else:
@@ -135,6 +146,17 @@ class ToolFormatter:
             # Get the key argument value
             key_value = cls._extract_key_arg(args, display_config.key_arg)
             if key_value:
+                # Check for secondary key arg
+                if display_config.secondary_key_arg:
+                    secondary_value = cls._extract_key_arg(
+                        args, display_config.secondary_key_arg
+                    )
+                    if secondary_value:
+                        # Format: "display_text: key_value → secondary_value"
+                        return (
+                            f"{display_config.display_text}: "
+                            f"{cls.truncate(key_value)} → {cls.truncate(secondary_value)}"
+                        )
                 # Format: "display_text: key_value"
                 return f"{display_config.display_text}: {cls.truncate(key_value)}"
             else:

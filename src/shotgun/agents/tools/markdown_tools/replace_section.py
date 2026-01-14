@@ -21,6 +21,7 @@ logger = get_logger(__name__)
     category=ToolCategory.ARTIFACT_MANAGEMENT,
     display_text="Replacing section",
     key_arg="filename",
+    secondary_key_arg="section_heading",
 )
 async def replace_markdown_section(
     ctx: RunContext[AgentDeps],
