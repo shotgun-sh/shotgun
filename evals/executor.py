@@ -13,6 +13,7 @@ from typing import Any
 
 import logfire
 from pydantic import BaseModel, Field, SecretStr
+from pydantic_ai import UsageLimits
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 
@@ -253,8 +254,11 @@ class RouterExecutor:
             start_time = time.time()
 
             # Run the agent with the test case prompt
+            # Use tight limits for evals to keep test runs fast
+            eval_limits = UsageLimits(request_limit=10, tool_calls_limit=10)
             result: AgentRunResult[AgentResponse] = await manager.run(
-                prompt=test_case.inputs.prompt
+                prompt=test_case.inputs.prompt,
+                usage_limits=eval_limits,
             )
 
             duration = time.time() - start_time
