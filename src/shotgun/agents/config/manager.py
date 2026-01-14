@@ -377,8 +377,8 @@ class ConfigManager:
 
                             # Find default model for this provider
                             provider_models = {
-                                ProviderType.OPENAI: ModelName.GPT_5_1,
-                                ProviderType.ANTHROPIC: ModelName.CLAUDE_HAIKU_4_5,
+                                ProviderType.OPENAI: ModelName.GPT_5_2,
+                                ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
                                 ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
                             }
 
@@ -527,8 +527,8 @@ class ConfigManager:
                 from .models import ModelName
 
                 provider_models = {
-                    ProviderType.OPENAI: ModelName.GPT_5_1,
-                    ProviderType.ANTHROPIC: ModelName.CLAUDE_HAIKU_4_5,
+                    ProviderType.OPENAI: ModelName.GPT_5_2,
+                    ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
                     ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
                 }
                 if provider_enum in provider_models:
