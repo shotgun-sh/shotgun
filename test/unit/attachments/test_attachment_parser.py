@@ -1,9 +1,9 @@
-"""Unit tests for attachment_parser module."""
+"""Unit tests for attachment parser module."""
 
 from pathlib import Path
 
-from shotgun.utils.attachment_models import AttachmentType
-from shotgun.utils.attachment_parser import (
+from shotgun.attachments.models import AttachmentType
+from shotgun.attachments.parser import (
     ATTACHMENT_PATH_PATTERN,
     MIME_TYPES,
     SUPPORTED_EXTENSIONS,

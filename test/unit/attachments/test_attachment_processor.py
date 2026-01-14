@@ -1,4 +1,4 @@
-"""Unit tests for attachment_processor module."""
+"""Unit tests for attachment processor module."""
 
 import base64
 from pathlib import Path
@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from shotgun.agents.config.models import ProviderType
-from shotgun.utils.attachment_models import AttachmentType, FileAttachment
-from shotgun.utils.attachment_processor import (
+from shotgun.attachments.models import AttachmentType, FileAttachment
+from shotgun.attachments.processor import (
     DEFAULT_SIZE_LIMIT,
     PROVIDER_SIZE_LIMITS,
     create_attachment_hint_display,

@@ -11,7 +11,7 @@ from pathlib import Path
 import aiofiles
 
 from shotgun.agents.config.models import ProviderType
-from shotgun.utils.attachment_models import AttachmentType, FileAttachment
+from shotgun.attachments.models import AttachmentType, FileAttachment
 
 logger = logging.getLogger(__name__)
 

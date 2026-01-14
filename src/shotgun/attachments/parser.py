@@ -8,7 +8,7 @@ import logging
 import re
 from pathlib import Path
 
-from shotgun.utils.attachment_models import (
+from shotgun.attachments.models import (
     AttachmentParseResult,
     AttachmentType,
     FileAttachment,

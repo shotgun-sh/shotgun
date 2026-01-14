@@ -3,14 +3,14 @@
 These models define the shape of file attachment data throughout the system.
 """
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
 
 
-class AttachmentType(str, Enum):
+class AttachmentType(StrEnum):
     """Supported attachment file types."""
 
     PDF = "pdf"
