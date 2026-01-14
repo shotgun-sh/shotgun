@@ -74,6 +74,22 @@ router_delegation_routing = EvaluationSuite(
 )
 
 # ============================================================================
+# File Write Suite
+# Tests Router delegates to sub-agents which write files
+# ============================================================================
+
+router_file_write = EvaluationSuite(
+    name="router_file_write",
+    description="Tests Router delegates to sub-agents which write files (not output to chat)",
+    test_case_names=[
+        "spec_request_delegates_to_specification",
+        "clear_spec_request_delegates",
+    ],
+    evaluator_names=["router_delegation", "router_correctness_judge"],
+    tags=["file_write", "router", "delegation"],
+)
+
+# ============================================================================
 # All Router Tests Suite
 # Runs all Router agent test cases
 # ============================================================================
@@ -97,6 +113,9 @@ router_all = EvaluationSuite(
         "cache_feature_plans_research_first",
         # Delegation routing cases
         "multi_file_update_delegates_separately",
+        # File write cases
+        "spec_request_delegates_to_specification",
+        "clear_spec_request_delegates",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],
@@ -111,6 +130,7 @@ ROUTER_SUITES: dict[str, EvaluationSuite] = {
     "router_core": router_core,
     "router_planning": router_planning,
     "router_delegation_routing": router_delegation_routing,
+    "router_file_write": router_file_write,
     "router_all": router_all,
 }
 
@@ -119,6 +139,7 @@ __all__ = [
     "router_core",
     "router_planning",
     "router_delegation_routing",
+    "router_file_write",
     "router_all",
     "ROUTER_SUITES",
 ]

@@ -8,12 +8,14 @@ Test case categories:
 - Planning: Tests Router creates appropriate plans for feature requests
 - Research planning: Tests Router plans research-first when adding features to codebase
 - Delegation routing: Tests Router correctly delegates to each agent for their files
+- File write: Tests Router delegates to sub-agents which write files (not output to chat)
 
 Exports:
 - CLARIFYING_QUESTIONS_CASES: List of clarifying questions test cases
 - PLANNING_CASES: List of planning behavior test cases
 - RESEARCH_PLANNING_CASES: List of research-first planning test cases
 - DELEGATION_ROUTING_CASES: List of delegation routing test cases
+- FILE_WRITE_CASES: List of file write verification test cases
 - ALL_ROUTER_CASES: Dict mapping test case names to test case objects
 """
 
@@ -27,6 +29,11 @@ from evals.datasets.router_agent.clarifying_questions_cases import (
 from evals.datasets.router_agent.delegation_routing_cases import (
     DELEGATION_ROUTING_CASES,
     MULTI_FILE_UPDATE_DELEGATES_SEPARATELY,
+)
+from evals.datasets.router_agent.file_write_cases import (
+    CLEAR_SPEC_REQUEST_DELEGATES,
+    FILE_WRITE_CASES,
+    SPEC_REQUEST_DELEGATES_TO_SPECIFICATION,
 )
 from evals.datasets.router_agent.planning_cases import (
     COMPLEX_FEATURE_ASKS_QUESTIONS,
@@ -49,6 +56,7 @@ ALL_ROUTER_CASES = {
         + PLANNING_CASES
         + RESEARCH_PLANNING_CASES
         + DELEGATION_ROUTING_CASES
+        + FILE_WRITE_CASES
     )
 }
 
@@ -58,6 +66,7 @@ __all__ = [
     "PLANNING_CASES",
     "RESEARCH_PLANNING_CASES",
     "DELEGATION_ROUTING_CASES",
+    "FILE_WRITE_CASES",
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
@@ -74,4 +83,7 @@ __all__ = [
     "CACHE_FEATURE_PLANS_RESEARCH_FIRST",
     # Delegation routing test cases
     "MULTI_FILE_UPDATE_DELEGATES_SEPARATELY",
+    # File write test cases
+    "SPEC_REQUEST_DELEGATES_TO_SPECIFICATION",
+    "CLEAR_SPEC_REQUEST_DELEGATES",
 ]
