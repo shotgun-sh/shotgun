@@ -31,9 +31,9 @@ from evals.datasets.router_agent.delegation_routing_cases import (
     MULTI_FILE_UPDATE_DELEGATES_SEPARATELY,
 )
 from evals.datasets.router_agent.file_write_cases import (
-    CLEAR_SPEC_REQUEST_DELEGATES,
+    FEATURE_REQUEST_CREATES_PLAN_WITH_FILES,
     FILE_WRITE_CASES,
-    SPEC_REQUEST_DELEGATES_TO_SPECIFICATION,
+    SPEC_REQUEST_CREATES_PLAN,
 )
 from evals.datasets.router_agent.planning_cases import (
     COMPLEX_FEATURE_ASKS_QUESTIONS,
@@ -84,6 +84,6 @@ __all__ = [
     # Delegation routing test cases
     "MULTI_FILE_UPDATE_DELEGATES_SEPARATELY",
     # File write test cases
-    "SPEC_REQUEST_DELEGATES_TO_SPECIFICATION",
-    "CLEAR_SPEC_REQUEST_DELEGATES",
+    "FEATURE_REQUEST_CREATES_PLAN_WITH_FILES",
+    "SPEC_REQUEST_CREATES_PLAN",
 ]

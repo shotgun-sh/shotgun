@@ -80,13 +80,13 @@ router_delegation_routing = EvaluationSuite(
 
 router_file_write = EvaluationSuite(
     name="router_file_write",
-    description="Tests Router delegates to sub-agents which write files (not output to chat)",
+    description="Tests Router creates plans that include writing core deliverable files",
     test_case_names=[
-        "spec_request_delegates_to_specification",
-        "clear_spec_request_delegates",
+        "feature_request_creates_plan_with_files",
+        "spec_request_creates_plan",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
-    tags=["file_write", "router", "delegation"],
+    tags=["file_write", "router", "planning"],
 )
 
 # ============================================================================
@@ -114,8 +114,8 @@ router_all = EvaluationSuite(
         # Delegation routing cases
         "multi_file_update_delegates_separately",
         # File write cases
-        "spec_request_delegates_to_specification",
-        "clear_spec_request_delegates",
+        "feature_request_creates_plan_with_files",
+        "spec_request_creates_plan",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],

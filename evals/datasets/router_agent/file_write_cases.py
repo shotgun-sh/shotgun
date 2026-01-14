@@ -1,30 +1,16 @@
 """
-Router agent test cases for verifying file write behavior.
+Router agent test cases for verifying plan creation includes file writes.
 
-Tests that the Router correctly delegates to sub-agents which write files.
-This catches bugs where:
-- Router outputs content directly via final_result instead of delegating
-- Sub-agents output content to chat instead of calling write_file()
+Tests that the Router creates plans that include writing specification.md,
+plan.md, and tasks.md files. These tests run in planning mode (no delegation)
+so they execute quickly.
 
 Bug scenario (2026-01-14):
 - User asked to "make a plan to build an ai agent"
-- Router created execution plan but just marked steps done without delegating
-- When user said "lets turn it into a full spec", Router dumped 2600-token spec
-  directly in response instead of delegating to specification agent
-- specification.md was never created
+- Router created execution plan but the plan didn't clearly include
+  writing the core deliverable files (specification.md, plan.md, tasks.md)
+- When executing, content was dumped to chat instead of files
 """
-
-from datetime import UTC, datetime
-
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    SystemPromptPart,
-    ToolCallPart,
-    ToolReturnPart,
-    UserPromptPart,
-)
 
 from evals.models import (
     AgentType,
@@ -34,136 +20,58 @@ from evals.models import (
     TestCaseInput,
 )
 
-# Fixed timestamp for deterministic test data
-_TEST_TIMESTAMP = datetime(2026, 1, 14, 10, 0, 0, tzinfo=UTC)
-
 # =============================================================================
-# Helper to build message history for spec request after clarification
+# Test Case: Feature request should create plan with file write steps
 # =============================================================================
 
-
-def _build_post_clarification_history() -> list[ModelMessage]:
-    """Build message history where user answered clarifying questions.
-
-    This simulates:
-    1. User asked to write a spec
-    2. Router asked clarifying questions
-    3. User answered the questions
-    4. Now Router should delegate to specification agent
-    """
-    return [
-        # Initial user request
-        ModelRequest(
-            parts=[
-                SystemPromptPart(content="You are the Router agent..."),
-                UserPromptPart(
-                    content="Write a spec for a REST API",
-                    timestamp=_TEST_TIMESTAMP,
-                ),
-            ]
-        ),
-        # Router asked clarifying questions
-        ModelResponse(
-            parts=[
-                ToolCallPart(
-                    tool_name="final_result",
-                    args={
-                        "response": "I'll help with the spec. A few questions first:",
-                        "clarifying_questions": [
-                            "What authentication method?",
-                            "What database?",
-                        ],
-                    },
-                    tool_call_id="call_1",
-                )
-            ],
-            model_name="test",
-            timestamp=_TEST_TIMESTAMP,
-        ),
-        # Tool return
-        ModelRequest(
-            parts=[
-                ToolReturnPart(
-                    tool_name="final_result",
-                    content="Final result processed.",
-                    tool_call_id="call_1",
-                    timestamp=_TEST_TIMESTAMP,
-                ),
-                SystemPromptPart(
-                    content="""<EXECUTION_PLAN>
-**Goal:** Write REST API specification
-
-**Steps:**
-1. ⬜ Write specification ◀
-</EXECUTION_PLAN>"""
-                ),
-                UserPromptPart(
-                    content="""Q1: What authentication method?
-A1: JWT tokens
-
-Q2: What database?
-A2: PostgreSQL""",
-                    timestamp=_TEST_TIMESTAMP,
-                ),
-            ]
-        ),
-    ]
-
-
-# =============================================================================
-# Test Case: Spec request should delegate to specification agent
-# =============================================================================
-
-SPEC_REQUEST_DELEGATES_TO_SPECIFICATION = ShotgunTestCase(
-    name="spec_request_delegates_to_specification",
+FEATURE_REQUEST_CREATES_PLAN_WITH_FILES = ShotgunTestCase(
+    name="feature_request_creates_plan_with_files",
     inputs=TestCaseInput(
-        prompt="""Q1: What authentication method?
-A1: JWT tokens
-
-Q2: What database?
-A2: PostgreSQL""",
+        prompt="I want to build a REST API with JWT authentication and PostgreSQL database",
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
-            has_codebase_indexed=True,
-            codebase_name="shotgun",
-            router_mode="drafting",  # Delegation tools enabled
+            has_codebase_indexed=False,
+            router_mode="planning",  # Planning mode - no delegation, just create plan
         ),
-        message_history=_build_post_clarification_history(),
     ),
     expected=ExpectedAgentOutput(
-        # Router MUST delegate to specification agent
-        expected_delegations=["specify"],
-        # Router should NOT output the spec content directly
+        # Router should use create_plan tool
+        expected_tools=["create_plan"],
+        # Plan should mention the core deliverable files
+        response_contains=["specification", "plan", "task"],
+        # Router should NOT dump full spec content directly
         response_not_contains=[
-            "## 1. Overview",  # Spec section heading dumped in response
-            "## 2. Functional Requirements",  # Spec section heading
-            "### Authentication",  # Spec subsection
+            "## 1. Overview",  # Full spec section
+            "## 2. Functional Requirements",  # Full spec section
+            "```python",  # Code blocks (router shouldn't write code)
         ],
     ),
 )
 
 # =============================================================================
-# Test Case: Clear spec request in drafting mode delegates immediately
+# Test Case: Spec request should create plan mentioning specification.md
 # =============================================================================
 
-CLEAR_SPEC_REQUEST_DELEGATES = ShotgunTestCase(
-    name="clear_spec_request_delegates",
+SPEC_REQUEST_CREATES_PLAN = ShotgunTestCase(
+    name="spec_request_creates_plan",
     inputs=TestCaseInput(
-        prompt="Write a specification for a REST API with JWT authentication and PostgreSQL database",
+        prompt="Write a specification for a user authentication system",
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
-            has_codebase_indexed=True,
-            codebase_name="shotgun",
-            router_mode="drafting",  # Delegation tools enabled
+            has_codebase_indexed=False,
+            router_mode="planning",  # Planning mode
         ),
     ),
     expected=ExpectedAgentOutput(
-        # With clear requirements in drafting mode, should delegate directly
-        expected_delegations=["specify"],
-        # Should not dump spec content in response
+        # Router should use create_plan tool
+        expected_tools=["create_plan"],
+        # Should mention specification in plan
+        response_contains=["specification"],
+        # Should NOT output the actual spec content
         response_not_contains=[
             "## Overview",
             "## Requirements",
+            "### Authentication Flow",
         ],
     ),
 )
@@ -173,12 +81,12 @@ CLEAR_SPEC_REQUEST_DELEGATES = ShotgunTestCase(
 # =============================================================================
 
 FILE_WRITE_CASES: list[ShotgunTestCase] = [
-    SPEC_REQUEST_DELEGATES_TO_SPECIFICATION,
-    CLEAR_SPEC_REQUEST_DELEGATES,
+    FEATURE_REQUEST_CREATES_PLAN_WITH_FILES,
+    SPEC_REQUEST_CREATES_PLAN,
 ]
 
 __all__ = [
-    "SPEC_REQUEST_DELEGATES_TO_SPECIFICATION",
-    "CLEAR_SPEC_REQUEST_DELEGATES",
+    "FEATURE_REQUEST_CREATES_PLAN_WITH_FILES",
+    "SPEC_REQUEST_CREATES_PLAN",
     "FILE_WRITE_CASES",
 ]

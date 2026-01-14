@@ -826,7 +826,7 @@ async def test_update_provider_sets_selected_model_when_first_key():
 
         # Verify selected_model is now set to Anthropic's default
         config = await manager.load()
-        assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
+        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
@@ -842,14 +842,14 @@ async def test_update_provider_keeps_selected_model_when_other_keys_exist():
             ProviderType.OPENAI, **{API_KEY_FIELD: "test-openai-key"}
         )
         config = await manager.load()
-        assert config.selected_model == ModelName.GPT_5_1
+        assert config.selected_model == ModelName.GPT_5_2
 
         # Now add Anthropic key (should NOT change selected_model)
         await manager.update_provider(
             ProviderType.ANTHROPIC, **{API_KEY_FIELD: "test-anthropic-key"}
         )
         config = await manager.load()
-        assert config.selected_model == ModelName.GPT_5_1  # Still GPT-5.1
+        assert config.selected_model == ModelName.GPT_5_2  # Still GPT-5.1
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
@@ -918,7 +918,7 @@ async def test_load_updates_selected_model_when_provider_has_no_key(mock_logger)
             config = await manager.load()
 
             # selected_model should now be Anthropic's default since OpenAI has no key
-            assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
+            assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
             assert isinstance(config.anthropic.api_key, SecretStr)
             assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
@@ -958,7 +958,7 @@ async def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
             config = await manager.load()
 
             # selected_model should still be GPT-5.1 since it has a key
-            assert config.selected_model == ModelName.GPT_5_1
+            assert config.selected_model == ModelName.GPT_5_2
             assert isinstance(config.openai.api_key, SecretStr)
             assert config.openai.api_key.get_secret_value() == "test-openai-key"
 
@@ -987,9 +987,9 @@ async def test_clear_provider_key_updates_selected_model():
         )
 
         # Manually set selected_model to Anthropic model
-        await manager.update_selected_model(ModelName.CLAUDE_HAIKU_4_5)
+        await manager.update_selected_model(ModelName.CLAUDE_SONNET_4_5)
         config = await manager.load(force_reload=True)
-        assert config.selected_model == ModelName.CLAUDE_HAIKU_4_5
+        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
 
         # Clear Anthropic provider key
         await manager.clear_provider_key(ProviderType.ANTHROPIC)
@@ -1000,8 +1000,8 @@ async def test_clear_provider_key_updates_selected_model():
         # selected_model should be updated to an OpenAI model or set to None then to OpenAI on load
         # The load() method should detect that the selected model's provider has no key
         # and switch to an available provider
-        assert config.selected_model != ModelName.CLAUDE_HAIKU_4_5
-        assert config.selected_model == ModelName.GPT_5_1  # Should switch to OpenAI
+        assert config.selected_model != ModelName.CLAUDE_SONNET_4_5
+        assert config.selected_model == ModelName.GPT_5_2  # Should switch to OpenAI
 
 
 @pytest.mark.asyncio
@@ -1014,7 +1014,7 @@ async def test_clear_all_provider_keys_sets_selected_model_to_none():
         # Set up a provider
         await manager.update_provider(ProviderType.OPENAI, api_key="test-openai-key")
         config = await manager.load(force_reload=True)
-        assert config.selected_model == ModelName.GPT_5_1
+        assert config.selected_model == ModelName.GPT_5_2
 
         # Clear the only provider key
         await manager.clear_provider_key(ProviderType.OPENAI)
