@@ -942,7 +942,7 @@ async def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
         ConfigSection.ANTHROPIC.value: {API_KEY_FIELD: "test-anthropic-key"},
         ConfigSection.GOOGLE.value: {},
         ConfigSection.SHOTGUN.value: {},
-        "selected_model": "gpt-5.1",
+        "selected_model": "gpt-5.2",
         SHOTGUN_INSTANCE_ID_FIELD: str(uuid.uuid4()),
         CONFIG_VERSION_FIELD: 3,
     }
@@ -957,7 +957,7 @@ async def test_load_keeps_selected_model_when_provider_has_key(mock_logger):
             manager = ConfigManager(config_path=Path(temp_file.name))
             config = await manager.load()
 
-            # selected_model should still be GPT-5.1 since it has a key
+            # selected_model should still be GPT-5.2 since it has a key
             assert config.selected_model == ModelName.GPT_5_2
             assert isinstance(config.openai.api_key, SecretStr)
             assert config.openai.api_key.get_secret_value() == "test-openai-key"
