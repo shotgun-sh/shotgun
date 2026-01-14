@@ -48,7 +48,7 @@ async def test_runner_success():
     # Should not raise any exception
     await runner.run("test prompt")
 
-    mock_manager.run.assert_called_once_with(prompt="test prompt")
+    mock_manager.run.assert_called_once_with(prompt="test prompt", attachment=None)
 
 
 @pytest.mark.asyncio

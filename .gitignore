@@ -11,7 +11,7 @@ playground/
 src/shotgun/build_constants.py
 
 # Claude code
-./claude/.claude/settings.local.json
+.claude/settings.local.json
 
 .DS_Store
 
