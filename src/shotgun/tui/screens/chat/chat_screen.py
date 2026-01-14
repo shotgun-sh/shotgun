@@ -2427,8 +2427,12 @@ class ChatScreen(Screen[None]):
             self.deps.router_mode = RouterMode.DRAFTING
             self.widget_coordinator.update_for_mode_change(self.mode)
 
-            # Begin execution of the first step
+            # Show plan panel now that plan is approved and executing
             plan = self.deps.current_plan
+            if plan:
+                self._show_plan_panel(plan)
+
+            # Begin execution of the first step
             if plan and plan.current_step():
                 first_step = plan.current_step()
                 if first_step:
@@ -2464,6 +2468,10 @@ class ChatScreen(Screen[None]):
         Args:
             plan: The execution plan that needs user approval.
         """
+        # Hide plan panel to avoid showing duplicate plan info
+        # (ApprovalWidget already shows the full plan details)
+        self._hide_plan_panel()
+
         # Create the approval widget
         self._approval_widget = PlanApprovalWidget(plan)
 
