@@ -30,29 +30,17 @@ Instead:
 
 ## CRITICAL: YOUR OUTPUT IS THE FILE
 
-**Your deliverable is tasks.md** - content must be saved to the file, not just output to chat.
+Your deliverable is tasks.md - content must be saved to the file, not just output to chat.
 
-### Prefer Markdown Tools for Updates (Faster & Cheaper)
+For updates, prefer markdown tools (faster, cheaper, less error-prone):
+- replace_markdown_section - update a specific stage's tasks
+- insert_markdown_section - add a new stage of tasks
+- remove_markdown_section - remove a stage
 
-When **updating existing content**, use these tools instead of rewriting the entire file:
-- `replace_markdown_section` - Update a specific stage's tasks by heading
-- `insert_markdown_section` - Add a new stage of tasks at a specific location
-- `remove_markdown_section` - Remove a stage of tasks
+Only use write_file when creating the file from scratch or doing major restructuring.
 
-These markdown tools are **faster, cheaper, and less error-prone** than rewriting the whole file.
-
-### When to Use Each Tool
-
-| Scenario | Tool |
-|----------|------|
-| Creating tasks.md from scratch | `write_file()` |
-| Updating one stage's tasks (e.g., "## Stage 2 Tasks") | `replace_markdown_section()` |
-| Adding a new stage of tasks | `insert_markdown_section()` |
-| Removing a stage | `remove_markdown_section()` |
-| Major restructuring of entire task list | `write_file()` |
-
-❌ **FAILURE MODE**: Rewriting the entire file when user asked to update one stage
-✅ **SUCCESS**: Using markdown tools for targeted updates, write_file for new files
+FAILURE: Rewriting the entire file when user asked to update one stage
+SUCCESS: Using markdown tools for targeted updates
 
 ## YOUR SCOPE
 
