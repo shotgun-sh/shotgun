@@ -35,10 +35,8 @@ FEATURE_REQUEST_CREATES_PLAN_WITH_FILES = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
-        # Router should use create_plan tool
-        expected_tools=["create_plan"],
-        # Plan should mention the core deliverable files
-        response_contains=["specification", "plan", "task"],
+        # Router should ask clarifying questions for this vague request
+        min_clarifying_questions=1,
         # Router should NOT dump full spec content directly
         response_not_contains=[
             "## 1. Overview",  # Full spec section
@@ -63,10 +61,8 @@ SPEC_REQUEST_CREATES_PLAN = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
-        # Router should use create_plan tool
-        expected_tools=["create_plan"],
-        # Should mention specification in plan
-        response_contains=["specification"],
+        # Router should ask clarifying questions for this request
+        min_clarifying_questions=1,
         # Should NOT output the actual spec content
         response_not_contains=[
             "## Overview",
