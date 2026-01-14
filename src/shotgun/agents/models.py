@@ -1,7 +1,7 @@
 """Pydantic models for agent dependencies and configuration."""
 
 import os
-from asyncio import Future, Queue
+from asyncio import Event, Future, Queue
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
@@ -371,6 +371,11 @@ class AgentDeps(AgentRuntimeOptions):
     sub_agent_context: SubAgentContext | None = Field(
         default=None,
         description="Context when agent is delegated to by router",
+    )
+
+    cancellation_event: Event | None = Field(
+        default=None,
+        description="Event set when the operation should be cancelled",
     )
 
 
