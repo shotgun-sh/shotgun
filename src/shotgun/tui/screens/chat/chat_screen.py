@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from shotgun.agents.router.models import ExecutionStep
 
+from pydantic_ai import BinaryContent
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -33,6 +34,7 @@ from shotgun.agents.agent_manager import (
     ClarifyingQuestionsMessage,
     CompactionCompletedMessage,
     CompactionStartedMessage,
+    FileRequestPendingMessage,
     MessageHistoryUpdated,
     ModelConfigUpdated,
     PartialResponseMessage,
@@ -58,6 +60,11 @@ from shotgun.agents.router.models import (
     RouterMode,
 )
 from shotgun.agents.runner import AgentRunner
+from shotgun.attachments import (
+    FileAttachment,
+    parse_attachment_reference,
+    process_attachment,
+)
 from shotgun.codebase.core.errors import (
     DatabaseIssue,
     KuzuErrorType,
@@ -1170,6 +1177,68 @@ class ChatScreen(Screen[None]):
         self.qa_current_index = 0
         self.qa_answers = []
 
+    @on(FileRequestPendingMessage)
+    def handle_file_request_pending(self, event: FileRequestPendingMessage) -> None:
+        """Handle file request from agent structured output.
+
+        When the agent returns file_requests in its response, we load the files
+        and resume the agent with the file contents.
+        """
+        logger.debug(
+            "[FILE_REQUEST] FileRequestPendingMessage received - %d files",
+            len(event.file_paths),
+        )
+        # Clear any streaming partial response
+        self._clear_partial_response()
+
+        # Process files and resume agent (run as background task)
+        self._process_files_and_resume(event.file_paths)
+
+    @work(exclusive=True, name="process_files_and_resume")
+    async def _process_files_and_resume(self, file_paths: list[str]) -> None:
+        """Load requested files and resume agent with content.
+
+        This runs as a background worker to avoid blocking the UI.
+        """
+        logger.debug("[FILE_REQUEST] Processing %d file requests", len(file_paths))
+
+        # Set working state
+        self.working = True
+        self.widget_coordinator.update_spinner_text("Loading files...")
+
+        try:
+            # Load files via agent manager
+            file_contents = self.agent_manager.process_file_requests()
+
+            if not file_contents:
+                logger.warning("[FILE_REQUEST] No files were successfully loaded")
+                self.mount_hint("⚠️ Could not load any of the requested files.")
+                self.working = False
+                return
+
+            logger.info(
+                "[FILE_REQUEST] Loaded %d files, resuming agent",
+                len(file_contents),
+            )
+
+            # Resume agent with file contents
+            # Note: We call run_agent directly since we're already in a worker
+            runner = AgentRunner(self.agent_manager)
+            await runner.run(
+                prompt=(
+                    "The files you requested are now loaded and included below. "
+                    "Analyze the file contents and respond to the user's original question. "
+                    "DO NOT use file_requests - the files are already provided in this message."
+                ),
+                file_contents=file_contents,
+            )
+            # Mark work as complete after successful file processing
+            self.working = False
+        except Exception as e:
+            logger.error("[FILE_REQUEST] Error processing files: %s", e)
+            self.mount_hint(f"⚠️ Error loading files: {e}")
+            self.working = False
+
     @on(MessageHistoryUpdated)
     async def handle_message_history_updated(
         self, event: MessageHistoryUpdated
@@ -1464,6 +1533,30 @@ class ChatScreen(Screen[None]):
             return
 
         # Not a command, process as normal
+
+        # Parse for @path attachment references
+        parse_result = parse_attachment_reference(text)
+
+        if parse_result.error_message:
+            self.mount_hint(f"\u26a0\ufe0f {parse_result.error_message}")
+            self.widget_coordinator.update_prompt_input(clear=True)
+            self.value = ""
+            return
+
+        # Process attachment if found (encode to base64, validate size)
+        attachment: FileAttachment | None = None
+        if parse_result.attachment:
+            processed_attachment, error = await process_attachment(
+                parse_result.attachment,
+                self.deps.llm_model.provider,
+            )
+            if error:
+                self.mount_hint(f"\u26a0\ufe0f {error}")
+                self.widget_coordinator.update_prompt_input(clear=True)
+                self.value = ""
+                return
+            attachment = processed_attachment
+
         self.history.append(message.text)
 
         # Add user message to agent_manager's history BEFORE running the agent
@@ -1474,7 +1567,7 @@ class ChatScreen(Screen[None]):
 
         # Clear the input
         self.value = ""
-        self.run_agent(text)  # Use stripped text
+        self.run_agent(text, attachment=attachment)  # Use stripped text
 
         self.widget_coordinator.update_prompt_input(clear=True)
 
@@ -1854,7 +1947,12 @@ class ChatScreen(Screen[None]):
             await self.codebase_sdk.service.indexing.complete(graph_id)
 
     @work
-    async def run_agent(self, message: str) -> None:
+    async def run_agent(
+        self,
+        message: str,
+        attachment: FileAttachment | None = None,
+        file_contents: list[tuple[str, BinaryContent]] | None = None,
+    ) -> None:
         # Start processing with spinner
         from textual.worker import get_current_worker
 
@@ -1870,7 +1968,9 @@ class ChatScreen(Screen[None]):
         try:
             # Use unified agent runner - exceptions propagate for handling
             runner = AgentRunner(self.agent_manager)
-            await runner.run(message)
+            await runner.run(
+                message, attachment=attachment, file_contents=file_contents
+            )
         except ShotgunAccountException as e:
             # Shotgun Account errors show contact email UI
             message_parts = e.to_markdown().split("**Need help?**")

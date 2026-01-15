@@ -114,6 +114,8 @@ async def process_attachment(
     """Validate and process an attachment for submission.
 
     Validates file size against provider limits and encodes content to base64.
+    All supported attachment types (PDF, PNG, JPG, JPEG, GIF, WEBP) work with
+    all providers (OpenAI, Anthropic, Google) via BinaryContent.
 
     Args:
         attachment: The file attachment to process.

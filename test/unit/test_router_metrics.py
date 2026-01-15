@@ -257,6 +257,7 @@ async def test_delegation_started_metric():
     mock_deps.current_plan = None
     mock_deps.active_sub_agent = None
     mock_deps.parent_stream_handler = None
+    mock_deps.cancellation_event = None
 
     mock_ctx = MagicMock(spec=RunContext)
     mock_ctx.deps = mock_deps

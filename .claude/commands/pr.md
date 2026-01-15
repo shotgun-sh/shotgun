@@ -1,0 +1,1 @@
+make sure mypy and ruff checks pass, and that the pytest ONLY smoke tests pass. then get this up into a PR 

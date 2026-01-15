@@ -19,7 +19,10 @@ from tenacity import (
 if TYPE_CHECKING:
     from shotgun.agents.conversation import ConversationState
 
+import base64
+
 from pydantic_ai import (
+    BinaryContent,
     RunContext,
     UsageLimits,
 )
@@ -69,13 +72,14 @@ from shotgun.agents.models import (
     RouterAgent,
     ShotgunAgent,
 )
+from shotgun.attachments import FileAttachment
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
 
 from .conversation.history.compaction import apply_persistent_compaction
 from .export import create_export_agent
-from .messages import AgentSystemPrompt
+from .messages import AgentSystemPrompt, InternalPromptPart
 from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
@@ -170,6 +174,29 @@ class ClarifyingQuestionsMessage(Message):
         """
         super().__init__()
         self.questions = questions
+        self.response_text = response_text
+
+
+class FileRequestPendingMessage(Message):
+    """Event posted when agent requests files to be loaded.
+
+    This triggers the TUI to load the requested files and resume
+    the agent with the file contents in the next prompt.
+    """
+
+    def __init__(
+        self,
+        file_paths: list[str],
+        response_text: str,
+    ) -> None:
+        """Initialize the file request pending message.
+
+        Args:
+            file_paths: List of file paths the agent wants to read
+            response_text: The agent's response text before requesting files
+        """
+        super().__init__()
+        self.file_paths = file_paths
         self.response_text = response_text
 
 
@@ -345,6 +372,10 @@ class AgentManager(Widget):
         self._qa_questions: list[str] | None = None
         self._qa_mode_active: bool = False
 
+        # File request state for structured output file loading
+        self._file_request_pending: bool = False
+        self._pending_file_requests: list[str] = []
+
     async def _ensure_agents_initialized(self) -> None:
         """Ensure all agents are initialized (lazy initialization)."""
         if self._agents_initialized:
@@ -488,6 +519,72 @@ class AgentManager(Widget):
         """
         return self._get_agent(self._current_agent_type)
 
+    @property
+    def file_request_pending(self) -> bool:
+        """Check if there's a pending file request."""
+        return self._file_request_pending
+
+    @property
+    def pending_file_requests(self) -> list[str]:
+        """Get the list of pending file requests."""
+        return self._pending_file_requests
+
+    def process_file_requests(self) -> list[tuple[str, BinaryContent]]:
+        """Process pending file requests and return loaded content.
+
+        This method is called by the TUI after FileRequestPendingMessage is received.
+        It loads the requested files as BinaryContent and clears the pending state.
+
+        Returns:
+            List of (file_path, BinaryContent) tuples for files that were successfully loaded.
+        """
+        if not self._file_request_pending:
+            return []
+
+        # MIME type mapping for supported file types
+        mime_types: dict[str, str] = {
+            ".pdf": "application/pdf",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+        }
+
+        loaded_files: list[tuple[str, BinaryContent]] = []
+        for file_path_str in self._pending_file_requests:
+            try:
+                path = Path(file_path_str).expanduser().resolve()
+                if not path.exists():
+                    logger.warning(f"Requested file not found: {path}")
+                    continue
+
+                # Get MIME type
+                suffix = path.suffix.lower()
+                mime_type = mime_types.get(suffix)
+                if mime_type is None:
+                    logger.warning(f"Unsupported file type: {suffix} for {path}")
+                    continue
+
+                # Read file and create BinaryContent
+                data = path.read_bytes()
+                loaded_files.append(
+                    (str(path), BinaryContent(data=data, media_type=mime_type))
+                )
+                logger.debug(f"Loaded file: {path} ({len(data)} bytes)")
+
+            except Exception as e:
+                logger.error(f"Error loading file {file_path_str}: {e}")
+
+        # Clear pending state
+        self._file_request_pending = False
+        self._pending_file_requests = []
+
+        logger.info(
+            f"Loaded {len(loaded_files)} of {len(self._pending_file_requests)} requested files"
+        )
+        return loaded_files
+
     def _get_agent(self, agent_type: AgentType) -> AnyAgent:
         """Get agent by type.
 
@@ -587,7 +684,7 @@ class AgentManager(Widget):
     async def _run_agent_with_retry(
         self,
         agent: AnyAgent,
-        prompt: str | None,
+        prompt: str | Sequence[UserContent] | None,
         deps: AgentDeps,
         usage_limits: UsageLimits | None,
         message_history: list[ModelMessage],
@@ -598,7 +695,8 @@ class AgentManager(Widget):
 
         Args:
             agent: The agent to run (ShotgunAgent or RouterAgent).
-            prompt: Optional prompt to send to the agent.
+            prompt: Optional prompt to send to the agent. Can be a string,
+                a sequence of UserContent (for multimodal), or None.
             deps: Agent dependencies (AgentDeps or RouterDeps).
             usage_limits: Optional usage limits.
             message_history: Message history to provide to agent.
@@ -632,6 +730,8 @@ class AgentManager(Widget):
         self,
         prompt: str | None = None,
         *,
+        attachment: FileAttachment | None = None,
+        file_contents: list[tuple[str, BinaryContent]] | None = None,
         deps: AgentDeps | None = None,
         usage_limits: UsageLimits | None = None,
         **kwargs: Any,
@@ -643,6 +743,9 @@ class AgentManager(Widget):
 
         Args:
             prompt: Optional prompt to send to the agent.
+            attachment: Optional file attachment to include as multimodal content.
+            file_contents: Optional list of (file_path, BinaryContent) tuples to include
+                          as multimodal content. Used when resuming after file_requests.
             deps: Optional dependencies override (defaults to manager's deps).
             usage_limits: Optional usage limits for the agent run.
             **kwargs: Additional keyword arguments to pass to the agent.
@@ -771,13 +874,46 @@ class AgentManager(Widget):
             {
                 "has_prompt": prompt is not None,
                 "model_name": model_name,
+                "has_attachment": attachment is not None,
             },
         )
+
+        # Construct multimodal prompt if attachment or file_contents is provided
+        user_prompt: str | Sequence[UserContent] | None = prompt
+
+        if file_contents:
+            # File contents from file_requests - construct multimodal prompt with files
+            content_parts: list[UserContent] = [
+                prompt or "Here are the files you requested:"
+            ]
+            for file_path, binary in file_contents:
+                content_parts.append(f"\n\n--- File: {file_path} ---")
+                content_parts.append(binary)
+            user_prompt = content_parts
+            logger.debug(
+                "Constructed multimodal prompt with requested files",
+                extra={"num_files": len(file_contents)},
+            )
+        elif attachment and attachment.content_base64:
+            # Use BinaryContent which is supported by all providers (OpenAI, Anthropic, Google)
+            binary_data = base64.b64decode(attachment.content_base64)
+            binary_content = BinaryContent(
+                data=binary_data,
+                media_type=attachment.mime_type,
+            )
+            user_prompt = [prompt or "", binary_content]
+            logger.debug(
+                "Constructed multimodal prompt with attachment",
+                extra={
+                    "attachment_type": attachment.file_type.value,
+                    "attachment_size": attachment.file_size_bytes,
+                },
+            )
 
         try:
             result: AgentRunResult[AgentResponse] = await self._run_agent_with_retry(
                 agent=self.current_agent,
-                prompt=prompt,
+                prompt=user_prompt,
                 deps=deps,
                 usage_limits=usage_limits,
                 message_history=message_history,
@@ -894,6 +1030,13 @@ class AgentManager(Widget):
 
             deduplicated_new_messages.append(msg)
 
+        # Mark file resume prompts as internal (hidden from UI)
+        # When file_contents is provided, the prompt is system-generated, not user input
+        if file_contents:
+            deduplicated_new_messages = self._mark_as_internal_prompts(
+                deduplicated_new_messages
+            )
+
         self.ui_message_history = original_messages + deduplicated_new_messages
 
         # Get file operations early so we can use them for contextual messages
@@ -907,6 +1050,48 @@ class AgentManager(Widget):
                 "operation_files": [Path(op.file_path).name for op in file_operations],
             },
         )
+
+        # Check if there are file requests (takes priority over clarifying questions)
+        # But ignore file_requests if we just provided file_contents (prevents infinite loops)
+        if agent_response.file_requests and not file_contents:
+            logger.info(
+                f"Agent requested {len(agent_response.file_requests)} files to be loaded"
+            )
+
+            # Set pending state
+            self._file_request_pending = True
+            self._pending_file_requests = agent_response.file_requests
+
+            # Add agent's response as hint if present
+            if agent_response.response:
+                self.ui_message_history.append(
+                    HintMessage(message=agent_response.response)
+                )
+
+            # Add file loading indicator
+            files_list = "\n".join(f"- `{p}`" for p in agent_response.file_requests)
+            self.ui_message_history.append(
+                HintMessage(message=f"📁 Loading requested files:\n{files_list}")
+            )
+
+            # Post UI update with hint messages
+            self._post_messages_updated([])
+
+            # Post event to TUI to load files and resume
+            self.post_message(
+                FileRequestPendingMessage(
+                    file_paths=agent_response.file_requests,
+                    response_text=agent_response.response,
+                )
+            )
+
+            return result
+        elif agent_response.file_requests and file_contents:
+            # We just provided files, ignore any new file_requests to prevent loops
+            logger.debug(
+                "Ignoring file_requests (files were just provided): %s",
+                agent_response.file_requests,
+            )
 
         # Check if there are clarifying questions
         if agent_response.clarifying_questions:
@@ -1437,6 +1622,43 @@ class AgentManager(Widget):
                 file_operations=file_operations,
             )
         )
+
+    def _mark_as_internal_prompts(
+        self,
+        messages: list[ModelRequest | ModelResponse | HintMessage],
+    ) -> list[ModelRequest | ModelResponse | HintMessage]:
+        """Mark UserPromptPart as InternalPromptPart for system-generated prompts.
+
+        Used when file_contents is provided - the resume prompt is system-generated,
+        not actual user input, and should be hidden from the UI.
+
+        Args:
+            messages: List of messages that may contain user prompts to mark as internal
+
+        Returns:
+            List of messages with UserPromptPart converted to InternalPromptPart
+        """
+        result: list[ModelRequest | ModelResponse | HintMessage] = []
+        for msg in messages:
+            if isinstance(msg, ModelRequest):
+                new_parts: list[ModelRequestPart] = []
+                for part in msg.parts:
+                    if isinstance(part, UserPromptPart) and not isinstance(
+                        part, InternalPromptPart
+                    ):
+                        # Convert to InternalPromptPart
+                        new_parts.append(
+                            InternalPromptPart(
+                                content=part.content,
+                                timestamp=part.timestamp,
+                            )
+                        )
+                    else:
+                        new_parts.append(part)
+                result.append(ModelRequest(parts=new_parts))
+            else:
+                result.append(msg)
+        return result
 
     def _filter_system_prompts(
         self, messages: list[ModelMessage | HintMessage]

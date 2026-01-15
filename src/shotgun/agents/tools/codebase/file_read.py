@@ -21,57 +21,48 @@ logger = get_logger(__name__)
     key_arg="file_path",
 )
 async def file_read(
-    ctx: RunContext[AgentDeps], graph_id: str, file_path: str
+    ctx: RunContext[AgentDeps], file_path: str, graph_id: str = ""
 ) -> FileReadResult:
-    """Read file contents from codebase.
+    """Read file contents from codebase or current working directory.
 
     Args:
         ctx: RunContext containing AgentDeps with codebase service
-        graph_id: Graph ID to identify the repository
-        file_path: Path to file relative to repository root
+        file_path: Path to file relative to repository root or CWD
+        graph_id: Graph ID to identify the repository (optional - uses CWD if not provided)
 
     Returns:
         FileReadResult with formatted output via __str__
     """
-    logger.debug("🔧 Reading file: %s in graph %s", file_path, graph_id)
+    logger.debug("🔧 Reading file: %s in graph %s", file_path, graph_id or "(CWD)")
 
     try:
-        if not ctx.deps.codebase_service:
-            return FileReadResult(
-                success=False,
-                file_path=file_path,
-                error="No codebase indexed",
-            )
+        # Determine the root path - either from indexed codebase or CWD
+        repo_path: Path | None = None
 
-        # Get the graph to find the repository path
-        try:
-            graphs = await ctx.deps.codebase_service.list_graphs()
-            graph = next((g for g in graphs if g.graph_id == graph_id), None)
-        except Exception as e:
-            logger.error("Error getting graph: %s", e)
-            return FileReadResult(
-                success=False,
-                file_path=file_path,
-                error=f"Could not find graph with ID '{graph_id}'",
-            )
+        if graph_id and ctx.deps.codebase_service:
+            # Try to get the graph to find the repository path
+            try:
+                graphs = await ctx.deps.codebase_service.list_graphs()
+                graph = next((g for g in graphs if g.graph_id == graph_id), None)
+                if graph:
+                    repo_path = Path(graph.repo_path).resolve()
+            except Exception as e:
+                logger.debug("Could not find graph '%s': %s", graph_id, e)
 
-        if not graph:
-            return FileReadResult(
-                success=False,
-                file_path=file_path,
-                error=f"Graph '{graph_id}' not found",
-            )
+        # Fall back to CWD if no graph found or no graph_id provided
+        if repo_path is None:
+            repo_path = Path.cwd().resolve()
+            logger.debug("📂 Using CWD as root: %s", repo_path)
 
-        # Validate the file path is within the repository
-        repo_path = Path(graph.repo_path).resolve()
+        # Validate the file path is within the root
         full_file_path = (repo_path / file_path).resolve()
 
-        # Security check: ensure the resolved path is within the repository
+        # Security check: ensure the resolved path is within the root directory
         try:
             full_file_path.relative_to(repo_path)
         except ValueError:
             error_msg = (
-                f"Access denied: Path '{file_path}' is outside repository bounds"
+                f"Access denied: Path '{file_path}' is outside allowed directory bounds"
             )
             logger.warning("🚨 Security violation attempt: %s", error_msg)
             return FileReadResult(success=False, file_path=file_path, error=error_msg)
@@ -81,7 +72,7 @@ async def file_read(
             return FileReadResult(
                 success=False,
                 file_path=file_path,
-                error=f"File '{file_path}' not found in repository",
+                error=f"File not found: {file_path}",
             )
 
         if full_file_path.is_dir():

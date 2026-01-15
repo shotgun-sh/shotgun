@@ -303,6 +303,11 @@ async def _run_sub_agent(
                 op.file_path for op in sub_agent_deps.file_tracker.operations
             ]
 
+            # Extract files found (used by FileReadAgent)
+            files_found: list[str] = []
+            if result and result.output and result.output.files_found:
+                files_found = result.output.files_found
+
             # Check for clarifying questions
             has_questions = False
             questions: list[str] = []
@@ -311,9 +316,10 @@ async def _run_sub_agent(
                 questions = result.output.clarifying_questions
 
             logger.info(
-                "Sub-agent %s completed. Files modified: %s",
+                "Sub-agent %s completed. Files modified: %s, files found: %s",
                 agent_type.value,
                 files_modified,
+                files_found,
             )
 
             # Track delegation completion metric
@@ -334,6 +340,7 @@ async def _run_sub_agent(
                 success=True,
                 response=response_text,
                 files_modified=files_modified,
+                files_found=files_found,
                 has_questions=has_questions,
                 questions=questions,
             )
@@ -358,6 +365,13 @@ async def _run_sub_agent(
                 attempt + 1,
                 str(e),
             )
+            # Clear the agent from cache on failure so next request gets a fresh agent
+            # This is especially important for request_limit errors
+            if agent_type in deps.sub_agent_cache:
+                del deps.sub_agent_cache[agent_type]
+                logger.debug(
+                    "Cleared %s from sub_agent_cache after failure", agent_type.value
+                )
             break
 
     # Track delegation failure metric

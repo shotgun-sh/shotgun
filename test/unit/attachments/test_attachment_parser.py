@@ -338,6 +338,101 @@ def test_attachment_pattern_stops_at_whitespace():
     assert match.group(1) == "/path/file.pdf"
 
 
+# Test new permissive path patterns
+def test_attachment_pattern_matches_bare_relative():
+    """Test regex pattern matches bare relative paths like tmp/file.pdf."""
+    match = ATTACHMENT_PATH_PATTERN.search("check @tmp/file.pdf please")
+    assert match is not None
+    assert match.group(1) == "tmp/file.pdf"
+
+
+def test_attachment_pattern_matches_nested_relative():
+    """Test regex pattern matches nested relative paths."""
+    match = ATTACHMENT_PATH_PATTERN.search("see @path/to/nested/file.png")
+    assert match is not None
+    assert match.group(1) == "path/to/nested/file.png"
+
+
+def test_attachment_pattern_matches_filename_only():
+    """Test regex pattern matches filename with supported extension."""
+    match = ATTACHMENT_PATH_PATTERN.search("look at @document.pdf")
+    assert match is not None
+    assert match.group(1) == "document.pdf"
+
+
+def test_attachment_pattern_matches_filename_with_dashes():
+    """Test regex pattern matches filename with dashes."""
+    match = ATTACHMENT_PATH_PATTERN.search("check @my-report-2024.pdf")
+    assert match is not None
+    assert match.group(1) == "my-report-2024.pdf"
+
+
+def test_attachment_pattern_matches_filename_with_dots():
+    """Test regex pattern matches filename with dots."""
+    match = ATTACHMENT_PATH_PATTERN.search("see @file.v2.final.png")
+    assert match is not None
+    assert match.group(1) == "file.v2.final.png"
+
+
+def test_attachment_pattern_no_match_at_username():
+    """Test regex pattern does not match @username mentions."""
+    match = ATTACHMENT_PATH_PATTERN.search("hello @username what do you think")
+    assert match is None
+
+
+def test_attachment_pattern_no_match_at_mention():
+    """Test regex pattern does not match social @mentions."""
+    match = ATTACHMENT_PATH_PATTERN.search("Thanks @john for the help")
+    assert match is None
+
+
+def test_attachment_pattern_case_insensitive_extension():
+    """Test regex pattern matches extensions case-insensitively."""
+    match = ATTACHMENT_PATH_PATTERN.search("check @Document.PDF")
+    assert match is not None
+    assert match.group(1) == "Document.PDF"
+
+
+def test_extract_path_reference_bare_relative():
+    """Test extracting bare relative path reference."""
+    result = _extract_path_reference("Check @tmp/example.pdf please")
+    assert result == "tmp/example.pdf"
+
+
+def test_extract_path_reference_filename_only():
+    """Test extracting filename-only reference."""
+    result = _extract_path_reference("Analyze @report.pdf")
+    assert result == "report.pdf"
+
+
+def test_parse_attachment_bare_relative_path(tmp_path, monkeypatch):
+    """Test parsing bare relative path like tmp/file.pdf."""
+    monkeypatch.chdir(tmp_path)
+    subdir = tmp_path / "tmp"
+    subdir.mkdir()
+    pdf_file = subdir / "test.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 test")
+
+    result = parse_attachment_reference("Check @tmp/test.pdf please")
+
+    assert result.attachment is not None
+    assert result.attachment.file_name == "test.pdf"
+    assert result.error_message is None
+
+
+def test_parse_attachment_filename_only(tmp_path, monkeypatch):
+    """Test parsing filename-only attachment in current directory."""
+    monkeypatch.chdir(tmp_path)
+    pdf_file = tmp_path / "document.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 test")
+
+    result = parse_attachment_reference("What is in @document.pdf?")
+
+    assert result.attachment is not None
+    assert result.attachment.file_name == "document.pdf"
+    assert result.error_message is None
+
+
 # Test constants are properly defined
 def test_supported_extensions_completeness():
     """Test all expected extensions are in SUPPORTED_EXTENSIONS."""

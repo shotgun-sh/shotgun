@@ -1,7 +1,14 @@
 """Attachment path parser for @path syntax in user input.
 
-Parses file references like @/absolute/path.pdf, @~/home/file.png,
-@./relative.jpg, and @../parent/file.gif from user input text.
+Parses file references from user input text. Supported formats:
+- Absolute paths: @/absolute/path.pdf
+- Home directory: @~/Documents/file.png
+- Explicit relative: @./relative.jpg, @../parent/file.gif
+- Bare relative: @tmp/file.pdf, @path/to/file.png
+- Filename only: @document.pdf, @image.png
+
+Without the @ prefix, file paths are passed through to the LLM which
+can use its own file tools to handle them.
 """
 
 import logging
@@ -17,9 +24,21 @@ from shotgun.attachments.models import (
 logger = logging.getLogger(__name__)
 
 # Regex pattern for @path syntax
-# Matches: @/absolute, @~/, @./, @../
+# Matches:
+# - Explicit prefixes: @/absolute, @~/, @./, @../
+# - Bare relative paths: @tmp/file, @path/to/file
+# - Filenames with supported extensions: @file.pdf, @image.png
 # Excludes trailing punctuation that commonly follows paths in sentences
-ATTACHMENT_PATH_PATTERN = re.compile(r"@((?:/|~|\.\.?/)[^\s?!,;:\"')\]]+)")
+ATTACHMENT_PATH_PATTERN = re.compile(
+    r"@("
+    r"(?:/|~|\.\.?/)[^\s?!,;:\"')\]]+"  # /path, ~/path, ./path, ../path
+    r"|"
+    r"\w[^\s?!,;:\"')\]@]*/[^\s?!,;:\"')\]]+"  # path/to/file (bare relative)
+    r"|"
+    r"\w[\w.-]*\.(?:pdf|png|jpe?g|gif|webp)"  # file.pdf (filename with extension)
+    r")",
+    re.IGNORECASE,
+)
 
 # Supported file extensions mapped to AttachmentType
 SUPPORTED_EXTENSIONS: dict[str, AttachmentType] = {
