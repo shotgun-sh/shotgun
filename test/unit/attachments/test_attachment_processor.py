@@ -236,7 +236,7 @@ async def test_process_attachment_size_validation_fails(tmp_path):
     result, error = await process_attachment(attachment, ProviderType.GOOGLE)
 
     assert error is not None
-    assert "exceeds" in error.lower()
+    assert "File too large" in error
     assert result.content_base64 is None  # Not encoded
 
 
@@ -371,3 +371,59 @@ def test_provider_limits_values():
     assert PROVIDER_SIZE_LIMITS[ProviderType.OPENAI] == 20 * 1024 * 1024
     assert PROVIDER_SIZE_LIMITS[ProviderType.ANTHROPIC] == 32 * 1024 * 1024
     assert PROVIDER_SIZE_LIMITS[ProviderType.GOOGLE] == 4 * 1024 * 1024
+
+
+# Test error message formats match specification
+def test_validate_file_size_error_message_format():
+    """Test file size error message matches specification format."""
+    attachment = FileAttachment(
+        file_path=Path("/large.pdf"),
+        file_name="large.pdf",
+        file_type=AttachmentType.PDF,
+        file_size_bytes=45 * 1024 * 1024,  # 45MB
+        mime_type="application/pdf",
+    )
+    is_valid, error = validate_file_size(attachment, ProviderType.ANTHROPIC)
+    assert is_valid is False
+    assert error is not None
+    # Format: "⚠️ File too large: 45.0 MB (max: 32.0 MB for Anthropic)"
+    assert error.startswith("⚠️ File too large:")
+    assert "45.0 MB" in error
+    assert "32.0 MB" in error
+    assert "Anthropic" in error
+
+
+def test_validate_file_size_error_message_format_openai():
+    """Test file size error message format for OpenAI."""
+    attachment = FileAttachment(
+        file_path=Path("/large.png"),
+        file_name="large.png",
+        file_type=AttachmentType.PNG,
+        file_size_bytes=25 * 1024 * 1024,  # 25MB
+        mime_type="image/png",
+    )
+    is_valid, error = validate_file_size(attachment, ProviderType.OPENAI)
+    assert is_valid is False
+    assert error is not None
+    assert error.startswith("⚠️ File too large:")
+    assert "25.0 MB" in error
+    assert "20.0 MB" in error
+    assert "Openai" in error
+
+
+def test_validate_file_size_error_message_format_google():
+    """Test file size error message format for Google."""
+    attachment = FileAttachment(
+        file_path=Path("/medium.pdf"),
+        file_name="medium.pdf",
+        file_type=AttachmentType.PDF,
+        file_size_bytes=5 * 1024 * 1024,  # 5MB
+        mime_type="application/pdf",
+    )
+    is_valid, error = validate_file_size(attachment, ProviderType.GOOGLE)
+    assert is_valid is False
+    assert error is not None
+    assert error.startswith("⚠️ File too large:")
+    assert "5.0 MB" in error
+    assert "4.0 MB" in error
+    assert "Google" in error

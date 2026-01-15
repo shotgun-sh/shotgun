@@ -181,7 +181,7 @@ def parse_attachment_reference(text: str) -> AttachmentParseResult:
         return AttachmentParseResult(
             original_text=text,
             attachment=None,
-            error_message=f"Could not resolve path: {path_str}",
+            error_message=f"⚠️ Could not resolve path: {path_str}",
         )
 
     # Check if file exists
@@ -189,7 +189,7 @@ def parse_attachment_reference(text: str) -> AttachmentParseResult:
         return AttachmentParseResult(
             original_text=text,
             attachment=None,
-            error_message=f"File not found: {resolved_path}",
+            error_message=f"⚠️ File not found: {resolved_path}",
         )
 
     # Check if it's a file (not a directory)
@@ -197,7 +197,7 @@ def parse_attachment_reference(text: str) -> AttachmentParseResult:
         return AttachmentParseResult(
             original_text=text,
             attachment=None,
-            error_message=f"Not a file: {resolved_path}",
+            error_message=f"⚠️ Not a file: {resolved_path}",
         )
 
     # Validate file extension
@@ -208,7 +208,7 @@ def parse_attachment_reference(text: str) -> AttachmentParseResult:
         return AttachmentParseResult(
             original_text=text,
             attachment=None,
-            error_message=f"Unsupported file type: {extension}. Supported: {supported}",
+            error_message=f"⚠️ Unsupported file type: {extension} (supported: {supported})",
         )
 
     # Check file is readable
@@ -218,14 +218,14 @@ def parse_attachment_reference(text: str) -> AttachmentParseResult:
         return AttachmentParseResult(
             original_text=text,
             attachment=None,
-            error_message=f"Permission denied: {resolved_path}",
+            error_message=f"⚠️ Cannot read file: {resolved_path} (permission denied)",
         )
     except OSError as e:
         logger.warning(f"Failed to stat file '{resolved_path}': {e}")
         return AttachmentParseResult(
             original_text=text,
             attachment=None,
-            error_message=f"Cannot read file: {resolved_path}",
+            error_message=f"⚠️ Cannot read file: {resolved_path}",
         )
 
     # Create successful attachment (content_base64 will be populated by processor)

@@ -1540,7 +1540,7 @@ class ChatScreen(Screen[None]):
         parse_result = parse_attachment_reference(text)
 
         if parse_result.error_message:
-            self.mount_hint(f"\u26a0\ufe0f {parse_result.error_message}")
+            self.mount_hint(parse_result.error_message)
             self.widget_coordinator.update_prompt_input(clear=True)
             self.value = ""
             return
@@ -1553,7 +1553,7 @@ class ChatScreen(Screen[None]):
                 self.deps.llm_model.provider,
             )
             if error:
-                self.mount_hint(f"\u26a0\ufe0f {error}")
+                self.mount_hint(error)
                 self.widget_coordinator.update_prompt_input(clear=True)
                 self.value = ""
                 return

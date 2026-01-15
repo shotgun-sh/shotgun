@@ -78,7 +78,7 @@ def validate_file_size(
         provider_name = provider.value.capitalize()
         return (
             False,
-            f"File size {size_str} exceeds {provider_name} limit of {limit_str}",
+            f"⚠️ File too large: {size_str} (max: {limit_str} for {provider_name})",
         )
 
     return (True, None)
@@ -135,12 +135,12 @@ async def process_attachment(
     try:
         content_base64 = await encode_file_to_base64(attachment.file_path)
     except FileNotFoundError:
-        return (attachment, f"File not found: {attachment.file_path}")
+        return (attachment, f"⚠️ File not found: {attachment.file_path}")
     except PermissionError:
-        return (attachment, f"Permission denied: {attachment.file_path}")
+        return (attachment, f"⚠️ Cannot read file: {attachment.file_path} (permission denied)")
     except OSError as e:
         logger.warning(f"Failed to read file '{attachment.file_path}': {e}")
-        return (attachment, f"Failed to read file: {attachment.file_path}")
+        return (attachment, f"⚠️ Cannot read file: {attachment.file_path}")
 
     # Create new attachment with base64 content
     processed = FileAttachment(

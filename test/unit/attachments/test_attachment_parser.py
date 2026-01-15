@@ -444,3 +444,66 @@ def test_mime_types_completeness():
     """Test all AttachmentTypes have MIME types defined."""
     for attachment_type in AttachmentType:
         assert attachment_type in MIME_TYPES
+
+
+# Test error message formats match specification
+def test_error_message_format_file_not_found():
+    """Test file not found error has correct format with warning emoji."""
+    result = parse_attachment_reference("Check @/nonexistent/file.pdf")
+    assert result.error_message is not None
+    assert result.error_message.startswith("⚠️ File not found:")
+    assert "/nonexistent/file.pdf" in result.error_message
+
+
+def test_error_message_format_unsupported_type(tmp_path):
+    """Test unsupported type error has correct format."""
+    doc_file = tmp_path / "document.doc"
+    doc_file.write_text("content")
+    result = parse_attachment_reference(f"Check @{doc_file}")
+    assert result.error_message is not None
+    assert result.error_message.startswith("⚠️ Unsupported file type: .doc")
+    assert "(supported:" in result.error_message
+    assert "pdf" in result.error_message
+    assert "png" in result.error_message
+
+
+def test_error_message_format_no_extension(tmp_path):
+    """Test no extension error has correct format."""
+    no_ext_file = tmp_path / "noextension"
+    no_ext_file.write_text("content")
+    result = parse_attachment_reference(f"Check @{no_ext_file}")
+    assert result.error_message is not None
+    assert "⚠️ Unsupported file type:" in result.error_message
+    assert "(no extension)" in result.error_message
+
+
+def test_error_message_format_not_a_file(tmp_path):
+    """Test directory (not a file) error has correct format."""
+    result = parse_attachment_reference(f"Check @{tmp_path}")
+    assert result.error_message is not None
+    assert result.error_message.startswith("⚠️ Not a file:")
+    assert str(tmp_path) in result.error_message
+
+
+def test_error_message_format_permission_denied(tmp_path):
+    """Test permission denied error has correct format."""
+    import os
+
+    # Skip on Windows where chmod doesn't work the same way
+    if os.name == "nt":
+        return
+
+    protected_file = tmp_path / "protected.pdf"
+    protected_file.write_bytes(b"content")
+    protected_file.chmod(0o000)
+    try:
+        result = parse_attachment_reference(f"Check @{protected_file}")
+        # On some systems (e.g., root user on Unix), chmod 0o000 doesn't
+        # actually prevent reading. In that case, we can't test permission denied.
+        if result.error_message is None:
+            # Skip the test if the file was readable despite 0o000 permissions
+            return
+        assert "⚠️ Cannot read file:" in result.error_message
+        assert "(permission denied)" in result.error_message
+    finally:
+        protected_file.chmod(0o644)  # Restore permissions for cleanup
