@@ -11,6 +11,11 @@ from pathlib import Path
 import aiofiles
 
 from shotgun.agents.config.models import ProviderType
+from shotgun.attachments.errors import (
+    cannot_read_file,
+    file_not_found,
+    file_too_large,
+)
 from shotgun.attachments.models import AttachmentType, FileAttachment
 
 logger = logging.getLogger(__name__)
@@ -78,7 +83,7 @@ def validate_file_size(
         provider_name = provider.value.capitalize()
         return (
             False,
-            f"⚠️ File too large: {size_str} (max: {limit_str} for {provider_name})",
+            file_too_large(size_str, limit_str, provider_name),
         )
 
     return (True, None)
@@ -135,12 +140,12 @@ async def process_attachment(
     try:
         content_base64 = await encode_file_to_base64(attachment.file_path)
     except FileNotFoundError:
-        return (attachment, f"⚠️ File not found: {attachment.file_path}")
+        return (attachment, file_not_found(attachment.file_path))
     except PermissionError:
-        return (attachment, f"⚠️ Cannot read file: {attachment.file_path} (permission denied)")
+        return (attachment, cannot_read_file(attachment.file_path, "permission denied"))
     except OSError as e:
         logger.warning(f"Failed to read file '{attachment.file_path}': {e}")
-        return (attachment, f"⚠️ Cannot read file: {attachment.file_path}")
+        return (attachment, cannot_read_file(attachment.file_path))
 
     # Create new attachment with base64 content
     processed = FileAttachment(
