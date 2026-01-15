@@ -47,18 +47,18 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
-        return ModelName.GPT_5_1
+        return ModelName.CLAUDE_SONNET_4_5
 
     # Priority 2: Individual provider keys
     if _get_api_key(config.anthropic.api_key):
-        return ModelName.CLAUDE_HAIKU_4_5
+        return ModelName.CLAUDE_SONNET_4_5
     if _get_api_key(config.openai.api_key):
-        return ModelName.GPT_5_1
+        return ModelName.GPT_5_2
     if _get_api_key(config.google.api_key):
-        return ModelName.GEMINI_2_5_PRO
+        return ModelName.GEMINI_3_PRO_PREVIEW
 
     # Fallback: system-wide default
-    return ModelName.CLAUDE_HAIKU_4_5
+    return ModelName.CLAUDE_SONNET_4_5
 
 
 def get_or_create_model(
@@ -263,11 +263,11 @@ async def get_provider_model(
                 "OpenAI API key not configured. Set via config or OPENAI_API_KEY env var."
             )
 
-        # Use requested model or default to gpt-5.1
-        model_name = requested_model if requested_model else ModelName.GPT_5_1
+        # Use requested model or default to gpt-5.2
+        model_name = requested_model if requested_model else ModelName.GPT_5_2
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            model_name = ModelName.GPT_5_1
+            model_name = ModelName.GPT_5_2
         spec = MODEL_SPECS[model_name]
 
         # Check and test streaming capability for GPT-5 family models
@@ -314,11 +314,11 @@ async def get_provider_model(
                 "Anthropic API key not configured. Set via config or ANTHROPIC_API_KEY env var."
             )
 
-        # Use requested model or default to claude-haiku-4-5
-        model_name = requested_model if requested_model else ModelName.CLAUDE_HAIKU_4_5
+        # Use requested model or default to claude-sonnet-4-5
+        model_name = requested_model if requested_model else ModelName.CLAUDE_SONNET_4_5
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            model_name = ModelName.CLAUDE_HAIKU_4_5
+            model_name = ModelName.CLAUDE_SONNET_4_5
         spec = MODEL_SPECS[model_name]
 
         # Create fully configured ModelConfig
@@ -338,11 +338,13 @@ async def get_provider_model(
                 "Gemini API key not configured. Set via config or GEMINI_API_KEY env var."
             )
 
-        # Use requested model or default to gemini-2.5-pro
-        model_name = requested_model if requested_model else ModelName.GEMINI_2_5_PRO
+        # Use requested model or default to gemini-3-pro-preview
+        model_name = (
+            requested_model if requested_model else ModelName.GEMINI_3_PRO_PREVIEW
+        )
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            model_name = ModelName.GEMINI_2_5_PRO
+            model_name = ModelName.GEMINI_3_PRO_PREVIEW
         spec = MODEL_SPECS[model_name]
 
         # Create fully configured ModelConfig
