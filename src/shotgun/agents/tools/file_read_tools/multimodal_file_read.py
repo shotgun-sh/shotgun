@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import pymupdf
+import pymupdf  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 from pydantic_ai import BinaryContent, RunContext, ToolReturn
 

@@ -181,7 +181,9 @@ async def test_handle_pending_database_issues_retry_success(locked_db_test_conte
 
 
 @pytest.mark.asyncio
-async def test_handle_pending_database_issues_retry_still_locked(locked_db_test_context):
+async def test_handle_pending_database_issues_retry_still_locked(
+    locked_db_test_context,
+):
     """Test that retry action quits if lock persists."""
     ctx = locked_db_test_context
     screen = ctx["screen"]

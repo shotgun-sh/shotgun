@@ -1962,7 +1962,9 @@ class ChatScreen(Screen[None]):
         try:
             # Use unified agent runner - exceptions propagate for handling
             runner = AgentRunner(self.agent_manager)
-            await runner.run(message, attachment=attachment, file_contents=file_contents)
+            await runner.run(
+                message, attachment=attachment, file_contents=file_contents
+            )
         except ShotgunAccountException as e:
             # Shotgun Account errors show contact email UI
             message_parts = e.to_markdown().split("**Need help?**")

@@ -580,7 +580,9 @@ class AgentManager(Widget):
         self._file_request_pending = False
         self._pending_file_requests = []
 
-        logger.info(f"Loaded {len(loaded_files)} of {len(self._pending_file_requests)} requested files")
+        logger.info(
+            f"Loaded {len(loaded_files)} of {len(self._pending_file_requests)} requested files"
+        )
         return loaded_files
 
     def _get_agent(self, agent_type: AgentType) -> AnyAgent:
@@ -1059,9 +1061,7 @@ class AgentManager(Widget):
                 )
 
             # Add file loading indicator
-            files_list = "\n".join(
-                f"- `{p}`" for p in agent_response.file_requests
-            )
+            files_list = "\n".join(f"- `{p}`" for p in agent_response.file_requests)
             self.ui_message_history.append(
                 HintMessage(message=f"📁 Loading requested files:\n{files_list}")
             )

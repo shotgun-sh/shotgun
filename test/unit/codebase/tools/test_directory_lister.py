@@ -19,7 +19,9 @@ async def test_directory_lister_success(
     mock_codebase_service.list_graphs.return_value = [mock_graph]
 
     # Execute
-    result = await directory_lister(mock_run_context, directory=".", graph_id="test-graph-id")
+    result = await directory_lister(
+        mock_run_context, directory=".", graph_id="test-graph-id"
+    )
 
     # Verify
     assert isinstance(result, DirectoryListResult)
@@ -39,7 +41,9 @@ async def test_directory_lister_security_violation(
     mock_graph.repo_path = str(tmp_path)
     mock_codebase_service.list_graphs.return_value = [mock_graph]
 
-    result = await directory_lister(mock_run_context, directory="../../../etc", graph_id="test-graph-id")
+    result = await directory_lister(
+        mock_run_context, directory="../../../etc", graph_id="test-graph-id"
+    )
 
     assert isinstance(result, DirectoryListResult)
     assert result.success is False
@@ -95,7 +99,9 @@ async def test_directory_lister_cwd_fallback_security(
     """Test directory_lister prevents path traversal even with CWD fallback."""
     monkeypatch.chdir(tmp_path)
 
-    result = await directory_lister(mock_run_context_no_codebase, directory="../../../etc")
+    result = await directory_lister(
+        mock_run_context_no_codebase, directory="../../../etc"
+    )
 
     assert isinstance(result, DirectoryListResult)
     assert result.success is False
@@ -109,7 +115,9 @@ async def test_directory_lister_cwd_fallback_not_found(
     """Test directory_lister returns error for non-existent directory with CWD fallback."""
     monkeypatch.chdir(tmp_path)
 
-    result = await directory_lister(mock_run_context_no_codebase, directory="nonexistent")
+    result = await directory_lister(
+        mock_run_context_no_codebase, directory="nonexistent"
+    )
 
     assert isinstance(result, DirectoryListResult)
     assert result.success is False

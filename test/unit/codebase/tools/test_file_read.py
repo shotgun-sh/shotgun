@@ -20,7 +20,9 @@ async def test_file_read_success(
     mock_codebase_service.list_graphs.return_value = [mock_graph]
 
     # Execute
-    result = await file_read(mock_run_context, file_path="test.py", graph_id="test-graph-id")
+    result = await file_read(
+        mock_run_context, file_path="test.py", graph_id="test-graph-id"
+    )
 
     # Verify
     assert isinstance(result, FileReadResult)
@@ -39,7 +41,9 @@ async def test_file_read_security_violation(
     mock_codebase_service.list_graphs.return_value = [mock_graph]
 
     # Try to read outside repo
-    result = await file_read(mock_run_context, file_path="../../../etc/passwd", graph_id="test-graph-id")
+    result = await file_read(
+        mock_run_context, file_path="../../../etc/passwd", graph_id="test-graph-id"
+    )
 
     assert isinstance(result, FileReadResult)
     assert result.success is False
@@ -54,7 +58,9 @@ async def test_file_read_file_not_found(
     mock_graph.repo_path = str(tmp_path)
     mock_codebase_service.list_graphs.return_value = [mock_graph]
 
-    result = await file_read(mock_run_context, file_path="nonexistent.py", graph_id="test-graph-id")
+    result = await file_read(
+        mock_run_context, file_path="nonexistent.py", graph_id="test-graph-id"
+    )
 
     assert isinstance(result, FileReadResult)
     assert result.success is False
@@ -97,7 +103,9 @@ async def test_file_read_cwd_fallback_nested_path(
     test_file.write_text("Nested content")
 
     # Execute without graph_id
-    result = await file_read(mock_run_context_no_codebase, file_path="subdir/nested.txt")
+    result = await file_read(
+        mock_run_context_no_codebase, file_path="subdir/nested.txt"
+    )
 
     assert isinstance(result, FileReadResult)
     assert result.success is True
@@ -112,7 +120,9 @@ async def test_file_read_cwd_fallback_security(
     monkeypatch.chdir(tmp_path)
 
     # Try to read outside CWD
-    result = await file_read(mock_run_context_no_codebase, file_path="../../../etc/passwd")
+    result = await file_read(
+        mock_run_context_no_codebase, file_path="../../../etc/passwd"
+    )
 
     assert isinstance(result, FileReadResult)
     assert result.success is False
