@@ -271,7 +271,7 @@ async def test_get_provider_model_openai_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5.1"
+        assert model.name == "gpt-5.2"
         assert model.api_key == "test-openai-key"
 
 
@@ -311,7 +311,7 @@ async def test_get_provider_model_anthropic_with_config_key(mock_get_config_mana
         model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-haiku-4-5"
+        assert model.name == "claude-sonnet-4-5"
         assert model.api_key == "test-anthropic-key"
 
 
@@ -351,7 +351,7 @@ async def test_get_provider_model_google_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.GOOGLE)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gemini-2.5-pro"
+        assert model.name == "gemini-3-pro-preview"
         assert model.api_key == "test-google-key"
 
 
@@ -390,7 +390,7 @@ async def test_get_provider_model_string_provider(mock_get_config_manager):
         model = await get_provider_model("openai")
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5.1"
+        assert model.name == "gpt-5.2"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -414,7 +414,7 @@ async def test_get_provider_model_none_finds_first_available(mock_get_config_man
         model = await get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-haiku-4-5"
+        assert model.name == "claude-sonnet-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -867,7 +867,7 @@ async def test_update_provider_sets_selected_model_for_google():
 
         # Verify selected_model is now set to Google's default
         config = await manager.load()
-        assert config.selected_model == ModelName.GEMINI_2_5_PRO
+        assert config.selected_model == ModelName.GEMINI_3_PRO_PREVIEW
         assert config.google.api_key.get_secret_value() == "test-google-key"
 
 
