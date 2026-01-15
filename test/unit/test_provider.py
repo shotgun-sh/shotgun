@@ -42,8 +42,8 @@ async def test_get_provider_model_openai_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5.1"
-        assert model.name == "gpt-5.1"
+        assert model.name == "gpt-5.2"
+        assert model.name == "gpt-5.2"
         assert model.provider == ProviderType.OPENAI
         assert model.api_key == "test-openai-key"
 
@@ -84,7 +84,7 @@ async def test_get_provider_model_anthropic_with_config_key(mock_get_config_mana
         model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-haiku-4-5"
+        assert model.name == "claude-sonnet-4-5"
         assert model.api_key == "test-anthropic-key"
 
 
@@ -124,7 +124,7 @@ async def test_get_provider_model_google_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.GOOGLE)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gemini-2.5-pro"
+        assert model.name == "gemini-3-pro-preview"
         assert model.api_key == "test-google-key"
 
 
@@ -163,7 +163,7 @@ async def test_get_provider_model_with_enum(mock_get_config_manager):
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5.1"
+        assert model.name == "gpt-5.2"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -187,7 +187,7 @@ async def test_get_provider_model_none_finds_first_available(mock_get_config_man
         model = await get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-haiku-4-5"
+        assert model.name == "claude-sonnet-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -225,7 +225,7 @@ async def test_get_provider_model_prefers_config_over_env(mock_get_config_manage
         model = await get_provider_model(ProviderType.OPENAI)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gpt-5.1"
+        assert model.name == "gpt-5.2"
         # Should use config key, not environment variable
         assert model.api_key == "config-key"
 
@@ -269,7 +269,7 @@ async def test_get_provider_model_provider_enum_conversion(mock_get_config_manag
         model = await get_provider_model("anthropic")
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-haiku-4-5"
+        assert model.name == "claude-sonnet-4-5"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -297,7 +297,7 @@ async def test_get_provider_model_with_env_key_precedence(mock_get_config_manage
         model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-haiku-4-5"
+        assert model.name == "claude-sonnet-4-5"
         assert model.provider == ProviderType.ANTHROPIC
         # Config key takes precedence over environment variable
         assert model.api_key == "config-anthropic-key"
