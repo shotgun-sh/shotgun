@@ -155,9 +155,7 @@ def cleanup_database_for_path(codebase_path: Path) -> None:
     within tests (e.g., between benchmark runs).
     """
     storage_dir = get_shotgun_home() / "codebases"
-    graph_id = hashlib.sha256(
-        str(codebase_path.resolve()).encode()
-    ).hexdigest()[:12]
+    graph_id = hashlib.sha256(str(codebase_path.resolve()).encode()).hexdigest()[:12]
 
     graph_path = storage_dir / f"{graph_id}.kuzu"
     if graph_path.exists():
@@ -227,7 +225,9 @@ class CPUSampler:
 
         if len(self.samples) > 10:
             trim_count = int(len(self.samples) * trim_percent)
-            trimmed = self.samples[trim_count:-trim_count] if trim_count > 0 else self.samples
+            trimmed = (
+                self.samples[trim_count:-trim_count] if trim_count > 0 else self.samples
+            )
         else:
             trimmed = self.samples
 

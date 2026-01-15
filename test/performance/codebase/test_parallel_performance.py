@@ -183,9 +183,7 @@ async def test_memory_usage_under_limit(
     peak_memory = memory_sampler.get_peak()
 
     # Target: <2GB = 2048MB
-    assert peak_memory < 2048, (
-        f"Peak memory {peak_memory:.0f}MB exceeds 2048MB limit"
-    )
+    assert peak_memory < 2048, f"Peak memory {peak_memory:.0f}MB exceeds 2048MB limit"
 
 
 @pytest.mark.slow
