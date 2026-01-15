@@ -60,3 +60,18 @@ ModeIndicator.mode-drafting {
 #indexing-job-display {
   text-align: end;
 }
+
+AttachmentBar {
+  height: auto;
+  padding: 0 1;
+  background: $secondary-background;
+  margin-bottom: 1;
+}
+
+AttachmentBar.hidden {
+  display: none;
+}
+
+AttachmentBar Static {
+  color: $text-accent;
+}

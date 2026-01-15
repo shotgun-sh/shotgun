@@ -24,6 +24,7 @@ from shotgun.tui.screens.chat_screen.history.chat_history import ChatHistory
 
 if TYPE_CHECKING:
     from shotgun.agents.context_analyzer.models import ContextAnalysis
+    from shotgun.attachments import FileAttachment
     from shotgun.tui.screens.chat import ChatScreen
     from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 
@@ -261,3 +262,20 @@ class WidgetCoordinator:
             context_indicator.set_streaming(streaming)
         except Exception as e:
             logger.exception(f"Failed to set context streaming: {e}")
+
+    def update_attachment_bar(self, attachment: "FileAttachment | None") -> None:
+        """Update the attachment bar with pending attachment.
+
+        Args:
+            attachment: FileAttachment to display, or None to hide bar.
+        """
+        if not self.screen.is_mounted:
+            return
+
+        try:
+            from shotgun.tui.components.attachment_bar import AttachmentBar
+
+            attachment_bar = self.screen.query_one(AttachmentBar)
+            attachment_bar.update_attachment(attachment)
+        except Exception as e:
+            logger.exception(f"Failed to update attachment bar: {e}")

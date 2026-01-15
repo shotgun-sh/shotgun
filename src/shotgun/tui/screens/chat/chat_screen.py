@@ -86,6 +86,7 @@ from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
+from shotgun.tui.components.attachment_bar import AttachmentBar
 from shotgun.tui.components.context_indicator import ContextIndicator
 from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
@@ -944,6 +945,7 @@ class ChatScreen(Screen[None]):
                     classes="" if self.working else "hidden",
                 )
                 yield StatusBar(working=self.working)
+                yield AttachmentBar(id="attachment-bar")
                 yield PromptInput(
                     text=self.value,
                     highlight_cursor_line=False,
@@ -1557,6 +1559,9 @@ class ChatScreen(Screen[None]):
                 return
             attachment = processed_attachment
 
+            # Show attachment in the attachment bar
+            self.widget_coordinator.update_attachment_bar(attachment)
+
         self.history.append(message.text)
 
         # Add user message to agent_manager's history BEFORE running the agent
@@ -1565,8 +1570,9 @@ class ChatScreen(Screen[None]):
         self.agent_manager.ui_message_history.append(user_message)
         self.messages = self.agent_manager.ui_message_history.copy()
 
-        # Clear the input
+        # Clear the input and attachment bar
         self.value = ""
+        self.widget_coordinator.update_attachment_bar(None)
         self.run_agent(text, attachment=attachment)  # Use stripped text
 
         self.widget_coordinator.update_prompt_input(clear=True)
