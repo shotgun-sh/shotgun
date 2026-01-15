@@ -216,6 +216,10 @@ class DelegationResult(BaseModel):
     files_modified: list[str] = Field(
         default_factory=list, description="Files modified by sub-agent"
     )
+    files_found: list[str] = Field(
+        default_factory=list,
+        description="Files found by sub-agent (used by FileReadAgent)",
+    )
     has_questions: bool = Field(
         default=False, description="Whether sub-agent has clarifying questions"
     )

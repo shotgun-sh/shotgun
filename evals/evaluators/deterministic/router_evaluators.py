@@ -393,14 +393,17 @@ class DelegationCorrectnessEvaluator(BaseEvaluator):
 
 class ClarifyingQuestionsEvaluator(BaseEvaluator):
     """
-    [HARD when expected] Checks that clarifying questions were asked when expected.
+    [HARD when expected] Checks that clarifying questions match expectations.
 
     When a test case specifies min_clarifying_questions, this becomes a HARD failure
-    because the test is specifically designed to verify that behavior. Otherwise,
-    it's a SOFT failure.
+    because the test is specifically designed to verify that behavior.
+
+    When a test case specifies max_clarifying_questions, exceeding it is a HARD failure
+    because the test expects the agent NOT to ask questions (e.g., for specific file paths).
 
     Used for test cases where we expect the agent to gather requirements
-    before proceeding (e.g., ambiguous feature requests).
+    before proceeding (e.g., ambiguous feature requests) OR where we expect
+    the agent to act directly without questions (e.g., specific file requests).
     """
 
     name = "clarifying_questions"
@@ -413,23 +416,26 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
         expected_output: ExpectedAgentOutput | None,
         test_case: ShotgunTestCase,
     ) -> EvaluatorResult:
-        """Check if clarifying questions were asked when expected."""
-        # Get minimum question count from expected output
+        """Check if clarifying questions match expectations."""
+        # Get question count constraints from expected output
         min_questions = (
             expected_output.min_clarifying_questions if expected_output else None
         )
+        max_questions = (
+            expected_output.max_clarifying_questions if expected_output else None
+        )
 
-        # If no minimum specified, questions are not required
-        if min_questions is None:
+        # If no constraints specified, questions are not required/restricted
+        if min_questions is None and max_questions is None:
             return EvaluatorResult(
                 evaluator_name=self.name,
                 passed=True,
                 severity=self.severity,
-                reasoning="Clarifying questions not required for this test",
+                reasoning="Clarifying questions not constrained for this test",
                 details={},
             )
 
-        # When questions are explicitly expected, use HARD severity
+        # When questions are explicitly constrained, use HARD severity
         # This ensures the test fails when its core assertion is violated
         failure_severity = EvaluatorSeverity.HARD
 
@@ -437,36 +443,63 @@ class ClarifyingQuestionsEvaluator(BaseEvaluator):
         questions = actual_output.clarifying_questions or []
         question_count = len(questions)
 
-        if question_count >= min_questions:
-            return EvaluatorResult(
-                evaluator_name=self.name,
-                passed=True,
-                severity=failure_severity,
-                reasoning=f"Agent asked {question_count} clarifying question(s) (required: {min_questions}+)",
-                details={
-                    "questions_asked": questions,
-                    "min_required": [str(min_questions)],
-                },
-            )
-
-        if question_count > 0:
+        # Check max_clarifying_questions constraint (should NOT ask questions)
+        if max_questions is not None and question_count > max_questions:
             return EvaluatorResult(
                 evaluator_name=self.name,
                 passed=False,
                 severity=failure_severity,
-                reasoning=f"Agent asked {question_count} question(s) but {min_questions}+ required",
+                reasoning=f"Agent asked {question_count} question(s) but max allowed is {max_questions}",
                 details={
                     "questions_asked": questions,
-                    "min_required": [str(min_questions)],
+                    "max_allowed": [str(max_questions)],
                 },
             )
 
+        # Check min_clarifying_questions constraint (should ask questions)
+        if min_questions is not None:
+            if question_count >= min_questions:
+                return EvaluatorResult(
+                    evaluator_name=self.name,
+                    passed=True,
+                    severity=failure_severity,
+                    reasoning=f"Agent asked {question_count} clarifying question(s) (required: {min_questions}+)",
+                    details={
+                        "questions_asked": questions,
+                        "min_required": [str(min_questions)],
+                    },
+                )
+
+            if question_count > 0:
+                return EvaluatorResult(
+                    evaluator_name=self.name,
+                    passed=False,
+                    severity=failure_severity,
+                    reasoning=f"Agent asked {question_count} question(s) but {min_questions}+ required",
+                    details={
+                        "questions_asked": questions,
+                        "min_required": [str(min_questions)],
+                    },
+                )
+
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=False,
+                severity=failure_severity,
+                reasoning=f"Agent did not ask clarifying questions (required: {min_questions}+)",
+                details={"questions_asked": [], "min_required": [str(min_questions)]},
+            )
+
+        # Only max constraint specified and it passed
         return EvaluatorResult(
             evaluator_name=self.name,
-            passed=False,
+            passed=True,
             severity=failure_severity,
-            reasoning=f"Agent did not ask clarifying questions (required: {min_questions}+)",
-            details={"questions_asked": [], "min_required": [str(min_questions)]},
+            reasoning=f"Agent asked {question_count} question(s) (max allowed: {max_questions})",
+            details={
+                "questions_asked": questions,
+                "max_allowed": [str(max_questions)],
+            },
         )
 
 

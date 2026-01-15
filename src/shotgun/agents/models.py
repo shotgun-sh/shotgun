@@ -89,6 +89,23 @@ Optional list of clarifying questions to ask the user.
 - Multiple questions (2+): Asked sequentially in Q&A mode (blocks input until all answered or cancelled)
 """,
     )
+    files_found: list[str] | None = Field(
+        default=None,
+        description="""
+Optional list of absolute file paths found by the agent.
+Used by FileReadAgent to return paths of files it searched and found.
+The delegation tool can then load these files as multimodal content.
+""",
+    )
+    file_requests: list[str] | None = Field(
+        default=None,
+        description="""
+Optional list of file paths the agent wants to read.
+When set, the agent loop exits, files are loaded as BinaryContent,
+and the loop resumes with file content in the next prompt.
+Use this for PDFs, images, or other binary files you need to analyze.
+""",
+    )
 
 
 class AgentType(StrEnum):
@@ -100,6 +117,7 @@ class AgentType(StrEnum):
     TASKS = "tasks"
     EXPORT = "export"
     ROUTER = "router"
+    FILE_READ = "file_read"
 
 
 class PipelineConfigEntry(BaseModel):

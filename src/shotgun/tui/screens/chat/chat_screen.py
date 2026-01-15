@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from shotgun.agents.router.models import ExecutionStep
 
+from pydantic_ai import BinaryContent
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -33,6 +34,7 @@ from shotgun.agents.agent_manager import (
     ClarifyingQuestionsMessage,
     CompactionCompletedMessage,
     CompactionStartedMessage,
+    FileRequestPendingMessage,
     MessageHistoryUpdated,
     ModelConfigUpdated,
     PartialResponseMessage,
@@ -1175,6 +1177,62 @@ class ChatScreen(Screen[None]):
         self.qa_current_index = 0
         self.qa_answers = []
 
+    @on(FileRequestPendingMessage)
+    def handle_file_request_pending(self, event: FileRequestPendingMessage) -> None:
+        """Handle file request from agent structured output.
+
+        When the agent returns file_requests in its response, we load the files
+        and resume the agent with the file contents.
+        """
+        logger.debug(
+            "[FILE_REQUEST] FileRequestPendingMessage received - %d files",
+            len(event.file_paths),
+        )
+        # Clear any streaming partial response
+        self._clear_partial_response()
+
+        # Process files and resume agent (run as background task)
+        self._process_files_and_resume(event.file_paths)
+
+    @work(exclusive=True, name="process_files_and_resume")
+    async def _process_files_and_resume(self, file_paths: list[str]) -> None:
+        """Load requested files and resume agent with content.
+
+        This runs as a background worker to avoid blocking the UI.
+        """
+        logger.debug("[FILE_REQUEST] Processing %d file requests", len(file_paths))
+
+        # Set working state
+        self.working = True
+        self.widget_coordinator.update_spinner_text("Loading files...")
+
+        try:
+            # Load files via agent manager
+            file_contents = self.agent_manager.process_file_requests()
+
+            if not file_contents:
+                logger.warning("[FILE_REQUEST] No files were successfully loaded")
+                self.mount_hint("⚠️ Could not load any of the requested files.")
+                self.working = False
+                return
+
+            logger.info(
+                "[FILE_REQUEST] Loaded %d files, resuming agent",
+                len(file_contents),
+            )
+
+            # Resume agent with file contents
+            # Note: We call run_agent directly since we're already in a worker
+            runner = AgentRunner(self.agent_manager)
+            await runner.run(
+                prompt="Here are the files you requested. Please analyze them and respond to the user's original question.",
+                file_contents=file_contents,
+            )
+        except Exception as e:
+            logger.error("[FILE_REQUEST] Error processing files: %s", e)
+            self.mount_hint(f"⚠️ Error loading files: {e}")
+            self.working = False
+
     @on(MessageHistoryUpdated)
     async def handle_message_history_updated(
         self, event: MessageHistoryUpdated
@@ -1887,6 +1945,7 @@ class ChatScreen(Screen[None]):
         self,
         message: str,
         attachment: FileAttachment | None = None,
+        file_contents: list[tuple[str, BinaryContent]] | None = None,
     ) -> None:
         # Start processing with spinner
         from textual.worker import get_current_worker
@@ -1903,7 +1962,7 @@ class ChatScreen(Screen[None]):
         try:
             # Use unified agent runner - exceptions propagate for handling
             runner = AgentRunner(self.agent_manager)
-            await runner.run(message, attachment=attachment)
+            await runner.run(message, attachment=attachment, file_contents=file_contents)
         except ShotgunAccountException as e:
             # Shotgun Account errors show contact email UI
             message_parts = e.to_markdown().split("**Need help?**")

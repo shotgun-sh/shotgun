@@ -90,6 +90,22 @@ router_file_write = EvaluationSuite(
 )
 
 # ============================================================================
+# File Request Suite
+# Tests Router uses file_requests for binary files instead of asking questions
+# ============================================================================
+
+router_file_request = EvaluationSuite(
+    name="router_file_request",
+    description="Tests Router uses file_requests for PDFs/images instead of asking questions",
+    test_case_names=[
+        "pdf_file_request_no_questions",
+        "image_file_request_no_questions",
+    ],
+    evaluator_names=["router_delegation"],
+    tags=["file_request", "router", "drafting"],
+)
+
+# ============================================================================
 # All Router Tests Suite
 # Runs all Router agent test cases
 # ============================================================================
@@ -116,6 +132,9 @@ router_all = EvaluationSuite(
         # File write cases
         "feature_request_creates_plan_with_files",
         "spec_request_creates_plan",
+        # File request cases
+        "pdf_file_request_no_questions",
+        "image_file_request_no_questions",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],
@@ -131,6 +150,7 @@ ROUTER_SUITES: dict[str, EvaluationSuite] = {
     "router_planning": router_planning,
     "router_delegation_routing": router_delegation_routing,
     "router_file_write": router_file_write,
+    "router_file_request": router_file_request,
     "router_all": router_all,
 }
 
@@ -140,6 +160,7 @@ __all__ = [
     "router_planning",
     "router_delegation_routing",
     "router_file_write",
+    "router_file_request",
     "router_all",
     "ROUTER_SUITES",
 ]

@@ -30,6 +30,8 @@ from shotgun.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from pydantic_ai import BinaryContent
+
     from shotgun.agents.agent_manager import AgentManager
 
 logger = logging.getLogger(__name__)
@@ -71,12 +73,15 @@ class AgentRunner:
         self,
         prompt: str,
         attachment: FileAttachment | None = None,
+        file_contents: list[tuple[str, "BinaryContent"]] | None = None,
     ) -> None:
         """Run the agent with the given prompt.
 
         Args:
             prompt: The user's prompt/query
             attachment: Optional file attachment to include as multimodal content.
+            file_contents: Optional list of (file_path, BinaryContent) tuples to include
+                          as multimodal content. Used when resuming after file_requests.
 
         Raises:
             Custom exceptions for different error types:
@@ -94,7 +99,11 @@ class AgentRunner:
             - UnknownAgentException: Unknown/unclassified error
         """
         try:
-            await self.agent_manager.run(prompt=prompt, attachment=attachment)
+            await self.agent_manager.run(
+                prompt=prompt,
+                attachment=attachment,
+                file_contents=file_contents,
+            )
 
         except asyncio.CancelledError as e:
             # User cancelled - wrap and re-raise as our custom exception

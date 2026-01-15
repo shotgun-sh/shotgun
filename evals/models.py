@@ -222,6 +222,10 @@ class ExpectedAgentOutput(BaseModel):
         default=None,
         description="Minimum clarifying questions expected. None means don't expect any.",
     )
+    max_clarifying_questions: int | None = Field(
+        default=None,
+        description="Maximum clarifying questions allowed. None means no limit.",
+    )
 
     # Tools - which tools should/shouldn't be called
     expected_tools: list[str] = Field(

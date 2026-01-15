@@ -8,12 +8,14 @@ Sub-agents run with isolated message histories to prevent context window bloat.
 
 import time
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
-from pydantic_ai import RunContext
+from pydantic_ai import BinaryContent, RunContext, ToolReturn
 from pydantic_ai.tools import ToolDefinition
 
 from shotgun.agents.export import create_export_agent, run_export_agent
+from shotgun.agents.file_read import create_file_read_agent, run_file_read_agent
 from shotgun.agents.models import (
     AgentDeps,
     AgentRuntimeOptions,
@@ -97,6 +99,7 @@ AGENT_FACTORIES: dict[AgentType, tuple[CreateAgentFn, RunAgentFn]] = {
     AgentType.PLAN: (create_plan_agent, run_plan_agent),
     AgentType.TASKS: (create_tasks_agent, run_tasks_agent),
     AgentType.EXPORT: (create_export_agent, run_export_agent),
+    AgentType.FILE_READ: (create_file_read_agent, run_file_read_agent),
 }
 
 
@@ -303,6 +306,11 @@ async def _run_sub_agent(
                 op.file_path for op in sub_agent_deps.file_tracker.operations
             ]
 
+            # Extract files found (used by FileReadAgent)
+            files_found: list[str] = []
+            if result and result.output and result.output.files_found:
+                files_found = result.output.files_found
+
             # Check for clarifying questions
             has_questions = False
             questions: list[str] = []
@@ -311,9 +319,10 @@ async def _run_sub_agent(
                 questions = result.output.clarifying_questions
 
             logger.info(
-                "Sub-agent %s completed. Files modified: %s",
+                "Sub-agent %s completed. Files modified: %s, files found: %s",
                 agent_type.value,
                 files_modified,
+                files_found,
             )
 
             # Track delegation completion metric
@@ -334,6 +343,7 @@ async def _run_sub_agent(
                 success=True,
                 response=response_text,
                 files_modified=files_modified,
+                files_found=files_found,
                 has_questions=has_questions,
                 questions=questions,
             )
@@ -540,4 +550,100 @@ async def delegate_to_export(
         AgentType.EXPORT,
         input.task,
         input.context_hint,
+    )
+
+
+# MIME type mapping for file loading
+_MIME_TYPES: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _get_mime_type(file_path: Path) -> str | None:
+    """Get MIME type for a file based on extension."""
+    suffix = file_path.suffix.lower()
+    return _MIME_TYPES.get(suffix)
+
+
+@register_tool(
+    category=ToolCategory.DELEGATION,
+    display_text="Delegating to FileRead agent",
+    key_arg="task",
+)
+async def delegate_to_file_read(
+    ctx: RunContext[RouterDeps],
+    input: DelegationInput,
+) -> ToolReturn:
+    """Delegate a task to the FileRead agent to search for and read files.
+
+    The FileRead agent specializes in:
+    - Searching for files by name, pattern, or content
+    - Reading PDFs and images to analyze their content
+    - Finding specific files the user is looking for
+
+    This tool returns the found files as BinaryContent so you can see them directly.
+
+    Args:
+        ctx: RunContext with RouterDeps.
+        input: DelegationInput with task describing what file to find.
+
+    Returns:
+        ToolReturn with the summary and file content as BinaryContent.
+    """
+    # Run the FileRead agent
+    result = await _run_sub_agent(
+        ctx,
+        AgentType.FILE_READ,
+        input.task,
+        input.context_hint,
+    )
+
+    # If delegation failed, return error as ToolReturn
+    if not result.success:
+        return ToolReturn(
+            return_value=f"FileRead delegation failed: {result.error}",
+        )
+
+    # Build content parts with the response
+    content_parts: list[str | BinaryContent] = [result.response]
+
+    # Load any found files as BinaryContent so Router can see them
+    if result.files_found:
+        for file_path_str in result.files_found:
+            file_path = Path(file_path_str)
+            if file_path.exists():
+                mime_type = _get_mime_type(file_path)
+                if mime_type:
+                    try:
+                        data = file_path.read_bytes()
+                        content_parts.append(f"\n\n--- File: {file_path.name} ---")
+                        content_parts.append(
+                            BinaryContent(data=data, media_type=mime_type)
+                        )
+                        logger.info(
+                            "Loaded file for Router context: %s (%d bytes)",
+                            file_path.name,
+                            len(data),
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to load file %s: %s", file_path, e)
+                        content_parts.append(
+                            f"\n\n[Could not load {file_path.name}: {e}]"
+                        )
+                else:
+                    # Non-multimodal file - just mention it
+                    content_parts.append(
+                        f"\n\n[File found: {file_path} - not a supported multimodal type]"
+                    )
+            else:
+                content_parts.append(f"\n\n[File not found: {file_path_str}]")
+
+    return ToolReturn(
+        return_value=result.response,
+        content=content_parts,
     )

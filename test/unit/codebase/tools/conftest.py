@@ -71,3 +71,33 @@ def mock_agent_deps(mock_codebase_service):
 def mock_run_context(mock_agent_deps):
     """Create mock run context."""
     return MagicMock(spec=RunContext, deps=mock_agent_deps)
+
+
+@pytest.fixture
+def mock_agent_deps_no_codebase():
+    """Create mock agent dependencies without codebase service (simulates no indexed codebase)."""
+    runtime_options = AgentRuntimeOptions()
+
+    # Create a real ModelConfig
+    model_config = ModelConfig(
+        name=ModelName.GPT_5_1,
+        provider=ProviderType.OPENAI,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=4096,
+        max_output_tokens=2048,
+        api_key="test-api-key",
+    )
+
+    # No codebase_service - simulates environment without indexed codebase
+    deps = AgentDeps.model_construct(
+        **runtime_options.model_dump(),
+        llm_model=model_config,
+        codebase_service=None,
+    )
+    return deps
+
+
+@pytest.fixture
+def mock_run_context_no_codebase(mock_agent_deps_no_codebase):
+    """Create mock run context without codebase service."""
+    return MagicMock(spec=RunContext, deps=mock_agent_deps_no_codebase)

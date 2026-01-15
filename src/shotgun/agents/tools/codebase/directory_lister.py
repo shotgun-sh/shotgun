@@ -19,60 +19,48 @@ logger = get_logger(__name__)
     key_arg="directory",
 )
 async def directory_lister(
-    ctx: RunContext[AgentDeps], graph_id: str, directory: str = "."
+    ctx: RunContext[AgentDeps], directory: str = ".", graph_id: str = ""
 ) -> DirectoryListResult:
-    """List directory contents in codebase.
+    """List directory contents in codebase or current working directory.
 
     Args:
         ctx: RunContext containing AgentDeps with codebase service
-        graph_id: Graph ID to identify the repository
-        directory: Path to directory relative to repository root (default: ".")
+        directory: Path to directory relative to repository root or CWD (default: ".")
+        graph_id: Graph ID to identify the repository (optional - uses CWD if not provided)
 
     Returns:
         DirectoryListResult with formatted output via __str__
     """
-    logger.debug("🔧 Listing directory: %s in graph %s", directory, graph_id)
+    logger.debug("🔧 Listing directory: %s in graph %s", directory, graph_id or "(CWD)")
 
     try:
-        if not ctx.deps.codebase_service:
-            return DirectoryListResult(
-                success=False,
-                directory=directory,
-                full_path="",
-                error="No codebase indexed",
-            )
+        # Determine the root path - either from indexed codebase or CWD
+        repo_path: Path | None = None
 
-        # Get the graph to find the repository path
-        try:
-            graphs = await ctx.deps.codebase_service.list_graphs()
-            graph = next((g for g in graphs if g.graph_id == graph_id), None)
-        except Exception as e:
-            logger.error("Error getting graph: %s", e)
-            return DirectoryListResult(
-                success=False,
-                directory=directory,
-                full_path="",
-                error=f"Could not find graph with ID '{graph_id}'",
-            )
+        if graph_id and ctx.deps.codebase_service:
+            # Try to get the graph to find the repository path
+            try:
+                graphs = await ctx.deps.codebase_service.list_graphs()
+                graph = next((g for g in graphs if g.graph_id == graph_id), None)
+                if graph:
+                    repo_path = Path(graph.repo_path).resolve()
+            except Exception as e:
+                logger.debug("Could not find graph '%s': %s", graph_id, e)
 
-        if not graph:
-            return DirectoryListResult(
-                success=False,
-                directory=directory,
-                full_path="",
-                error=f"Graph '{graph_id}' not found",
-            )
+        # Fall back to CWD if no graph found or no graph_id provided
+        if repo_path is None:
+            repo_path = Path.cwd().resolve()
+            logger.debug("📂 Using CWD as root: %s", repo_path)
 
-        # Validate the directory path is within the repository
-        repo_path = Path(graph.repo_path).resolve()
+        # Validate the directory path is within the root
         full_dir_path = (repo_path / directory).resolve()
 
-        # Security check: ensure the resolved path is within the repository
+        # Security check: ensure the resolved path is within the root directory
         try:
             full_dir_path.relative_to(repo_path)
         except ValueError:
             error_msg = (
-                f"Access denied: Path '{directory}' is outside repository bounds"
+                f"Access denied: Path '{directory}' is outside allowed directory bounds"
             )
             logger.warning("🚨 Security violation attempt: %s", error_msg)
             return DirectoryListResult(
@@ -88,7 +76,7 @@ async def directory_lister(
                 success=False,
                 directory=directory,
                 full_path=str(full_dir_path),
-                error=f"Directory '{directory}' not found in repository",
+                error=f"Directory not found: {directory}",
             )
 
         if not full_dir_path.is_dir():
