@@ -379,7 +379,7 @@ class ConfigManager:
                             provider_models = {
                                 ProviderType.OPENAI: ModelName.GPT_5_2,
                                 ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
-                                ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
+                                ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
                             }
 
                             if provider in provider_models:
@@ -529,7 +529,7 @@ class ConfigManager:
                 provider_models = {
                     ProviderType.OPENAI: ModelName.GPT_5_2,
                     ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
-                    ProviderType.GOOGLE: ModelName.GEMINI_2_5_PRO,
+                    ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
                 }
                 if provider_enum in provider_models:
                     config.selected_model = provider_models[provider_enum]

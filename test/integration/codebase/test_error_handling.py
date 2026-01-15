@@ -191,6 +191,7 @@ async def test_graceful_degradation_to_sequential(
     tmp_path: Path,
 ) -> None:
     """Test graceful degradation to sequential mode on errors."""
+
     # Mock parallel executor to raise an exception
     def failing_execute(self, batches):
         raise RuntimeError("Simulated parallel failure")
