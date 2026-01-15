@@ -42,7 +42,9 @@ class MultimodalFileReadResult(BaseModel):
     def __str__(self) -> str:
         if not self.success:
             return f"Error: {self.error}"
-        return f"Found: {self.file_name} ({self.file_size_bytes} bytes, {self.mime_type})"
+        return (
+            f"Found: {self.file_name} ({self.file_size_bytes} bytes, {self.mime_type})"
+        )
 
 
 def _get_mime_type(file_path: Path) -> str | None:

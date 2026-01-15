@@ -369,7 +369,9 @@ async def _run_sub_agent(
             # This is especially important for request_limit errors
             if agent_type in deps.sub_agent_cache:
                 del deps.sub_agent_cache[agent_type]
-                logger.debug("Cleared %s from sub_agent_cache after failure", agent_type.value)
+                logger.debug(
+                    "Cleared %s from sub_agent_cache after failure", agent_type.value
+                )
             break
 
     # Track delegation failure metric
@@ -553,5 +555,3 @@ async def delegate_to_export(
         input.task,
         input.context_hint,
     )
-
-
