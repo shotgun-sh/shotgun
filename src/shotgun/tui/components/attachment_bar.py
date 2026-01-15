@@ -19,18 +19,8 @@ class AttachmentBar(Widget):
 
     Displays format: [icon filename.ext (size)]
     Hidden when no attachment is pending.
-    """
 
-    DEFAULT_CSS = """
-    AttachmentBar {
-        height: auto;
-        padding: 0 1;
-        background: $secondary-background;
-    }
-
-    AttachmentBar.hidden {
-        display: none;
-    }
+    Styles defined in chat.tcss.
     """
 
     state: reactive[AttachmentBarState] = reactive(AttachmentBarState, init=False)
