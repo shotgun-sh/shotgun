@@ -1001,13 +1001,23 @@ class AgentManager(Widget):
         # Deduplicate: skip user prompts that are already in original_messages
         # Note: We compare content only, not timestamps, since UserPromptPart
         # has a timestamp field that differs between instances
-        def get_user_prompt_content(
+        def get_user_prompt_text(
             request: ModelRequest,
-        ) -> str | Sequence[UserContent] | None:
-            """Extract the user prompt content from a ModelRequest."""
+        ) -> str | None:
+            """Extract just the text content from a ModelRequest for deduplication.
+
+            When content is multimodal (list with text + binary), extract just the text.
+            This ensures text-only and multimodal versions of the same prompt match.
+            """
             for part in request.parts:
                 if isinstance(part, UserPromptPart):
-                    return part.content
+                    content = part.content
+                    if isinstance(content, str):
+                        return content
+                    elif isinstance(content, list):
+                        # Multimodal content - extract text strings only
+                        text_parts = [item for item in content if isinstance(item, str)]
+                        return text_parts[0] if text_parts else None
             return None
 
         deduplicated_new_messages = []
@@ -1016,11 +1026,11 @@ class AgentManager(Widget):
             if isinstance(msg, ModelRequest) and any(
                 isinstance(part, UserPromptPart) for part in msg.parts
             ):
-                msg_content = get_user_prompt_content(msg)
+                msg_text = get_user_prompt_text(msg)
                 # Check if an identical user prompt is already in original_messages
                 already_exists = any(
                     isinstance(existing, ModelRequest)
-                    and get_user_prompt_content(existing) == msg_content
+                    and get_user_prompt_text(existing) == msg_text
                     for existing in original_messages[
                         -5:
                     ]  # Check last 5 messages for efficiency
