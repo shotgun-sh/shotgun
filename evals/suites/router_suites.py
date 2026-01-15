@@ -96,10 +96,12 @@ router_file_write = EvaluationSuite(
 
 router_file_request = EvaluationSuite(
     name="router_file_request",
-    description="Tests Router uses file_requests for PDFs/images instead of asking questions",
+    description="Tests Router uses file_requests for PDFs/images instead of asking questions or reading .shotgun files",
     test_case_names=[
         "pdf_file_request_no_questions",
         "image_file_request_no_questions",
+        "pdf_direct_access_no_excuses",
+        "pdf_no_research_file_read",
     ],
     evaluator_names=["router_delegation"],
     tags=["file_request", "router", "drafting"],
@@ -135,6 +137,8 @@ router_all = EvaluationSuite(
         # File request cases
         "pdf_file_request_no_questions",
         "image_file_request_no_questions",
+        "pdf_direct_access_no_excuses",
+        "pdf_no_research_file_read",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],

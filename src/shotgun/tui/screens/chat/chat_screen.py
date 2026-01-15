@@ -1225,9 +1225,15 @@ class ChatScreen(Screen[None]):
             # Note: We call run_agent directly since we're already in a worker
             runner = AgentRunner(self.agent_manager)
             await runner.run(
-                prompt="Here are the files you requested. Please analyze them and respond to the user's original question.",
+                prompt=(
+                    "The files you requested are now loaded and included below. "
+                    "Analyze the file contents and respond to the user's original question. "
+                    "DO NOT use file_requests - the files are already provided in this message."
+                ),
                 file_contents=file_contents,
             )
+            # Mark work as complete after successful file processing
+            self.working = False
         except Exception as e:
             logger.error("[FILE_REQUEST] Error processing files: %s", e)
             self.mount_hint(f"⚠️ Error loading files: {e}")

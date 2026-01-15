@@ -1,12 +1,13 @@
 """Custom message types for Shotgun agents.
 
-This module defines specialized SystemPromptPart subclasses to distinguish
-between different types of system prompts in the agent pipeline.
+This module defines specialized message part subclasses to distinguish
+between different types of prompts in the agent pipeline.
 """
 
 from dataclasses import dataclass, field
+from typing import Literal
 
-from pydantic_ai.messages import SystemPromptPart
+from pydantic_ai.messages import SystemPromptPart, UserPromptPart
 
 from shotgun.agents.models import AgentType
 
@@ -33,3 +34,14 @@ class SystemStatusPrompt(SystemPromptPart):
     """
 
     prompt_type: str = "status"
+
+
+@dataclass
+class InternalPromptPart(UserPromptPart):
+    """User prompt that is system-generated rather than actual user input.
+
+    Used for internal continuation prompts like file resume messages.
+    These should be hidden from the UI but preserved in agent history for context.
+    """
+
+    part_kind: Literal["internal-prompt"] = "internal-prompt"  # type: ignore[assignment]

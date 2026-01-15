@@ -29,7 +29,6 @@ from shotgun.agents.router.tools import (
 )
 from shotgun.agents.router.tools.delegation_tools import (
     delegate_to_export,
-    delegate_to_file_read,
     delegate_to_plan,
     delegate_to_research,
     delegate_to_specification,
@@ -111,7 +110,6 @@ async def create_router_agent(
         Tool(delegate_to_plan, prepare=prepare_delegation_tool),
         Tool(delegate_to_tasks, prepare=prepare_delegation_tool),
         Tool(delegate_to_export, prepare=prepare_delegation_tool),
-        Tool(delegate_to_file_read, prepare=prepare_delegation_tool),
     ]
 
     # Create the agent with delegation tools that have prepare functions

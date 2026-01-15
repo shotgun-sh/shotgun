@@ -79,7 +79,7 @@ from shotgun.utils.source_detection import detect_source
 
 from .conversation.history.compaction import apply_persistent_compaction
 from .export import create_export_agent
-from .messages import AgentSystemPrompt
+from .messages import AgentSystemPrompt, InternalPromptPart
 from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
 from .research import create_research_agent
@@ -1030,6 +1030,13 @@ class AgentManager(Widget):
 
             deduplicated_new_messages.append(msg)
 
+        # Mark file resume prompts as internal (hidden from UI)
+        # When file_contents is provided, the prompt is system-generated, not user input
+        if file_contents:
+            deduplicated_new_messages = self._mark_as_internal_prompts(
+                deduplicated_new_messages
+            )
+
         self.ui_message_history = original_messages + deduplicated_new_messages
 
         # Get file operations early so we can use them for contextual messages
@@ -1045,7 +1052,8 @@ class AgentManager(Widget):
         )
 
         # Check if there are file requests (takes priority over clarifying questions)
-        if agent_response.file_requests:
+        # But ignore file_requests if we just provided file_contents (prevents infinite loops)
+        if agent_response.file_requests and not file_contents:
             logger.info(
                 f"Agent requested {len(agent_response.file_requests)} files to be loaded"
             )
@@ -1078,6 +1086,12 @@ class AgentManager(Widget):
             )
 
             return result
+        elif agent_response.file_requests and file_contents:
+            # We just provided files, ignore any new file_requests to prevent loops
+            logger.debug(
+                "Ignoring file_requests (files were just provided): %s",
+                agent_response.file_requests,
+            )
 
         # Check if there are clarifying questions
         if agent_response.clarifying_questions:
@@ -1608,6 +1622,43 @@ class AgentManager(Widget):
                 file_operations=file_operations,
             )
         )
+
+    def _mark_as_internal_prompts(
+        self,
+        messages: list[ModelRequest | ModelResponse | HintMessage],
+    ) -> list[ModelRequest | ModelResponse | HintMessage]:
+        """Mark UserPromptPart as InternalPromptPart for system-generated prompts.
+
+        Used when file_contents is provided - the resume prompt is system-generated,
+        not actual user input, and should be hidden from the UI.
+
+        Args:
+            messages: List of messages that may contain user prompts to mark as internal
+
+        Returns:
+            List of messages with UserPromptPart converted to InternalPromptPart
+        """
+        result: list[ModelRequest | ModelResponse | HintMessage] = []
+        for msg in messages:
+            if isinstance(msg, ModelRequest):
+                new_parts: list[ModelRequestPart] = []
+                for part in msg.parts:
+                    if isinstance(part, UserPromptPart) and not isinstance(
+                        part, InternalPromptPart
+                    ):
+                        # Convert to InternalPromptPart
+                        new_parts.append(
+                            InternalPromptPart(
+                                content=part.content,
+                                timestamp=part.timestamp,
+                            )
+                        )
+                    else:
+                        new_parts.append(part)
+                result.append(ModelRequest(parts=new_parts))
+            else:
+                result.append(msg)
+        return result
 
     def _filter_system_prompts(
         self, messages: list[ModelMessage | HintMessage]

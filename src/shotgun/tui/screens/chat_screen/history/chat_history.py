@@ -14,6 +14,7 @@ from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widget import Widget
 
+from shotgun.agents.messages import InternalPromptPart
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.vertical_tail import VerticalTail
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessageWidget
@@ -77,14 +78,16 @@ class ChatHistory(Widget):
     def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
         """Filter and yield items for display."""
         for item in self.items:
-            # Skip ModelRequest messages that only contain ToolReturnPart
-            # (these are internal tool results, not user prompts)
+            # Skip ModelRequest messages without visible user content
             if isinstance(item, ModelRequest):
-                has_user_content = any(
-                    isinstance(part, UserPromptPart) for part in item.parts
+                # Check for visible user content (UserPromptPart but NOT InternalPromptPart)
+                has_visible_user_content = any(
+                    isinstance(part, UserPromptPart)
+                    and not isinstance(part, InternalPromptPart)
+                    for part in item.parts
                 )
-                if not has_user_content:
-                    # This is just a tool return, skip displaying it
+                if not has_visible_user_content:
+                    # Skip: either just tool returns or internal system prompts
                     continue
 
             yield item
