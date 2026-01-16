@@ -453,9 +453,10 @@ class TestIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_error_recovery_scenarios(self):
         """Test various error recovery scenarios."""
+        # Note: TimeoutError is handled specially by the timeout wrapper,
+        # so it returns a different message format
         error_scenarios = [
             (ConnectionError("Network unavailable"), "Network unavailable"),
-            (TimeoutError("Request timeout"), "Request timeout"),
             (KeyError("Missing API key"), "Missing API key"),
             (ValueError("Invalid model"), "Invalid model"),
             (RuntimeError("Service unavailable"), "Service unavailable"),
@@ -486,3 +487,30 @@ class TestIntegrationScenarios:
 
                 assert "Error performing web search" in result
                 assert expected_error_text in result
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_handling(self):
+        """Test that timeout errors return a user-friendly message."""
+        mock_model_config = Mock()
+        mock_model_config.api_key = "test-api-key"
+
+        mock_client = Mock()
+        mock_client.responses.create = AsyncMock(side_effect=TimeoutError("timeout"))
+
+        with (
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch(
+                "shotgun.agents.tools.web_search.openai.AsyncOpenAI"
+            ) as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
+        ):
+            mock_get_provider.return_value = mock_model_config
+            mock_openai.return_value = mock_client
+            mock_span = Mock()
+            mock_trace.get_current_span.return_value = mock_span
+
+            result = await openai_web_search_tool("test query")
+
+            assert "timed out" in result

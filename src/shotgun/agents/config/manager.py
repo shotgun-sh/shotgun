@@ -521,7 +521,10 @@ class ConfigManager:
             if provider_enum is None:
                 raise RuntimeError("Provider enum should not be None for LLM providers")
             other_providers = [p for p in ProviderType if p != provider_enum]
-            has_other_keys = any(self.has_provider_key(p) for p in other_providers)
+            has_other_keys = any(
+                self._provider_has_api_key(self._get_provider_config(config, p))
+                for p in other_providers
+            )
             if not has_other_keys:
                 # Set selected_model to this provider's default model
                 from .models import ModelName
