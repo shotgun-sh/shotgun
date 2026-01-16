@@ -28,13 +28,9 @@ from shotgun.cli import (
     compact,
     config,
     context,
-    export,
     feedback,
-    plan,
-    research,
+    run,
     spec,
-    specify,
-    tasks,
     update,
 )
 from shotgun.logging_config import configure_root_logger, get_logger
@@ -89,11 +85,7 @@ app.add_typer(
 app.add_typer(context.app, name="context", help="Analyze conversation context usage")
 app.add_typer(compact.app, name="compact", help="Compact conversation history")
 app.add_typer(clear.app, name="clear", help="Clear conversation history")
-app.add_typer(research.app, name="research", help="Perform research with agentic loops")
-app.add_typer(plan.app, name="plan", help="Generate structured plans")
-app.add_typer(specify.app, name="specify", help="Generate comprehensive specifications")
-app.add_typer(tasks.app, name="tasks", help="Generate task lists with agentic approach")
-app.add_typer(export.app, name="export", help="Export artifacts to various formats")
+app.add_typer(run.app, name="run", help="Run a prompt using the Router agent")
 app.add_typer(update.app, name="update", help="Check for and install updates")
 app.add_typer(feedback.app, name="feedback", help="Send us feedback")
 app.add_typer(spec.app, name="spec", help="Manage shared specifications")
