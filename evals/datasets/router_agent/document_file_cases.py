@@ -1,0 +1,239 @@
+"""
+Router agent test cases for document file handling in both Planning and Drafting modes.
+
+Tests that the Router uses file_requests to load binary document files (PDFs, images)
+when a user asks about specific file paths containing:
+- PRDs (Product Requirement Documents)
+- User stories
+- QA guidelines
+- Specification documents
+- Wireframes and design mockups
+- Screenshots for bug reports
+
+The Router should IMMEDIATELY use file_requests for any binary file path,
+regardless of whether it's in Planning or Drafting mode.
+"""
+
+from evals.models import (
+    AgentType,
+    ExpectedAgentOutput,
+    ShotgunTestCase,
+    TestCaseContext,
+    TestCaseInput,
+)
+
+# Common response patterns that indicate incorrect behavior
+INABILITY_PATTERNS = [
+    "can't tell you",
+    "cannot tell you",
+    "can't access",
+    "cannot access",
+    "don't have access",
+    "no tool",
+    "unable to",
+    "I need access",
+    "need the file",
+    "cannot extract",
+    "can't extract",
+    "I would need",
+]
+
+QUESTION_PATTERNS = [
+    "Before I",
+    "few questions",
+    "clarify",
+    "Could you",
+    "Would you",
+    "Is this file",
+    "What specifically",
+]
+
+RESEARCH_FILE_PATTERNS = [
+    "prior",
+    "previous",
+    "existing research",
+    "inspection notes",
+    "metadata-only",
+]
+
+# All sub-agents that Router should NOT delegate to for direct file access
+ALL_DELEGATIONS = ["research", "specification", "plan", "tasks", "export"]
+
+
+# ============================================================================
+# Planning Mode Cases
+# Tests Router uses file_requests for documents even when in planning mode
+# ============================================================================
+
+PRD_FILE_PLANNING_MODE = ShotgunTestCase(
+    name="prd_file_planning_mode",
+    inputs=TestCaseInput(
+        prompt="I need to understand the requirements in docs/prd.pdf before we start planning",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=True,
+            router_mode="planning",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load the PRD PDF in planning mode",
+    ),
+)
+
+USER_STORIES_FILE_PLANNING_MODE = ShotgunTestCase(
+    name="user_stories_file_planning_mode",
+    inputs=TestCaseInput(
+        prompt="Check the user stories document at requirements/user-stories.pdf",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=True,
+            router_mode="planning",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load user stories document",
+    ),
+)
+
+QA_GUIDELINES_FILE_PLANNING_MODE = ShotgunTestCase(
+    name="qa_guidelines_file_planning_mode",
+    inputs=TestCaseInput(
+        prompt="Review the QA guidelines in docs/qa-checklist.pdf before we plan testing",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=True,
+            router_mode="planning",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load QA guidelines PDF",
+    ),
+)
+
+SPEC_DOC_FILE_PLANNING_MODE = ShotgunTestCase(
+    name="spec_doc_file_planning_mode",
+    inputs=TestCaseInput(
+        prompt="I uploaded the technical specification at specs/api-spec.pdf - what does it say about authentication?",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=True,
+            router_mode="planning",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load specification PDF and answer the question",
+    ),
+)
+
+
+# ============================================================================
+# Drafting Mode Cases
+# Tests Router uses file_requests for documents in drafting mode
+# ============================================================================
+
+PRD_FILE_DRAFTING_MODE = ShotgunTestCase(
+    name="prd_file_drafting_mode",
+    inputs=TestCaseInput(
+        prompt="Look at the PRD in docs/product-requirements.pdf and tell me the main features",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=False,
+            router_mode="drafting",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load the PRD PDF in drafting mode",
+    ),
+)
+
+USER_STORIES_FILE_DRAFTING_MODE = ShotgunTestCase(
+    name="user_stories_file_drafting_mode",
+    inputs=TestCaseInput(
+        prompt="Summarize the user stories from attachments/stories.pdf",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=False,
+            router_mode="drafting",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load user stories PDF",
+    ),
+)
+
+WIREFRAME_IMAGE_DRAFTING_MODE = ShotgunTestCase(
+    name="wireframe_image_drafting_mode",
+    inputs=TestCaseInput(
+        prompt="Describe the wireframe in designs/dashboard-wireframe.png",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=False,
+            router_mode="drafting",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load the wireframe image",
+    ),
+)
+
+SCREENSHOT_FOR_BUG_REPORT = ShotgunTestCase(
+    name="screenshot_for_bug_report",
+    inputs=TestCaseInput(
+        prompt="Here's a screenshot of the bug: screenshots/error-state.png - what's happening here?",
+        agent_type=AgentType.ROUTER,
+        context=TestCaseContext(
+            has_codebase_indexed=False,
+            router_mode="drafting",
+        ),
+    ),
+    expected=ExpectedAgentOutput(
+        max_clarifying_questions=0,
+        disallowed_delegations=ALL_DELEGATIONS,
+        disallowed_tools=["read_file"],
+        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
+        expected_response="Router should use file_requests to load the screenshot and analyze the bug",
+    ),
+)
+
+
+# Export all test cases
+DOCUMENT_FILE_CASES: list[ShotgunTestCase] = [
+    # Planning mode cases
+    PRD_FILE_PLANNING_MODE,
+    USER_STORIES_FILE_PLANNING_MODE,
+    QA_GUIDELINES_FILE_PLANNING_MODE,
+    SPEC_DOC_FILE_PLANNING_MODE,
+    # Drafting mode cases
+    PRD_FILE_DRAFTING_MODE,
+    USER_STORIES_FILE_DRAFTING_MODE,
+    WIREFRAME_IMAGE_DRAFTING_MODE,
+    SCREENSHOT_FOR_BUG_REPORT,
+]

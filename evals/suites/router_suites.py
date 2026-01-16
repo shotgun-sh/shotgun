@@ -108,6 +108,30 @@ router_file_request = EvaluationSuite(
 )
 
 # ============================================================================
+# Document Files Suite
+# Tests Router handles document files (PDFs, images) via file_requests in both modes
+# ============================================================================
+
+router_document_files = EvaluationSuite(
+    name="router_document_files",
+    description="Tests Router handles document files (PDFs, images) via file_requests in both Planning and Drafting modes",
+    test_case_names=[
+        # Planning mode cases
+        "prd_file_planning_mode",
+        "user_stories_file_planning_mode",
+        "qa_guidelines_file_planning_mode",
+        "spec_doc_file_planning_mode",
+        # Drafting mode cases
+        "prd_file_drafting_mode",
+        "user_stories_file_drafting_mode",
+        "wireframe_image_drafting_mode",
+        "screenshot_for_bug_report",
+    ],
+    evaluator_names=["router_delegation"],
+    tags=["file_request", "router", "documents"],
+)
+
+# ============================================================================
 # All Router Tests Suite
 # Runs all Router agent test cases
 # ============================================================================
@@ -139,6 +163,15 @@ router_all = EvaluationSuite(
         "image_file_request_no_questions",
         "pdf_direct_access_no_excuses",
         "pdf_no_research_file_read",
+        # Document file cases (planning and drafting modes)
+        "prd_file_planning_mode",
+        "user_stories_file_planning_mode",
+        "qa_guidelines_file_planning_mode",
+        "spec_doc_file_planning_mode",
+        "prd_file_drafting_mode",
+        "user_stories_file_drafting_mode",
+        "wireframe_image_drafting_mode",
+        "screenshot_for_bug_report",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],
@@ -155,6 +188,7 @@ ROUTER_SUITES: dict[str, EvaluationSuite] = {
     "router_delegation_routing": router_delegation_routing,
     "router_file_write": router_file_write,
     "router_file_request": router_file_request,
+    "router_document_files": router_document_files,
     "router_all": router_all,
 }
 
@@ -165,6 +199,7 @@ __all__ = [
     "router_delegation_routing",
     "router_file_write",
     "router_file_request",
+    "router_document_files",
     "router_all",
     "ROUTER_SUITES",
 ]
