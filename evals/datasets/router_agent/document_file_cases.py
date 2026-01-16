@@ -80,7 +80,9 @@ PRD_FILE_PLANNING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load the PRD PDF in planning mode",
+        expected_response="""The Router should immediately use file_requests to load the PRD PDF file.
+Correct behavior: Set file_requests with the PDF path, provide a brief acknowledgment that it will load and analyze the document.
+Incorrect behavior: Asking clarifying questions about the file, claiming inability to access PDFs, or delegating to Research agent.""",
     ),
 )
 
@@ -99,7 +101,9 @@ USER_STORIES_FILE_PLANNING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load user stories document",
+        expected_response="""The Router should immediately use file_requests to load the user stories PDF.
+Correct behavior: Set file_requests with the PDF path, acknowledge it will review the document.
+Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
     ),
 )
 
@@ -118,7 +122,9 @@ QA_GUIDELINES_FILE_PLANNING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load QA guidelines PDF",
+        expected_response="""The Router should immediately use file_requests to load the QA guidelines PDF.
+Correct behavior: Set file_requests with the PDF path, acknowledge it will review the QA checklist.
+Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
     ),
 )
 
@@ -137,7 +143,9 @@ SPEC_DOC_FILE_PLANNING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load specification PDF and answer the question",
+        expected_response="""The Router should immediately use file_requests to load the technical specification PDF.
+Correct behavior: Set file_requests with the PDF path, acknowledge it will load the spec to answer the authentication question.
+Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
     ),
 )
 
@@ -162,7 +170,9 @@ PRD_FILE_DRAFTING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load the PRD PDF in drafting mode",
+        expected_response="""The Router should immediately use file_requests to load the PRD PDF file.
+Correct behavior: Set file_requests with the PDF path, acknowledge it will load and identify the main features.
+Incorrect behavior: Asking clarifying questions, claiming inability to access PDFs, or delegating to Research agent.""",
     ),
 )
 
@@ -181,7 +191,9 @@ USER_STORIES_FILE_DRAFTING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load user stories PDF",
+        expected_response="""The Router should immediately use file_requests to load the user stories PDF.
+Correct behavior: Set file_requests with the PDF path, acknowledge it will load and summarize the stories.
+Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
     ),
 )
 
@@ -200,7 +212,9 @@ WIREFRAME_IMAGE_DRAFTING_MODE = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load the wireframe image",
+        expected_response="""The Router should immediately use file_requests to load the wireframe image.
+Correct behavior: Set file_requests with the image path, acknowledge it will load and describe the wireframe.
+Incorrect behavior: Asking clarifying questions, claiming inability to view images, or delegating to Research agent.""",
     ),
 )
 
@@ -219,7 +233,9 @@ SCREENSHOT_FOR_BUG_REPORT = ShotgunTestCase(
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
         response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
-        expected_response="Router should use file_requests to load the screenshot and analyze the bug",
+        expected_response="""The Router should immediately use file_requests to load the screenshot image.
+Correct behavior: Set file_requests with the image path, acknowledge it will load and analyze the bug shown.
+Incorrect behavior: Asking clarifying questions, claiming inability to view images, or delegating to Research agent.""",
     ),
 )
 

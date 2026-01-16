@@ -127,7 +127,7 @@ router_document_files = EvaluationSuite(
         "wireframe_image_drafting_mode",
         "screenshot_for_bug_report",
     ],
-    evaluator_names=["router_delegation"],
+    evaluator_names=["router_delegation", "file_requests_judge"],
     tags=["file_request", "router", "documents"],
 )
 
