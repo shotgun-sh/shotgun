@@ -1,6 +1,7 @@
 """Run command for shotgun CLI - executes prompts using the Router agent."""
 
 import asyncio
+import traceback
 from typing import Annotated
 
 import typer
@@ -48,8 +49,6 @@ def run(
         asyncio.run(async_run(prompt, non_interactive, provider))
     except Exception as e:
         logger.error("Error during execution: %s", str(e))
-        import traceback
-
         logger.debug("Full traceback:\n%s", traceback.format_exc())
 
 
