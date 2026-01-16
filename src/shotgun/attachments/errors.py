@@ -27,7 +27,9 @@ def unsupported_file_type(extension: str, supported: str) -> str:
         extension: The file extension (e.g., ".doc" or "(no extension)")
         supported: Comma-separated list of supported extensions
     """
-    return f"{WARNING_PREFIX} Unsupported file type: {extension} (supported: {supported})"
+    return (
+        f"{WARNING_PREFIX} Unsupported file type: {extension} (supported: {supported})"
+    )
 
 
 def cannot_read_file(path: Path | str, reason: str | None = None) -> str:
