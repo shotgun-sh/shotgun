@@ -163,19 +163,33 @@ def _validate_shotgun_path(filename: str) -> Path:
     return full_path
 
 
+# Binary file extensions that should be loaded via file_requests
+BINARY_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
 @register_tool(
     category=ToolCategory.ARTIFACT_MANAGEMENT,
     display_text="Reading file",
     key_arg="filename",
 )
 async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
-    """Read a file from the .shotgun directory.
+    """Read a TEXT file from the .shotgun directory.
+
+    IMPORTANT: This tool is for TEXT files only (.md, .txt, .json, etc.).
+
+    For BINARY files (PDFs, images), DO NOT use this tool. Instead:
+    - Use file_requests in your response to load binary files
+    - Example: {"response": "Let me check that.", "file_requests": ["/path/to/file.pdf"]}
+
+    Binary file extensions that require file_requests instead:
+    - .pdf, .png, .jpg, .jpeg, .gif, .webp
 
     Args:
         filename: Relative path to file within .shotgun directory
 
     Returns:
-        File contents as string
+        File contents as string. For binary files, returns instructions
+        with the absolute path to use in file_requests.
 
     Raises:
         ValueError: If path is outside .shotgun directory
@@ -188,6 +202,22 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
 
         if not await aiofiles.os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {filename}")
+
+        # Check if it's a binary file type (PDF, image)
+        suffix = file_path.suffix.lower()
+        if suffix in BINARY_EXTENSIONS:
+            # Return info for the agent to use file_requests
+            logger.debug(
+                "📎 Binary file detected (%s), returning path for file_requests: %s",
+                suffix,
+                file_path,
+            )
+            return (
+                f"This is a binary file ({suffix}) that cannot be read as text. "
+                f"To view its contents, include the absolute path in your "
+                f"`file_requests` response field:\n\n"
+                f"Absolute path: {file_path}"
+            )
 
         async with aiofiles.open(file_path, encoding="utf-8") as f:
             content = await f.read()

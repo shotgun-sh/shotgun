@@ -184,6 +184,84 @@ class TestReadFile:
             assert "Access denied" in result
 
     @pytest.mark.asyncio
+    async def test_read_pdf_returns_file_request_instruction(self):
+        """Test that reading a PDF returns instructions to use file_requests."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
+            ) as mock_base:
+                shotgun_dir = Path(temp_dir) / ".shotgun"
+                shotgun_dir.mkdir()
+                mock_base.return_value = shotgun_dir
+
+                # Create test PDF file (just binary content for testing)
+                test_file = shotgun_dir / "document.pdf"
+                test_file.write_bytes(b"%PDF-1.4 fake pdf content")
+
+                # Create mock context
+                mock_ctx = MagicMock()
+                mock_ctx.deps = MagicMock()
+
+                result = await read_file(mock_ctx, "document.pdf")
+
+                assert "binary file" in result
+                assert "file_requests" in result
+                assert str(test_file) in result
+
+    @pytest.mark.asyncio
+    async def test_read_image_returns_file_request_instruction(self):
+        """Test that reading an image returns instructions to use file_requests."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
+            ) as mock_base:
+                shotgun_dir = Path(temp_dir) / ".shotgun"
+                shotgun_dir.mkdir()
+                mock_base.return_value = shotgun_dir
+
+                # Create test image file (just binary content for testing)
+                test_file = shotgun_dir / "image.png"
+                test_file.write_bytes(b"\x89PNG\r\n\x1a\n fake png content")
+
+                # Create mock context
+                mock_ctx = MagicMock()
+                mock_ctx.deps = MagicMock()
+
+                result = await read_file(mock_ctx, "image.png")
+
+                assert "binary file" in result
+                assert ".png" in result
+                assert "file_requests" in result
+                assert str(test_file) in result
+
+    @pytest.mark.asyncio
+    async def test_read_all_supported_binary_extensions(self):
+        """Test that all supported binary extensions are handled."""
+        from shotgun.agents.tools.file_management import BINARY_EXTENSIONS
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "shotgun.agents.tools.file_management.get_shotgun_base_path"
+            ) as mock_base:
+                shotgun_dir = Path(temp_dir) / ".shotgun"
+                shotgun_dir.mkdir()
+                mock_base.return_value = shotgun_dir
+
+                # Create mock context
+                mock_ctx = MagicMock()
+                mock_ctx.deps = MagicMock()
+
+                for ext in BINARY_EXTENSIONS:
+                    # Create test file
+                    test_file = shotgun_dir / f"test{ext}"
+                    test_file.write_bytes(b"binary content")
+
+                    result = await read_file(mock_ctx, f"test{ext}")
+
+                    assert "binary file" in result, f"Failed for extension {ext}"
+                    assert "file_requests" in result, f"Failed for extension {ext}"
+
+    @pytest.mark.asyncio
     async def test_permission_error_handling(self):
         """Test handling of permission errors."""
         from unittest.mock import AsyncMock
