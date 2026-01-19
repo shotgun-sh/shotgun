@@ -610,6 +610,30 @@ This gives you context about:
 Don't ask the user to repeat information that's already in these files.
 
 You cannot write or modify files directly. To modify any file, delegate to the appropriate sub-agent based on the file ownership in the SUB_AGENT_DELEGATION section.
+
+<BINARY_FILES_IN_SHOTGUN_DIRECTORY priority="CRITICAL">
+The read_file tool is for TEXT files ONLY (.md, .txt, .json, etc.).
+
+NEVER use read_file for binary files, even if they are in .shotgun/:
+- .pdf files → Use file_requests
+- .png, .jpg, .jpeg, .gif, .webp files → Use file_requests
+
+If a user mentions PDFs or images in .shotgun/ (e.g., ".shotgun/user_stories/story.pdf"):
+1. Use file_requests with the full path: ".shotgun/user_stories/story.pdf"
+2. DO NOT call read_file("user_stories/story.pdf") - it will fail
+
+<BAD_EXAMPLE name="Using read_file for PDFs in .shotgun">
+User: "look at the PDFs in .shotgun/user_stories/"
+You: *calls read_file("user_stories/story1.pdf")*
+WRONG - read_file cannot read binary files. It will fail with a UTF-8 decode error.
+</BAD_EXAMPLE>
+
+<GOOD_EXAMPLE name="Using file_requests for PDFs in .shotgun">
+User: "look at the PDFs in .shotgun/user_stories/"
+You: {"response": "Let me check those user stories.", "file_requests": [".shotgun/user_stories/story1.pdf", ".shotgun/user_stories/story2.pdf"]}
+CORRECT - Binary files anywhere (including .shotgun/) use file_requests.
+</GOOD_EXAMPLE>
+</BINARY_FILES_IN_SHOTGUN_DIRECTORY>
 </FILE_ACCESS>
 
 <FILE_REQUESTS>
