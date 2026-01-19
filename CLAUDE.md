@@ -4,6 +4,26 @@
 
 To understand how to run the evals read evals/README.md
 
+### Writing Eval Test Cases
+
+When adding new eval test cases with judge rubrics:
+
+1. **Default to LLM as a judge** - Unless the behavior being tested is purely deterministic (e.g., specific tool was called, specific field was populated), use the `expected_response` field to provide a rubric for the LLM judge to evaluate against.
+
+2. **Write rubrics that describe correct vs incorrect behavior** - The `expected_response` field should explain:
+   - What the correct behavior looks like
+   - What incorrect behaviors to watch for
+   - Why the distinction matters
+
+3. **Example rubric format:**
+   ```python
+   expected_response="""The Router should immediately use file_requests to load the PDF file.
+   Correct behavior: Set file_requests with the PDF path, provide a brief acknowledgment.
+   Incorrect behavior: Asking clarifying questions, claiming inability to access files, or delegating to another agent."""
+   ```
+
+4. **Use deterministic evaluators for structural checks** - Things like `disallowed_tools`, `disallowed_delegations`, and `response_not_contains` are better as deterministic checks since they have clear pass/fail criteria.
+
 ## Commit Message Convention
 
 This project enforces **Conventional Commits** specification. All commit messages MUST follow this format:

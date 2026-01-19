@@ -12,6 +12,9 @@ when a user asks about specific file paths containing:
 
 The Router should IMMEDIATELY use file_requests for any binary file path,
 regardless of whether it's in Planning or Drafting mode.
+
+These test cases rely primarily on the LLM judge (FileRequestsJudge) to evaluate
+the quality of the Router's response, rather than deterministic text matching.
 """
 
 from evals.models import (
@@ -21,40 +24,6 @@ from evals.models import (
     TestCaseContext,
     TestCaseInput,
 )
-
-# Common response patterns that indicate incorrect behavior
-INABILITY_PATTERNS = [
-    "can't tell you",
-    "cannot tell you",
-    "can't access",
-    "cannot access",
-    "don't have access",
-    "no tool",
-    "unable to",
-    "I need access",
-    "need the file",
-    "cannot extract",
-    "can't extract",
-    "I would need",
-]
-
-QUESTION_PATTERNS = [
-    "Before I",
-    "few questions",
-    "clarify",
-    "Could you",
-    "Would you",
-    "Is this file",
-    "What specifically",
-]
-
-RESEARCH_FILE_PATTERNS = [
-    "prior",
-    "previous",
-    "existing research",
-    "inspection notes",
-    "metadata-only",
-]
 
 # All sub-agents that Router should NOT delegate to for direct file access
 ALL_DELEGATIONS = ["research", "specification", "plan", "tasks", "export"]
@@ -79,7 +48,6 @@ PRD_FILE_PLANNING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the PRD PDF file.
 Correct behavior: Set file_requests with the PDF path, provide a brief acknowledgment that it will load and analyze the document.
 Incorrect behavior: Asking clarifying questions about the file, claiming inability to access PDFs, or delegating to Research agent.""",
@@ -100,7 +68,6 @@ USER_STORIES_FILE_PLANNING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the user stories PDF.
 Correct behavior: Set file_requests with the PDF path, acknowledge it will review the document.
 Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
@@ -121,7 +88,6 @@ QA_GUIDELINES_FILE_PLANNING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the QA guidelines PDF.
 Correct behavior: Set file_requests with the PDF path, acknowledge it will review the QA checklist.
 Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
@@ -142,7 +108,6 @@ SPEC_DOC_FILE_PLANNING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the technical specification PDF.
 Correct behavior: Set file_requests with the PDF path, acknowledge it will load the spec to answer the authentication question.
 Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
@@ -169,7 +134,6 @@ PRD_FILE_DRAFTING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the PRD PDF file.
 Correct behavior: Set file_requests with the PDF path, acknowledge it will load and identify the main features.
 Incorrect behavior: Asking clarifying questions, claiming inability to access PDFs, or delegating to Research agent.""",
@@ -190,7 +154,6 @@ USER_STORIES_FILE_DRAFTING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the user stories PDF.
 Correct behavior: Set file_requests with the PDF path, acknowledge it will load and summarize the stories.
 Incorrect behavior: Asking clarifying questions, claiming inability to access the file, or delegating to Research agent.""",
@@ -211,7 +174,6 @@ WIREFRAME_IMAGE_DRAFTING_MODE = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the wireframe image.
 Correct behavior: Set file_requests with the image path, acknowledge it will load and describe the wireframe.
 Incorrect behavior: Asking clarifying questions, claiming inability to view images, or delegating to Research agent.""",
@@ -232,7 +194,6 @@ SCREENSHOT_FOR_BUG_REPORT = ShotgunTestCase(
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
-        response_not_contains=INABILITY_PATTERNS + QUESTION_PATTERNS,
         expected_response="""The Router should immediately use file_requests to load the screenshot image.
 Correct behavior: Set file_requests with the image path, acknowledge it will load and analyze the bug shown.
 Incorrect behavior: Asking clarifying questions, claiming inability to view images, or delegating to Research agent.""",
