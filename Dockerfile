@@ -3,7 +3,6 @@ FROM python:3.13-slim
 
 # Build arguments for telemetry configuration
 # These are used during the build process to embed analytics keys
-ARG SHOTGUN_SENTRY_DSN=""
 ARG SHOTGUN_POSTHOG_API_KEY=""
 ARG SHOTGUN_POSTHOG_PROJECT_ID=""
 ARG SHOTGUN_LOGFIRE_ENABLED=""
@@ -40,8 +39,7 @@ COPY --chown=shotgun:shotgun docs/README_DOCKER.md ./docs/
 
 # Install dependencies
 # Pass build args as environment variables for the build hook
-RUN SHOTGUN_SENTRY_DSN="${SHOTGUN_SENTRY_DSN}" \
-    SHOTGUN_POSTHOG_API_KEY="${SHOTGUN_POSTHOG_API_KEY}" \
+RUN SHOTGUN_POSTHOG_API_KEY="${SHOTGUN_POSTHOG_API_KEY}" \
     SHOTGUN_POSTHOG_PROJECT_ID="${SHOTGUN_POSTHOG_PROJECT_ID}" \
     SHOTGUN_LOGFIRE_ENABLED="${SHOTGUN_LOGFIRE_ENABLED}" \
     SHOTGUN_LOGFIRE_TOKEN="${SHOTGUN_LOGFIRE_TOKEN}" \

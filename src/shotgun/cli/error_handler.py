@@ -6,12 +6,12 @@ by printing formatted messages to the console.
 
 from rich.console import Console
 
-from shotgun.exceptions import ErrorNotPickedUpBySentry
+from shotgun.exceptions import UserActionableError
 
 console = Console(stderr=True)
 
 
-def print_agent_error(exception: ErrorNotPickedUpBySentry) -> None:
+def print_agent_error(exception: UserActionableError) -> None:
     """Print an agent error to the console in yellow.
 
     Args:

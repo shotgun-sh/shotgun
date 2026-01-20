@@ -1,6 +1,6 @@
 # Observability & Telemetry
 
-Shotgun includes built-in observability with Sentry for error tracking, Logfire for logging and tracing, and PostHog for analytics. All services track users anonymously using a UUID generated on first run.
+Shotgun includes built-in observability with PostHog for analytics and exception tracking, and Logfire for logging and tracing. All services track users anonymously using a UUID generated on first run.
 
 ## Anonymous User Tracking
 
@@ -12,9 +12,8 @@ shotgun config get-user-id
 ```
 
 This ID is automatically included in:
-- **Sentry**: Error reports and exceptions
+- **PostHog**: Analytics, feature usage, and exception tracking
 - **Logfire**: All logs, traces, and spans
-- **PostHog**: Analytics and feature usage
 
 ## Privacy Commitments
 
@@ -38,18 +37,9 @@ export SHOTGUN_LOGFIRE_TOKEN=your-logfire-token
 shotgun research "topic"
 ```
 
-### Sentry Setup
-
-For Sentry error tracking (automatically configured in production builds):
-
-```bash
-# Set for local development (SHOTGUN_ prefix required)
-export SHOTGUN_SENTRY_DSN=your-sentry-dsn
-```
-
 ### PostHog Setup
 
-For PostHog analytics (automatically configured in production builds):
+For PostHog analytics and exception tracking (automatically configured in production builds):
 
 ```bash
 # Set for local development (SHOTGUN_ prefix required)
@@ -176,27 +166,18 @@ GROUP BY attributes->>'version'
 ORDER BY unique_users DESC;
 ```
 
-## Sentry Usage
+## PostHog Usage
 
-### Viewing Errors
+### Exception Tracking
 
-1. Log into Sentry dashboard
-2. Filter by user ID using custom tags
-3. View stack traces and context
-4. Track error trends over time
+PostHog automatically captures exceptions via `enable_exception_autocapture=True`. User-actionable errors (like context size limits, rate limits) are filtered out as they represent expected conditions, not bugs.
 
-### Error Context
-
-Each Sentry error includes:
+Each exception includes:
 - User ID (anonymous UUID)
 - Shotgun version
-- Python version
-- Operating system
-- Command being executed
-- Full stack trace
-- Local variables at error point
-
-## PostHog Usage
+- Environment (production/development)
+- Exception type and message
+- Stack trace
 
 ### Tracked Events
 
@@ -205,7 +186,7 @@ PostHog tracks:
 - Command execution
 - Configuration changes
 - Update checks
-- Errors and exceptions
+- Unknown tool encounters (for debugging)
 
 ### Spec Operations Events
 
@@ -245,6 +226,22 @@ track_event("event_name", {
 })
 ```
 
+### Manual Exception Capture
+
+For exceptions that need to be explicitly captured:
+
+```python
+from shotgun.posthog_telemetry import capture_exception
+
+try:
+    risky_operation()
+except Exception as e:
+    capture_exception(e, properties={"context": "additional info"})
+    raise
+```
+
+Note: `UserActionableError` exceptions are automatically filtered out.
+
 ## Debugging with Telemetry
 
 ### For Users
@@ -254,7 +251,7 @@ If you encounter an issue:
 1. Get your user ID: `shotgun config get-user-id`
 2. Note the time the error occurred
 3. Share your user ID with maintainers
-4. Maintainers can query Logfire/Sentry for your specific logs
+4. Maintainers can query Logfire/PostHog for your specific logs
 
 ### For Maintainers
 
@@ -262,7 +259,7 @@ When debugging user issues:
 
 1. Get user ID from issue report
 2. Query Logfire for logs around reported time
-3. Check Sentry for any exceptions
+3. Check PostHog for any exceptions
 4. Review PostHog for user's recent activity
 5. Analyze patterns across similar users
 
@@ -286,6 +283,5 @@ In production builds (via Hatch):
 ## Additional Resources
 
 - [Logfire Documentation](https://logfire.pydantic.dev/)
-- [Sentry Documentation](https://docs.sentry.io/)
 - [PostHog Documentation](https://posthog.com/docs)
 - [Pydantic Logfire Python SDK](https://logfire.pydantic.dev/docs/integrations/python/)

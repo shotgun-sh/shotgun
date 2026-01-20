@@ -123,7 +123,6 @@ jobs:
             test/unit/test_marketing.py \
             test/unit/test_posthog_telemetry.py \
             test/unit/test_provider.py \
-            test/unit/test_sentry_filtering.py \
             test/unit/test_settings.py \
             test/unit/test_streaming_detection.py \
             test/unit/test_update_checker.py \
@@ -188,7 +187,6 @@ jobs:
           # Require validation for production builds - fail if secrets are missing
           SHOTGUN_BUILD_REQUIRE_VALIDATION: "true"
           # Map GitHub secrets to SHOTGUN_ prefixed environment variables for build
-          SHOTGUN_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SHOTGUN_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           SHOTGUN_POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
           # Logfire configuration for dev builds only
@@ -196,12 +194,11 @@ jobs:
           SHOTGUN_LOGFIRE_ENABLED: ${{ steps.version_update.outputs.is_dev == 'true' && 'true' || '' }}
         run: |
           echo "🔨 Building package version: ${{ steps.version_update.outputs.version }}"
-          if [[ -n "$SHOTGUN_SENTRY_DSN" ]] || [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] || [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]]; then
-            [[ -n "$SHOTGUN_SENTRY_DSN" ]] && echo "✅ Building with Sentry integration enabled"
+          if [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] || [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]]; then
             [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] && echo "✅ Building with PostHog analytics enabled"
             [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]] && echo "✅ Building with Logfire observability enabled (dev build)"
           else
-            echo "⚠️  Building without analytics (Sentry/PostHog/Logfire will use fallback)"
+            echo "⚠️  Building without analytics (PostHog/Logfire will use fallback)"
           fi
           python -m build
 
@@ -420,7 +417,6 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             SHOTGUN_BUILD_REQUIRE_VALIDATION=true
-            SHOTGUN_SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             SHOTGUN_POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
             SHOTGUN_POSTHOG_PROJECT_ID=${{ secrets.POSTHOG_PROJECT_ID }}
             SHOTGUN_LOGFIRE_ENABLED=${{ needs.build-and-package.outputs.is_dev == 'true' && 'true' || '' }}

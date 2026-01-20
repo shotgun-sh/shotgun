@@ -1,34 +1,86 @@
 """PostHog analytics setup for Shotgun."""
 
+import platform
 from enum import StrEnum
 from typing import Any
 
-import posthog
+from posthog import Posthog
 from pydantic import BaseModel
 
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
 from shotgun.agents.conversation import ConversationManager
+from shotgun.exceptions import UserActionableError
 from shotgun.logging_config import get_early_logger
 from shotgun.settings import settings
 
 # Use early logger to prevent automatic StreamHandler creation
 logger = get_early_logger(__name__)
 
-# Global PostHog client instance
-_posthog_client = None
 
-# Cache the shotgun instance ID to avoid async calls during event tracking
+def _get_environment() -> str:
+    """Determine environment from version string.
+
+    Returns:
+        'development' for dev/rc/alpha/beta versions, 'production' otherwise
+    """
+    if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
+        return "development"
+    return "production"
+
+
+# Global PostHog client instance
+_posthog_client: Posthog | None = None
+
+# Cache user context to avoid async calls during event tracking
 _shotgun_instance_id: str | None = None
+_user_context: dict[str, Any] = {}
+
+# Store original exception hook
+_original_excepthook: Any = None
+
+
+def _install_exception_hook() -> None:
+    """Install custom exception hook to capture unhandled exceptions with full context."""
+    import sys
+
+    global _original_excepthook
+
+    # Store original excepthook
+    _original_excepthook = sys.excepthook
+
+    def custom_excepthook(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        exc_traceback: Any,
+    ) -> None:
+        """Custom exception hook that captures exceptions to PostHog."""
+        # Only capture Exception subclasses (not KeyboardInterrupt, SystemExit, etc.)
+        if isinstance(exc_value, Exception):
+            capture_exception(exc_value)
+
+            # Flush PostHog to ensure exception is sent before process exits
+            if _posthog_client is not None:
+                try:
+                    _posthog_client.flush()  # type: ignore[no-untyped-call]
+                except Exception:  # noqa: S110 - intentionally silent during crash
+                    pass
+
+        # Call original excepthook to maintain normal behavior
+        if _original_excepthook is not None:
+            _original_excepthook(exc_type, exc_value, exc_traceback)
+
+    sys.excepthook = custom_excepthook
+    logger.debug("Installed custom exception hook for PostHog")
 
 
 def setup_posthog_observability() -> bool:
-    """Set up PostHog analytics for usage tracking.
+    """Set up PostHog analytics for usage tracking and exception capture.
 
     Returns:
         True if PostHog was successfully set up, False otherwise
     """
-    global _posthog_client, _shotgun_instance_id
+    global _posthog_client, _shotgun_instance_id, _user_context
 
     try:
         # Check if PostHog is already initialized
@@ -46,26 +98,48 @@ def setup_posthog_observability() -> bool:
 
         logger.debug("Using PostHog API key from settings")
 
-        # Determine environment based on version
-        # Dev versions contain "dev", "rc", "alpha", or "beta"
-        if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
-            environment = "development"
-        else:
-            environment = "production"
+        environment = _get_environment()
 
-        # Initialize PostHog client
-        posthog.api_key = api_key
-        posthog.host = "https://us.i.posthog.com"  # Use US cloud instance
+        def on_error(e: Exception, batch: list[dict[str, Any]]) -> None:
+            """Handle PostHog errors."""
+            logger.warning("PostHog error: %s", e)
 
-        # Store the client for later use
-        _posthog_client = posthog
+        # Initialize PostHog client (we use custom exception hook instead of autocapture)
+        _posthog_client = Posthog(
+            project_api_key=api_key,
+            host="https://us.i.posthog.com",
+            on_error=on_error,
+        )
 
-        # Cache the shotgun instance ID for later use (avoids async issues)
+        # Cache user context for later use (avoids async issues in exception capture)
         try:
             import asyncio
 
             config_manager = get_config_manager()
             _shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
+
+            # Load config to get account type and model info
+            config = asyncio.run(config_manager.load())
+
+            # Cache user context for exception tracking
+            is_shotgun_account = config.shotgun.has_valid_account
+            _user_context["account_type"] = "shotgun" if is_shotgun_account else "byok"
+            _user_context["selected_model"] = (
+                config.selected_model.value if config.selected_model else None
+            )
+
+            # Set user properties for tracking
+            _posthog_client.capture(
+                distinct_id=_shotgun_instance_id,
+                event="$identify",
+                properties={
+                    "$set": {
+                        "app_version": __version__,
+                        "environment": environment,
+                        "account_type": _user_context["account_type"],
+                    },
+                },
+            )
 
             logger.debug(
                 "PostHog initialized with shotgun instance ID: %s",
@@ -74,6 +148,9 @@ def setup_posthog_observability() -> bool:
         except Exception as e:
             logger.warning("Failed to load shotgun instance ID: %s", e)
             # Continue anyway - we'll try to get it during event tracking
+
+        # Install custom exception hook to capture unhandled exceptions with full context
+        _install_exception_hook()
 
         logger.debug(
             "PostHog analytics configured successfully (environment: %s, version: %s)",
@@ -112,12 +189,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         if properties is None:
             properties = {}
         properties["version"] = __version__
-
-        # Determine environment
-        if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
-            properties["environment"] = "development"
-        else:
-            properties["environment"] = "production"
+        properties["environment"] = _get_environment()
 
         # Track the event using PostHog's capture method
         _posthog_client.capture(
@@ -128,13 +200,82 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         logger.warning("Failed to track PostHog event '%s': %s", event_name, e)
 
 
+def capture_exception(
+    exception: Exception,
+    properties: dict[str, Any] | None = None,
+) -> None:
+    """Manually capture an exception in PostHog.
+
+    Uses the PostHog SDK's built-in capture_exception method which properly
+    formats the exception with stack traces, fingerprinting, and all required
+    fields for PostHog's Error Tracking system.
+
+    Note: UserActionableError exceptions are filtered out as they represent
+    expected user conditions, not bugs.
+
+    Args:
+        exception: The exception to capture
+        properties: Optional additional properties
+    """
+    global _posthog_client, _shotgun_instance_id
+
+    if _posthog_client is None:
+        logger.debug("PostHog not initialized, skipping exception capture")
+        return
+
+    # Filter out user-actionable errors - these are expected conditions
+    if isinstance(exception, UserActionableError):
+        logger.debug(
+            "Skipping UserActionableError in PostHog exception capture: %s",
+            type(exception).__name__,
+        )
+        return
+
+    try:
+        if _shotgun_instance_id is None:
+            logger.warning(
+                "Shotgun instance ID not available, skipping exception capture"
+            )
+            return
+
+        # Build properties with app/user context
+        event_properties: dict[str, Any] = {
+            # App info
+            "version": __version__,
+            "environment": _get_environment(),
+            # System info
+            "python_version": platform.python_version(),
+            "os": platform.system(),
+            "os_version": platform.release(),
+            # User context
+            "shotgun_instance_id": _shotgun_instance_id,
+            "account_type": _user_context.get("account_type"),
+            "selected_model": _user_context.get("selected_model"),
+        }
+
+        # Add custom properties
+        if properties:
+            event_properties.update(properties)
+
+        # Use the SDK's built-in capture_exception method which properly
+        # formats the exception with stack traces, fingerprinting, etc.
+        _posthog_client.capture_exception(
+            exception,
+            distinct_id=_shotgun_instance_id,
+            properties=event_properties,
+        )
+        logger.debug("Captured exception in PostHog: %s", type(exception).__name__)
+    except Exception as e:
+        logger.warning("Failed to capture exception in PostHog: %s", e)
+
+
 def shutdown() -> None:
     """Shutdown PostHog client and flush any pending events."""
     global _posthog_client
 
     if _posthog_client is not None:
         try:
-            _posthog_client.shutdown()
+            _posthog_client.shutdown()  # type: ignore[no-untyped-call]
             logger.debug("PostHog client shutdown successfully")
         except Exception as e:
             logger.warning("Error shutting down PostHog: %s", e)

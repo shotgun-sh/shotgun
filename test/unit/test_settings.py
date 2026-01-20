@@ -37,7 +37,6 @@ def test_telemetry_settings_defaults():
 
     # Verify settings match what _get_build_constant returns
     # (either empty strings or values from build_constants.py)
-    assert settings.sentry_dsn == _get_build_constant("SENTRY_DSN", "")
     assert settings.posthog_api_key == _get_build_constant("POSTHOG_API_KEY", "")
     assert settings.posthog_project_id == _get_build_constant("POSTHOG_PROJECT_ID", "")
     # logfire_enabled defaults to False if build_constants returns falsy value
@@ -48,7 +47,6 @@ def test_telemetry_settings_defaults():
 
 def test_telemetry_settings_from_env(monkeypatch):
     """Test TelemetrySettings loads from SHOTGUN_ prefixed environment variables."""
-    monkeypatch.setenv("SHOTGUN_SENTRY_DSN", "test-sentry-dsn")
     monkeypatch.setenv("SHOTGUN_POSTHOG_API_KEY", "test-posthog-key")
     monkeypatch.setenv("SHOTGUN_POSTHOG_PROJECT_ID", "test-project-id")
     monkeypatch.setenv("SHOTGUN_LOGFIRE_ENABLED", "true")
@@ -58,7 +56,6 @@ def test_telemetry_settings_from_env(monkeypatch):
 
     settings = TelemetrySettings()
 
-    assert settings.sentry_dsn == "test-sentry-dsn"
     assert settings.posthog_api_key == "test-posthog-key"
     assert settings.posthog_project_id == "test-project-id"
     assert settings.logfire_enabled is True
@@ -225,7 +222,7 @@ def test_main_settings_composition():
 
 def test_main_settings_env_vars(monkeypatch):
     """Test main Settings loads all sub-settings from environment."""
-    monkeypatch.setenv("SHOTGUN_SENTRY_DSN", "main-test-dsn")
+    monkeypatch.setenv("SHOTGUN_POSTHOG_API_KEY", "main-test-key")
     monkeypatch.setenv("SHOTGUN_LOG_LEVEL", "ERROR")
     monkeypatch.setenv("SHOTGUN_WEB_BASE_URL", "https://test.example.com")
     monkeypatch.setenv("SHOTGUN_HOME", "/test/home")
@@ -234,7 +231,7 @@ def test_main_settings_env_vars(monkeypatch):
 
     settings = Settings()
 
-    assert settings.telemetry.sentry_dsn == "main-test-dsn"
+    assert settings.telemetry.posthog_api_key == "main-test-key"
     assert settings.logging.log_level == "ERROR"
     assert settings.api.web_base_url == "https://test.example.com"
     assert settings.dev.home == "/test/home"
@@ -248,7 +245,7 @@ def test_build_constants_integration():
     from shotgun.settings import _get_build_constant
 
     # Test getting a constant (should return empty string from real build_constants)
-    result = _get_build_constant("SENTRY_DSN", "default_value")
+    result = _get_build_constant("POSTHOG_API_KEY", "default_value")
     # Either returns the value from build_constants or the default
     assert isinstance(result, str)
 
@@ -261,10 +258,10 @@ def test_env_vars_override_build_constants(monkeypatch):
     """Test environment variables override build constants."""
     # Mock the build_constants module
     mock_build_constants = MagicMock()
-    mock_build_constants.SENTRY_DSN = "build-sentry-dsn"
+    mock_build_constants.POSTHOG_API_KEY = "build-posthog-key"
 
     # Set environment variable to override
-    monkeypatch.setenv("SHOTGUN_SENTRY_DSN", "env-sentry-dsn")
+    monkeypatch.setenv("SHOTGUN_POSTHOG_API_KEY", "env-posthog-key")
 
     # Ensure settings module is reloaded
     if "shotgun.settings" in sys.modules:
@@ -276,7 +273,7 @@ def test_env_vars_override_build_constants(monkeypatch):
         settings = TelemetrySettings()
 
         # Environment variable should win
-        assert settings.sentry_dsn == "env-sentry-dsn"
+        assert settings.posthog_api_key == "env-posthog-key"
 
 
 def test_build_constants_import_error_handled():
@@ -305,7 +302,7 @@ def test_build_constants_import_error_handled():
         settings = TelemetrySettings()
 
         # Should use defaults
-        assert settings.sentry_dsn == ""
+        assert settings.posthog_api_key == ""
 
 
 def test_settings_singleton_exists():
@@ -324,7 +321,7 @@ def test_settings_dotenv_file_support(tmp_path, monkeypatch):
     # Create a temporary .env file
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "SHOTGUN_SENTRY_DSN=dotenv-sentry-dsn\n"
+        "SHOTGUN_POSTHOG_API_KEY=dotenv-posthog-key\n"
         "SHOTGUN_LOG_LEVEL=WARNING\n"
         "SHOTGUN_PIPX_SIMULATE=true\n"
     )

@@ -35,7 +35,6 @@ from shotgun.cli import (
 )
 from shotgun.logging_config import configure_root_logger, get_logger
 from shotgun.posthog_telemetry import setup_posthog_observability
-from shotgun.sentry_telemetry import setup_sentry_observability
 from shotgun.telemetry import setup_logfire_observability
 from shotgun.tui import app as tui_app
 from shotgun.utils.update_checker import perform_auto_update_async
@@ -62,11 +61,7 @@ try:
 except Exception as e:
     logger.debug("Configuration initialization warning: %s", e)
 
-# Initialize Sentry telemetry
-_sentry_enabled = setup_sentry_observability()
-logger.debug("Sentry observability enabled: %s", _sentry_enabled)
-
-# Initialize PostHog analytics
+# Initialize PostHog analytics (includes exception tracking)
 _posthog_enabled = setup_posthog_observability()
 logger.debug("PostHog analytics enabled: %s", _posthog_enabled)
 
