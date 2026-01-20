@@ -256,12 +256,14 @@ def capture_exception(
                 )
 
         # Build exception list in PostHog format
+        # See: https://posthog.com/docs/error-tracking
         exception_list = [
             {
                 "type": exc_type.__name__,
                 "value": str(exception),
                 "module": exc_type.__module__,
-                "stacktrace": {"frames": stack_frames},
+                "mechanism": {"handled": False, "type": "generic"},
+                "stacktrace": {"type": "raw", "frames": stack_frames},
             }
         ]
 
