@@ -37,7 +37,7 @@ class UserActionableError(Exception):  # noqa: N818
 # ============================================================================
 
 
-class AgentCancelledException(UserActionableError):
+class AgentCancelledException(UserActionableError):  # noqa: N818
     """Raised when user cancels an agent operation."""
 
     def __init__(self) -> None:
@@ -53,7 +53,7 @@ class AgentCancelledException(UserActionableError):
         return "⚠️  Operation cancelled by user"
 
 
-class ContextSizeLimitExceeded(UserActionableError):
+class ContextSizeLimitExceeded(UserActionableError):  # noqa: N818
     """Raised when conversation context exceeds the model's limits.
 
     This is a user-actionable error - they need to either:
@@ -103,7 +103,7 @@ class ContextSizeLimitExceeded(UserActionableError):
 # ============================================================================
 
 
-class ShotgunAccountException(UserActionableError):
+class ShotgunAccountException(UserActionableError):  # noqa: N818
     """Base class for Shotgun Account service errors.
 
     TUI will check isinstance() of this class to show contact email UI.
@@ -216,7 +216,7 @@ class ShotgunRateLimitException(ShotgunAccountException):
 # ============================================================================
 
 
-class BYOKAPIException(UserActionableError):
+class BYOKAPIException(UserActionableError):  # noqa: N818
     """Base class for BYOK API errors.
 
     All BYOK errors suggest using Shotgun Account to avoid the issue.
@@ -313,7 +313,7 @@ class BYOKGenericAPIException(BYOKAPIException):
 # ============================================================================
 
 
-class GenericAPIStatusException(UserActionableError):
+class GenericAPIStatusException(UserActionableError):  # noqa: N818
     """Raised for generic API status errors that don't fit other categories."""
 
     def __init__(self, message: str):
@@ -334,7 +334,7 @@ class GenericAPIStatusException(UserActionableError):
         return f"⚠️  AI service error: {self.api_message}"
 
 
-class UnknownAgentException(UserActionableError):
+class UnknownAgentException(UserActionableError):  # noqa: N818
     """Raised for unknown/unclassified agent errors."""
 
     def __init__(self, original_exception: Exception):

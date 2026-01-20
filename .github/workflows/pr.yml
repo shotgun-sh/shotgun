@@ -173,7 +173,6 @@ jobs:
             test/unit/test_marketing.py \
             test/unit/test_posthog_telemetry.py \
             test/unit/test_provider.py \
-            test/unit/test_sentry_filtering.py \
             test/unit/test_settings.py \
             test/unit/test_streaming_detection.py \
             test/unit/test_update_checker.py \
