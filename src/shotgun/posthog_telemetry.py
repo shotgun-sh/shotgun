@@ -37,6 +37,43 @@ _posthog_client: Posthog | None = None
 _shotgun_instance_id: str | None = None
 _user_context: dict[str, Any] = {}
 
+# Store original exception hook
+_original_excepthook: Any = None
+
+
+def _install_exception_hook() -> None:
+    """Install custom exception hook to capture unhandled exceptions with full context."""
+    import sys
+
+    global _original_excepthook
+
+    # Store original excepthook
+    _original_excepthook = sys.excepthook
+
+    def custom_excepthook(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        exc_traceback: Any,
+    ) -> None:
+        """Custom exception hook that captures exceptions to PostHog."""
+        # Only capture Exception subclasses (not KeyboardInterrupt, SystemExit, etc.)
+        if isinstance(exc_value, Exception):
+            capture_exception(exc_value)
+
+            # Flush PostHog to ensure exception is sent before process exits
+            if _posthog_client is not None:
+                try:
+                    _posthog_client.flush()  # type: ignore[no-untyped-call]
+                except Exception:  # noqa: S110 - intentionally silent during crash
+                    pass
+
+        # Call original excepthook to maintain normal behavior
+        if _original_excepthook is not None:
+            _original_excepthook(exc_type, exc_value, exc_traceback)
+
+    sys.excepthook = custom_excepthook
+    logger.debug("Installed custom exception hook for PostHog")
+
 
 def setup_posthog_observability() -> bool:
     """Set up PostHog analytics for usage tracking and exception capture.
@@ -68,11 +105,10 @@ def setup_posthog_observability() -> bool:
             """Handle PostHog errors."""
             logger.warning("PostHog error: %s", e)
 
-        # Initialize PostHog client with exception autocapture
+        # Initialize PostHog client (we use custom exception hook instead of autocapture)
         _posthog_client = Posthog(
             project_api_key=api_key,
             host="https://us.i.posthog.com",
-            enable_exception_autocapture=True,
             on_error=on_error,
         )
 
@@ -113,6 +149,9 @@ def setup_posthog_observability() -> bool:
         except Exception as e:
             logger.warning("Failed to load shotgun instance ID: %s", e)
             # Continue anyway - we'll try to get it during event tracking
+
+        # Install custom exception hook to capture unhandled exceptions with full context
+        _install_exception_hook()
 
         logger.debug(
             "PostHog analytics configured successfully (environment: %s, version: %s)",

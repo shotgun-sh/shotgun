@@ -84,7 +84,6 @@ def test_setup_posthog_with_build_constants():
                     call_kwargs = mock_posthog_class.call_args[1]
                     assert call_kwargs["project_api_key"] == "test_api_key"
                     assert call_kwargs["host"] == "https://us.i.posthog.com"
-                    assert call_kwargs["enable_exception_autocapture"] is True
 
                     # Verify capture was called with $identify event
                     mock_posthog_instance.capture.assert_called_once()
