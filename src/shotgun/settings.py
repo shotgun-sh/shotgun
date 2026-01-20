@@ -10,8 +10,8 @@ Example usage:
     from shotgun.settings import settings
 
     # Access telemetry settings
-    if settings.telemetry.sentry_dsn:
-        sentry_sdk.init(dsn=settings.telemetry.sentry_dsn)
+    if settings.telemetry.posthog_api_key:
+        posthog.init(api_key=settings.telemetry.posthog_api_key)
 
     # Access logging settings
     logger.setLevel(settings.logging.log_level)
@@ -30,7 +30,7 @@ def _get_build_constant(name: str, default: Any = None) -> Any:
     """Get a value from build_constants.py, falling back to default.
 
     Args:
-        name: The constant name to retrieve (e.g., "SENTRY_DSN")
+        name: The constant name to retrieve (e.g., "POSTHOG_API_KEY")
         default: Default value if constant not found
 
     Returns:
@@ -47,14 +47,10 @@ def _get_build_constant(name: str, default: Any = None) -> Any:
 class TelemetrySettings(BaseSettings):
     """Telemetry and observability settings.
 
-    These settings control error tracking (Sentry), analytics (PostHog),
-    and observability (Logfire) integrations.
+    These settings control analytics (PostHog) and observability (Logfire)
+    integrations. PostHog handles both analytics and exception tracking.
     """
 
-    sentry_dsn: str = Field(
-        default_factory=lambda: _get_build_constant("SENTRY_DSN", ""),
-        description="Sentry DSN for error tracking",
-    )
     posthog_api_key: str = Field(
         default_factory=lambda: _get_build_constant("POSTHOG_API_KEY", ""),
         description="PostHog API key for analytics",
@@ -247,7 +243,6 @@ class Settings(BaseSettings):
         from shotgun.settings import settings
 
         # Telemetry settings
-        settings.telemetry.sentry_dsn
         settings.telemetry.posthog_api_key
         settings.telemetry.logfire_enabled
 

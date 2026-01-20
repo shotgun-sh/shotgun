@@ -1,6 +1,5 @@
 """Tests for PostHog telemetry module."""
 
-import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from shotgun import posthog_telemetry
@@ -28,79 +27,60 @@ def test_setup_posthog_no_api_key():
     posthog_telemetry._posthog_client = None
 
     try:
-        with patch.dict(os.environ, {}, clear=True):
-            # Patch settings.telemetry.posthog_api_key since that's what the code reads
-            with patch.object(
-                posthog_telemetry.settings.telemetry, "posthog_api_key", ""
-            ):
-                # PostHog should not initialize without API key
-                result = posthog_telemetry.setup_posthog_observability()
-                assert result is False
+        with patch.object(
+            posthog_telemetry.settings.telemetry, "posthog_api_key", ""
+        ):
+            # PostHog should not initialize without API key
+            result = posthog_telemetry.setup_posthog_observability()
+            assert result is False
     finally:
         posthog_telemetry._posthog_client = original_client
 
 
 def test_setup_posthog_with_build_constants():
     """Test setup with API key from settings (via build constants or env vars)."""
-    # Reset the global client
+    # Reset the global client and instance ID
     original_client = posthog_telemetry._posthog_client
+    original_instance_id = posthog_telemetry._shotgun_instance_id
     posthog_telemetry._posthog_client = None
+    posthog_telemetry._shotgun_instance_id = None
 
     try:
-        with patch("posthog.api_key", None):
-            with patch("posthog.host", None):
-                with patch("posthog.disabled", True):
-                    with patch("shotgun.posthog_telemetry.settings") as mock_settings:
-                        # Mock the settings to return an API key
-                        mock_settings.telemetry.posthog_api_key = "test_api_key"
+        with patch("shotgun.posthog_telemetry.settings") as mock_settings:
+            # Mock the settings to return an API key
+            mock_settings.telemetry.posthog_api_key = "test_api_key"
 
-                        with patch(
-                            "shotgun.posthog_telemetry.get_config_manager"
-                        ) as mock_get_config:
-                            mock_config = MagicMock()
-                            mock_config.get_shotgun_instance_id = AsyncMock(
-                                return_value="test-shotgun-instance-id"
-                            )
-                            mock_get_config.return_value = mock_config
+            with patch("shotgun.posthog_telemetry.Posthog") as mock_posthog_class:
+                mock_posthog_instance = MagicMock()
+                mock_posthog_class.return_value = mock_posthog_instance
 
-                            result = posthog_telemetry.setup_posthog_observability()
+                with patch(
+                    "shotgun.posthog_telemetry.get_config_manager"
+                ) as mock_get_config:
+                    mock_config = MagicMock()
+                    mock_config.get_shotgun_instance_id = AsyncMock(
+                        return_value="test-shotgun-instance-id"
+                    )
+                    mock_get_config.return_value = mock_config
 
-                            assert result is True
-                            # The global client should be set to posthog module
-                            assert posthog_telemetry._posthog_client is not None
+                    result = posthog_telemetry.setup_posthog_observability()
+
+                    assert result is True
+                    # The global client should be set to the Posthog instance
+                    assert posthog_telemetry._posthog_client is not None
+
+                    # Verify Posthog class was instantiated with correct args
+                    mock_posthog_class.assert_called_once()
+                    call_kwargs = mock_posthog_class.call_args[1]
+                    assert call_kwargs["project_api_key"] == "test_api_key"
+                    assert call_kwargs["host"] == "https://us.i.posthog.com"
+                    assert call_kwargs["enable_exception_autocapture"] is True
+
+                    # Verify capture was called with $identify event
+                    mock_posthog_instance.capture.assert_called_once()
     finally:
         posthog_telemetry._posthog_client = original_client
-
-
-def test_setup_posthog_with_env_vars():
-    """Test setup with API key from environment variables via settings."""
-    # Reset the global client
-    original_client = posthog_telemetry._posthog_client
-    posthog_telemetry._posthog_client = None
-
-    try:
-        with patch("posthog.api_key", None):
-            with patch("posthog.host", None):
-                with patch("posthog.disabled", True):
-                    with patch("shotgun.posthog_telemetry.settings") as mock_settings:
-                        # Mock the settings to return an API key from env
-                        mock_settings.telemetry.posthog_api_key = "env_api_key"
-
-                        with patch(
-                            "shotgun.posthog_telemetry.get_config_manager"
-                        ) as mock_get_config:
-                            mock_config = MagicMock()
-                            mock_config.get_shotgun_instance_id = AsyncMock(
-                                return_value="test-shotgun-instance-id"
-                            )
-                            mock_get_config.return_value = mock_config
-
-                            result = posthog_telemetry.setup_posthog_observability()
-
-                            assert result is True
-                            assert posthog_telemetry._posthog_client is not None
-    finally:
-        posthog_telemetry._posthog_client = original_client
+        posthog_telemetry._shotgun_instance_id = original_instance_id
 
 
 def test_track_event_not_initialized():
@@ -119,54 +99,46 @@ def test_track_event_initialized():
     """Test tracking events when PostHog is initialized."""
     mock_client = MagicMock()
     original_client = posthog_telemetry._posthog_client
+    original_instance_id = posthog_telemetry._shotgun_instance_id
     posthog_telemetry._posthog_client = mock_client
+    posthog_telemetry._shotgun_instance_id = "test-shotgun-instance-id"
 
     try:
-        with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
-            mock_config = MagicMock()
-            mock_config.get_shotgun_instance_id = AsyncMock(
-                return_value="test-shotgun-instance-id"
+        with patch("shotgun.posthog_telemetry.__version__", "1.0.0"):
+            posthog_telemetry.track_event("test_event", {"custom": "property"})
+
+            mock_client.capture.assert_called_once_with(
+                distinct_id="test-shotgun-instance-id",
+                event="test_event",
+                properties={
+                    "custom": "property",
+                    "version": "1.0.0",
+                    "environment": "production",
+                },
             )
-            mock_get_config.return_value = mock_config
-
-            with patch("shotgun.posthog_telemetry.__version__", "1.0.0"):
-                posthog_telemetry.track_event("test_event", {"custom": "property"})
-
-                mock_client.capture.assert_called_once_with(
-                    distinct_id="test-shotgun-instance-id",
-                    event="test_event",
-                    properties={
-                        "custom": "property",
-                        "version": "1.0.0",
-                        "environment": "production",
-                    },
-                )
     finally:
         posthog_telemetry._posthog_client = original_client
+        posthog_telemetry._shotgun_instance_id = original_instance_id
 
 
 def test_track_event_dev_version():
     """Test that dev versions are marked with development environment."""
     mock_client = MagicMock()
     original_client = posthog_telemetry._posthog_client
+    original_instance_id = posthog_telemetry._shotgun_instance_id
     posthog_telemetry._posthog_client = mock_client
+    posthog_telemetry._shotgun_instance_id = "test-shotgun-instance-id"
 
     try:
-        with patch("shotgun.posthog_telemetry.get_config_manager") as mock_get_config:
-            mock_config = MagicMock()
-            mock_config.get_shotgun_instance_id = AsyncMock(
-                return_value="test-shotgun-instance-id"
-            )
-            mock_get_config.return_value = mock_config
+        with patch("shotgun.posthog_telemetry.__version__", "1.0.0.dev1"):
+            posthog_telemetry.track_event("test_event", None)
 
-            with patch("shotgun.posthog_telemetry.__version__", "1.0.0.dev1"):
-                posthog_telemetry.track_event("test_event", None)
-
-                mock_client.capture.assert_called_once()
-                call_args = mock_client.capture.call_args[1]
-                assert call_args["properties"]["environment"] == "development"
+            mock_client.capture.assert_called_once()
+            call_args = mock_client.capture.call_args[1]
+            assert call_args["properties"]["environment"] == "development"
     finally:
         posthog_telemetry._posthog_client = original_client
+        posthog_telemetry._shotgun_instance_id = original_instance_id
 
 
 def test_track_event_exception_handling():
@@ -174,17 +146,75 @@ def test_track_event_exception_handling():
     mock_client = MagicMock()
     mock_client.capture.side_effect = Exception("Network error")
     original_client = posthog_telemetry._posthog_client
+    original_instance_id = posthog_telemetry._shotgun_instance_id
     posthog_telemetry._posthog_client = mock_client
+    posthog_telemetry._shotgun_instance_id = "test-shotgun-instance-id"
 
     try:
-        with patch(
-            "shotgun.posthog_telemetry.get_config_manager",
-            side_effect=Exception("Config error"),
-        ):
-            # Should not raise exception
-            posthog_telemetry.track_event("test_event", {})
+        # Should not raise exception
+        posthog_telemetry.track_event("test_event", {})
     finally:
         posthog_telemetry._posthog_client = original_client
+        posthog_telemetry._shotgun_instance_id = original_instance_id
+
+
+def test_capture_exception_not_initialized():
+    """Test that capture_exception does nothing when PostHog is not initialized."""
+    original_client = posthog_telemetry._posthog_client
+    posthog_telemetry._posthog_client = None
+
+    try:
+        # Should not raise any exception
+        posthog_telemetry.capture_exception(ValueError("test error"))
+    finally:
+        posthog_telemetry._posthog_client = original_client
+
+
+def test_capture_exception_filters_user_actionable_errors():
+    """Test that capture_exception filters out UserActionableError exceptions."""
+    from shotgun.exceptions import UserActionableError
+
+    mock_client = MagicMock()
+    original_client = posthog_telemetry._posthog_client
+    original_instance_id = posthog_telemetry._shotgun_instance_id
+    posthog_telemetry._posthog_client = mock_client
+    posthog_telemetry._shotgun_instance_id = "test-shotgun-instance-id"
+
+    try:
+        # UserActionableError should be filtered out
+        posthog_telemetry.capture_exception(UserActionableError("test error"))
+
+        # capture should NOT have been called
+        mock_client.capture.assert_not_called()
+    finally:
+        posthog_telemetry._posthog_client = original_client
+        posthog_telemetry._shotgun_instance_id = original_instance_id
+
+
+def test_capture_exception_sends_regular_exceptions():
+    """Test that capture_exception sends regular exceptions."""
+    mock_client = MagicMock()
+    original_client = posthog_telemetry._posthog_client
+    original_instance_id = posthog_telemetry._shotgun_instance_id
+    posthog_telemetry._posthog_client = mock_client
+    posthog_telemetry._shotgun_instance_id = "test-shotgun-instance-id"
+
+    try:
+        with patch("shotgun.posthog_telemetry.__version__", "1.0.0"):
+            posthog_telemetry.capture_exception(
+                ValueError("test error"), properties={"extra": "data"}
+            )
+
+            mock_client.capture.assert_called_once()
+            call_args = mock_client.capture.call_args[1]
+            assert call_args["distinct_id"] == "test-shotgun-instance-id"
+            assert call_args["event"] == "$exception"
+            assert call_args["properties"]["$exception_type"] == "ValueError"
+            assert call_args["properties"]["$exception_message"] == "test error"
+            assert call_args["properties"]["extra"] == "data"
+    finally:
+        posthog_telemetry._posthog_client = original_client
+        posthog_telemetry._shotgun_instance_id = original_instance_id
 
 
 def test_shutdown_not_initialized():

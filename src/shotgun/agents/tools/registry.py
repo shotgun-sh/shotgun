@@ -12,10 +12,10 @@ from collections.abc import Callable
 from enum import StrEnum
 from typing import TypeVar, overload
 
-import sentry_sdk
 from pydantic import BaseModel
 
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 
 logger = get_logger(__name__)
 
@@ -166,7 +166,7 @@ tool_category = register_tool
 
 
 def get_tool_category(tool_name: str) -> ToolCategory:
-    """Get category for a tool, logging unknown tools to Sentry.
+    """Get category for a tool, logging unknown tools to telemetry.
 
     Args:
         tool_name: Name of the tool to look up
@@ -178,10 +178,9 @@ def get_tool_category(tool_name: str) -> ToolCategory:
 
     if category is None:
         logger.warning(f"Unknown tool encountered in context analysis: {tool_name}")
-        sentry_sdk.capture_message(
-            f"Unknown tool in context analysis: {tool_name}",
-            level="warning",
-            extras={"tool_name": tool_name},
+        track_event(
+            "unknown_tool_encountered",
+            properties={"tool_name": tool_name},
         )
         return ToolCategory.UNKNOWN
 

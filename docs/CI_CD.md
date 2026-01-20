@@ -218,10 +218,9 @@ Automated on main branch pushes and tags:
 The following secrets must be configured in GitHub repository settings:
 
 - `PYPI_API_TOKEN` - For PyPI publishing
-- `SHOTGUN_SENTRY_DSN` - Sentry error tracking (embedded at build time)
 - `SHOTGUN_LOGFIRE_TOKEN` - Logfire logging (embedded at build time)
-- `SHOTGUN_POSTHOG_API_KEY` - PostHog analytics (embedded at build time)
-- `SHOTGUN_POSTHOG_PROJECT_ID` - PostHog project ID (embedded at build time)
+- `POSTHOG_API_KEY` - PostHog analytics and exception tracking (embedded at build time)
+- `POSTHOG_PROJECT_ID` - PostHog project ID (embedded at build time)
 - `SHOTGUN_ALPHA_WEBHOOK` - Slack webhook URL for notifications (deployments, issues, test failures)
 - `AUTO_ASSIGN_TO_USER` - GitHub username to auto-assign new issues to (optional)
 

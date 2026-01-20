@@ -79,8 +79,8 @@ from shotgun.codebase.models import IndexProgress, ProgressPhase
 from shotgun.exceptions import (
     SHOTGUN_CONTACT_EMAIL,
     AgentCancelledException,
-    ErrorNotPickedUpBySentry,
     ShotgunAccountException,
+    UserActionableError,
 )
 from shotgun.posthog_telemetry import track_event
 from shotgun.sdk.codebase import CodebaseSDK
@@ -1997,7 +1997,7 @@ class ChatScreen(Screen[None]):
                 self.deps.is_executing = False
                 self.deps.active_sub_agent = None
             self.mount_hint(e.to_markdown())
-        except ErrorNotPickedUpBySentry as e:
+        except UserActionableError as e:
             # All other user-actionable errors - display with markdown
             self.mount_hint(e.to_markdown())
         except Exception as e:

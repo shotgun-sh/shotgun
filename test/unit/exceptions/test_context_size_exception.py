@@ -1,19 +1,19 @@
 """Unit tests for context size exception classes."""
 
-from shotgun.exceptions import ContextSizeLimitExceeded, ErrorNotPickedUpBySentry
+from shotgun.exceptions import ContextSizeLimitExceeded, UserActionableError
 
 
-def test_error_not_picked_up_by_sentry_is_exception():
-    """ErrorNotPickedUpBySentry should be an Exception."""
-    error = ErrorNotPickedUpBySentry("test message")
+def test_user_actionable_error_is_exception():
+    """UserActionableError should be an Exception."""
+    error = UserActionableError("test message")
     assert isinstance(error, Exception)
     assert str(error) == "test message"
 
 
 def test_context_size_limit_exceeded_inheritance():
-    """ContextSizeLimitExceeded should inherit from ErrorNotPickedUpBySentry."""
+    """ContextSizeLimitExceeded should inherit from UserActionableError."""
     error = ContextSizeLimitExceeded(model_name="test-model", max_tokens=1000)
-    assert isinstance(error, ErrorNotPickedUpBySentry)
+    assert isinstance(error, UserActionableError)
     assert isinstance(error, Exception)
 
 

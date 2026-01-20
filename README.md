@@ -372,7 +372,7 @@ We had to implement payments. Cursor, Claude Code, and Copilot all suggested bui
 
 **Q: Does Shotgun collect any stats or data?**
 
-A: We only gather minimal, anonymous events (e.g., install, server start, tool call). We don't collect the content itself—only that an event occurred. We use Sentry for error reporting to improve stability.
+A: We only gather minimal, anonymous events (e.g., install, server start, tool call). We don't collect the content itself—only that an event occurred. We use PostHog for analytics and error reporting to improve stability.
 
 **Q: Does my code leave my computer when indexing?**
 

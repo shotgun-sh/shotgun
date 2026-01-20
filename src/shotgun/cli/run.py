@@ -14,7 +14,7 @@ from shotgun.agents.router import (
     run_router_agent,
 )
 from shotgun.cli.error_handler import print_agent_error
-from shotgun.exceptions import ErrorNotPickedUpBySentry
+from shotgun.exceptions import UserActionableError
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 
@@ -83,7 +83,7 @@ async def async_run(
         print("Complete!")
         print("Response:")
         print(result.output)
-    except ErrorNotPickedUpBySentry as e:
+    except UserActionableError as e:
         print_agent_error(e)
     except Exception as e:
         logger.exception("Unexpected error in run command")

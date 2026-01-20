@@ -7,8 +7,8 @@ SHOTGUN_SIGNUP_URL = "https://shotgun.sh"
 SHOTGUN_CONTACT_EMAIL = "contact@shotgun.sh"
 
 
-class ErrorNotPickedUpBySentry(Exception):  # noqa: N818
-    """Base for user-actionable errors that shouldn't be sent to Sentry.
+class UserActionableError(Exception):  # noqa: N818
+    """Base for user-actionable errors that shouldn't be sent to telemetry.
 
     These errors represent expected user conditions requiring action
     rather than bugs that need tracking.
@@ -37,7 +37,7 @@ class ErrorNotPickedUpBySentry(Exception):  # noqa: N818
 # ============================================================================
 
 
-class AgentCancelledException(ErrorNotPickedUpBySentry):
+class AgentCancelledException(UserActionableError):
     """Raised when user cancels an agent operation."""
 
     def __init__(self) -> None:
@@ -53,7 +53,7 @@ class AgentCancelledException(ErrorNotPickedUpBySentry):
         return "⚠️  Operation cancelled by user"
 
 
-class ContextSizeLimitExceeded(ErrorNotPickedUpBySentry):
+class ContextSizeLimitExceeded(UserActionableError):
     """Raised when conversation context exceeds the model's limits.
 
     This is a user-actionable error - they need to either:
@@ -103,7 +103,7 @@ class ContextSizeLimitExceeded(ErrorNotPickedUpBySentry):
 # ============================================================================
 
 
-class ShotgunAccountException(ErrorNotPickedUpBySentry):
+class ShotgunAccountException(UserActionableError):
     """Base class for Shotgun Account service errors.
 
     TUI will check isinstance() of this class to show contact email UI.
@@ -216,7 +216,7 @@ class ShotgunRateLimitException(ShotgunAccountException):
 # ============================================================================
 
 
-class BYOKAPIException(ErrorNotPickedUpBySentry):
+class BYOKAPIException(UserActionableError):
     """Base class for BYOK API errors.
 
     All BYOK errors suggest using Shotgun Account to avoid the issue.
@@ -313,7 +313,7 @@ class BYOKGenericAPIException(BYOKAPIException):
 # ============================================================================
 
 
-class GenericAPIStatusException(ErrorNotPickedUpBySentry):
+class GenericAPIStatusException(UserActionableError):
     """Raised for generic API status errors that don't fit other categories."""
 
     def __init__(self, message: str):
@@ -334,7 +334,7 @@ class GenericAPIStatusException(ErrorNotPickedUpBySentry):
         return f"⚠️  AI service error: {self.api_message}"
 
 
-class UnknownAgentException(ErrorNotPickedUpBySentry):
+class UnknownAgentException(UserActionableError):
     """Raised for unknown/unclassified agent errors."""
 
     def __init__(self, original_exception: Exception):

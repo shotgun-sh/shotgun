@@ -253,11 +253,11 @@ def test_run_command_agent_error(mock_router_agent):
 
 def test_run_command_user_actionable_error(mock_router_agent):
     """Test run command handles user-actionable errors properly."""
-    from shotgun.exceptions import ErrorNotPickedUpBySentry
+    from shotgun.exceptions import UserActionableError
 
     mock_agent, mock_deps = mock_router_agent
 
-    class TestError(ErrorNotPickedUpBySentry):
+    class TestError(UserActionableError):
         def to_plain_text(self) -> str:
             return "Test user error message"
 
@@ -280,5 +280,5 @@ def test_run_command_user_actionable_error(mock_router_agent):
     # User-actionable errors should be passed to print_agent_error
     mock_print_error.assert_called_once()
     called_exception = mock_print_error.call_args[0][0]
-    assert isinstance(called_exception, ErrorNotPickedUpBySentry)
+    assert isinstance(called_exception, UserActionableError)
     assert called_exception.to_plain_text() == "Test user error message"

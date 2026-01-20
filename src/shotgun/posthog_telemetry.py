@@ -3,12 +3,13 @@
 from enum import StrEnum
 from typing import Any
 
-import posthog
+from posthog import Posthog
 from pydantic import BaseModel
 
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
 from shotgun.agents.conversation import ConversationManager
+from shotgun.exceptions import UserActionableError
 from shotgun.logging_config import get_early_logger
 from shotgun.settings import settings
 
@@ -16,14 +17,14 @@ from shotgun.settings import settings
 logger = get_early_logger(__name__)
 
 # Global PostHog client instance
-_posthog_client = None
+_posthog_client: Posthog | None = None
 
 # Cache the shotgun instance ID to avoid async calls during event tracking
 _shotgun_instance_id: str | None = None
 
 
 def setup_posthog_observability() -> bool:
-    """Set up PostHog analytics for usage tracking.
+    """Set up PostHog analytics for usage tracking and exception capture.
 
     Returns:
         True if PostHog was successfully set up, False otherwise
@@ -53,12 +54,17 @@ def setup_posthog_observability() -> bool:
         else:
             environment = "production"
 
-        # Initialize PostHog client
-        posthog.api_key = api_key
-        posthog.host = "https://us.i.posthog.com"  # Use US cloud instance
+        def on_error(e: Exception, batch: list[dict[str, Any]]) -> None:
+            """Handle PostHog errors."""
+            logger.warning("PostHog error: %s", e)
 
-        # Store the client for later use
-        _posthog_client = posthog
+        # Initialize PostHog client with exception autocapture
+        _posthog_client = Posthog(
+            project_api_key=api_key,
+            host="https://us.i.posthog.com",
+            enable_exception_autocapture=True,
+            on_error=on_error,
+        )
 
         # Cache the shotgun instance ID for later use (avoids async issues)
         try:
@@ -66,6 +72,18 @@ def setup_posthog_observability() -> bool:
 
             config_manager = get_config_manager()
             _shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
+
+            # Set user properties for tracking
+            _posthog_client.capture(
+                distinct_id=_shotgun_instance_id,
+                event="$identify",
+                properties={
+                    "$set": {
+                        "app_version": __version__,
+                        "environment": environment,
+                    },
+                },
+            )
 
             logger.debug(
                 "PostHog initialized with shotgun instance ID: %s",
@@ -128,13 +146,78 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         logger.warning("Failed to track PostHog event '%s': %s", event_name, e)
 
 
+def capture_exception(
+    exception: Exception,
+    properties: dict[str, Any] | None = None,
+) -> None:
+    """Manually capture an exception in PostHog.
+
+    This is used for reporting exceptions that should be tracked but may not
+    be caught by automatic exception capture.
+
+    Note: UserActionableError exceptions are filtered out as they represent
+    expected user conditions, not bugs.
+
+    Args:
+        exception: The exception to capture
+        properties: Optional additional properties
+    """
+    global _posthog_client, _shotgun_instance_id
+
+    if _posthog_client is None:
+        logger.debug("PostHog not initialized, skipping exception capture")
+        return
+
+    # Filter out user-actionable errors - these are expected conditions
+    if isinstance(exception, UserActionableError):
+        logger.debug(
+            "Skipping UserActionableError in PostHog exception capture: %s",
+            type(exception).__name__,
+        )
+        return
+
+    try:
+        if _shotgun_instance_id is None:
+            logger.warning(
+                "Shotgun instance ID not available, skipping exception capture"
+            )
+            return
+
+        # Build exception properties
+        event_properties: dict[str, Any] = {
+            "version": __version__,
+            "$exception_type": type(exception).__name__,
+            "$exception_message": str(exception),
+        }
+
+        # Determine environment
+        if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
+            event_properties["environment"] = "development"
+        else:
+            event_properties["environment"] = "production"
+
+        # Add custom properties
+        if properties:
+            event_properties.update(properties)
+
+        # Track as exception event
+        _posthog_client.capture(
+            distinct_id=_shotgun_instance_id,
+            event="$exception",
+            properties=event_properties,
+        )
+        logger.debug("Captured exception in PostHog: %s", type(exception).__name__)
+    except Exception as e:
+        logger.warning("Failed to capture exception in PostHog: %s", e)
+
+
 def shutdown() -> None:
     """Shutdown PostHog client and flush any pending events."""
     global _posthog_client
 
     if _posthog_client is not None:
         try:
-            _posthog_client.shutdown()
+            _posthog_client.shutdown()  # type: ignore[no-untyped-call]
             logger.debug("PostHog client shutdown successfully")
         except Exception as e:
             logger.warning("Error shutting down PostHog: %s", e)

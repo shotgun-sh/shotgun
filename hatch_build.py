@@ -72,16 +72,6 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
                 "ℹ️  Build validation required (SHOTGUN_BUILD_REQUIRE_VALIDATION=true)"
             )
 
-        # Get Sentry configuration from environment (SHOTGUN_ prefix for production builds)
-        sentry_dsn = os.environ.get("SHOTGUN_SENTRY_DSN", "")
-
-        # Validate that Sentry DSN is present for all builds (unless skipped)
-        if not skip_validation and not sentry_dsn:
-            raise ValueError(
-                "❌ SHOTGUN_SENTRY_DSN is required for builds but not found in environment. "
-                "Ensure the GitHub secret SENTRY_DSN is set and passed to the build."
-            )
-
         # Get PostHog configuration from environment (SHOTGUN_ prefix)
         posthog_api_key = os.environ.get("SHOTGUN_POSTHOG_API_KEY", "")
         posthog_project_id = os.environ.get("SHOTGUN_POSTHOG_PROJECT_ID", "")
@@ -114,9 +104,6 @@ This file is auto-generated during the build process.
 DO NOT EDIT MANUALLY.
 """
 
-# Sentry DSN embedded at build time (empty string if not provided)
-SENTRY_DSN = {repr(sentry_dsn)}
-
 # PostHog configuration embedded at build time (empty strings if not provided)
 POSTHOG_API_KEY = {repr(posthog_api_key)}
 POSTHOG_PROJECT_ID = {repr(posthog_project_id)}
@@ -126,7 +113,7 @@ LOGFIRE_ENABLED = {repr(logfire_enabled)}
 LOGFIRE_TOKEN = {repr(logfire_token)}
 
 # Build metadata
-BUILD_TIME_ENV = "production" if SENTRY_DSN else "development"
+BUILD_TIME_ENV = "production" if POSTHOG_API_KEY else "development"
 IS_DEV_BUILD = {repr(is_dev_build)}
 '''
 
@@ -139,8 +126,6 @@ IS_DEV_BUILD = {repr(is_dev_build)}
 
         # Log the build hook execution
         features = []
-        if sentry_dsn:
-            features.append("Sentry")
         if posthog_api_key:
             features.append("PostHog")
         if logfire_enabled and logfire_token:
