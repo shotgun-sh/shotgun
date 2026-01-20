@@ -1,7 +1,6 @@
 """PostHog analytics setup for Shotgun."""
 
 import platform
-import traceback
 from enum import StrEnum
 from typing import Any
 
@@ -207,8 +206,9 @@ def capture_exception(
 ) -> None:
     """Manually capture an exception in PostHog.
 
-    This is used for reporting exceptions that should be tracked but may not
-    be caught by automatic exception capture.
+    Uses the PostHog SDK's built-in capture_exception method which properly
+    formats the exception with stack traces, fingerprinting, and all required
+    fields for PostHog's Error Tracking system.
 
     Note: UserActionableError exceptions are filtered out as they represent
     expected user conditions, not bugs.
@@ -238,39 +238,8 @@ def capture_exception(
             )
             return
 
-        # Get exception info and format stack trace
-        exc_type = type(exception)
-        exc_tb = exception.__traceback__
-
-        # Format stack frames for PostHog
-        stack_frames = []
-        if exc_tb:
-            for frame_info in traceback.extract_tb(exc_tb):
-                stack_frames.append(
-                    {
-                        "filename": frame_info.filename,
-                        "lineno": frame_info.lineno,
-                        "function": frame_info.name,
-                        "context_line": frame_info.line or "",
-                    }
-                )
-
-        # Build exception list in PostHog format
-        # See: https://posthog.com/docs/error-tracking
-        exception_list = [
-            {
-                "type": exc_type.__name__,
-                "value": str(exception),
-                "module": exc_type.__module__,
-                "mechanism": {"handled": False, "type": "generic"},
-                "stacktrace": {"type": "raw", "frames": stack_frames},
-            }
-        ]
-
-        # Build exception properties
+        # Build properties with app/user context
         event_properties: dict[str, Any] = {
-            # Required by PostHog Cymbal error processor
-            "$platform": "python",
             # App info
             "version": __version__,
             "environment": _get_environment(),
@@ -282,23 +251,20 @@ def capture_exception(
             "shotgun_instance_id": _shotgun_instance_id,
             "account_type": _user_context.get("account_type"),
             "selected_model": _user_context.get("selected_model"),
-            # Exception details
-            "$exception_type": exc_type.__name__,
-            "$exception_message": str(exception),
-            "$exception_list": exception_list,
         }
 
         # Add custom properties
         if properties:
             event_properties.update(properties)
 
-        # Track as exception event
-        _posthog_client.capture(
+        # Use the SDK's built-in capture_exception method which properly
+        # formats the exception with stack traces, fingerprinting, etc.
+        _posthog_client.capture_exception(
+            exception,
             distinct_id=_shotgun_instance_id,
-            event="$exception",
             properties=event_properties,
         )
-        logger.debug("Captured exception in PostHog: %s", exc_type.__name__)
+        logger.debug("Captured exception in PostHog: %s", type(exception).__name__)
     except Exception as e:
         logger.warning("Failed to capture exception in PostHog: %s", e)
 

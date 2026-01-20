@@ -194,15 +194,15 @@ def test_capture_exception_filters_user_actionable_errors():
         # UserActionableError should be filtered out
         posthog_telemetry.capture_exception(UserActionableError("test error"))
 
-        # capture should NOT have been called
-        mock_client.capture.assert_not_called()
+        # capture_exception should NOT have been called
+        mock_client.capture_exception.assert_not_called()
     finally:
         posthog_telemetry._posthog_client = original_client
         posthog_telemetry._shotgun_instance_id = original_instance_id
 
 
 def test_capture_exception_sends_regular_exceptions():
-    """Test that capture_exception sends regular exceptions."""
+    """Test that capture_exception sends regular exceptions using the SDK method."""
     mock_client = MagicMock()
     original_client = posthog_telemetry._posthog_client
     original_instance_id = posthog_telemetry._shotgun_instance_id
@@ -211,17 +211,20 @@ def test_capture_exception_sends_regular_exceptions():
 
     try:
         with patch("shotgun.posthog_telemetry.__version__", "1.0.0"):
+            test_exception = ValueError("test error")
             posthog_telemetry.capture_exception(
-                ValueError("test error"), properties={"extra": "data"}
+                test_exception, properties={"extra": "data"}
             )
 
-            mock_client.capture.assert_called_once()
-            call_args = mock_client.capture.call_args[1]
-            assert call_args["distinct_id"] == "test-shotgun-instance-id"
-            assert call_args["event"] == "$exception"
-            assert call_args["properties"]["$exception_type"] == "ValueError"
-            assert call_args["properties"]["$exception_message"] == "test error"
-            assert call_args["properties"]["extra"] == "data"
+            # Now uses SDK's capture_exception method
+            mock_client.capture_exception.assert_called_once()
+            call_args = mock_client.capture_exception.call_args
+            # First positional arg is the exception
+            assert call_args[0][0] is test_exception
+            # Check keyword args
+            assert call_args[1]["distinct_id"] == "test-shotgun-instance-id"
+            assert call_args[1]["properties"]["version"] == "1.0.0"
+            assert call_args[1]["properties"]["extra"] == "data"
     finally:
         posthog_telemetry._posthog_client = original_client
         posthog_telemetry._shotgun_instance_id = original_instance_id
