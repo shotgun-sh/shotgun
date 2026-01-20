@@ -269,6 +269,8 @@ def capture_exception(
 
         # Build exception properties
         event_properties: dict[str, Any] = {
+            # Required by PostHog Cymbal error processor
+            "$platform": "python",
             # App info
             "version": __version__,
             "environment": _get_environment(),
