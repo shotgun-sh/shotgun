@@ -1,5 +1,7 @@
 """PostHog analytics setup for Shotgun."""
 
+import platform
+import traceback
 from enum import StrEnum
 from typing import Any
 
@@ -15,6 +17,17 @@ from shotgun.settings import settings
 
 # Use early logger to prevent automatic StreamHandler creation
 logger = get_early_logger(__name__)
+
+
+def _get_environment() -> str:
+    """Determine environment from version string.
+
+    Returns:
+        'development' for dev/rc/alpha/beta versions, 'production' otherwise
+    """
+    if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
+        return "development"
+    return "production"
 
 # Global PostHog client instance
 _posthog_client: Posthog | None = None
@@ -47,12 +60,7 @@ def setup_posthog_observability() -> bool:
 
         logger.debug("Using PostHog API key from settings")
 
-        # Determine environment based on version
-        # Dev versions contain "dev", "rc", "alpha", or "beta"
-        if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
-            environment = "development"
-        else:
-            environment = "production"
+        environment = _get_environment()
 
         def on_error(e: Exception, batch: list[dict[str, Any]]) -> None:
             """Handle PostHog errors."""
@@ -130,12 +138,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         if properties is None:
             properties = {}
         properties["version"] = __version__
-
-        # Determine environment
-        if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
-            properties["environment"] = "development"
-        else:
-            properties["environment"] = "production"
+        properties["environment"] = _get_environment()
 
         # Track the event using PostHog's capture method
         _posthog_client.capture(
@@ -162,8 +165,6 @@ def capture_exception(
         exception: The exception to capture
         properties: Optional additional properties
     """
-    import traceback
-
     global _posthog_client, _shotgun_instance_id
 
     if _posthog_client is None:
@@ -215,16 +216,14 @@ def capture_exception(
         # Build exception properties
         event_properties: dict[str, Any] = {
             "version": __version__,
+            "environment": _get_environment(),
+            "python_version": platform.python_version(),
+            "os": platform.system(),
+            "os_version": platform.release(),
             "$exception_type": exc_type.__name__,
             "$exception_message": str(exception),
             "$exception_list": exception_list,
         }
-
-        # Determine environment
-        if any(marker in __version__ for marker in ["dev", "rc", "alpha", "beta"]):
-            event_properties["environment"] = "development"
-        else:
-            event_properties["environment"] = "production"
 
         # Add custom properties
         if properties:
