@@ -33,8 +33,9 @@ def _get_environment() -> str:
 # Global PostHog client instance
 _posthog_client: Posthog | None = None
 
-# Cache the shotgun instance ID to avoid async calls during event tracking
+# Cache user context to avoid async calls during event tracking
 _shotgun_instance_id: str | None = None
+_user_context: dict[str, Any] = {}
 
 
 def setup_posthog_observability() -> bool:
@@ -43,7 +44,7 @@ def setup_posthog_observability() -> bool:
     Returns:
         True if PostHog was successfully set up, False otherwise
     """
-    global _posthog_client, _shotgun_instance_id
+    global _posthog_client, _shotgun_instance_id, _user_context
 
     try:
         # Check if PostHog is already initialized
@@ -75,12 +76,22 @@ def setup_posthog_observability() -> bool:
             on_error=on_error,
         )
 
-        # Cache the shotgun instance ID for later use (avoids async issues)
+        # Cache user context for later use (avoids async issues in exception capture)
         try:
             import asyncio
 
             config_manager = get_config_manager()
             _shotgun_instance_id = asyncio.run(config_manager.get_shotgun_instance_id())
+
+            # Load config to get account type and model info
+            config = asyncio.run(config_manager.load())
+
+            # Cache user context for exception tracking
+            is_shotgun_account = config.shotgun.has_valid_account
+            _user_context["account_type"] = "shotgun" if is_shotgun_account else "byok"
+            _user_context["selected_model"] = (
+                config.selected_model.value if config.selected_model else None
+            )
 
             # Set user properties for tracking
             _posthog_client.capture(
@@ -90,6 +101,7 @@ def setup_posthog_observability() -> bool:
                     "$set": {
                         "app_version": __version__,
                         "environment": environment,
+                        "account_type": _user_context["account_type"],
                     },
                 },
             )
@@ -216,11 +228,18 @@ def capture_exception(
 
         # Build exception properties
         event_properties: dict[str, Any] = {
+            # App info
             "version": __version__,
             "environment": _get_environment(),
+            # System info
             "python_version": platform.python_version(),
             "os": platform.system(),
             "os_version": platform.release(),
+            # User context
+            "shotgun_instance_id": _shotgun_instance_id,
+            "account_type": _user_context.get("account_type"),
+            "selected_model": _user_context.get("selected_model"),
+            # Exception details
             "$exception_type": exc_type.__name__,
             "$exception_message": str(exception),
             "$exception_list": exception_list,

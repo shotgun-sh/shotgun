@@ -501,9 +501,7 @@ class TestIntegrationScenarios:
             patch(
                 "shotgun.agents.tools.web_search.openai.get_provider_model"
             ) as mock_get_provider,
-            patch(
-                "shotgun.agents.tools.web_search.openai.AsyncOpenAI"
-            ) as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.AsyncOpenAI") as mock_openai,
             patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
         ):
             mock_get_provider.return_value = mock_model_config

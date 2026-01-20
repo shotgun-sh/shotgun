@@ -27,9 +27,7 @@ def test_setup_posthog_no_api_key():
     posthog_telemetry._posthog_client = None
 
     try:
-        with patch.object(
-            posthog_telemetry.settings.telemetry, "posthog_api_key", ""
-        ):
+        with patch.object(posthog_telemetry.settings.telemetry, "posthog_api_key", ""):
             # PostHog should not initialize without API key
             result = posthog_telemetry.setup_posthog_observability()
             assert result is False
@@ -42,8 +40,10 @@ def test_setup_posthog_with_build_constants():
     # Reset the global client and instance ID
     original_client = posthog_telemetry._posthog_client
     original_instance_id = posthog_telemetry._shotgun_instance_id
+    original_user_context = posthog_telemetry._user_context.copy()
     posthog_telemetry._posthog_client = None
     posthog_telemetry._shotgun_instance_id = None
+    posthog_telemetry._user_context = {}
 
     try:
         with patch("shotgun.posthog_telemetry.settings") as mock_settings:
@@ -57,11 +57,21 @@ def test_setup_posthog_with_build_constants():
                 with patch(
                     "shotgun.posthog_telemetry.get_config_manager"
                 ) as mock_get_config:
-                    mock_config = MagicMock()
-                    mock_config.get_shotgun_instance_id = AsyncMock(
+                    # Mock config manager
+                    mock_config_manager = MagicMock()
+                    mock_config_manager.get_shotgun_instance_id = AsyncMock(
                         return_value="test-shotgun-instance-id"
                     )
-                    mock_get_config.return_value = mock_config
+
+                    # Mock the loaded config
+                    mock_loaded_config = MagicMock()
+                    mock_loaded_config.shotgun.has_valid_account = True
+                    mock_loaded_config.selected_model = MagicMock(value="claude-sonnet")
+                    mock_config_manager.load = AsyncMock(
+                        return_value=mock_loaded_config
+                    )
+
+                    mock_get_config.return_value = mock_config_manager
 
                     result = posthog_telemetry.setup_posthog_observability()
 
@@ -81,6 +91,7 @@ def test_setup_posthog_with_build_constants():
     finally:
         posthog_telemetry._posthog_client = original_client
         posthog_telemetry._shotgun_instance_id = original_instance_id
+        posthog_telemetry._user_context = original_user_context
 
 
 def test_track_event_not_initialized():
