@@ -29,6 +29,7 @@ def _get_environment() -> str:
         return "development"
     return "production"
 
+
 # Global PostHog client instance
 _posthog_client: Posthog | None = None
 
