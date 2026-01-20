@@ -162,6 +162,8 @@ def capture_exception(
         exception: The exception to capture
         properties: Optional additional properties
     """
+    import traceback
+
     global _posthog_client, _shotgun_instance_id
 
     if _posthog_client is None:
@@ -183,11 +185,39 @@ def capture_exception(
             )
             return
 
+        # Get exception info and format stack trace
+        exc_type = type(exception)
+        exc_tb = exception.__traceback__
+
+        # Format stack frames for PostHog
+        stack_frames = []
+        if exc_tb:
+            for frame_info in traceback.extract_tb(exc_tb):
+                stack_frames.append(
+                    {
+                        "filename": frame_info.filename,
+                        "lineno": frame_info.lineno,
+                        "function": frame_info.name,
+                        "context_line": frame_info.line or "",
+                    }
+                )
+
+        # Build exception list in PostHog format
+        exception_list = [
+            {
+                "type": exc_type.__name__,
+                "value": str(exception),
+                "module": exc_type.__module__,
+                "stacktrace": {"frames": stack_frames},
+            }
+        ]
+
         # Build exception properties
         event_properties: dict[str, Any] = {
             "version": __version__,
-            "$exception_type": type(exception).__name__,
+            "$exception_type": exc_type.__name__,
             "$exception_message": str(exception),
+            "$exception_list": exception_list,
         }
 
         # Determine environment
@@ -206,7 +236,7 @@ def capture_exception(
             event="$exception",
             properties=event_properties,
         )
-        logger.debug("Captured exception in PostHog: %s", type(exception).__name__)
+        logger.debug("Captured exception in PostHog: %s", exc_type.__name__)
     except Exception as e:
         logger.warning("Failed to capture exception in PostHog: %s", e)
 
