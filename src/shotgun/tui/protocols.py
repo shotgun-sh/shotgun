@@ -80,3 +80,21 @@ class ActiveSubAgentProvider(Protocol):
             a sub-agent is executing, None if idle.
         """
         ...
+
+
+@runtime_checkable
+class QuitConfirmationProvider(Protocol):
+    """Protocol for apps that provide quit confirmation state.
+
+    This protocol allows components (like StatusBar) to check if a quit
+    confirmation is pending without importing the concrete App class.
+    """
+
+    @property
+    def quit_pending(self) -> bool:
+        """Whether a quit confirmation is pending.
+
+        Returns:
+            True if user pressed Ctrl+C and needs to confirm quit.
+        """
+        ...

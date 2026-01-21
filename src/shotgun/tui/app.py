@@ -53,7 +53,10 @@ class ShotgunApp(App[None]):
         "github_issue": GitHubIssueScreen,
     }
     BINDINGS = [
-        Binding("ctrl+c", "quit", "Quit the app"),
+        # Use smart_quit to support ctrl+c for copying selected text
+        Binding("ctrl+c", "smart_quit", "Quit/Copy", show=False),
+        # Cancel quit confirmation with ESC
+        Binding("escape", "cancel_quit", "Cancel Quit", show=False),
     ]
 
     CSS_PATH = "styles.tcss"
@@ -77,6 +80,9 @@ class ShotgunApp(App[None]):
         # Database issues detected at startup (locked, corrupted, timeout)
         # These will be shown to the user via dialogs when ChatScreen mounts
         self.pending_db_issues = pending_db_issues or []
+
+        # Quit confirmation state for double Ctrl+C to quit
+        self._quit_pending = False
 
         # Initialize dependency injection container
         self.container = TUIContainer()
@@ -238,6 +244,63 @@ class ShotgunApp(App[None]):
 
         # Continue to ChatScreen
         self.refresh_startup_screen()
+
+    @property
+    def quit_pending(self) -> bool:
+        """Whether a quit confirmation is pending.
+
+        Returns True if user pressed Ctrl+C and needs to press again or ESC to cancel.
+        """
+        return self._quit_pending
+
+    def _reset_quit_pending(self) -> None:
+        """Reset the quit confirmation state and refresh the status bar."""
+        self._quit_pending = False
+        self._refresh_status_bar()
+
+    def _refresh_status_bar(self) -> None:
+        """Refresh the StatusBar widget to reflect current state."""
+        from textual.css.query import NoMatches
+
+        from shotgun.tui.components.status_bar import StatusBar
+
+        try:
+            status_bar = self.screen.query_one(StatusBar)
+            status_bar.refresh()
+        except NoMatches:
+            # StatusBar might not exist on all screens
+            pass
+
+    def action_cancel_quit(self) -> None:
+        """Cancel the quit confirmation when ESC is pressed."""
+        if self._quit_pending:
+            self._reset_quit_pending()
+
+    async def action_smart_quit(self) -> None:
+        """Handle ctrl+c: copy selected text if any, otherwise quit.
+
+        This allows users to select text in the TUI and copy it with ctrl+c,
+        while still supporting ctrl+c to quit when no text is selected.
+        Requires pressing Ctrl+C twice to quit, or ESC to cancel.
+        """
+        # Check if there's selected text on the current screen
+        selected_text = self.screen.get_selected_text()
+        if selected_text:
+            # Copy selected text to clipboard
+            self.copy_to_clipboard(selected_text)
+            # Clear the selection after copying
+            self.screen.clear_selection()
+            self.notify("Copied to clipboard", timeout=2)
+            return
+
+        # No selection - check if quit is already pending
+        if self._quit_pending:
+            await self.action_quit()
+            return
+
+        # Start quit confirmation
+        self._quit_pending = True
+        self._refresh_status_bar()
 
     async def action_quit(self) -> None:
         """Quit the application."""

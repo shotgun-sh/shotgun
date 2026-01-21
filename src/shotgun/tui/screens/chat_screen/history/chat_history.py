@@ -148,11 +148,20 @@ class ChatHistory(Widget):
             self.vertical_tail.scroll_end(animate=False)
 
     def on_click(self, event: events.Click) -> None:
-        """Focus the prompt input when clicking on the history area."""
-        # Only handle clicks that weren't already handled by a child widget
-        if event.button == 1:  # Left click
-            results = self.screen.query(PromptInput)
-            if results:
-                prompt_input = results.first()
-                if prompt_input.display:
-                    prompt_input.focus()
+        """Focus the prompt input when clicking on the history area.
+
+        Skip focusing if text is selected (to allow copy operations).
+        """
+        # Only handle left clicks
+        if event.button != 1:
+            return
+
+        # Don't focus input if user has selected text (they might want to copy it)
+        if self.screen.get_selected_text():
+            return
+
+        results = self.screen.query(PromptInput)
+        if results:
+            prompt_input = results.first()
+            if prompt_input.display:
+                prompt_input.focus()
