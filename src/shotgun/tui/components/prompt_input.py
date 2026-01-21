@@ -50,8 +50,10 @@ class PromptInput(TextArea):
             self.post_message(self.OpenCommandPalette())
             return
 
-        # Handle ctrl+j for newline (since enter is for submit)
-        if event.key == "ctrl+j":
+        # Handle ctrl+j or shift+enter for newline (since enter is for submit)
+        # Note: shift+enter only works if terminal is configured to send escape sequence
+        # Common terminals: iTerm2, VS Code, WezTerm can be configured for this
+        if event.key in ("ctrl+j", "shift+enter"):
             event.stop()
             event.prevent_default()
             start, end = self.selection
