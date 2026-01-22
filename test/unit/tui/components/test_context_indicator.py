@@ -172,7 +172,7 @@ def test_context_indicator_display_with_different_models():
         ModelName.CLAUDE_SONNET_4_5,
         ModelName.CLAUDE_OPUS_4_5,
         ModelName.GPT_5_1,
-        ModelName.GEMINI_2_5_PRO,
+        ModelName.GEMINI_3_PRO_PREVIEW,
     ]:
         indicator.update_context(analysis, model_name)
         assert indicator.model_name == model_name

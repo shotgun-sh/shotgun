@@ -330,10 +330,9 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             ModelName.CLAUDE_OPUS_4_5: "Claude Opus 4.5 (Anthropic)",
             ModelName.CLAUDE_SONNET_4_5: "Claude Sonnet 4.5 (Anthropic)",
             ModelName.CLAUDE_HAIKU_4_5: "Claude Haiku 4.5 (Anthropic)",
-            ModelName.GEMINI_2_5_PRO: "Gemini 2.5 Pro (Google)",
-            ModelName.GEMINI_2_5_FLASH: "Gemini 2.5 Flash (Google)",
             ModelName.GEMINI_2_5_FLASH_LITE: "Gemini 2.5 Flash Lite (Google)",
             ModelName.GEMINI_3_PRO_PREVIEW: "Gemini 3 Pro Preview (Google)",
+            ModelName.GEMINI_3_FLASH_PREVIEW: "Gemini 3 Flash Preview (Google)",
         }
         return names.get(model_name, model_name.value)
 
