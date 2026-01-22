@@ -50,6 +50,12 @@ configure_root_logger()
 logger = get_logger(__name__)
 logger.debug("Logfire observability enabled: %s", _logfire_enabled)
 
+# Apply Gemini 3 patch early (before any agents are created)
+# This fixes a pydantic-ai bug where TextPart(content=None) crashes the agent
+from shotgun.agents.gemini3_patch import apply_gemini3_patch
+
+apply_gemini3_patch()
+
 # Initialize configuration
 # Note: If config migration fails, ConfigManager will auto-create fresh config
 # and set migration_failed flag for user notification

@@ -33,16 +33,16 @@ def test_model_spec_short_name_gpt_5_2():
     assert spec.short_name == "GPT-5.2"
 
 
-def test_model_spec_short_name_gemini_pro():
-    """Test ModelSpec short_name for Gemini 2.5 Pro."""
-    spec = MODEL_SPECS[ModelName.GEMINI_2_5_PRO]
-    assert spec.short_name == "Gemini 2.5 Pro"
+def test_model_spec_short_name_gemini_3_pro():
+    """Test ModelSpec short_name for Gemini 3 Pro."""
+    spec = MODEL_SPECS[ModelName.GEMINI_3_PRO_PREVIEW]
+    assert spec.short_name == "Gemini 3 Pro"
 
 
-def test_model_spec_short_name_gemini_flash():
-    """Test ModelSpec short_name for Gemini 2.5 Flash."""
-    spec = MODEL_SPECS[ModelName.GEMINI_2_5_FLASH]
-    assert spec.short_name == "Gemini 2.5 Flash"
+def test_model_spec_short_name_gemini_3_flash():
+    """Test ModelSpec short_name for Gemini 3 Flash."""
+    spec = MODEL_SPECS[ModelName.GEMINI_3_FLASH_PREVIEW]
+    assert spec.short_name == "Gemini 3 Flash"
 
 
 def test_all_models_have_short_name():

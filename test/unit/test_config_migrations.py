@@ -521,7 +521,7 @@ def test_apply_migrations_v2_to_current_with_full_config():
     config["anthropic"]["api_key"] = "sk-ant-full-test"
     config["google"]["api_key"] = "AIza-full-test"
     config["shotgun"]["api_key"] = "sg_full_test"
-    config["selected_model"] = "gemini-2.5-pro"
+    config["selected_model"] = "gemini-3-pro-preview"
 
     result = _apply_migrations(config)
 
@@ -538,7 +538,7 @@ def test_apply_migrations_v2_to_current_with_full_config():
     assert result["anthropic"]["api_key"] == "sk-ant-full-test"
     assert result["google"]["api_key"] == "AIza-full-test"
     assert result["shotgun"]["api_key"] == "sg_full_test"
-    assert result["selected_model"] == "gemini-2.5-pro"
+    assert result["selected_model"] == "gemini-3-pro-preview"
 
 
 def test_apply_migrations_v3_to_current_with_partial_config():

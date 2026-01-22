@@ -424,7 +424,7 @@ def test_submit_feedback_survey_other_feedback(
     # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
-    mock_config.selected_model.value = "gemini-2.5-pro"
+    mock_config.selected_model.value = "gemini-3-pro-preview"
     mock_config.config_version = "1.5.0"
     mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager

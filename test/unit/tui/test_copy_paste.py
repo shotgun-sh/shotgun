@@ -1,7 +1,5 @@
 """Tests for copy/paste functionality in the TUI."""
 
-from unittest.mock import AsyncMock, Mock, patch
-
 
 class TestSmartQuitActionLogic:
     """Tests for the smart_quit action logic.
@@ -31,7 +29,7 @@ class TestSmartQuitActionLogic:
         from shotgun.tui.app import ShotgunApp
 
         assert hasattr(ShotgunApp, "action_smart_quit")
-        assert callable(getattr(ShotgunApp, "action_smart_quit"))
+        assert callable(ShotgunApp.action_smart_quit)
 
 
 class TestChatHistoryOnClickLogic:
@@ -204,7 +202,7 @@ class TestQuitConfirmation:
         assert hasattr(ShotgunApp, "quit_pending")
         # It should be a property
         assert isinstance(
-            getattr(ShotgunApp, "quit_pending"), property
+            ShotgunApp.quit_pending, property
         ), "quit_pending should be a property"
 
     def test_app_has_reset_quit_pending_method(self):
@@ -212,14 +210,14 @@ class TestQuitConfirmation:
         from shotgun.tui.app import ShotgunApp
 
         assert hasattr(ShotgunApp, "_reset_quit_pending")
-        assert callable(getattr(ShotgunApp, "_reset_quit_pending"))
+        assert callable(ShotgunApp._reset_quit_pending)
 
     def test_app_has_cancel_quit_action(self):
         """Verify ShotgunApp has the action_cancel_quit method for ESC key."""
         from shotgun.tui.app import ShotgunApp
 
         assert hasattr(ShotgunApp, "action_cancel_quit")
-        assert callable(getattr(ShotgunApp, "action_cancel_quit"))
+        assert callable(ShotgunApp.action_cancel_quit)
 
     def test_escape_binding_configured(self):
         """Verify the escape binding uses cancel_quit action."""
