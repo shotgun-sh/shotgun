@@ -8,6 +8,7 @@ from opentelemetry import trace
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.tools.registry import ToolCategory, register_tool
+from shotgun.llm_proxy import LITELLM_PROXY_OPENAI_BASE
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.utils.datetime_utils import get_datetime_context
@@ -30,7 +31,8 @@ async def openai_web_search_tool(query: str) -> str:
     """Perform a web search and return results.
 
     This tool uses OpenAI's web search capabilities to find current information
-    about the given query.
+    about the given query. Works with both Shotgun Account (via LiteLLM proxy)
+    and direct OpenAI API keys (BYOK).
 
     Args:
         query: The search query
@@ -68,7 +70,12 @@ async def openai_web_search_tool(query: str) -> str:
             utc_offset=dt_context.utc_offset,
         )
 
-        client = AsyncOpenAI(api_key=api_key)
+        # Use proxy for Shotgun Account, direct API for BYOK
+        if model_config.is_shotgun_account:
+            logger.debug("🔑 Using Shotgun Account proxy for OpenAI web search")
+            client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_PROXY_OPENAI_BASE)
+        else:
+            client = AsyncOpenAI(api_key=api_key)
 
         # Wrap API call with timeout to prevent indefinite hangs
         try:
