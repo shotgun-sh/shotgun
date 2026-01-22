@@ -46,7 +46,7 @@ async def gemini_web_search_tool(query: str) -> str:
 
     # Get model configuration (supports both Shotgun and BYOK)
     try:
-        model_config = await get_provider_model(ModelName.GEMINI_3_FLASH_PREVIEW)
+        model_config = await get_provider_model(ModelName.GEMINI_2_5_FLASH_LITE)
     except ValueError as e:
         error_msg = f"Gemini API key not configured: {str(e)}"
         logger.error("❌ %s", error_msg)
