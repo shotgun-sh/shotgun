@@ -76,8 +76,8 @@ def apply_gemini3_patch() -> bool:
 
             return model_response
 
-        # Apply the patch using setattr to satisfy mypy
-        setattr(OpenAIResponsesModel, "_process_response", patched_process_response)
+        # Apply the patch
+        OpenAIResponsesModel._process_response = patched_process_response  # type: ignore[method-assign]
         logger.info("Applied Gemini 3 patch to OpenAIResponsesModel._process_response")
         _patch_applied = True
         return True
