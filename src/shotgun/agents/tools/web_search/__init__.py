@@ -1,17 +1,15 @@
 """Web search tools for Pydantic AI agents.
 
 Provides web search capabilities for multiple LLM providers:
-- OpenAI: Uses Responses API with web_search tool (BYOK only)
-- Anthropic: Uses Messages API with web_search_20250305 tool (BYOK only)
-- Gemini: Uses grounding with Google Search via Pydantic AI (Shotgun Account and BYOK)
+- OpenAI: Uses Responses API with web_search tool
+- Anthropic: Uses Messages API with web_search_20250305 tool
+- Gemini: Uses grounding with Google Search via Pydantic AI
 
-Shotgun Account: Only Gemini web search is available
-BYOK: All tools work with direct provider API keys
+All web search tools are available for both Shotgun Account and BYOK users.
 """
 
 from collections.abc import Awaitable, Callable
 
-from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import ProviderType
 from shotgun.logging_config import get_logger
 
@@ -30,55 +28,26 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
     """Get list of available web search tools based on configured API keys.
 
     Works with both Shotgun Account (via LiteLLM proxy) and BYOK (individual provider keys).
-
-    Available tools:
-    - Gemini: Available for both Shotgun Account and BYOK
-    - Anthropic: BYOK only (uses Messages API with web search)
-    - OpenAI: BYOK only (uses Responses API not compatible with LiteLLM proxy)
+    All web search tools are available for Shotgun Account users.
 
     Returns:
         List of web search tool functions that have API keys configured
     """
     tools: list[WebSearchTool] = []
 
-    # Check if using Shotgun Account
-    config_manager = get_config_manager()
-    config = await config_manager.load()
+    logger.debug("🔍 Checking available web search tools")
 
-    if config.shotgun.has_valid_account:
-        logger.debug("🔑 Shotgun Account - only Gemini web search available")
+    if await is_provider_available(ProviderType.OPENAI):
+        logger.debug("✅ OpenAI web search tool available")
+        tools.append(openai_web_search_tool)
 
-        # Gemini: Only search tool available for Shotgun Account
-        if await is_provider_available(ProviderType.GOOGLE):
-            logger.debug("✅ Gemini web search tool available")
-            tools.append(gemini_web_search_tool)
+    if await is_provider_available(ProviderType.ANTHROPIC):
+        logger.debug("✅ Anthropic web search tool available")
+        tools.append(anthropic_web_search_tool)
 
-        # Anthropic: Not available for Shotgun Account (Gemini-only for Shotgun)
-        if await is_provider_available(ProviderType.ANTHROPIC):
-            logger.debug(
-                "⚠️  Anthropic web search requires BYOK (Shotgun Account uses Gemini only)"
-            )
-
-        # OpenAI: Not available for Shotgun Account (Responses API incompatible with proxy)
-        if await is_provider_available(ProviderType.OPENAI):
-            logger.debug(
-                "⚠️  OpenAI web search requires BYOK (Responses API not supported via proxy)"
-            )
-    else:
-        # BYOK mode: Load all available tools based on individual provider keys
-        logger.debug("🔑 BYOK mode - checking all provider web search tools")
-
-        if await is_provider_available(ProviderType.OPENAI):
-            logger.debug("✅ OpenAI web search tool available")
-            tools.append(openai_web_search_tool)
-
-        if await is_provider_available(ProviderType.ANTHROPIC):
-            logger.debug("✅ Anthropic web search tool available")
-            tools.append(anthropic_web_search_tool)
-
-        if await is_provider_available(ProviderType.GOOGLE):
-            logger.debug("✅ Gemini web search tool available")
-            tools.append(gemini_web_search_tool)
+    if await is_provider_available(ProviderType.GOOGLE):
+        logger.debug("✅ Gemini web search tool available")
+        tools.append(gemini_web_search_tool)
 
     if not tools:
         logger.warning("⚠️ No web search tools available - no API keys configured")

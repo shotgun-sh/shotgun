@@ -21,6 +21,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -52,6 +53,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -81,6 +83,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -108,6 +111,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -132,6 +136,7 @@ class TestWebSearchTool:
         """Test handling of OpenAI client creation errors."""
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -161,6 +166,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -229,6 +235,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -263,6 +270,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -296,6 +304,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         test_queries = [
             "simple query",
@@ -363,6 +372,7 @@ class TestWebSearchTool:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -405,6 +415,7 @@ class TestIntegrationScenarios:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         with (
             patch(
@@ -464,6 +475,7 @@ class TestIntegrationScenarios:
 
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         for exception, expected_error_text in error_scenarios:
             mock_client = Mock()
@@ -493,6 +505,7 @@ class TestIntegrationScenarios:
         """Test that timeout errors return a user-friendly message."""
         mock_model_config = Mock()
         mock_model_config.api_key = "test-api-key"
+        mock_model_config.is_shotgun_account = False
 
         mock_client = Mock()
         mock_client.responses.create = AsyncMock(side_effect=TimeoutError("timeout"))
@@ -512,3 +525,40 @@ class TestIntegrationScenarios:
             result = await openai_web_search_tool("test query")
 
             assert "timed out" in result
+
+    @pytest.mark.asyncio
+    async def test_shotgun_account_uses_proxy(self):
+        """Test that Shotgun Account uses LiteLLM proxy endpoint."""
+        mock_response = Mock()
+        mock_response.output_text = "Search results"
+
+        mock_client = Mock()
+        mock_client.responses.create = AsyncMock(return_value=mock_response)
+
+        mock_model_config = Mock()
+        mock_model_config.api_key = "shotgun-api-key"
+        mock_model_config.is_shotgun_account = True
+
+        with (
+            patch(
+                "shotgun.agents.tools.web_search.openai.get_provider_model"
+            ) as mock_get_provider,
+            patch("shotgun.agents.tools.web_search.openai.AsyncOpenAI") as mock_openai,
+            patch("shotgun.agents.tools.web_search.openai.trace") as mock_trace,
+            patch(
+                "shotgun.agents.tools.web_search.openai.LITELLM_PROXY_OPENAI_BASE",
+                "https://proxy.example.com",
+            ),
+        ):
+            mock_get_provider.return_value = mock_model_config
+            mock_openai.return_value = mock_client
+            mock_span = Mock()
+            mock_trace.get_current_span.return_value = mock_span
+
+            result = await openai_web_search_tool("test query")
+
+            assert result == "Search results"
+            # Verify proxy URL is used for Shotgun Account
+            mock_openai.assert_called_once_with(
+                api_key="shotgun-api-key", base_url="https://proxy.example.com"
+            )
