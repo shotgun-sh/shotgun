@@ -160,7 +160,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         provider=ProviderType.GOOGLE,
         max_input_tokens=1_048_576,
         max_output_tokens=65_536,
-        litellm_proxy_model_name="gemini/gemini-3-flash",
+        litellm_proxy_model_name="gemini/gemini-3-flash-preview",
         short_name="Gemini 3 Flash",
     ),
 }
