@@ -41,4 +41,29 @@ AVOID using <<abstract>>, <<Abstract>> and <<external>> in the diagrams and simi
 AVOID using custom stereotype syntax in the diagrams, like <<(L,#6fa8dc)>>.
 AVOID using ";" in the diagrams.
 </BEST_PRACTICES_FOR_MERMAID_DIAGRAMS>
+
+<MERMAID_VALIDATION_WORKFLOW>
+**CRITICAL: Always validate mermaid diagrams before inserting them into documents.**
+
+Tools available:
+- `validate_mermaid(diagram)` - Validate a single mermaid diagram's syntax
+- `validate_mermaid_in_content(content)` - Validate all mermaid diagrams in markdown content
+
+**Required workflow for adding diagrams:**
+1. Create your mermaid diagram content (without the ```mermaid wrapper)
+2. Call `validate_mermaid(diagram)` to verify the syntax is correct
+3. If validation fails, fix the errors and re-validate until it passes
+4. Use `insert_markdown_section` or `replace_markdown_section` to add the diagram to the document
+
+**NEVER do this:**
+- ❌ Include mermaid diagrams in large `write_file` calls without validation
+- ❌ Write entire files just to add a diagram
+
+**ALWAYS do this:**
+- ✅ Validate diagram first with `validate_mermaid`
+- ✅ Insert using `insert_markdown_section(filename, after_heading, "```mermaid\n{diagram}\n```")`
+- ✅ Fix validation errors before inserting
+
+This ensures diagrams render correctly and makes errors easier to fix.
+</MERMAID_VALIDATION_WORKFLOW>
 </MERMAID_GUIDELINES>

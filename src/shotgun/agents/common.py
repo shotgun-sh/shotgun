@@ -44,6 +44,8 @@ from .tools import (
     remove_markdown_section,
     replace_markdown_section,
     retrieve_code,
+    validate_mermaid,
+    validate_mermaid_in_content,
     write_file,
 )
 
@@ -210,6 +212,10 @@ async def create_base_agent(
     agent.tool(replace_markdown_section)
     agent.tool(insert_markdown_section)
     agent.tool(remove_markdown_section)
+
+    # Register mermaid validation tools (always available)
+    agent.tool(validate_mermaid)
+    agent.tool(validate_mermaid_in_content)
 
     # Register codebase understanding tools (conditional)
     if load_codebase_understanding_tools:

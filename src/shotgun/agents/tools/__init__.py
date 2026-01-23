@@ -13,6 +13,7 @@ from .markdown_tools import (
     remove_markdown_section,
     replace_markdown_section,
 )
+from .mermaid_validation import validate_mermaid, validate_mermaid_in_content
 from .web_search import (
     anthropic_web_search_tool,
     gemini_web_search_tool,
@@ -28,6 +29,9 @@ __all__ = [
     "read_file",
     "write_file",
     "append_file",
+    # Mermaid validation tools
+    "validate_mermaid",
+    "validate_mermaid_in_content",
     "replace_markdown_section",
     "insert_markdown_section",
     "remove_markdown_section",
