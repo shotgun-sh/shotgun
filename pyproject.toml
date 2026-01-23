@@ -31,7 +31,6 @@ dependencies = [
     "logfire>=2.0.0",
     "posthog>=3.0.0",
     "textual>=6.1.0",
-    "textual-dev>=1.7.0",
     "textual-serve>=0.1.0",
     "real_ladybug==0.14.1",
     "tree-sitter>=0.21.0",
@@ -53,7 +52,6 @@ dependencies = [
     "aiofiles>=24.0.0",
     "pathspec>=0.12.0", # For gitignore pattern matching
     "psutil>=5.9.0", # Cross-platform process and system utilities
-    "pymupdf>=1.26.7",
 ]
 
 [project.urls]
@@ -132,6 +130,7 @@ update_changelog_on_bump = true
 
 [dependency-groups]
 dev = [
+    "textual-dev>=1.7.0",
     "commitizen>=3.13.0",
     "coverage>=7.10.6",
     "debugpy>=1.8.16",
