@@ -10,6 +10,7 @@ Test case categories:
 - Delegation routing: Tests Router correctly delegates to each agent for their files
 - File write: Tests Router delegates to sub-agents which write files (not output to chat)
 - File requests: Tests Router uses file_requests for binary files instead of asking questions
+- Document files: Tests Router handles document files (PDFs, images) in both modes
 
 Exports:
 - CLARIFYING_QUESTIONS_CASES: List of clarifying questions test cases
@@ -18,6 +19,7 @@ Exports:
 - DELEGATION_ROUTING_CASES: List of delegation routing test cases
 - FILE_WRITE_CASES: List of file write verification test cases
 - FILE_REQUEST_CASES: List of file_requests behavior test cases
+- DOCUMENT_FILE_CASES: List of document file handling test cases
 - ALL_ROUTER_CASES: Dict mapping test case names to test case objects
 """
 
@@ -31,6 +33,17 @@ from evals.datasets.router_agent.clarifying_questions_cases import (
 from evals.datasets.router_agent.delegation_routing_cases import (
     DELEGATION_ROUTING_CASES,
     MULTI_FILE_UPDATE_DELEGATES_SEPARATELY,
+)
+from evals.datasets.router_agent.document_file_cases import (
+    DOCUMENT_FILE_CASES,
+    PRD_FILE_DRAFTING_MODE,
+    PRD_FILE_PLANNING_MODE,
+    QA_GUIDELINES_FILE_PLANNING_MODE,
+    SCREENSHOT_FOR_BUG_REPORT,
+    SPEC_DOC_FILE_PLANNING_MODE,
+    USER_STORIES_FILE_DRAFTING_MODE,
+    USER_STORIES_FILE_PLANNING_MODE,
+    WIREFRAME_IMAGE_DRAFTING_MODE,
 )
 from evals.datasets.router_agent.file_request_cases import (
     FILE_REQUEST_CASES,
@@ -65,6 +78,7 @@ ALL_ROUTER_CASES = {
         + DELEGATION_ROUTING_CASES
         + FILE_WRITE_CASES
         + FILE_REQUEST_CASES
+        + DOCUMENT_FILE_CASES
     )
 }
 
@@ -76,6 +90,7 @@ __all__ = [
     "DELEGATION_ROUTING_CASES",
     "FILE_WRITE_CASES",
     "FILE_REQUEST_CASES",
+    "DOCUMENT_FILE_CASES",
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
@@ -98,4 +113,13 @@ __all__ = [
     # File request test cases
     "PDF_FILE_REQUEST_NO_QUESTIONS",
     "IMAGE_FILE_REQUEST_NO_QUESTIONS",
+    # Document file test cases
+    "PRD_FILE_PLANNING_MODE",
+    "USER_STORIES_FILE_PLANNING_MODE",
+    "QA_GUIDELINES_FILE_PLANNING_MODE",
+    "SPEC_DOC_FILE_PLANNING_MODE",
+    "PRD_FILE_DRAFTING_MODE",
+    "USER_STORIES_FILE_DRAFTING_MODE",
+    "WIREFRAME_IMAGE_DRAFTING_MODE",
+    "SCREENSHOT_FOR_BUG_REPORT",
 ]

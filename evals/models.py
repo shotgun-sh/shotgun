@@ -8,10 +8,16 @@ but is self-contained for the evaluation system.
 Note: This is evaluation-specific code, not part of the main Shotgun codebase.
 """
 
+from __future__ import annotations
+
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
+
+if TYPE_CHECKING:
+    from evals.judges.file_requests_judge import FileRequestsJudgeResult
 
 # ============================================================================
 # Constants
@@ -211,6 +217,10 @@ class AgentExecutionOutput(BaseModel):
     delegation_reasoning: str | None = Field(
         default=None,
         description="Router's reasoning for delegation (Router agent only)",
+    )
+    file_requests: list[str] = Field(
+        default_factory=list,
+        description="File paths requested via file_requests (Router agent only)",
     )
 
 
@@ -543,7 +553,8 @@ class AggregatedResult(BaseModel):
     deterministic_results: list[EvaluatorResult] = Field(
         ..., description="Results from deterministic evaluators"
     )
-    judge_result: RouterJudgeResult | None = Field(
+    # Note: FileRequestsJudgeResult imported via model_rebuild() in aggregator
+    judge_result: RouterJudgeResult | FileRequestsJudgeResult | None = Field(
         default=None, description="Result from LLM judge (if run)"
     )
 

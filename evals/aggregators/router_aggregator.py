@@ -12,6 +12,7 @@ Into a final score with:
 - Trace reference for each case
 """
 
+from evals.judges.file_requests_judge import FileRequestsJudgeResult
 from evals.models import (
     AgentExecutionOutput,
     AggregatedResult,
@@ -24,6 +25,12 @@ from evals.models import (
     TestCaseResult,
     TraceRef,
 )
+
+# Union type for all judge results
+JudgeResult = RouterJudgeResult | FileRequestsJudgeResult
+
+# Rebuild the model to resolve forward reference to FileRequestsJudgeResult
+AggregatedResult.model_rebuild()
 
 
 class RouterAggregator:
@@ -59,7 +66,7 @@ class RouterAggregator:
         self,
         test_case_name: str,
         deterministic_results: list[EvaluatorResult],
-        judge_result: RouterJudgeResult | None,
+        judge_result: JudgeResult | None,
         trace_ref: TraceRef,
     ) -> AggregatedResult:
         """Aggregate all evaluation results for a test case.
@@ -139,7 +146,7 @@ class RouterAggregator:
     def _calculate_overall_score(
         self,
         deterministic_results: list[EvaluatorResult],
-        judge_result: RouterJudgeResult | None,
+        judge_result: JudgeResult | None,
         hard_failures: list[str],
         soft_failures: list[str],
     ) -> float:
@@ -191,7 +198,7 @@ class RouterAggregator:
         overall_score: float,
         hard_failures: list[str],
         soft_failures: list[str],
-        judge_result: RouterJudgeResult | None,
+        judge_result: JudgeResult | None,
     ) -> str:
         """Build a human-readable summary of the evaluation."""
         parts: list[str] = []

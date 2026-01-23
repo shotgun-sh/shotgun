@@ -267,6 +267,7 @@ class RouterExecutor:
             # Extract response
             response = result.output.response
             clarifying_questions = result.output.clarifying_questions or []
+            file_requests = result.output.file_requests or []
 
             # Extract tool usage
             tools_used = self._extract_tool_names(result.all_messages())
@@ -299,6 +300,7 @@ class RouterExecutor:
             delegated_sub_agent=delegated_sub_agent,
             delegated_sub_agents=delegated_sub_agents,
             delegation_reasoning=None,  # Could extract from response if needed
+            file_requests=file_requests,
         )
 
     def _extract_tool_names(self, messages: list[ModelMessage]) -> list[str]:
@@ -412,6 +414,7 @@ class RouterExecutor:
             delegated_sub_agent=None,
             delegated_sub_agents=[],
             delegation_reasoning=None,
+            file_requests=[],
         )
 
 

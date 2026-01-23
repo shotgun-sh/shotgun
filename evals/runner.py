@@ -34,6 +34,7 @@ from evals.evaluators.deterministic.router_evaluators import (  # noqa: E402
     run_all_deterministic_evaluators,
 )
 from evals.executor import ExecutionResult, RouterExecutor  # noqa: E402
+from evals.judges.file_requests_judge import FileRequestsJudge  # noqa: E402
 from evals.judges.router_quality_judge import RouterQualityJudge  # noqa: E402
 from evals.models import (  # noqa: E402
     AgentExecutionOutput,
@@ -137,8 +138,22 @@ class EvaluationRunner:
         """
         self.config = config or RunnerConfig()
         self.executor = RouterExecutor(working_directory=working_directory)
-        self.judge = RouterQualityJudge() if self.config.enable_judge else None
+        # Initialize judges lazily based on evaluator_names
+        self._router_judge: RouterQualityJudge | None = None
+        self._file_requests_judge: FileRequestsJudge | None = None
         self.aggregator = RouterAggregator()
+
+    def _get_router_judge(self) -> RouterQualityJudge:
+        """Get or create the RouterQualityJudge instance."""
+        if self._router_judge is None:
+            self._router_judge = RouterQualityJudge()
+        return self._router_judge
+
+    def _get_file_requests_judge(self) -> FileRequestsJudge:
+        """Get or create the FileRequestsJudge instance."""
+        if self._file_requests_judge is None:
+            self._file_requests_judge = FileRequestsJudge()
+        return self._file_requests_judge
 
     async def run_suite(
         self,
@@ -263,7 +278,9 @@ class EvaluationRunner:
                 raise ValueError(f"No valid test cases found in suite {suite.name}")
 
             # Run test cases with concurrency control
-            results = await self._run_test_cases(test_cases, suite.name, model_override)
+            results = await self._run_test_cases(
+                test_cases, suite.name, suite.evaluator_names, model_override
+            )
 
             # Build report
             total_duration = time.time() - start_time
@@ -275,6 +292,7 @@ class EvaluationRunner:
         self,
         test_cases: list[ShotgunTestCase],
         suite_name: str,
+        evaluator_names: list[str],
         model_override: ModelName | None = None,
     ) -> list[tuple[AggregatedResult, AgentExecutionOutput]]:
         """Run test cases with concurrency control.
@@ -282,6 +300,7 @@ class EvaluationRunner:
         Args:
             test_cases: Test cases to run
             suite_name: Name of the suite for logging
+            evaluator_names: Names of evaluators to apply (determines which judge to use)
             model_override: Optional model to use instead of the default
 
         Returns:
@@ -295,7 +314,7 @@ class EvaluationRunner:
         ) -> tuple[AggregatedResult, AgentExecutionOutput]:
             async with semaphore:
                 return await self._evaluate_case(
-                    test_case, suite_name, judge_semaphore, model_override
+                    test_case, suite_name, evaluator_names, judge_semaphore, model_override
                 )
 
         tasks = [run_single(tc) for tc in test_cases]
@@ -305,6 +324,7 @@ class EvaluationRunner:
         self,
         test_case: ShotgunTestCase,
         suite_name: str,
+        evaluator_names: list[str],
         judge_semaphore: asyncio.Semaphore,
         model_override: ModelName | None = None,
     ) -> tuple[AggregatedResult, AgentExecutionOutput]:
@@ -313,6 +333,7 @@ class EvaluationRunner:
         Args:
             test_case: Test case to run
             suite_name: Suite name for context
+            evaluator_names: Names of evaluators to apply (determines which judge to use)
             judge_semaphore: Semaphore for judge concurrency
             model_override: Optional model to use instead of the default
 
@@ -350,13 +371,27 @@ class EvaluationRunner:
             )
 
             # Run LLM judge (with concurrency control)
-            judge_result = None
-            if self.judge:
+            # Select judge based on evaluator_names
+            from evals.judges.file_requests_judge import FileRequestsJudgeResult
+            from evals.models import RouterJudgeResult
+
+            judge_result: RouterJudgeResult | FileRequestsJudgeResult | None = None
+            if self.config.enable_judge:
                 async with judge_semaphore:
                     try:
-                        judge_result = await self.judge.evaluate(
-                            test_case, execution_result.output
-                        )
+                        if "file_requests_judge" in evaluator_names:
+                            # Use FileRequestsJudge for file handling scenarios
+                            file_judge = self._get_file_requests_judge()
+                            judge_result = await file_judge.evaluate(
+                                test_case, execution_result.output
+                            )
+                        elif "router_correctness_judge" in evaluator_names:
+                            # Use RouterQualityJudge for clarifying questions scenarios
+                            router_judge = self._get_router_judge()
+                            judge_result = await router_judge.evaluate(
+                                test_case, execution_result.output
+                            )
+                        # If neither judge specified, no judge evaluation
                     except Exception:
                         logger.exception(
                             f"Judge evaluation failed for {test_case.name}"
