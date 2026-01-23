@@ -18,7 +18,9 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 # API configuration
-MERMAID_API_URL = os.environ.get("MERMAID_API_URL", "http://localhost:8080")
+MERMAID_API_URL = os.environ.get(
+    "MERMAID_API_URL", "https://mermaid-validator-219702594231.us-east4.run.app"
+)
 MERMAID_API_TIMEOUT = float(os.environ.get("MERMAID_API_TIMEOUT", "30"))
 
 # Shotgun identification for API requests
