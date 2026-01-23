@@ -128,6 +128,7 @@ flowchart TD
 @pytest.mark.anyio
 async def test_call_validation_api_valid_response():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.json.return_value = {
         "valid": True,
         "diagramType": "flowchart-v2",
@@ -150,6 +151,7 @@ async def test_call_validation_api_valid_response():
 @pytest.mark.anyio
 async def test_call_validation_api_invalid_response():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.json.return_value = {
         "valid": False,
         "error": {
@@ -211,6 +213,7 @@ async def test_call_validation_api_request_error():
 @pytest.mark.anyio
 async def test_call_batch_validation_api_valid_response():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.json.return_value = {
         "results": [
             {"valid": True, "diagramType": "flowchart"},
@@ -236,6 +239,7 @@ async def test_call_batch_validation_api_valid_response():
 @pytest.mark.anyio
 async def test_call_batch_validation_api_mixed_response():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.json.return_value = {
         "results": [
             {"valid": True, "diagramType": "flowchart"},
