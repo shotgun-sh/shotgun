@@ -15,7 +15,6 @@ from shotgun.agents.tools.mermaid_validation import (
     validate_mermaid_in_content,
 )
 
-
 # Tests for MermaidValidationResult model
 
 
@@ -46,9 +45,7 @@ def test_mermaid_batch_result_all_valid():
         MermaidValidationResult(valid=True, diagram_type="flowchart"),
         MermaidValidationResult(valid=True, diagram_type="sequence"),
     ]
-    batch = MermaidBatchResult(
-        total=2, valid_count=2, invalid_count=0, results=results
-    )
+    batch = MermaidBatchResult(total=2, valid_count=2, invalid_count=0, results=results)
     assert batch.all_valid is True
 
 
@@ -57,9 +54,7 @@ def test_mermaid_batch_result_not_all_valid():
         MermaidValidationResult(valid=True, diagram_type="flowchart"),
         MermaidValidationResult(valid=False, error_message="Error"),
     ]
-    batch = MermaidBatchResult(
-        total=2, valid_count=1, invalid_count=1, results=results
-    )
+    batch = MermaidBatchResult(total=2, valid_count=1, invalid_count=1, results=results)
     assert batch.all_valid is False
 
 
@@ -182,9 +177,7 @@ async def test_call_validation_api_invalid_response():
 async def test_call_validation_api_timeout_error():
     with patch("httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
-        mock_instance.post = AsyncMock(
-            side_effect=httpx.TimeoutException("timeout")
-        )
+        mock_instance.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
         mock_instance.__aexit__ = AsyncMock(return_value=None)
         mock_client.return_value = mock_instance
@@ -270,9 +263,7 @@ async def test_call_batch_validation_api_mixed_response():
 async def test_call_batch_validation_api_timeout_error():
     with patch("httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
-        mock_instance.post = AsyncMock(
-            side_effect=httpx.TimeoutException("timeout")
-        )
+        mock_instance.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
         mock_instance.__aexit__ = AsyncMock(return_value=None)
         mock_client.return_value = mock_instance
