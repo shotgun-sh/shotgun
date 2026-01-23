@@ -15,6 +15,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
 )
+from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import ProviderType, get_provider_model
 from shotgun.agents.models import (
@@ -537,6 +538,7 @@ async def run_agent(
     message_history: list[ModelMessage] | None = None,
     usage_limits: UsageLimits | None = None,
     event_stream_handler: EventStreamHandler | None = None,
+    model_settings: ModelSettings | None = None,
 ) -> AgentRunResult[AgentResponse]:
     """Run an agent with optional streaming support.
 
@@ -548,6 +550,8 @@ async def run_agent(
         usage_limits: Optional usage limits for the run.
         event_stream_handler: Optional callback for streaming events.
             When provided, enables real-time streaming of agent responses.
+        model_settings: Optional model settings for the run.
+            Can be used to configure model behavior like parallel_tool_calls.
 
     Returns:
         The agent run result.
@@ -565,6 +569,7 @@ async def run_agent(
         usage_limits=usage_limits,
         message_history=message_history,
         event_stream_handler=event_stream_handler,
+        model_settings=model_settings,
     )
 
     # Log file operations summary if any files were modified
