@@ -24,6 +24,7 @@ from .models import (
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_sub_agent_model,
 )
 from .streaming_test import check_streaming_capability
 
@@ -175,6 +176,7 @@ def get_or_create_model(
 
 async def get_provider_model(
     provider_or_model: ProviderType | ModelName | None = None,
+    for_sub_agent: bool = False,
 ) -> ModelConfig:
     """Get a fully configured ModelConfig with API key and Model instance.
 
@@ -183,6 +185,7 @@ async def get_provider_model(
             - If ModelName: returns that specific model with appropriate API key
             - If ProviderType: returns default model for that provider (backward compatible)
             - If None: uses default provider with its default model
+        for_sub_agent: If True, substitute cheaper model for cost optimization.
 
     Returns:
         ModelConfig with API key configured and lazy Model instance
@@ -201,6 +204,18 @@ async def get_provider_model(
         if isinstance(provider_or_model, ModelName):
             # Specific model requested - honor it (e.g., web search tools)
             model_name = provider_or_model
+        elif isinstance(provider_or_model, ProviderType):
+            # Specific provider requested - use default model for that provider
+            # This is important for web search tools that need specific provider APIs
+            provider_defaults = {
+                ProviderType.OPENAI: ModelName.GPT_5_2,
+                ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
+                ProviderType.GOOGLE: ModelName.GEMINI_3_FLASH_PREVIEW,
+            }
+            model_name = provider_defaults.get(
+                provider_or_model,
+                config.selected_model or get_default_model_for_provider(config),
+            )
         else:
             # No specific model requested - use selected or default
             model_name = config.selected_model or get_default_model_for_provider(config)
@@ -208,6 +223,17 @@ async def get_provider_model(
         # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
         if model_name not in MODEL_SPECS:
             model_name = get_default_model_for_provider(config)
+
+        # Apply sub-agent model mapping for cost optimization
+        if for_sub_agent:
+            original_model = model_name
+            model_name = get_sub_agent_model(model_name)
+            if model_name != original_model:
+                logger.debug(
+                    "Sub-agent model substitution: %s -> %s",
+                    original_model.value,
+                    model_name.value,
+                )
 
         spec = MODEL_SPECS[model_name]
 
@@ -270,6 +296,18 @@ async def get_provider_model(
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
             model_name = ModelName.GPT_5_2
+
+        # Apply sub-agent model mapping for cost optimization
+        if for_sub_agent:
+            original_model = model_name
+            model_name = get_sub_agent_model(model_name)
+            if model_name != original_model:
+                logger.debug(
+                    "Sub-agent model substitution: %s -> %s",
+                    original_model.value,
+                    model_name.value,
+                )
+
         spec = MODEL_SPECS[model_name]
 
         # Check and test streaming capability for GPT-5 family models
@@ -321,6 +359,18 @@ async def get_provider_model(
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
             model_name = ModelName.CLAUDE_SONNET_4_5
+
+        # Apply sub-agent model mapping for cost optimization
+        if for_sub_agent:
+            original_model = model_name
+            model_name = get_sub_agent_model(model_name)
+            if model_name != original_model:
+                logger.debug(
+                    "Sub-agent model substitution: %s -> %s",
+                    original_model.value,
+                    model_name.value,
+                )
+
         spec = MODEL_SPECS[model_name]
 
         # Create fully configured ModelConfig
@@ -347,6 +397,18 @@ async def get_provider_model(
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
             model_name = ModelName.GEMINI_3_PRO_PREVIEW
+
+        # Apply sub-agent model mapping for cost optimization
+        if for_sub_agent:
+            original_model = model_name
+            model_name = get_sub_agent_model(model_name)
+            if model_name != original_model:
+                logger.debug(
+                    "Sub-agent model substitution: %s -> %s",
+                    original_model.value,
+                    model_name.value,
+                )
+
         spec = MODEL_SPECS[model_name]
 
         # Create fully configured ModelConfig

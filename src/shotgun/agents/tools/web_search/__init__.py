@@ -5,12 +5,13 @@ Provides web search capabilities for multiple LLM providers:
 - Anthropic: Uses Messages API with web_search_20250305 tool
 - Gemini: Uses grounding with Google Search via Pydantic AI
 
-All web search tools are available for both Shotgun Account and BYOK users.
+Web search uses the provider matching the user's selected model for consistency.
 """
 
 from collections.abc import Awaitable, Callable
 
-from shotgun.agents.config.models import ProviderType
+from shotgun.agents.config.manager import get_config_manager
+from shotgun.agents.config.models import MODEL_SPECS, ProviderType
 from shotgun.logging_config import get_logger
 
 from .anthropic import anthropic_web_search_tool
@@ -23,38 +24,55 @@ logger = get_logger(__name__)
 # Type alias for web search tools (all now async)
 WebSearchTool = Callable[[str], Awaitable[str]]
 
+# Map providers to their web search tools
+_PROVIDER_WEB_SEARCH_TOOLS: dict[ProviderType, WebSearchTool] = {
+    ProviderType.OPENAI: openai_web_search_tool,
+    ProviderType.ANTHROPIC: anthropic_web_search_tool,
+    ProviderType.GOOGLE: gemini_web_search_tool,
+}
+
 
 async def get_available_web_search_tools() -> list[WebSearchTool]:
-    """Get list of available web search tools based on configured API keys.
+    """Get web search tool matching the user's selected provider.
 
-    Works with both Shotgun Account (via LiteLLM proxy) and BYOK (individual provider keys).
-    All web search tools are available for Shotgun Account users.
+    Prefers the web search tool from the same provider as the user's selected model.
+    Falls back to other available providers if the preferred one isn't available.
 
     Returns:
-        List of web search tool functions that have API keys configured
+        List containing the preferred web search tool, or empty if none available
     """
-    tools: list[WebSearchTool] = []
-
     logger.debug("🔍 Checking available web search tools")
 
-    if await is_provider_available(ProviderType.OPENAI):
-        logger.debug("✅ OpenAI web search tool available")
-        tools.append(openai_web_search_tool)
+    # Get user's selected model to determine preferred provider
+    config_manager = get_config_manager()
+    config = await config_manager.load(force_reload=False)
 
-    if await is_provider_available(ProviderType.ANTHROPIC):
-        logger.debug("✅ Anthropic web search tool available")
-        tools.append(anthropic_web_search_tool)
+    preferred_provider: ProviderType | None = None
+    if config.selected_model and config.selected_model in MODEL_SPECS:
+        preferred_provider = MODEL_SPECS[config.selected_model].provider
+        logger.debug(
+            "User selected model %s, preferring %s web search",
+            config.selected_model.value,
+            preferred_provider.value,
+        )
 
-    if await is_provider_available(ProviderType.GOOGLE):
-        logger.debug("✅ Gemini web search tool available")
-        tools.append(gemini_web_search_tool)
+    # Try preferred provider first
+    if preferred_provider and await is_provider_available(preferred_provider):
+        tool = _PROVIDER_WEB_SEARCH_TOOLS[preferred_provider]
+        logger.info(
+            "🔍 Using %s web search (matches selected model)", preferred_provider.value
+        )
+        return [tool]
 
-    if not tools:
-        logger.warning("⚠️ No web search tools available - no API keys configured")
-    else:
-        logger.info("🔍 %d web search tool(s) available", len(tools))
+    # Fall back to any available provider
+    for provider in ProviderType:
+        if await is_provider_available(provider):
+            tool = _PROVIDER_WEB_SEARCH_TOOLS[provider]
+            logger.info("🔍 Using %s web search (fallback)", provider.value)
+            return [tool]
 
-    return tools
+    logger.warning("⚠️ No web search tools available - no API keys configured")
+    return []
 
 
 __all__ = [

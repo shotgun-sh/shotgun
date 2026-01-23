@@ -6,7 +6,7 @@ from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
-from shotgun.agents.config.models import ProviderType
+from shotgun.agents.config.models import ModelName
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
@@ -45,8 +45,9 @@ async def anthropic_web_search_tool(query: str) -> str:
     logger.debug("📡 Executing Anthropic web search with prompt: %s", query)
 
     # Get model configuration (supports both Shotgun and BYOK)
+    # Use Haiku (cheapest Anthropic model) for web search
     try:
-        model_config = await get_provider_model(ProviderType.ANTHROPIC)
+        model_config = await get_provider_model(ModelName.CLAUDE_HAIKU_4_5)
     except ValueError as e:
         error_msg = f"Anthropic API key not configured: {str(e)}"
         logger.error("❌ %s", error_msg)
@@ -141,7 +142,7 @@ async def main() -> None:
     # Check if API key is available
     try:
         if callable(get_provider_model):
-            model_config = await get_provider_model(ProviderType.ANTHROPIC)
+            model_config = await get_provider_model(ModelName.CLAUDE_HAIKU_4_5)
             if not model_config.api_key:
                 raise ValueError("No API key configured")
     except (ValueError, Exception):

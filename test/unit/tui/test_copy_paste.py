@@ -54,9 +54,7 @@ class TestChatHistoryOnClickLogic:
         source = inspect.getsource(ChatHistory.on_click)
 
         # Verify the method checks for selected text
-        assert "get_selected_text" in source, (
-            "on_click should check for selected text"
-        )
+        assert "get_selected_text" in source, "on_click should check for selected text"
         # Verify it only handles left clicks
         assert "button" in source, "on_click should check button type"
 
@@ -100,7 +98,9 @@ class TestCopyPasteIntegration:
         copy_called = False
         quit_pending = False
 
-        async def mock_smart_quit(screen_get_selected_text, copy_to_clipboard, start_quit_pending):
+        async def mock_smart_quit(
+            screen_get_selected_text, copy_to_clipboard, start_quit_pending
+        ):
             """Simulates the smart_quit logic with selection."""
             nonlocal copy_called, quit_pending
 
@@ -201,9 +201,9 @@ class TestQuitConfirmation:
 
         assert hasattr(ShotgunApp, "quit_pending")
         # It should be a property
-        assert isinstance(
-            ShotgunApp.quit_pending, property
-        ), "quit_pending should be a property"
+        assert isinstance(ShotgunApp.quit_pending, property), (
+            "quit_pending should be a property"
+        )
 
     def test_app_has_reset_quit_pending_method(self):
         """Verify ShotgunApp has the _reset_quit_pending method."""
@@ -231,4 +231,6 @@ class TestQuitConfirmation:
                 break
 
         assert escape_binding is not None, "escape binding should exist"
-        assert escape_binding.action == "cancel_quit", "escape should trigger cancel_quit"
+        assert escape_binding.action == "cancel_quit", (
+            "escape should trigger cancel_quit"
+        )

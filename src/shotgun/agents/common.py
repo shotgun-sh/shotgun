@@ -130,6 +130,7 @@ async def create_base_agent(
     additional_tools: list[Any] | None = None,
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
+    for_sub_agent: bool = False,
 ) -> tuple[ShotgunAgent, AgentDeps]:
     """Create a base agent with common configuration.
 
@@ -140,6 +141,7 @@ async def create_base_agent(
         additional_tools: Optional list of additional tools
         provider: Optional provider override. If None, uses configured default
         agent_mode: The mode of the agent (research, plan, tasks, specify, export)
+        for_sub_agent: If True, use cheaper model for cost optimization
 
     Returns:
         Tuple of (Configured Pydantic AI agent, Agent dependencies)
@@ -148,7 +150,7 @@ async def create_base_agent(
 
     # Get configured model or fall back to first available provider
     try:
-        model_config = await get_provider_model(provider)
+        model_config = await get_provider_model(provider, for_sub_agent=for_sub_agent)
         provider_name = model_config.provider
         logger.debug(
             "🤖 Creating agent with configured %s model: %s",

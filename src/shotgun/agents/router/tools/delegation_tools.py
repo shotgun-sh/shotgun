@@ -82,9 +82,8 @@ async def prepare_delegation_tool(
 
 
 # Type aliases for factory functions
-CreateAgentFn = Callable[
-    [AgentRuntimeOptions], Awaitable[tuple[ShotgunAgent, AgentDeps]]
-]
+# Note: Create functions accept AgentRuntimeOptions and optional for_sub_agent kwarg
+CreateAgentFn = Callable[..., Awaitable[tuple[ShotgunAgent, AgentDeps]]]
 RunAgentFn = Callable[..., Awaitable[Any]]
 
 # Maximum retries for transient errors
@@ -177,7 +176,7 @@ async def _get_or_create_sub_agent(
     runtime_options = _create_agent_runtime_options(deps)
 
     logger.debug("Creating new %s agent for delegation", agent_type.value)
-    agent, agent_deps = await create_fn(runtime_options)
+    agent, agent_deps = await create_fn(runtime_options, for_sub_agent=True)
 
     # Cache for reuse
     cache_entry: SubAgentCacheEntry = (agent, agent_deps)
