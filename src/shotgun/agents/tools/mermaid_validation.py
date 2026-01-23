@@ -6,10 +6,17 @@ files that contain mermaid diagrams, ensuring they render correctly.
 
 import os
 import re
+from typing import Any
 
 import httpx
 from pydantic import BaseModel
 from pydantic_ai import RunContext
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
@@ -18,8 +25,11 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 # API configuration
-MERMAID_API_URL = os.environ.get("MERMAID_API_URL", "http://localhost:8080")
+MERMAID_API_URL = os.environ.get(
+    "MERMAID_API_URL", "https://mermaid-validator-219702594231.us-east4.run.app"
+)
 MERMAID_API_TIMEOUT = float(os.environ.get("MERMAID_API_TIMEOUT", "30"))
+MERMAID_API_MAX_RETRIES = int(os.environ.get("MERMAID_API_MAX_RETRIES", "3"))
 
 # Shotgun identification for API requests
 SHOTGUN_INSTANCE_ID = os.environ.get(
@@ -50,112 +60,175 @@ class MermaidBatchResult(BaseModel):
         return self.invalid_count == 0
 
 
+class MermaidAPIError(Exception):
+    """Raised when the mermaid API returns a retryable error."""
+
+
+# Retry decorator with exponential backoff and jitter for API resilience
+_retry_on_transient_errors = retry(
+    retry=retry_if_exception_type(
+        (httpx.TimeoutException, httpx.RequestError, MermaidAPIError)
+    ),
+    stop=stop_after_attempt(MERMAID_API_MAX_RETRIES),
+    wait=wait_exponential_jitter(initial=1, max=10, jitter=2),
+    reraise=True,
+)
+
+
+async def _make_validation_request(
+    client: httpx.AsyncClient, diagram: str
+) -> dict[str, Any]:
+    """Make a single validation request to the API. Raises on retryable errors."""
+    response = await client.post(
+        f"{MERMAID_API_URL}/validate",
+        json={
+            "shotgun_instance_id": SHOTGUN_INSTANCE_ID,
+            "shotgun_version": SHOTGUN_VERSION,
+            "diagram": diagram,
+        },
+    )
+    # Retry on 5xx server errors
+    if response.status_code >= 500:
+        raise MermaidAPIError(f"Server error: {response.status_code}")
+    response.raise_for_status()
+    result: dict[str, Any] = response.json()
+    return result
+
+
+async def _make_batch_validation_request(
+    client: httpx.AsyncClient, diagrams: list[dict[str, str]]
+) -> dict[str, Any]:
+    """Make a batch validation request to the API. Raises on retryable errors."""
+    response = await client.post(
+        f"{MERMAID_API_URL}/validate/batch",
+        json={
+            "shotgun_instance_id": SHOTGUN_INSTANCE_ID,
+            "shotgun_version": SHOTGUN_VERSION,
+            "diagrams": diagrams,
+        },
+    )
+    # Retry on 5xx server errors
+    if response.status_code >= 500:
+        raise MermaidAPIError(f"Server error: {response.status_code}")
+    response.raise_for_status()
+    result: dict[str, Any] = response.json()
+    return result
+
+
 async def _call_validation_api(diagram: str) -> MermaidValidationResult:
-    """Call the mermaid validation API for a single diagram."""
-    async with httpx.AsyncClient(timeout=MERMAID_API_TIMEOUT) as client:
-        try:
-            response = await client.post(
-                f"{MERMAID_API_URL}/validate",
-                json={
-                    "shotgun_instance_id": SHOTGUN_INSTANCE_ID,
-                    "shotgun_version": SHOTGUN_VERSION,
-                    "diagram": diagram,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
+    """Call the mermaid validation API for a single diagram with retries."""
 
-            if data.get("valid"):
-                return MermaidValidationResult(
-                    valid=True,
-                    diagram_type=data.get("diagramType"),
-                )
-            else:
-                error = data.get("error", {})
-                return MermaidValidationResult(
-                    valid=False,
-                    error_message=error.get("message"),
-                    error_line=error.get("line"),
-                )
+    @_retry_on_transient_errors
+    async def _request_with_retry() -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=MERMAID_API_TIMEOUT) as client:
+            return await _make_validation_request(client, diagram)
 
-        except httpx.TimeoutException:
+    try:
+        data = await _request_with_retry()
+
+        if data.get("valid"):
+            return MermaidValidationResult(
+                valid=True,
+                diagram_type=data.get("diagramType"),
+            )
+        else:
+            error = data.get("error", {})
             return MermaidValidationResult(
                 valid=False,
-                error_message="Validation API request timed out",
+                error_message=error.get("message"),
+                error_line=error.get("line"),
             )
-        except httpx.RequestError as e:
-            return MermaidValidationResult(
-                valid=False,
-                error_message=f"Validation API request failed: {e}",
-            )
-        except Exception as e:
-            return MermaidValidationResult(
-                valid=False,
-                error_message=f"Unexpected error during validation: {e}",
-            )
+
+    except httpx.TimeoutException:
+        return MermaidValidationResult(
+            valid=False,
+            error_message=f"Validation API request timed out after {MERMAID_API_MAX_RETRIES} retries",
+        )
+    except httpx.RequestError as e:
+        return MermaidValidationResult(
+            valid=False,
+            error_message=f"Validation API request failed after {MERMAID_API_MAX_RETRIES} retries: {e}",
+        )
+    except MermaidAPIError as e:
+        return MermaidValidationResult(
+            valid=False,
+            error_message=f"Validation API server error after {MERMAID_API_MAX_RETRIES} retries: {e}",
+        )
+    except Exception as e:
+        return MermaidValidationResult(
+            valid=False,
+            error_message=f"Unexpected error during validation: {e}",
+        )
 
 
 async def _call_batch_validation_api(
     diagrams: list[dict[str, str]],
 ) -> list[MermaidValidationResult]:
-    """Call the mermaid validation API for multiple diagrams."""
-    async with httpx.AsyncClient(timeout=MERMAID_API_TIMEOUT) as client:
-        try:
-            response = await client.post(
-                f"{MERMAID_API_URL}/validate/batch",
-                json={
-                    "shotgun_instance_id": SHOTGUN_INSTANCE_ID,
-                    "shotgun_version": SHOTGUN_VERSION,
-                    "diagrams": diagrams,
-                },
+    """Call the mermaid validation API for multiple diagrams with retries."""
+
+    @_retry_on_transient_errors
+    async def _request_with_retry() -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=MERMAID_API_TIMEOUT) as client:
+            return await _make_batch_validation_request(client, diagrams)
+
+    try:
+        data = await _request_with_retry()
+
+        results = []
+        results_list = data.get("results", [])
+        if not isinstance(results_list, list):
+            results_list = []
+        for item in results_list:
+            if item.get("valid"):
+                results.append(
+                    MermaidValidationResult(
+                        valid=True,
+                        diagram_type=item.get("diagramType"),
+                    )
+                )
+            else:
+                error = item.get("error", {})
+                results.append(
+                    MermaidValidationResult(
+                        valid=False,
+                        error_message=error.get("message"),
+                        error_line=error.get("line"),
+                    )
+                )
+        return results
+
+    except httpx.TimeoutException:
+        return [
+            MermaidValidationResult(
+                valid=False,
+                error_message=f"Validation API request timed out after {MERMAID_API_MAX_RETRIES} retries",
             )
-            response.raise_for_status()
-            data = response.json()
-
-            results = []
-            for item in data.get("results", []):
-                if item.get("valid"):
-                    results.append(
-                        MermaidValidationResult(
-                            valid=True,
-                            diagram_type=item.get("diagramType"),
-                        )
-                    )
-                else:
-                    error = item.get("error", {})
-                    results.append(
-                        MermaidValidationResult(
-                            valid=False,
-                            error_message=error.get("message"),
-                            error_line=error.get("line"),
-                        )
-                    )
-            return results
-
-        except httpx.TimeoutException:
-            return [
-                MermaidValidationResult(
-                    valid=False,
-                    error_message="Validation API request timed out",
-                )
-                for _ in diagrams
-            ]
-        except httpx.RequestError as e:
-            return [
-                MermaidValidationResult(
-                    valid=False,
-                    error_message=f"Validation API request failed: {e}",
-                )
-                for _ in diagrams
-            ]
-        except Exception as e:
-            return [
-                MermaidValidationResult(
-                    valid=False,
-                    error_message=f"Unexpected error during validation: {e}",
-                )
-                for _ in diagrams
-            ]
+            for _ in diagrams
+        ]
+    except httpx.RequestError as e:
+        return [
+            MermaidValidationResult(
+                valid=False,
+                error_message=f"Validation API request failed after {MERMAID_API_MAX_RETRIES} retries: {e}",
+            )
+            for _ in diagrams
+        ]
+    except MermaidAPIError as e:
+        return [
+            MermaidValidationResult(
+                valid=False,
+                error_message=f"Validation API server error after {MERMAID_API_MAX_RETRIES} retries: {e}",
+            )
+            for _ in diagrams
+        ]
+    except Exception as e:
+        return [
+            MermaidValidationResult(
+                valid=False,
+                error_message=f"Unexpected error during validation: {e}",
+            )
+            for _ in diagrams
+        ]
 
 
 # Pattern to extract mermaid code blocks from markdown
