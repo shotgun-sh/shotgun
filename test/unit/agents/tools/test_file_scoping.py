@@ -219,3 +219,61 @@ async def test_read_file_not_restricted_by_agent_mode(
 
     content = await read_file(mock_context, "tasks.md")
     assert content == "Tasks content"
+
+
+@pytest.mark.asyncio
+async def test_write_file_normalizes_shotgun_prefix(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that paths with .shotgun/ prefix are normalized correctly."""
+    # Setup
+    mock_context.deps.agent_mode = AgentType.RESEARCH
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    # Research agent should be able to write with .shotgun/ prefix
+    result = await write_file(
+        mock_context, ".shotgun/research/topic.md", "Topic content"
+    )
+    assert "Successfully wrote" in result
+    assert (tmp_path / "research" / "topic.md").exists()
+
+    # Should also work for root files with .shotgun/ prefix
+    result = await write_file(mock_context, ".shotgun/research.md", "Research content")
+    assert "Successfully wrote" in result
+    assert (tmp_path / "research.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_write_file_rejects_invalid_paths_with_shotgun_prefix(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that invalid paths are still rejected even with .shotgun/ prefix."""
+    # Setup
+    mock_context.deps.agent_mode = AgentType.RESEARCH
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    # Research agent should NOT be able to write to plan.md even with .shotgun/ prefix
+    result = await write_file(mock_context, ".shotgun/plan.md", "Test content")
+    assert "Error" in result
+    assert "Research agent can only write to" in result
+
+
+@pytest.mark.asyncio
+async def test_read_file_normalizes_shotgun_prefix(mock_context, tmp_path, monkeypatch):
+    """Test that read_file normalizes .shotgun/ prefix correctly."""
+    # Setup
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    # Create test file
+    (tmp_path / "research.md").write_text("Research content")
+
+    # Should be able to read with .shotgun/ prefix
+    mock_context.deps.agent_mode = AgentType.RESEARCH
+    content = await read_file(mock_context, ".shotgun/research.md")
+    assert content == "Research content"

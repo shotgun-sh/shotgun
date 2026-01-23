@@ -49,7 +49,7 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
     """Validate and resolve a file path within the agent's scoped directory.
 
     Args:
-        filename: Relative filename
+        filename: Relative filename (with or without .shotgun/ prefix)
         agent_mode: The current agent mode
 
     Returns:
@@ -59,6 +59,11 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
         ValueError: If the path attempts to access files outside the agent's scope
     """
     base_path = get_shotgun_base_path()
+
+    # Normalize filename: strip .shotgun/ prefix if present
+    # Agents may pass paths like ".shotgun/research/foo.md" or "research/foo.md"
+    if filename.startswith(".shotgun/"):
+        filename = filename[len(".shotgun/") :]
 
     if agent_mode and agent_mode in AGENT_DIRECTORIES:
         # For export mode, allow writing to any file except protected agent files
@@ -139,7 +144,7 @@ def _validate_shotgun_path(filename: str) -> Path:
     """Validate and resolve a file path within the .shotgun directory.
 
     Args:
-        filename: Relative filename within .shotgun directory
+        filename: Relative filename within .shotgun directory (with or without .shotgun/ prefix)
 
     Returns:
         Absolute path to the file within .shotgun directory
@@ -148,6 +153,11 @@ def _validate_shotgun_path(filename: str) -> Path:
         ValueError: If the path attempts to access files outside .shotgun directory
     """
     base_path = get_shotgun_base_path()
+
+    # Normalize filename: strip .shotgun/ prefix if present
+    # Agents may pass paths like ".shotgun/research/foo.md" or "research/foo.md"
+    if filename.startswith(".shotgun/"):
+        filename = filename[len(".shotgun/") :]
 
     # Create the full path
     full_path = (base_path / filename).resolve()
