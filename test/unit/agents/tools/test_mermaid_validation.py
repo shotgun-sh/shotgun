@@ -174,7 +174,9 @@ class TestCallValidationApi:
     async def test_timeout_error(self):
         with patch("httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
-            mock_instance.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
+            mock_instance.post = AsyncMock(
+                side_effect=httpx.TimeoutException("timeout")
+            )
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
@@ -257,7 +259,9 @@ class TestCallBatchValidationApi:
     async def test_batch_timeout_error(self):
         with patch("httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
-            mock_instance.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
+            mock_instance.post = AsyncMock(
+                side_effect=httpx.TimeoutException("timeout")
+            )
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
@@ -314,7 +318,9 @@ class TestValidateMermaidInContent:
     async def test_no_diagrams(self):
         mock_ctx = MagicMock()
 
-        result = await validate_mermaid_in_content(mock_ctx, "# Just text\n\nNo diagrams here.")
+        result = await validate_mermaid_in_content(
+            mock_ctx, "# Just text\n\nNo diagrams here."
+        )
 
         assert "No mermaid diagrams found" in result
 

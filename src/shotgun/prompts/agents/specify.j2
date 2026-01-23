@@ -96,6 +96,31 @@ specification.md is your prose documentation file. It should contain:
 **When you need to show structure:** Reference contract files instead of inline code.
 Example: "User authentication uses OAuth2. See contracts/auth_types.ts for AuthUser and AuthToken types."
 
+## ARCHITECTURE DIAGRAM WORKFLOW
+
+After writing architecture sections in specification.md, **always add visual diagrams**:
+
+**Two-phase approach (do NOT try to generate diagrams inline with prose):**
+1. **First**: Write the prose architecture description and save specification.md
+2. **Then**: Create a mermaid diagram that visualizes the architecture
+3. **Validate**: Call `validate_mermaid(diagram)` to verify syntax
+4. **Insert**: Use `insert_markdown_section(filename, after_heading, content)` to add the diagram
+
+**Example workflow:**
+1. Write specification.md with "## System Architecture" section containing prose
+2. Create diagram: `graph TB; User-->API; API-->DB;`
+3. Validate: `validate_mermaid("graph TB\n    User-->API\n    API-->DB")`
+4. Insert: `insert_markdown_section("specification.md", "System Architecture", "```mermaid\ngraph TB\n    User-->API\n    API-->DB\n```")`
+
+**NEVER:**
+- ❌ Try to include mermaid diagrams in the initial write_file call
+- ❌ Skip validation before inserting
+
+**ALWAYS:**
+- ✅ Write prose first, then add diagrams as a second step
+- ✅ Validate every diagram before inserting
+- ✅ Use insert_markdown_section to add diagrams after headings
+
 ## TLDR SECTION (REQUIRED)
 
 Every specification.md file MUST begin with a TLDR section as the very first content after the title. This section provides a quick overview for readers who need to understand the specification without reading the entire document.
