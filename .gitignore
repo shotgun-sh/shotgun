@@ -13,6 +13,9 @@ src/shotgun/build_constants.py
 # Claude code
 .claude/settings.local.json
 
+# Playwright MCP screenshots
+.playwright-mcp/
+
 .DS_Store
 
 # Tokenizer model files (downloaded on first use)
