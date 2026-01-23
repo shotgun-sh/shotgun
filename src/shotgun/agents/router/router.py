@@ -10,6 +10,7 @@ from functools import partial
 from pydantic_ai import Agent, Tool
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
+from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.common import (
     add_system_status_message,
@@ -169,12 +170,20 @@ async def run_router_agent(
     try:
         usage_limits = create_usage_limits()
 
+        # Disable parallel tool calls for the Router agent.
+        # This prevents models like GPT-5.2 from calling multiple delegation tools
+        # simultaneously, which would run multiple sub-agents in parallel and
+        # cause race conditions with shared state (active_sub_agent, file_tracker).
+        # Sub-agents must run sequentially to maintain proper state management.
+        router_model_settings: ModelSettings = {"parallel_tool_calls": False}
+
         result = await run_agent(
             agent=agent,  # type: ignore[arg-type]
             prompt=prompt,
             deps=deps,
             message_history=message_history,
             usage_limits=usage_limits,
+            model_settings=router_model_settings,
         )
 
         logger.debug("Router agent completed successfully")
