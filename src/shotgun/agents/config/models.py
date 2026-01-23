@@ -165,6 +165,23 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
     ),
 }
 
+# Sub-agent model mappings for cost optimization
+# Maps expensive models to cheaper alternatives from the same provider
+SUB_AGENT_MODEL_MAPPINGS: dict[ModelName, ModelName] = {
+    # Anthropic: premium models use Haiku for sub-agents
+    ModelName.CLAUDE_OPUS_4_5: ModelName.CLAUDE_HAIKU_4_5,
+    ModelName.CLAUDE_SONNET_4_5: ModelName.CLAUDE_HAIKU_4_5,
+    # Gemini: Pro uses Flash for sub-agents
+    ModelName.GEMINI_3_PRO_PREVIEW: ModelName.GEMINI_3_FLASH_PREVIEW,
+    # OpenAI: 5.2 uses 5.1 for sub-agents
+    ModelName.GPT_5_2: ModelName.GPT_5_1,
+}
+
+
+def get_sub_agent_model(main_model: ModelName) -> ModelName:
+    """Get the cheaper model for sub-agents, or same model if no cheaper alternative."""
+    return SUB_AGENT_MODEL_MAPPINGS.get(main_model, main_model)
+
 
 class OpenAIConfig(BaseModel):
     """Configuration for OpenAI provider."""

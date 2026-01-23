@@ -74,14 +74,19 @@ async def openai_web_search_tool(query: str) -> str:
         if model_config.is_shotgun_account:
             logger.debug("🔑 Using Shotgun Account proxy for OpenAI web search")
             client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_PROXY_OPENAI_BASE)
+            # Use gpt-5.2 for web search on Shotgun Account
+            # The proxy requires openai/ prefix for LiteLLM routing
+            web_search_model = "openai/gpt-5.2"
         else:
             client = AsyncOpenAI(api_key=api_key)
+            # BYOK users can use gpt-5-mini directly
+            web_search_model = "gpt-5-mini"
 
         # Wrap API call with timeout to prevent indefinite hangs
         try:
             response = await asyncio.wait_for(
                 client.responses.create(
-                    model="gpt-5-mini",
+                    model=web_search_model,
                     input=[
                         {
                             "role": "user",

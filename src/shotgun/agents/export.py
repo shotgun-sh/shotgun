@@ -23,13 +23,16 @@ logger = get_logger(__name__)
 
 
 async def create_export_agent(
-    agent_runtime_options: AgentRuntimeOptions, provider: ProviderType | None = None
+    agent_runtime_options: AgentRuntimeOptions,
+    provider: ProviderType | None = None,
+    for_sub_agent: bool = False,
 ) -> tuple[ShotgunAgent, AgentDeps]:
     """Create an export agent with file management capabilities.
 
     Args:
         agent_runtime_options: Agent runtime options for the agent
         provider: Optional provider override. If None, uses configured default
+        for_sub_agent: If True, use cheaper model for cost optimization
 
     Returns:
         Tuple of (Configured Pydantic AI agent for export management, Agent dependencies)
@@ -43,6 +46,7 @@ async def create_export_agent(
         agent_runtime_options,
         provider=provider,
         agent_mode=AgentType.EXPORT,
+        for_sub_agent=for_sub_agent,
     )
     return agent, deps
 
