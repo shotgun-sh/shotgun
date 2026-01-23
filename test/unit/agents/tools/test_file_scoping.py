@@ -6,7 +6,11 @@ import pytest
 from pydantic_ai import RunContext
 
 from shotgun.agents.models import AgentDeps, AgentType, FileOperationTracker
-from shotgun.agents.tools.file_management import read_file, write_file
+from shotgun.agents.tools.file_management import (
+    _normalize_shotgun_filename,
+    read_file,
+    write_file,
+)
 
 
 @pytest.fixture
@@ -277,3 +281,45 @@ async def test_read_file_normalizes_shotgun_prefix(mock_context, tmp_path, monke
     mock_context.deps.agent_mode = AgentType.RESEARCH
     content = await read_file(mock_context, ".shotgun/research.md")
     assert content == "Research content"
+
+
+def test_normalize_shotgun_filename_strips_unix_prefix():
+    """Test that _normalize_shotgun_filename strips Unix-style .shotgun/ prefix."""
+    assert _normalize_shotgun_filename(".shotgun/research.md") == "research.md"
+    assert (
+        _normalize_shotgun_filename(".shotgun/research/topic.md") == "research/topic.md"
+    )
+    assert _normalize_shotgun_filename("research.md") == "research.md"
+
+
+def test_normalize_shotgun_filename_strips_windows_prefix():
+    """Test that _normalize_shotgun_filename strips Windows-style .shotgun\\ prefix."""
+    assert _normalize_shotgun_filename(".shotgun\\research.md") == "research.md"
+    assert (
+        _normalize_shotgun_filename(".shotgun\\research\\topic.md")
+        == "research\\topic.md"
+    )
+
+
+def test_normalize_shotgun_filename_preserves_paths_without_prefix():
+    """Test that paths without .shotgun prefix are unchanged."""
+    assert _normalize_shotgun_filename("research.md") == "research.md"
+    assert _normalize_shotgun_filename("research/topic.md") == "research/topic.md"
+    assert _normalize_shotgun_filename("contracts/api.ts") == "contracts/api.ts"
+
+
+@pytest.mark.asyncio
+async def test_write_file_normalizes_windows_style_prefix(
+    mock_context, tmp_path, monkeypatch
+):
+    """Test that Windows-style .shotgun\\ prefix is normalized correctly."""
+    # Setup
+    mock_context.deps.agent_mode = AgentType.RESEARCH
+    monkeypatch.setattr(
+        "shotgun.agents.tools.file_management.get_shotgun_base_path", lambda: tmp_path
+    )
+
+    # Research agent should be able to write with Windows-style .shotgun\\ prefix
+    result = await write_file(mock_context, ".shotgun\\research.md", "Research content")
+    assert "Successfully wrote" in result
+    assert (tmp_path / "research.md").exists()

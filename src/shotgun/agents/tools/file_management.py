@@ -44,6 +44,29 @@ PROTECTED_AGENT_FILES = {
     "tasks.md",
 }
 
+# Prefix patterns to strip (forward slash for Unix, backslash for Windows)
+_SHOTGUN_PREFIXES = (".shotgun/", ".shotgun\\")
+
+
+def _normalize_shotgun_filename(filename: str) -> str:
+    """Normalize a filename by stripping .shotgun/ or .shotgun\\ prefix if present.
+
+    Handles both Unix (/) and Windows (\\) path separators for cross-platform
+    compatibility. Agents may pass paths like ".shotgun/research/foo.md" or
+    ".shotgun\\research\\foo.md" when the validation expects paths relative
+    to .shotgun (e.g., "research/foo.md").
+
+    Args:
+        filename: Filename that may include .shotgun prefix
+
+    Returns:
+        Filename with .shotgun prefix stripped if present
+    """
+    for prefix in _SHOTGUN_PREFIXES:
+        if filename.startswith(prefix):
+            return filename[len(prefix) :]
+    return filename
+
 
 def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> Path:
     """Validate and resolve a file path within the agent's scoped directory.
@@ -59,11 +82,7 @@ def _validate_agent_scoped_path(filename: str, agent_mode: AgentType | None) -> 
         ValueError: If the path attempts to access files outside the agent's scope
     """
     base_path = get_shotgun_base_path()
-
-    # Normalize filename: strip .shotgun/ prefix if present
-    # Agents may pass paths like ".shotgun/research/foo.md" or "research/foo.md"
-    if filename.startswith(".shotgun/"):
-        filename = filename[len(".shotgun/") :]
+    filename = _normalize_shotgun_filename(filename)
 
     if agent_mode and agent_mode in AGENT_DIRECTORIES:
         # For export mode, allow writing to any file except protected agent files
@@ -153,11 +172,7 @@ def _validate_shotgun_path(filename: str) -> Path:
         ValueError: If the path attempts to access files outside .shotgun directory
     """
     base_path = get_shotgun_base_path()
-
-    # Normalize filename: strip .shotgun/ prefix if present
-    # Agents may pass paths like ".shotgun/research/foo.md" or "research/foo.md"
-    if filename.startswith(".shotgun/"):
-        filename = filename[len(".shotgun/") :]
+    filename = _normalize_shotgun_filename(filename)
 
     # Create the full path
     full_path = (base_path / filename).resolve()
