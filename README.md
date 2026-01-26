@@ -156,7 +156,7 @@ _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
 # 🎥 Demo
 
 <p align="center">
-  <a href="https://youtu.be/nR6iKbJ8l_I">
+  <a href="https://youtu.be/hGryc6YZr2o">
     <img src="https://github.com/user-attachments/assets/37eae206-0d6f-4499-b980-2f33a5aed65d" alt="Watch the Shotgun demo" width="720" height="405">
   </a>
 </p>
