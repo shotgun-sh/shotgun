@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="{{ config.static.url }}css/xterm.css" />
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Roboto%20Mono"
+    />
+    <script src="{{ config.static.url }}js/textual.js"></script>
+    <style>
+      body {
+        background: #0c181f;
+      }
+
+      .dialog-container {
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        box-shadow: var(--shadow-elevation-high);
+      }
+      .shade {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: #0c181f;
+        background-image: url("{{ config.static.url }}images/background.png");
+      }
+      .intro {
+        width: 640px;
+        height: 240px;
+        font-size: 16px;
+        z-index: 20;
+        font-family: "Roboto Mono", menlo, monospace;
+        text-align: center;
+        opacity: 1;
+        color: rgba(255, 255, 255, 0.95);
+        background-color: #12232d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 32px;
+      }
+
+      body.-first-byte .intro-dialog,
+      body.-first-byte .intro-dialog .shade {
+        opacity: 0;
+        transition: opacity 0.3s ease-out;
+        display: none;
+      }
+
+      body .textual-terminal {
+        opacity: 0;
+        transition: opacity 0.3s ease-out;
+      }
+
+      body.-first-byte .textual-terminal {
+        opacity: 1;
+        transition: opacity 0.3s ease-out;
+      }
+
+      .intro svg {
+        padding-right: 16px;
+      }
+
+      body Button {
+        padding: 16px 32px;
+        background-color: #5e0ba7;
+        color: rgba(255, 255, 255, 0.95);
+        border: none;
+        font-family: "Roboto Mono", menlo, monospace;
+        margin: 16px;
+        display: block;
+      }
+
+      Button:hover {
+        background: #ac5af4;
+        cursor: pointer;
+      }
+
+      .closed-dialog {
+        opacity: 0;
+        display: none;
+      }
+
+      body.-closed .closed-dialog {
+        opacity: 1;
+        display: flex;
+      }
+
+      #start {
+        display: none;
+      }
+
+      #start.-delay {
+        display: flex;
+      }
+
+      /* Testing overlay styles */
+      #shotgun-test-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1000;
+      }
+
+      #shotgun-test-overlay.active {
+        pointer-events: auto;
+      }
+
+      .test-button {
+        position: absolute;
+        background: rgba(76, 175, 80, 0.8);
+        color: white;
+        border: 2px solid white;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-family: "Roboto Mono", monospace;
+        font-size: 12px;
+        z-index: 1001;
+        pointer-events: auto;
+      }
+
+      .test-button:hover {
+        background: rgba(76, 175, 80, 1);
+      }
+
+      #shotgun-test-status {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #4caf50;
+        padding: 8px 16px;
+        font-family: "Roboto Mono", monospace;
+        font-size: 11px;
+        z-index: 1002;
+        display: none;
+      }
+
+      body.shotgun-testing #shotgun-test-status {
+        display: block;
+      }
+    </style>
+    <script>
+      function getStartUrl() {
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams(url.search);
+        params.delete("delay");
+        return url.pathname + "?" + params.toString();
+      }
+      async function refresh() {
+        const ping_url = document.body.dataset.pingurl;
+        if (ping_url) {
+          await fetch(ping_url, {
+            method: "GET",
+            mode: "no-cors",
+          });
+        }
+        window.location.href = getStartUrl();
+      }
+
+      // Intercept WebSocket creation to capture the terminal connection
+      (function() {
+        const OriginalWebSocket = window.WebSocket;
+        window._capturedWebSockets = [];
+
+        window.WebSocket = function(url, protocols) {
+          const ws = protocols
+            ? new OriginalWebSocket(url, protocols)
+            : new OriginalWebSocket(url);
+
+          // Capture websockets that look like terminal connections
+          if (url.includes('/ws')) {
+            window._capturedWebSockets.push(ws);
+            console.log('[ShotgunTest] Captured WebSocket:', url);
+          }
+
+          return ws;
+        };
+        window.WebSocket.prototype = OriginalWebSocket.prototype;
+        window.WebSocket.CONNECTING = OriginalWebSocket.CONNECTING;
+        window.WebSocket.OPEN = OriginalWebSocket.OPEN;
+        window.WebSocket.CLOSING = OriginalWebSocket.CLOSING;
+        window.WebSocket.CLOSED = OriginalWebSocket.CLOSED;
+      })();
+
+      /**
+       * Shotgun Testing API
+       *
+       * This API provides methods for automated testing of the Shotgun TUI
+       * when served via textual-serve. It works by sending keyboard input
+       * directly to the terminal.
+       *
+       * Usage in Playwright:
+       *   await page.evaluate(() => shotgunTest.pressKey('Tab'));
+       *   await page.evaluate(() => shotgunTest.type('hello world'));
+       *   await page.evaluate(() => shotgunTest.pressEnter());
+       */
+      window.shotgunTest = {
+        _terminal: null,
+        _ws: null,
+
+        /**
+         * Initialize the test API by finding the WebSocket connection
+         */
+        init() {
+          // Get the captured WebSocket
+          if (window._capturedWebSockets && window._capturedWebSockets.length > 0) {
+            this._ws = window._capturedWebSockets[window._capturedWebSockets.length - 1];
+          }
+
+          // Enable testing mode indicator
+          document.body.classList.add('shotgun-testing');
+
+          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+            this._updateStatus('Test API initialized (WebSocket connected)');
+            return true;
+          } else {
+            this._updateStatus('Test API initialized (waiting for WebSocket...)');
+            return false;
+          }
+        },
+
+        /**
+         * Send raw data to the terminal via websocket
+         */
+        _send(data) {
+          // Re-initialize if no WebSocket or if it's closed
+          if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+            this.init();
+          }
+          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+            this._ws.send(JSON.stringify(['stdin', data]));
+            return true;
+          }
+          console.warn('[ShotgunTest] WebSocket not ready, state:', this._ws?.readyState);
+          return false;
+        },
+
+        /**
+         * Update the test status indicator
+         */
+        _updateStatus(msg) {
+          let status = document.getElementById('shotgun-test-status');
+          if (!status) {
+            status = document.createElement('div');
+            status.id = 'shotgun-test-status';
+            document.body.appendChild(status);
+          }
+          status.textContent = `[TEST] ${msg}`;
+        },
+
+        /**
+         * Press a special key
+         * Supported keys: Tab, Enter, Escape, Backspace, Delete,
+         * ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+         * Home, End, PageUp, PageDown, F1-F12
+         */
+        pressKey(key) {
+          const keyMap = {
+            'Tab': '\t',
+            'Enter': '\r',
+            'Return': '\r',
+            'Escape': '\x1b',
+            'Esc': '\x1b',
+            'Backspace': '\x7f',
+            'Delete': '\x1b[3~',
+            'ArrowUp': '\x1b[A',
+            'ArrowDown': '\x1b[B',
+            'ArrowRight': '\x1b[C',
+            'ArrowLeft': '\x1b[D',
+            'Home': '\x1b[H',
+            'End': '\x1b[F',
+            'PageUp': '\x1b[5~',
+            'PageDown': '\x1b[6~',
+            'F1': '\x1bOP',
+            'F2': '\x1bOQ',
+            'F3': '\x1bOR',
+            'F4': '\x1bOS',
+            'F5': '\x1b[15~',
+            'F6': '\x1b[17~',
+            'F7': '\x1b[18~',
+            'F8': '\x1b[19~',
+            'F9': '\x1b[20~',
+            'F10': '\x1b[21~',
+            'F11': '\x1b[23~',
+            'F12': '\x1b[24~',
+            'Space': ' ',
+            '/': '/',
+          };
+
+          const sequence = keyMap[key];
+          if (sequence) {
+            this._updateStatus(`Press: ${key}`);
+            return this._send(sequence);
+          }
+
+          // If it's a single character, send it directly
+          if (key.length === 1) {
+            this._updateStatus(`Press: ${key}`);
+            return this._send(key);
+          }
+
+          console.warn(`Unknown key: ${key}`);
+          return false;
+        },
+
+        /**
+         * Press key with Shift modifier
+         */
+        pressShiftKey(key) {
+          const shiftKeyMap = {
+            'Tab': '\x1b[Z',  // Shift+Tab
+          };
+
+          const sequence = shiftKeyMap[key];
+          if (sequence) {
+            this._updateStatus(`Press: Shift+${key}`);
+            return this._send(sequence);
+          }
+
+          // For regular characters, send uppercase
+          if (key.length === 1) {
+            this._updateStatus(`Press: Shift+${key}`);
+            return this._send(key.toUpperCase());
+          }
+
+          return false;
+        },
+
+        /**
+         * Press key with Ctrl modifier
+         */
+        pressCtrlKey(key) {
+          // Ctrl key sends the character code minus 64 (for A-Z)
+          // Ctrl+A = 1, Ctrl+B = 2, ..., Ctrl+Z = 26
+          if (key.length === 1) {
+            const charCode = key.toUpperCase().charCodeAt(0);
+            if (charCode >= 65 && charCode <= 90) {
+              const ctrlCode = String.fromCharCode(charCode - 64);
+              this._updateStatus(`Press: Ctrl+${key}`);
+              return this._send(ctrlCode);
+            }
+          }
+          return false;
+        },
+
+        /**
+         * Type a string of text
+         */
+        type(text) {
+          this._updateStatus(`Type: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`);
+          return this._send(text);
+        },
+
+        /**
+         * Type text slowly, character by character with delay
+         */
+        async typeSlowly(text, delayMs = 50) {
+          this._updateStatus(`Typing slowly: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`);
+          for (const char of text) {
+            this._send(char);
+            await new Promise(r => setTimeout(r, delayMs));
+          }
+          return true;
+        },
+
+        /**
+         * Convenience method to press Enter
+         */
+        pressEnter() {
+          return this.pressKey('Enter');
+        },
+
+        /**
+         * Convenience method to press Tab
+         */
+        pressTab() {
+          return this.pressKey('Tab');
+        },
+
+        /**
+         * Convenience method to press Escape
+         */
+        pressEscape() {
+          return this.pressKey('Escape');
+        },
+
+        /**
+         * Convenience method to press Shift+Tab
+         */
+        pressShiftTab() {
+          return this.pressShiftKey('Tab');
+        },
+
+        /**
+         * Type text and press Enter
+         */
+        typeAndEnter(text) {
+          this.type(text);
+          return this.pressEnter();
+        },
+
+        /**
+         * Open command palette (press /)
+         */
+        openCommandPalette() {
+          this._updateStatus('Opening command palette');
+          return this.pressKey('/');
+        },
+
+        /**
+         * Wait for specified milliseconds
+         */
+        async wait(ms) {
+          this._updateStatus(`Waiting ${ms}ms`);
+          await new Promise(r => setTimeout(r, ms));
+          return true;
+        },
+
+        /**
+         * Click at specific coordinates on the terminal
+         * Note: This is approximate since terminal uses character cells
+         */
+        clickAt(x, y) {
+          // Send mouse click escape sequence
+          // CSI < button ; x ; y M for press, m for release
+          // button 0 = left click
+          const press = `\x1b[<0;${x};${y}M`;
+          const release = `\x1b[<0;${x};${y}m`;
+          this._updateStatus(`Click at (${x}, ${y})`);
+          this._send(press);
+          return this._send(release);
+        },
+
+        /**
+         * Focus the terminal input
+         */
+        focusTerminal() {
+          const terminalEl = document.getElementById('terminal');
+          if (terminalEl) {
+            terminalEl.click();
+            // Try to find and focus the xterm textarea
+            const textarea = terminalEl.querySelector('.xterm-helper-textarea');
+            if (textarea) {
+              textarea.focus();
+            }
+            this._updateStatus('Terminal focused');
+            return true;
+          }
+          return false;
+        },
+
+        /**
+         * Check if test mode is active
+         */
+        isTestMode() {
+          return document.body.classList.contains('shotgun-testing');
+        },
+
+        /**
+         * Get terminal dimensions
+         */
+        getTerminalSize() {
+          const terminalEl = document.getElementById('terminal');
+          if (terminalEl && terminalEl._textual) {
+            return {
+              cols: terminalEl._textual.cols || 80,
+              rows: terminalEl._textual.rows || 24
+            };
+          }
+          return { cols: 80, rows: 24 };
+        }
+      };
+
+      // Auto-initialize when page loads and testing param is present
+      document.addEventListener('DOMContentLoaded', () => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('testing')) {
+          // Wait for terminal to be ready
+          setTimeout(() => {
+            window.shotgunTest.init();
+          }, 1000);
+        }
+      });
+    </script>
+  </head>
+  <body data-pingurl="{{ ping_url }}">
+    <div class="dialog-container intro-dialog">
+      <div class="shade"></div>
+      <div class="intro">
+        <svg
+          width="32px"
+          viewBox="0 0 2933 2261"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M2927.81 0H1677.1L1312.35 205.173H306.689L0.359375 434.921L204.029 893.177H735.972L644.784 2261H1060.36L1441.72 1974.97L2073.92 688.003H2334.4L2717.9 472.286L2927.81 0ZM1245.82 410.347L1276.32 277.656H330.85L153.929 410.347H1245.82ZM1229.16 482.83H100.972L251.134 820.694H813.449L722.26 2188.52H837.043L1229.16 482.83ZM1350.7 277.656L911.417 2188.52H1023.87L1662.19 615.52H2301.36L2451.52 277.656H1350.7ZM1460.19 205.173H2497.79L2733.69 72.4829H1696.09L1460.19 205.173Z"
+            fill="#ffffff"
+          />
+        </svg>
+
+        <div>{{ application.name or 'Textual Application' }}</div>
+        <button type="button" onClick="refresh()" id="start">Start</button>
+      </div>
+    </div>
+
+    <div class="dialog-container closed-dialog">
+      <div class="shade"></div>
+      <div class="intro">
+        <div class="message">Session ended.</div>
+        <button type="button" onClick="refresh()">Restart</button>
+      </div>
+    </div>
+
+    <div id="shotgun-test-overlay"></div>
+    <div id="shotgun-test-status"></div>
+
+    <div
+      id="terminal"
+      class="textual-terminal"
+      data-session-websocket-url="{{ app_websocket_url }}"
+      data-font-size="{{ font_size }}"
+    ></div>
+  </body>
+</html>

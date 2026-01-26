@@ -81,6 +81,43 @@ The project has two types of tests:
 - Both unit and integration tests must pass
 - No API keys required for tests - all external services are mocked
 
+### Testing the TUI with Playwright MCP
+
+When you have access to the Playwright MCP server, you can interactively test the Shotgun TUI. See `@./docs/testing-tui-with-playwright.md` for the full guide.
+
+**Quick Start:**
+
+1. Start the TUI web server in the background:
+   ```bash
+   uv run shotgun --web --port 8765 --no-update-check
+   ```
+
+2. Navigate to it with Playwright:
+   ```
+   browser_navigate: http://localhost:8765
+   browser_wait_for: time=3
+   browser_take_screenshot: filename=tui.png
+   ```
+
+**Key Techniques:**
+
+- **Always use screenshots** - Textual renders to a canvas, so `browser_snapshot` won't show the content
+- **Use keyboard navigation** - Tab/Enter to navigate, `/` for command palette, `Shift+Tab` for mode toggle
+- **Type via run_code** - Standard `browser_type` doesn't work on xterm canvas:
+  ```javascript
+  browser_run_code: async (page) => {
+    await page.click('.xterm-screen');
+    await page.keyboard.type('Your message', { delay: 50 });
+  }
+  ```
+
+**Common keyboard shortcuts:**
+- `Tab` - Move focus
+- `Enter` - Select
+- `/` - Open command palette
+- `Shift+Tab` - Toggle mode
+- `Escape` - Close modal
+
 ## Commands for Development
 
 - **Install dependencies**: `uv sync --all-extras`
@@ -89,6 +126,21 @@ The project has two types of tests:
 - **Run type checking**: `uv run mypy src/`
 - **Create conventional commit**: `uv run cz commit`
 - **Validate commit message**: `uv run cz check --commit-msg-file .git/COMMIT_EDITMSG`
+- **Count tokens in folder**: `uv run python scripts/count_tokens.py .shotgun/`
+
+### Token Counting Script
+
+The `scripts/count_tokens.py` script counts tokens using tiktoken (cl100k_base encoding).
+
+```bash
+# Count tokens in .shotgun folder (default)
+uv run python scripts/count_tokens.py
+
+# Count tokens in any folder
+uv run python scripts/count_tokens.py src/shotgun/prompts/
+```
+
+Output shows per-file and per-folder token counts. Useful for understanding context window usage.
 
 ## Important Notes
 
