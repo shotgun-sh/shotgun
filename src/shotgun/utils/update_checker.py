@@ -7,12 +7,92 @@ from pathlib import Path
 
 import httpx
 from packaging import version
+from pydantic import BaseModel
 
 from shotgun import __version__
 from shotgun.logging_config import get_logger
 from shotgun.settings import settings
 
 logger = get_logger(__name__)
+
+
+class UpdateInfo(BaseModel):
+    """Information about available update."""
+
+    current_version: str
+    latest_version: str
+    update_available: bool
+    installation_method: str
+    upgrade_command: list[str] | None  # None for uvx
+    upgrade_hint: str  # User-friendly instruction
+
+
+def get_upgrade_hint(method: str) -> str:
+    """Get user-friendly upgrade hint based on installation method.
+
+    Args:
+        method: Installation method ('uvx', 'uv-tool', 'pipx', 'pip', 'venv', or 'unknown').
+
+    Returns:
+        User-friendly instruction for upgrading.
+    """
+    # All methods suggest uvx as the recommended approach for always getting latest
+    uvx_suggestion = "Or use `uvx shotgun-sh@latest` to always run the latest version"
+
+    hints = {
+        "uvx": "Run `uvx shotgun-sh@latest` to use the latest version",
+        "uv-tool": f"Run `uv tool upgrade shotgun-sh` to update. {uvx_suggestion}",
+        "pipx": f"Run `pipx upgrade shotgun-sh` to update. {uvx_suggestion}",
+        "pip": f"Run `pip install --upgrade shotgun-sh` to update. {uvx_suggestion}",
+        "venv": f"Run `pip install --upgrade shotgun-sh` to update. {uvx_suggestion}",
+        "unknown": f"Run `pip install --upgrade shotgun-sh` to update. {uvx_suggestion}",
+    }
+    return hints.get(method, hints["unknown"])
+
+
+def check_for_update() -> UpdateInfo | None:
+    """Check if an update is available and return comprehensive info.
+
+    Returns:
+        UpdateInfo with version details and upgrade instructions,
+        or None if check failed (network error) or if running dev version.
+
+    Note:
+        Set SHOTGUN_VERSION_OVERRIDE environment variable to simulate
+        running a different version for testing (e.g., "0.1.0").
+        Set SHOTGUN_INSTALL_METHOD_OVERRIDE to simulate different install
+        methods (uvx, uv-tool, pipx, pip, venv).
+    """
+    # Allow version override for testing
+    current = settings.dev.version_override or __version__
+
+    # Skip check for dev versions
+    if is_dev_version(current):
+        logger.debug("Skipping update check for dev version")
+        return None
+
+    # Fetch latest version from PyPI
+    latest = get_latest_version()
+    if latest is None:
+        logger.debug("Failed to fetch latest version, skipping update check")
+        return None
+
+    # Get installation method (allow override for testing)
+    method = settings.dev.install_method_override or detect_installation_method()
+    upgrade_command = get_update_command(method)
+    upgrade_hint = get_upgrade_hint(method)
+
+    # Check if update is available
+    update_available = compare_versions(current, latest)
+
+    return UpdateInfo(
+        current_version=current,
+        latest_version=latest,
+        update_available=update_available,
+        installation_method=method,
+        upgrade_command=upgrade_command,
+        upgrade_hint=upgrade_hint,
+    )
 
 
 def detect_installation_method() -> str:
@@ -288,7 +368,10 @@ def perform_update(force: bool = False) -> tuple[bool, str]:
 
 
 __all__ = [
+    "UpdateInfo",
+    "check_for_update",
     "detect_installation_method",
+    "get_upgrade_hint",
     "perform_auto_update",
     "perform_auto_update_async",
     "is_dev_version",

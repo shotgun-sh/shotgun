@@ -175,6 +175,14 @@ class DevelopmentSettings(BaseSettings):
         default=False,
         description="Simulate pipx installation (for testing)",
     )
+    version_override: str | None = Field(
+        default=None,
+        description="Override current version for testing (e.g., '0.1.0')",
+    )
+    install_method_override: str | None = Field(
+        default=None,
+        description="Override installation method for testing (uvx, uv-tool, pipx, pip, venv)",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="SHOTGUN_",

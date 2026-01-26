@@ -52,6 +52,11 @@ ModeIndicator.mode-drafting {
   layout: vertical;
 }
 
+#update-indicator {
+  text-align: end;
+  height: 1;
+}
+
 #context-indicator {
   text-align: end;
   height: 1;
