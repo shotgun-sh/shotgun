@@ -145,12 +145,6 @@ When you launch Shotgun, it will guide you through:
 
 _**💡 Pro tip:** Run Shotgun in your IDE's terminal for the best experience._
 
-> [!WARNING]
-> **Upgrading from alpha?** Uninstall the old version first:
-> ```bash
-> npm uninstall -g @proofs-io/shotgun @proofs-io/shotgun-server
-> ```
-
 ---
 
 # 🎥 Demo
