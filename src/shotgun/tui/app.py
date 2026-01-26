@@ -4,6 +4,7 @@ import os
 import platform
 import sys
 from collections.abc import Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -480,6 +481,9 @@ def serve(
     if force_reindex:
         command += " --force-reindex"
 
+    # Get the path to our custom templates directory
+    templates_path = Path(__file__).parent / "templates"
+
     # Create and start the server with hardcoded title and debug=False
     server = Server(
         command=command,
@@ -487,6 +491,7 @@ def serve(
         port=port,
         title="The Shotgun",
         public_url=public_url,
+        templates_path=str(templates_path),
     )
 
     # Set up graceful shutdown on SIGTERM/SIGINT

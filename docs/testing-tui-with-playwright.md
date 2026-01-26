@@ -1,6 +1,18 @@
 # Testing the Shotgun TUI with Playwright MCP
 
-This guide documents how to test the Shotgun TUI using the Playwright MCP server. Since Textual renders to a canvas element, standard accessibility-based testing doesn't work well - these techniques use screenshots and keyboard navigation instead.
+This guide documents how to test the Shotgun TUI using the Playwright MCP server. Since Textual renders to a canvas element via xterm.js, standard accessibility-based testing doesn't work - these techniques use screenshots and keyboard navigation instead.
+
+## Architecture Overview
+
+When running `shotgun --web`, the TUI is served via `textual-serve` which:
+1. Renders the Textual app to a pseudo-terminal
+2. Streams the output to xterm.js in the browser via WebSocket
+3. Sends keyboard input from the browser back to the app
+
+A **custom HTML template** (`src/shotgun/tui/templates/app_index.html`) extends the default textual-serve template with:
+- WebSocket interception for debugging
+- A `window.shotgunTest` JavaScript API (see "Testing API" section)
+- Test status indicator when `?testing` query param is used
 
 ## Starting the TUI Web Server
 
@@ -18,6 +30,11 @@ uv run shotgun --web --port 8765 --no-update-check &
 ```
 
 Wait 2-3 seconds for the server to start before navigating to it.
+
+**For testing with the debug indicator**, add `?testing` to the URL:
+```
+http://localhost:8765/?testing
+```
 
 ## Efficient Testing Strategy
 
@@ -405,3 +422,110 @@ This directory is gitignored. Screenshots are useful for:
 - Debugging test failures
 - Documenting UI states
 - Verifying visual changes
+
+## Testing API (window.shotgunTest)
+
+The custom template at `src/shotgun/tui/templates/app_index.html` provides a JavaScript API for automation. However, **it has known limitations**.
+
+### What the API Provides
+
+When navigating to `http://localhost:8765/?testing`, the template:
+1. Intercepts WebSocket creation to capture the terminal connection
+2. Exposes `window.shotgunTest` with methods like:
+   - `init()` - Initialize the API
+   - `pressKey(key)` - Send a key press (Tab, Enter, Escape, etc.)
+   - `type(text)` - Send text
+   - `pressEnter()`, `pressTab()`, `pressEscape()` - Convenience methods
+3. Shows a green status indicator in the bottom-right corner
+
+### Known Bug: WebSocket Input Unreliable
+
+**The `shotgunTest` API sends keypresses via WebSocket but they often don't reach Textual widgets properly.** The keypresses are sent to the terminal but Textual's widget focus system doesn't always process them.
+
+**What works:**
+- The WebSocket connection is established correctly
+- Keys are sent to the terminal (you can see the status indicator update)
+- Basic Tab/Enter sometimes works for modal buttons after many presses
+
+**What doesn't work reliably:**
+- Typing text into input fields
+- Opening command palette with `/`
+- Complex keyboard sequences
+
+### Recommended Approach: Use Playwright's Native Keyboard
+
+Instead of the `shotgunTest` API, use Playwright's native keyboard which sends input through the browser's event system:
+
+```javascript
+// First click to focus the terminal
+const terminal = await page.$('#terminal');
+await terminal.click();
+await page.waitForTimeout(300);
+
+// Type text - this WORKS reliably
+await page.keyboard.type('/model', { delay: 30 });
+await page.waitForTimeout(500);
+await page.keyboard.press('Enter');
+```
+
+This approach:
+- Clicks the terminal element to ensure focus
+- Uses `page.keyboard.type()` and `page.keyboard.press()` for input
+- Works for both typing text and special keys
+
+### When to Use Each Approach
+
+| Task | Use This |
+|------|----------|
+| Typing text in input fields | `page.keyboard.type()` |
+| Pressing special keys (Enter, Tab, Escape) | `page.keyboard.press()` |
+| Arrow key navigation | `page.keyboard.press('ArrowUp')` |
+| Debugging what keys are sent | `shotgunTest` API (check status indicator) |
+
+### Example: Complete Interaction Pattern
+
+```javascript
+await page.evaluate(() => {
+  // Optional: use for debugging
+  shotgunTest.init();
+});
+
+// Click terminal to focus
+const terminal = await page.$('#terminal');
+await terminal.click();
+await page.waitForTimeout(300);
+
+// Type a command
+await page.keyboard.type('/model', { delay: 30 });
+await page.waitForTimeout(500);
+
+// Press Enter
+await page.keyboard.press('Enter');
+await page.waitForTimeout(1000);
+
+// Navigate with arrow keys
+await page.keyboard.press('ArrowDown');
+await page.waitForTimeout(200);
+await page.keyboard.press('Enter');
+```
+
+### Skipping the Codebase Index Prompt
+
+The modal has two buttons. Tab cycles through them:
+
+```javascript
+// Click terminal first
+const terminal = await page.$('#terminal');
+await terminal.click();
+await page.waitForTimeout(200);
+
+// Press Tab multiple times to cycle through focusable elements
+// Then press Enter when "Not now" is focused
+for (let i = 0; i < 5; i++) {
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(200);
+}
+await page.keyboard.press('Enter');
+```
+
+Note: The exact number of Tab presses may vary depending on which button has initial focus.
