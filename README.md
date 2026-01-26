@@ -127,36 +127,9 @@ _💡 Restart your terminal after installation_
 
 ### 2. Run Shotgun
 
-<table>
-<tr>
-<th>🚀 Try It Out (Ephemeral)</th>
-<th>⚡ Regular Use (Permanent)</th>
-</tr>
-<tr>
-<td>
-  
-**Best for:** Testing Shotgun first
-
 ```bash
 uvx shotgun-sh@latest    
 ```
-
-No installation needed, runs immediately
-
-</td>
-<td>
-
-**Best for:** Daily use
-
-```bash
-uv tool install shotgun-sh       
-```
-
-Then run anywhere: ``` shotgun ```
-
-</td>
-</tr>
-</table>
 
 _**Why uv?** It's 10-100x faster than pip and handles binary wheels reliably—no cmake/build tool errors._
 
@@ -196,11 +169,9 @@ _Click the image above to watch the full demo on YouTube_
 
 ### Launch Shotgun in your project directory:
 
-| Already Installed | First Time / Try It Out |
-|-------------------|------------------------|
-| `shotgun` | `uvx shotgun-sh@latest` |
-
-Shotgun's Terminal UI runs a Router that orchestrates your work using two execution modes: **Planning** and **Drafting**.
+```bash
+uvx shotgun-sh@latest    
+```
 
 ### Planning vs Drafting
 
