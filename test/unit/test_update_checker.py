@@ -4,10 +4,13 @@ import sys
 from unittest.mock import Mock, patch
 
 from shotgun.utils.update_checker import (
+    UpdateInfo,
+    check_for_update,
     compare_versions,
     detect_installation_method,
     get_latest_version,
     get_update_command,
+    get_upgrade_hint,
     is_dev_version,
     perform_auto_update,
     perform_auto_update_async,
@@ -272,3 +275,155 @@ def test_perform_auto_update_async():
         thread = perform_auto_update_async(no_update_check=False)
         thread.join(timeout=1)
         mock_update.assert_called_once_with(False)
+
+
+def test_get_upgrade_hint():
+    """Test upgrade hints for different installation methods."""
+    # uvx only shows uvx command
+    assert "uvx shotgun-sh@latest" in get_upgrade_hint("uvx")
+
+    # All other methods show their specific command AND uvx suggestion
+    uv_tool_hint = get_upgrade_hint("uv-tool")
+    assert "uv tool upgrade shotgun-sh" in uv_tool_hint
+    assert "uvx shotgun-sh@latest" in uv_tool_hint
+
+    pipx_hint = get_upgrade_hint("pipx")
+    assert "pipx upgrade shotgun-sh" in pipx_hint
+    assert "uvx shotgun-sh@latest" in pipx_hint
+
+    pip_hint = get_upgrade_hint("pip")
+    assert "pip install --upgrade shotgun-sh" in pip_hint
+    assert "uvx shotgun-sh@latest" in pip_hint
+
+    venv_hint = get_upgrade_hint("venv")
+    assert "pip install --upgrade shotgun-sh" in venv_hint
+    assert "uvx shotgun-sh@latest" in venv_hint
+
+    unknown_hint = get_upgrade_hint("unknown")
+    assert "pip install --upgrade shotgun-sh" in unknown_hint
+    assert "uvx shotgun-sh@latest" in unknown_hint
+
+
+def test_check_for_update_returns_none_for_dev_version(monkeypatch):
+    """Test check_for_update returns None for dev versions."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.1.0.dev1")
+
+    result = check_for_update()
+    assert result is None
+
+
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_check_for_update_returns_none_on_network_failure(mock_get_latest, monkeypatch):
+    """Test check_for_update returns None on network failure."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.1.0")
+    mock_get_latest.return_value = None
+
+    result = check_for_update()
+    assert result is None
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_check_for_update_returns_update_info_when_available(
+    mock_get_latest, mock_detect, monkeypatch
+):
+    """Test check_for_update returns UpdateInfo when update available."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.1.0")
+    mock_get_latest.return_value = "0.2.0"
+    mock_detect.return_value = "pipx"
+
+    result = check_for_update()
+
+    assert result is not None
+    assert isinstance(result, UpdateInfo)
+    assert result.current_version == "0.1.0"
+    assert result.latest_version == "0.2.0"
+    assert result.update_available is True
+    assert result.installation_method == "pipx"
+    assert result.upgrade_command == ["pipx", "upgrade", "shotgun-sh"]
+    assert "pipx upgrade" in result.upgrade_hint
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_check_for_update_returns_update_info_no_update_needed(
+    mock_get_latest, mock_detect, monkeypatch
+):
+    """Test check_for_update returns UpdateInfo with update_available=False when current."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.2.0")
+    mock_get_latest.return_value = "0.2.0"
+    mock_detect.return_value = "pipx"
+
+    result = check_for_update()
+
+    assert result is not None
+    assert isinstance(result, UpdateInfo)
+    assert result.current_version == "0.2.0"
+    assert result.latest_version == "0.2.0"
+    assert result.update_available is False
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_check_for_update_uvx_has_no_upgrade_command(
+    mock_get_latest, mock_detect, monkeypatch
+):
+    """Test check_for_update for uvx has None upgrade_command."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.1.0")
+    mock_get_latest.return_value = "0.2.0"
+    mock_detect.return_value = "uvx"
+
+    result = check_for_update()
+
+    assert result is not None
+    assert result.upgrade_command is None
+    assert "uvx shotgun-sh@latest" in result.upgrade_hint
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_check_for_update_respects_version_override(
+    mock_get_latest, mock_detect, monkeypatch
+):
+    """Test check_for_update uses SHOTGUN_VERSION_OVERRIDE setting."""
+    # Set the actual version to latest (no update needed)
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.2.0")
+    mock_get_latest.return_value = "0.2.0"
+    mock_detect.return_value = "pipx"
+
+    # Override version to an older version to simulate update available
+    monkeypatch.setattr(
+        "shotgun.utils.update_checker.settings.dev.version_override", "0.1.0"
+    )
+
+    result = check_for_update()
+
+    assert result is not None
+    assert result.current_version == "0.1.0"  # Uses override
+    assert result.latest_version == "0.2.0"
+    assert result.update_available is True
+
+
+@patch("shotgun.utils.update_checker.detect_installation_method")
+@patch("shotgun.utils.update_checker.get_latest_version")
+def test_check_for_update_respects_install_method_override(
+    mock_get_latest, mock_detect, monkeypatch
+):
+    """Test check_for_update uses SHOTGUN_INSTALL_METHOD_OVERRIDE setting."""
+    monkeypatch.setattr("shotgun.utils.update_checker.__version__", "0.1.0")
+    mock_get_latest.return_value = "0.2.0"
+    mock_detect.return_value = "pip"  # Would normally detect pip
+
+    # Override installation method to test different hints
+    monkeypatch.setattr(
+        "shotgun.utils.update_checker.settings.dev.install_method_override", "uvx"
+    )
+
+    result = check_for_update()
+
+    assert result is not None
+    assert result.installation_method == "uvx"  # Uses override
+    assert result.upgrade_command is None  # uvx has no upgrade command
+    assert "uvx shotgun-sh@latest" in result.upgrade_hint
+    # Verify detect_installation_method was not called (we used override)
+    mock_detect.assert_not_called()

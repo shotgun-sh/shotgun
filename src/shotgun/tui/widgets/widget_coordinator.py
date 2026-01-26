@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from shotgun.attachments import FileAttachment
     from shotgun.tui.screens.chat import ChatScreen
     from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+    from shotgun.utils.update_checker import UpdateInfo
 
 logger = logging.getLogger(__name__)
 
@@ -279,3 +280,20 @@ class WidgetCoordinator:
             attachment_bar.update_attachment(attachment)
         except Exception as e:
             logger.exception(f"Failed to update attachment bar: {e}")
+
+    def update_version_indicator(self, info: "UpdateInfo | None") -> None:
+        """Update the version indicator with update info.
+
+        Args:
+            info: UpdateInfo with version details, or None to hide indicator.
+        """
+        if not self.screen.is_mounted:
+            return
+
+        try:
+            from shotgun.tui.components.update_indicator import UpdateIndicator
+
+            update_indicator = self.screen.query_one(UpdateIndicator)
+            update_indicator.set_update_info(info)
+        except Exception as e:
+            logger.exception(f"Failed to update version indicator: {e}")

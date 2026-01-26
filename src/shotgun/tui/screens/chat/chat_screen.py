@@ -92,6 +92,7 @@ from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
 from shotgun.tui.components.status_bar import StatusBar
+from shotgun.tui.components.update_indicator import UpdateIndicator
 
 # TUIErrorHandler removed - exceptions now caught directly
 from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
@@ -147,6 +148,7 @@ from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
 from shotgun.utils.file_system_utils import get_shotgun_base_path
 from shotgun.utils.marketing import MarketingManager
+from shotgun.utils.update_checker import UpdateInfo, check_for_update
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +303,8 @@ class ChatScreen(Screen[None]):
         self.call_later(self.check_if_codebase_is_indexed)
         # Initial update of context indicator
         self.update_context_indicator()
+        # Check for updates in background (after other startup tasks)
+        self.call_later(self.check_for_updates)
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
@@ -955,6 +959,7 @@ class ChatScreen(Screen[None]):
                 with Grid():
                     yield ModeIndicator(mode=self.mode)
                     with Container(id="right-footer-indicators"):
+                        yield UpdateIndicator(id="update-indicator")
                         yield ContextIndicator(id="context-indicator")
                         yield Static("", id="indexing-job-display")
 
@@ -993,6 +998,35 @@ class ChatScreen(Screen[None]):
         except Exception:
             # Ignore errors reading meta.json - this is optional UI feedback
             logger.debug("Failed to read meta.json for pull hint", exc_info=True)
+
+    @work(exclusive=True, group="version_check")
+    async def check_for_updates(self) -> None:
+        """Check for updates in background, show hint if update available."""
+        # Run blocking version check in thread pool
+        info = await asyncio.to_thread(check_for_update)
+
+        if info is None or not info.update_available:
+            return
+
+        # Update the footer indicator
+        update_indicator = self.query_one("#update-indicator", UpdateIndicator)
+        update_indicator.set_update_info(info)
+
+        # Show a HintMessage in chat history
+        self._show_update_hint(info)
+
+    def _show_update_hint(self, info: UpdateInfo) -> None:
+        """Show a hint message about the available update.
+
+        Args:
+            info: UpdateInfo with version details.
+        """
+        hint_md = (
+            f"🚀 **New version available!** "
+            f"**v{info.latest_version}** is out (you have v{info.current_version})\n\n"
+            f"{info.upgrade_hint}"
+        )
+        self.mount_hint(hint_md)
 
     def mount_hint_with_email(
         self, markdown_before: str, email: str, markdown_after: str = ""
