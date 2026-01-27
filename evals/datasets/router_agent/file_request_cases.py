@@ -13,6 +13,7 @@ The Router should IMMEDIATELY use file_requests for any binary file path.
 from evals.models import (
     AgentType,
     ExpectedAgentOutput,
+    JudgeType,
     ShotgunTestCase,
     TestCaseContext,
     TestCaseInput,
@@ -30,6 +31,7 @@ PDF_FILE_REQUEST_NO_QUESTIONS = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         # Should NOT ask clarifying questions
         max_clarifying_questions=0,
         # Should NOT delegate to any sub-agent (first turn: just use file_requests)
@@ -61,6 +63,7 @@ IMAGE_FILE_REQUEST_NO_QUESTIONS = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=["research", "specification", "plan", "tasks", "export"],
         response_not_contains=[
@@ -88,6 +91,7 @@ PDF_DIRECT_ACCESS_NO_EXCUSES = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=["research", "specification", "plan", "tasks", "export"],
         # Response should NOT contain inability claims
@@ -124,6 +128,7 @@ PDF_NO_RESEARCH_FILE_READ = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=["research", "specification", "plan", "tasks", "export"],
         # Disallow read_file - for binary files, use file_requests directly
@@ -154,6 +159,7 @@ SHOTGUN_MULTIPLE_PDFS_FILE_REQUEST = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=["research", "specification", "plan", "tasks", "export"],
         # Should NOT use read_file on PDF files (will fail with UTF-8 error)

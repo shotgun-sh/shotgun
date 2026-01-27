@@ -104,6 +104,18 @@ class EvaluatorSeverity(str, Enum):
     SOFT = "soft"
 
 
+class JudgeType(str, Enum):
+    """Type of LLM judge to use for evaluation.
+
+    Each test case specifies which judge to use based on what behavior it tests:
+    - ROUTER_CORRECTNESS: For clarifying questions, planning, and general routing scenarios
+    - FILE_REQUESTS: For file handling scenarios (PDFs, images, binary files)
+    """
+
+    ROUTER_CORRECTNESS = "router_correctness"
+    FILE_REQUESTS = "file_requests"
+
+
 class EvaluatorName(str, Enum):
     """Names of deterministic evaluators."""
 
@@ -226,6 +238,12 @@ class AgentExecutionOutput(BaseModel):
 
 class ExpectedAgentOutput(BaseModel):
     """Expected output specification - only fields that are actually evaluated."""
+
+    # Judge selection - determines which LLM judge evaluates this test case
+    judge_type: JudgeType = Field(
+        default=JudgeType.ROUTER_CORRECTNESS,
+        description="Which LLM judge to use for this test case",
+    )
 
     # Clarifying questions - if set, expect at least this many questions
     min_clarifying_questions: int | None = Field(

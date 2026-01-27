@@ -41,6 +41,7 @@ from evals.models import (  # noqa: E402
     AggregatedResult,
     EvaluationReport,
     EvaluationSuite,
+    JudgeType,
     ShotgunTestCase,
     TestCaseResult,
     TraceRef,
@@ -314,7 +315,11 @@ class EvaluationRunner:
         ) -> tuple[AggregatedResult, AgentExecutionOutput]:
             async with semaphore:
                 return await self._evaluate_case(
-                    test_case, suite_name, evaluator_names, judge_semaphore, model_override
+                    test_case,
+                    suite_name,
+                    evaluator_names,
+                    judge_semaphore,
+                    model_override,
                 )
 
         tasks = [run_single(tc) for tc in test_cases]
@@ -371,7 +376,7 @@ class EvaluationRunner:
             )
 
             # Run LLM judge (with concurrency control)
-            # Select judge based on evaluator_names
+            # Select judge based on test_case.expected.judge_type (per-test-case selection)
             from evals.judges.file_requests_judge import FileRequestsJudgeResult
             from evals.models import RouterJudgeResult
 
@@ -379,19 +384,20 @@ class EvaluationRunner:
             if self.config.enable_judge:
                 async with judge_semaphore:
                     try:
-                        if "file_requests_judge" in evaluator_names:
+                        judge_type = test_case.expected.judge_type
+                        if judge_type == JudgeType.FILE_REQUESTS:
                             # Use FileRequestsJudge for file handling scenarios
                             file_judge = self._get_file_requests_judge()
                             judge_result = await file_judge.evaluate(
                                 test_case, execution_result.output
                             )
-                        elif "router_correctness_judge" in evaluator_names:
-                            # Use RouterQualityJudge for clarifying questions scenarios
+                        else:
+                            # Default: JudgeType.ROUTER_CORRECTNESS
+                            # Use RouterQualityJudge for clarifying questions/planning scenarios
                             router_judge = self._get_router_judge()
                             judge_result = await router_judge.evaluate(
                                 test_case, execution_result.output
                             )
-                        # If neither judge specified, no judge evaluation
                     except Exception:
                         logger.exception(
                             f"Judge evaluation failed for {test_case.name}"
