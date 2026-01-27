@@ -157,13 +157,22 @@ class ExecutionFailureEvaluator(BaseEvaluator):
         test_case: ShotgunTestCase,
     ) -> EvaluatorResult:
         """Check for execution failures."""
+        # Check if agent produced any meaningful output
+        has_response = actual_output.response and actual_output.response.strip() != ""
+        has_clarifying_questions = bool(actual_output.clarifying_questions)
+        has_file_requests = bool(actual_output.file_requests)
+        has_delegation = bool(actual_output.delegated_sub_agent)
+
         logger.debug(
-            f"ExecutionFailureEvaluator checking response (len={len(actual_output.response) if actual_output.response else 0}): "
-            f"{actual_output.response[:200] if actual_output.response else 'EMPTY'}..."
+            f"ExecutionFailureEvaluator: response={has_response}, "
+            f"questions={has_clarifying_questions}, "
+            f"file_requests={has_file_requests}, "
+            f"delegation={has_delegation}"
         )
-        # Check if response is empty (indicating failure)
-        if not actual_output.response or actual_output.response.strip() == "":
-            logger.warning(f"ExecutionFailureEvaluator: empty response for {test_case.name}")
+
+        # Agent succeeded if it produced ANY meaningful output
+        if not (has_response or has_clarifying_questions or has_file_requests or has_delegation):
+            logger.warning(f"ExecutionFailureEvaluator: no output for {test_case.name}")
             return EvaluatorResult(
                 evaluator_name=self.name,
                 passed=False,
@@ -172,7 +181,16 @@ class ExecutionFailureEvaluator(BaseEvaluator):
                 details={},
             )
 
-        # Check if response indicates an error
+        # Check if response indicates an error (only if there is a response)
+        if not has_response:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=True,
+                severity=self.severity,
+                reasoning="Execution completed successfully (clarifying questions or other structured output)",
+                details={},
+            )
+
         error_indicators = [
             "error occurred",
             "failed to",
