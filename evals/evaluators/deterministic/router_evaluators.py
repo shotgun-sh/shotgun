@@ -10,6 +10,7 @@ NOTE: Performance bounds checks (duration/tokens thresholds) are EXCLUDED per sc
 Duration and tokens are recorded for debugging only, not for pass/fail evaluation.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Protocol
 
@@ -21,6 +22,8 @@ from evals.models import (
     ExpectedAgentOutput,
     ShotgunTestCase,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RouterDeterministicEvaluator(Protocol):
@@ -181,6 +184,10 @@ class ExecutionFailureEvaluator(BaseEvaluator):
                     "i encountered" in response_lower
                     or "an error occurred" in response_lower
                 ):
+                    logger.warning(
+                        f"ExecutionFailureEvaluator failed: found '{indicator}' in response. "
+                        f"Response preview: {actual_output.response[:500]}"
+                    )
                     return EvaluatorResult(
                         evaluator_name=self.name,
                         passed=False,
