@@ -157,8 +157,13 @@ class ExecutionFailureEvaluator(BaseEvaluator):
         test_case: ShotgunTestCase,
     ) -> EvaluatorResult:
         """Check for execution failures."""
+        logger.debug(
+            f"ExecutionFailureEvaluator checking response (len={len(actual_output.response) if actual_output.response else 0}): "
+            f"{actual_output.response[:200] if actual_output.response else 'EMPTY'}..."
+        )
         # Check if response is empty (indicating failure)
         if not actual_output.response or actual_output.response.strip() == "":
+            logger.warning(f"ExecutionFailureEvaluator: empty response for {test_case.name}")
             return EvaluatorResult(
                 evaluator_name=self.name,
                 passed=False,

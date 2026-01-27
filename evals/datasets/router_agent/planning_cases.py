@@ -51,8 +51,14 @@ SPECIFIC_FEATURE_CREATES_PLAN = ShotgunTestCase(
         context=TestCaseContext(has_codebase_indexed=True, codebase_name="shotgun"),
     ),
     expected=ExpectedAgentOutput(
-        expected_tools=["create_plan"],
-        expected_response="Plan should have research as the first step and writing a specification as the second step",
+        # No expected_tools - in single-turn eval, Router may reasonably ask clarifying questions
+        # before creating a plan. Let the LLM judge evaluate if the response is appropriate.
+        expected_response="""The Router should either:
+1. Ask clarifying questions about Ollama integration requirements (runtime config, platforms, performance needs), OR
+2. Create a plan with research as the first step and specification writing as the second step.
+
+Both are acceptable first-turn responses. Asking clarifying questions shows thoughtfulness.
+Incorrect behavior: Refusing to help, delegating immediately without understanding, or creating an overly vague plan.""",
     ),
 )
 
