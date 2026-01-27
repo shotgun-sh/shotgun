@@ -43,6 +43,9 @@ FEATURE_REQUEST_CREATES_PLAN_WITH_FILES = ShotgunTestCase(
             "## 2. Functional Requirements",  # Full spec section
             "```python",  # Code blocks (router shouldn't write code)
         ],
+        expected_response="""The Router should ask clarifying questions about this feature request.
+Correct behavior: Ask questions about API endpoints needed, authentication flow details, database schema requirements, and framework preferences.
+Incorrect behavior: Immediately writing a full specification, outputting code blocks, or creating a plan without understanding requirements.""",
     ),
 )
 
@@ -69,6 +72,9 @@ SPEC_REQUEST_CREATES_PLAN = ShotgunTestCase(
             "## Requirements",
             "### Authentication Flow",
         ],
+        expected_response="""The Router should ask clarifying questions before writing a specification.
+Correct behavior: Ask about authentication method (OAuth, password, SSO), session management, password requirements, and integration needs.
+Incorrect behavior: Immediately writing specification content, outputting full markdown sections, or assuming requirements without asking.""",
     ),
 )
 

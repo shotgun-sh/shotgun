@@ -32,7 +32,7 @@ from evals.datasets.router_agent.clarifying_questions_cases import (
 )
 from evals.datasets.router_agent.delegation_routing_cases import (
     DELEGATION_ROUTING_CASES,
-    MULTI_FILE_UPDATE_DELEGATES_SEPARATELY,
+    MULTI_AREA_REQUEST_CREATES_PLAN,
 )
 from evals.datasets.router_agent.document_file_cases import (
     DOCUMENT_FILE_CASES,
@@ -106,7 +106,7 @@ __all__ = [
     "AUTH_FEATURE_PLANS_RESEARCH_FIRST",
     "CACHE_FEATURE_PLANS_RESEARCH_FIRST",
     # Delegation routing test cases
-    "MULTI_FILE_UPDATE_DELEGATES_SEPARATELY",
+    "MULTI_AREA_REQUEST_CREATES_PLAN",
     # File write test cases
     "FEATURE_REQUEST_CREATES_PLAN_WITH_FILES",
     "SPEC_REQUEST_CREATES_PLAN",

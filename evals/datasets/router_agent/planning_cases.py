@@ -20,7 +20,12 @@ FEATURE_REQUEST_ASKS_QUESTIONS = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(has_codebase_indexed=True, codebase_name="shotgun"),
     ),
-    expected=ExpectedAgentOutput(min_clarifying_questions=1),
+    expected=ExpectedAgentOutput(
+        min_clarifying_questions=1,
+        expected_response="""The Router should ask clarifying questions about local model support.
+Correct behavior: Ask about which local model runtimes (Ollama, vLLM, llama.cpp), target platforms, integration requirements, and performance expectations.
+Incorrect behavior: Immediately creating a plan or specification without understanding requirements.""",
+    ),
 )
 
 COMPLEX_FEATURE_ASKS_QUESTIONS = ShotgunTestCase(
@@ -30,7 +35,12 @@ COMPLEX_FEATURE_ASKS_QUESTIONS = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(has_codebase_indexed=True, codebase_name="shotgun"),
     ),
-    expected=ExpectedAgentOutput(min_clarifying_questions=1),
+    expected=ExpectedAgentOutput(
+        min_clarifying_questions=1,
+        expected_response="""The Router should ask clarifying questions about authentication requirements.
+Correct behavior: Ask about authentication type (OAuth, password, API keys), session management, user roles, and security requirements.
+Incorrect behavior: Immediately creating a plan or making assumptions about the authentication approach.""",
+    ),
 )
 
 SPECIFIC_FEATURE_CREATES_PLAN = ShotgunTestCase(
