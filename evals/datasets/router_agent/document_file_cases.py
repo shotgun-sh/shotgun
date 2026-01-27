@@ -20,6 +20,7 @@ the quality of the Router's response, rather than deterministic text matching.
 from evals.models import (
     AgentType,
     ExpectedAgentOutput,
+    JudgeType,
     ShotgunTestCase,
     TestCaseContext,
     TestCaseInput,
@@ -45,6 +46,7 @@ PRD_FILE_PLANNING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -65,6 +67,7 @@ USER_STORIES_FILE_PLANNING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -85,6 +88,7 @@ QA_GUIDELINES_FILE_PLANNING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -105,6 +109,7 @@ SPEC_DOC_FILE_PLANNING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -131,6 +136,7 @@ PRD_FILE_DRAFTING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -151,6 +157,7 @@ USER_STORIES_FILE_DRAFTING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -171,6 +178,7 @@ WIREFRAME_IMAGE_DRAFTING_MODE = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],
@@ -191,6 +199,7 @@ SCREENSHOT_FOR_BUG_REPORT = ShotgunTestCase(
         ),
     ),
     expected=ExpectedAgentOutput(
+        judge_type=JudgeType.FILE_REQUESTS,
         max_clarifying_questions=0,
         disallowed_delegations=ALL_DELEGATIONS,
         disallowed_tools=["read_file"],

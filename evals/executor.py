@@ -269,6 +269,15 @@ class RouterExecutor:
             clarifying_questions = result.output.clarifying_questions or []
             file_requests = result.output.file_requests or []
 
+            # Debug logging for empty responses
+            if not response or response.strip() == "":
+                logger.warning(
+                    f"Empty response from agent for {test_case.name}. "
+                    f"clarifying_questions={len(clarifying_questions)}, "
+                    f"file_requests={len(file_requests)}, "
+                    f"output={result.output}"
+                )
+
             # Extract tool usage
             tools_used = self._extract_tool_names(result.all_messages())
 

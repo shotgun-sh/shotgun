@@ -74,7 +74,9 @@ class FileRequestsJudgeResult(BaseModel):
 
 
 # Default rubrics for file_requests evaluation dimensions
-DEFAULT_FILE_REQUESTS_RUBRICS: dict[FileRequestsDimension, FileRequestsDimensionRubric] = {
+DEFAULT_FILE_REQUESTS_RUBRICS: dict[
+    FileRequestsDimension, FileRequestsDimensionRubric
+] = {
     FileRequestsDimension.FILE_REQUEST_USAGE: FileRequestsDimensionRubric(
         dimension=FileRequestsDimension.FILE_REQUEST_USAGE,
         description="Did the Router correctly use file_requests to load the binary file?",
@@ -179,13 +181,15 @@ class FileRequestsJudge:
         """
         self.model_config = model_config or JudgeModelConfig(
             provider=JudgeProviderType.ANTHROPIC,
-            model_name="claude-sonnet-4-20250514",
+            model_name="claude-opus-4-5-20251101",
             temperature=0.2,  # Low temperature for consistency
             max_tokens=2000,
         )
 
         self.dimensions = dimensions or list(FileRequestsDimension)
-        self.rubrics = {dim: DEFAULT_FILE_REQUESTS_RUBRICS[dim] for dim in self.dimensions}
+        self.rubrics = {
+            dim: DEFAULT_FILE_REQUESTS_RUBRICS[dim] for dim in self.dimensions
+        }
 
     def _create_judge_agent(self) -> Agent[None, FileRequestsScoreOutput]:
         """Create a Pydantic AI agent that evaluates all dimensions in one call.
