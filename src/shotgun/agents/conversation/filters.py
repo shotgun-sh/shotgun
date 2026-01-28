@@ -1,8 +1,13 @@
 """Filter functions for conversation message validation."""
 
+from __future__ import annotations
+
 import json
 import logging
+import re
+from typing import TYPE_CHECKING, Any
 
+from pydantic_ai import BinaryContent
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -10,7 +15,13 @@ from pydantic_ai.messages import (
     ModelResponse,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pydantic_ai.messages import UserContent
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +169,146 @@ def filter_orphaned_tool_responses(messages: list[ModelMessage]) -> list[ModelMe
                 "orphaned_count": orphaned_count,
                 "total_messages": len(messages),
                 "orphaned_tool_names": orphaned_tool_names,
+            },
+        )
+
+    return filtered
+
+
+# Pattern to extract file path from the marker string preceding BinaryContent
+# Format: "\n\n--- File: {path} ---"
+_FILE_MARKER_PATTERN = re.compile(r"^[\n\s]*---\s*File:\s*(.+?)\s*---$")
+
+
+def _extract_file_path(text: str) -> str | None:
+    """Extract file path from a file marker string.
+
+    Args:
+        text: String potentially containing a file marker
+
+    Returns:
+        The file path if found, None otherwise
+    """
+    match = _FILE_MARKER_PATTERN.match(text.strip())
+    return match.group(1) if match else None
+
+
+def _create_file_reference(
+    binary: BinaryContent, file_path: str | None
+) -> dict[str, Any]:
+    """Create a FileReference dict from BinaryContent.
+
+    Args:
+        binary: The BinaryContent to create a reference for
+        file_path: The file path if known, None for unknown
+
+    Returns:
+        A dict representation of FileReference
+    """
+    return {
+        "kind": "file_reference",
+        "file_path": file_path or "<unknown>",
+        "media_type": binary.media_type,
+        "size_bytes": len(binary.data),
+    }
+
+
+def _filter_content_parts(content: Sequence[UserContent]) -> list[UserContent]:
+    """Replace BinaryContent with FileReference in content parts.
+
+    Args:
+        content: Sequence of content parts (strings, BinaryContent, etc.)
+
+    Returns:
+        New list with BinaryContent replaced by FileReference dicts
+    """
+    result: list[UserContent] = []
+    last_file_path: str | None = None
+
+    for item in content:
+        if isinstance(item, str):
+            # Check if this is a file marker and extract the path
+            extracted_path = _extract_file_path(item)
+            if extracted_path:
+                last_file_path = extracted_path
+            result.append(item)
+        elif isinstance(item, BinaryContent):
+            # Replace BinaryContent with FileReference
+            file_ref = _create_file_reference(item, last_file_path)
+            result.append(file_ref)  # type: ignore[arg-type]
+            last_file_path = None  # Reset after use
+        else:
+            # Keep other content types as-is
+            result.append(item)
+
+    return result
+
+
+def filter_binary_content(messages: list[ModelMessage]) -> list[ModelMessage]:
+    """Replace BinaryContent with FileReference placeholders in messages.
+
+    This ensures conversation history can be serialized to JSON without
+    UTF-8 encoding issues from binary data. The FileReference preserves
+    metadata about the file that was loaded.
+
+    Args:
+        messages: List of messages to filter
+
+    Returns:
+        List of messages with BinaryContent replaced by FileReference
+    """
+    filtered: list[ModelMessage] = []
+    replaced_count = 0
+
+    for message in messages:
+        if not isinstance(message, ModelRequest):
+            filtered.append(message)
+            continue
+
+        # Check if any parts contain BinaryContent
+        has_binary = False
+        for part in message.parts:
+            if isinstance(part, UserPromptPart):
+                # Content can be a string or sequence
+                if isinstance(part.content, (list, tuple)):
+                    for item in part.content:
+                        if isinstance(item, BinaryContent):
+                            has_binary = True
+                            break
+            if has_binary:
+                break
+
+        if not has_binary:
+            filtered.append(message)
+            continue
+
+        # Filter parts, replacing BinaryContent with FileReference
+        filtered_parts: list[ModelRequestPart] = []
+        for part in message.parts:
+            if isinstance(part, UserPromptPart) and isinstance(
+                part.content, (list, tuple)
+            ):
+                # Filter the content parts
+                new_content = _filter_content_parts(part.content)
+                # Count how many were replaced
+                for item in new_content:
+                    if isinstance(item, dict) and item.get("kind") == "file_reference":
+                        replaced_count += 1
+                # Create new UserPromptPart with filtered content
+                filtered_parts.append(
+                    UserPromptPart(content=new_content, timestamp=part.timestamp)
+                )
+            else:
+                filtered_parts.append(part)
+
+        filtered.append(ModelRequest(parts=filtered_parts))
+
+    if replaced_count > 0:
+        logger.info(
+            "Replaced binary content with file references",
+            extra={
+                "replaced_count": replaced_count,
+                "total_messages": len(messages),
             },
         )
 
