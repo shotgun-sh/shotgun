@@ -269,14 +269,9 @@ async def get_provider_model(
     from shotgun.settings import settings
 
     # PRIORITY 0: Check for OpenAI-compatible mode
-    # When SHOTGUN_OPENAI_COMPAT_BASE_URL is set, bypass all other provider config
-    if settings.openai_compat.base_url:
+    # When both SHOTGUN_OPENAI_COMPAT_BASE_URL and API_KEY are set, bypass all other providers
+    if settings.openai_compat.base_url and settings.openai_compat.api_key:
         api_key = settings.openai_compat.api_key
-        if not api_key:
-            raise ValueError(
-                "SHOTGUN_OPENAI_COMPAT_API_KEY is required when "
-                "SHOTGUN_OPENAI_COMPAT_BASE_URL is set"
-            )
 
         # Use CLI override if set, otherwise use hardcoded default
         model_name = _openai_compat_model_override or OPENAI_COMPAT_DEFAULT_MODEL
