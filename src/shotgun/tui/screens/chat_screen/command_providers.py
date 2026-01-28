@@ -4,12 +4,18 @@ from typing import TYPE_CHECKING, cast
 from textual.command import DiscoveryHit, Hit, Provider
 
 from shotgun.codebase.models import CodebaseGraph
+from shotgun.settings import settings
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.model_picker import ModelPickerScreen
 from shotgun.tui.screens.provider_config import ProviderConfigScreen
 
 if TYPE_CHECKING:
     from shotgun.tui.screens.chat import ChatScreen
+
+
+def _is_openai_compat_mode() -> bool:
+    """Check if OpenAI-compatible mode is active."""
+    return bool(settings.openai_compat.base_url)
 
 
 class UsageProvider(Provider):
@@ -85,13 +91,6 @@ class ProviderSetupProvider(Provider):
 
         return cast(ChatScreen, self.screen)
 
-    @staticmethod
-    def _is_openai_compat_mode() -> bool:
-        """Check if OpenAI-compatible mode is active."""
-        from shotgun.settings import settings
-
-        return bool(settings.openai_compat.base_url)
-
     def open_provider_config(self) -> None:
         """Show the provider configuration screen."""
         self.chat_screen.app.push_screen(ProviderConfigScreen())
@@ -104,7 +103,7 @@ class ProviderSetupProvider(Provider):
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         # Hide provider/model commands when using OpenAI-compatible endpoint
-        if self._is_openai_compat_mode():
+        if _is_openai_compat_mode():
             return
 
         yield DiscoveryHit(
@@ -120,7 +119,7 @@ class ProviderSetupProvider(Provider):
 
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
         # Hide provider/model commands when using OpenAI-compatible endpoint
-        if self._is_openai_compat_mode():
+        if _is_openai_compat_mode():
             return
 
         matcher = self.matcher(query)
@@ -245,13 +244,6 @@ class UnifiedCommandProvider(Provider):
 
         return cast(ChatScreen, self.screen)
 
-    @staticmethod
-    def _is_openai_compat_mode() -> bool:
-        """Check if OpenAI-compatible mode is active."""
-        from shotgun.settings import settings
-
-        return bool(settings.openai_compat.base_url)
-
     def open_provider_config(self) -> None:
         """Show the provider configuration screen."""
         self.chat_screen.app.push_screen(ProviderConfigScreen())
@@ -264,7 +256,7 @@ class UnifiedCommandProvider(Provider):
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         """Provide commands in alphabetical order when palette opens."""
-        is_compat_mode = self._is_openai_compat_mode()
+        is_compat_mode = _is_openai_compat_mode()
 
         # Alphabetically ordered commands
         yield DiscoveryHit(
@@ -318,7 +310,7 @@ class UnifiedCommandProvider(Provider):
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
         """Search for commands in alphabetical order."""
         matcher = self.matcher(query)
-        is_compat_mode = self._is_openai_compat_mode()
+        is_compat_mode = _is_openai_compat_mode()
 
         # Define all commands in alphabetical order
         commands = [
