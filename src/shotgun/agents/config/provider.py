@@ -35,6 +35,7 @@ _model_cache: dict[tuple[ProviderType, KeyProvider, ModelName | str, str], Model
 
 # Module-level model override for OpenAI-compatible mode (set via --model CLI flag)
 _openai_compat_model_override: str | None = None
+_openai_compat_sub_agent_model_override: str | None = None
 
 # Default model for OpenAI-compatible endpoints
 OPENAI_COMPAT_DEFAULT_MODEL = "gpt-5.2"
@@ -50,6 +51,18 @@ def set_openai_compat_model(model: str | None) -> None:
     """
     global _openai_compat_model_override
     _openai_compat_model_override = model
+
+
+def set_openai_compat_sub_agent_model(model: str | None) -> None:
+    """Set the sub-agent model override for OpenAI-compatible endpoints.
+
+    This is called by the CLI when --sub-agent-model is specified.
+
+    Args:
+        model: Model name to use for sub-agents, or None to use the main model.
+    """
+    global _openai_compat_sub_agent_model_override
+    _openai_compat_sub_agent_model_override = model
 
 
 def _create_openai_compat_model(
@@ -274,13 +287,23 @@ async def get_provider_model(
         compat_api_key = settings.openai_compat.api_key
 
         # Use CLI override if set, otherwise use hardcoded default
-        model_name = _openai_compat_model_override or OPENAI_COMPAT_DEFAULT_MODEL
+        main_model = _openai_compat_model_override or OPENAI_COMPAT_DEFAULT_MODEL
 
-        logger.info(
-            "Using OpenAI-compatible endpoint: %s with model: %s",
-            settings.openai_compat.base_url,
-            model_name,
-        )
+        # For sub-agents, use sub-agent model if specified, otherwise fall back to main model
+        if for_sub_agent and _openai_compat_sub_agent_model_override:
+            model_name = _openai_compat_sub_agent_model_override
+            logger.info(
+                "Using OpenAI-compatible endpoint: %s with sub-agent model: %s",
+                settings.openai_compat.base_url,
+                model_name,
+            )
+        else:
+            model_name = main_model
+            logger.info(
+                "Using OpenAI-compatible endpoint: %s with model: %s",
+                settings.openai_compat.base_url,
+                model_name,
+            )
 
         return ModelConfig(
             name=model_name,

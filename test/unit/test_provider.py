@@ -484,3 +484,75 @@ async def test_get_provider_model_openai_compatible_bypasses_other_providers():
     finally:
         settings_module.settings = settings_module.Settings()
         set_openai_compat_model(None)
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+        "SHOTGUN_OPENAI_COMPAT_API_KEY": "test-compat-key",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_sub_agent_model():
+    """Test get_provider_model uses --sub-agent-model for sub-agents."""
+    from shotgun import settings as settings_module
+    from shotgun.agents.config.provider import (
+        set_openai_compat_model,
+        set_openai_compat_sub_agent_model,
+    )
+
+    settings_module.settings = settings_module.Settings()
+    set_openai_compat_model("gpt-5.2")
+    set_openai_compat_sub_agent_model("gpt-5.1")
+
+    try:
+        # Router model (for_sub_agent=False) should use main model
+        router_model = await get_provider_model(for_sub_agent=False)
+        assert isinstance(router_model, ModelConfig)
+        assert router_model.name == "gpt-5.2"
+        assert router_model.provider == ProviderType.OPENAI_COMPATIBLE
+
+        # Sub-agent model (for_sub_agent=True) should use sub-agent model
+        sub_agent_model = await get_provider_model(for_sub_agent=True)
+        assert isinstance(sub_agent_model, ModelConfig)
+        assert sub_agent_model.name == "gpt-5.1"
+        assert sub_agent_model.provider == ProviderType.OPENAI_COMPATIBLE
+    finally:
+        settings_module.settings = settings_module.Settings()
+        set_openai_compat_model(None)
+        set_openai_compat_sub_agent_model(None)
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+        "SHOTGUN_OPENAI_COMPAT_API_KEY": "test-compat-key",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_sub_agent_fallback_to_main():
+    """Test sub-agent uses main model when --sub-agent-model is not set."""
+    from shotgun import settings as settings_module
+    from shotgun.agents.config.provider import (
+        set_openai_compat_model,
+        set_openai_compat_sub_agent_model,
+    )
+
+    settings_module.settings = settings_module.Settings()
+    set_openai_compat_model("gpt-5.2")
+    set_openai_compat_sub_agent_model(None)  # Not set
+
+    try:
+        # Sub-agent should fall back to main model when sub-agent model not set
+        sub_agent_model = await get_provider_model(for_sub_agent=True)
+        assert isinstance(sub_agent_model, ModelConfig)
+        assert sub_agent_model.name == "gpt-5.2"  # Falls back to main model
+        assert sub_agent_model.provider == ProviderType.OPENAI_COMPATIBLE
+    finally:
+        settings_module.settings = settings_module.Settings()
+        set_openai_compat_model(None)
+        set_openai_compat_sub_agent_model(None)
