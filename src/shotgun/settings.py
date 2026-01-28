@@ -250,6 +250,7 @@ class OpenAICompatSettings(BaseSettings):
     Environment variables:
         SHOTGUN_OPENAI_COMPAT_BASE_URL: The base URL of the OpenAI-compatible endpoint
         SHOTGUN_OPENAI_COMPAT_API_KEY: API key for authentication
+        SHOTGUN_OPENAI_COMPAT_WEB_SEARCH_MODEL: Model to use for web search (optional)
     """
 
     base_url: str | None = Field(
@@ -259,6 +260,10 @@ class OpenAICompatSettings(BaseSettings):
     api_key: str | None = Field(
         default=None,
         description="API key for the OpenAI-compatible endpoint",
+    )
+    web_search_model: str | None = Field(
+        default=None,
+        description="Model to use for web search (defaults to openai/gpt-5.2 if not set)",
     )
 
     model_config = SettingsConfigDict(
