@@ -20,7 +20,7 @@ class ContextIndicator(Static):
     """
 
     context_analysis: reactive[ContextAnalysis | None] = reactive(None)
-    model_name: reactive[ModelName | None] = reactive(None)
+    model_name: reactive[ModelName | str | None] = reactive(None)
     is_streaming: reactive[bool] = reactive(False)
 
     _animation_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -37,13 +37,13 @@ class ContextIndicator(Static):
         self._animation_timer: Timer | None = None
 
     def update_context(
-        self, analysis: ContextAnalysis | None, model: ModelName | None
+        self, analysis: ContextAnalysis | None, model: ModelName | str | None
     ) -> None:
         """Update the context indicator with new analysis and model data.
 
         Args:
             analysis: Context analysis with token usage data
-            model: Current model name
+            model: Current model name (ModelName enum or string for custom models)
         """
         self.context_analysis = analysis
         self.model_name = model
@@ -113,15 +113,29 @@ class ContextIndicator(Static):
         else:
             return str(tokens)
 
+    def _get_model_display_name(self) -> str | None:
+        """Get the display name for the current model.
+
+        Returns:
+            Display name from ModelSpec if available, otherwise the raw model name string,
+            or None if no model is set.
+        """
+        if not self.model_name:
+            return None
+        # For ModelName enum, look up in MODEL_SPECS for short_name
+        if isinstance(self.model_name, ModelName):
+            model_spec = MODEL_SPECS.get(self.model_name)
+            return model_spec.short_name if model_spec else self.model_name.value
+        # For string (e.g., OpenAI-compatible mode), use as-is
+        return self.model_name
+
     def _refresh_display(self) -> None:
         """Refresh the display with current context data."""
+        model_display = self._get_model_display_name()
+
         # If no analysis yet, show placeholder with model name or empty
         if self.context_analysis is None:
-            if self.model_name:
-                model_spec = MODEL_SPECS.get(self.model_name)
-                model_display = (
-                    model_spec.short_name if model_spec else str(self.model_name)
-                )
+            if model_display:
                 self.update(f"[bold]{model_display}[/bold]")
             else:
                 self.update("")
@@ -156,11 +170,7 @@ class ContextIndicator(Static):
             parts.append(f"[bold cyan]{animation_char}[/]")
 
         # Add model name if available
-        if self.model_name:
-            model_spec = MODEL_SPECS.get(self.model_name)
-            model_display = (
-                model_spec.short_name if model_spec else str(self.model_name)
-            )
+        if model_display:
             parts.extend(
                 [
                     "[$foreground-muted]|[/]",
@@ -174,6 +184,6 @@ class ContextIndicator(Static):
         """React to context analysis changes."""
         self._refresh_display()
 
-    def watch_model_name(self, model: ModelName | None) -> None:
+    def watch_model_name(self, model: ModelName | str | None) -> None:
         """React to model name changes."""
         self._refresh_display()
