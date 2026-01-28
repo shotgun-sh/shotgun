@@ -85,6 +85,13 @@ class ProviderSetupProvider(Provider):
 
         return cast(ChatScreen, self.screen)
 
+    @staticmethod
+    def _is_openai_compat_mode() -> bool:
+        """Check if OpenAI-compatible mode is active."""
+        from shotgun.settings import settings
+
+        return bool(settings.openai_compat.base_url)
+
     def open_provider_config(self) -> None:
         """Show the provider configuration screen."""
         self.chat_screen.app.push_screen(ProviderConfigScreen())
@@ -96,6 +103,10 @@ class ProviderSetupProvider(Provider):
         )
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
+        # Hide provider/model commands when using OpenAI-compatible endpoint
+        if self._is_openai_compat_mode():
+            return
+
         yield DiscoveryHit(
             "Open Provider Setup",
             self.open_provider_config,
@@ -108,6 +119,10 @@ class ProviderSetupProvider(Provider):
         )
 
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
+        # Hide provider/model commands when using OpenAI-compatible endpoint
+        if self._is_openai_compat_mode():
+            return
+
         matcher = self.matcher(query)
 
         title = "Open Provider Setup"
@@ -230,6 +245,13 @@ class UnifiedCommandProvider(Provider):
 
         return cast(ChatScreen, self.screen)
 
+    @staticmethod
+    def _is_openai_compat_mode() -> bool:
+        """Check if OpenAI-compatible mode is active."""
+        from shotgun.settings import settings
+
+        return bool(settings.openai_compat.base_url)
+
     def open_provider_config(self) -> None:
         """Show the provider configuration screen."""
         self.chat_screen.app.push_screen(ProviderConfigScreen())
@@ -242,6 +264,8 @@ class UnifiedCommandProvider(Provider):
 
     async def discover(self) -> AsyncGenerator[DiscoveryHit, None]:
         """Provide commands in alphabetical order when palette opens."""
+        is_compat_mode = self._is_openai_compat_mode()
+
         # Alphabetically ordered commands
         yield DiscoveryHit(
             "Clear Conversation",
@@ -263,16 +287,18 @@ class UnifiedCommandProvider(Provider):
             self.chat_screen.action_compact_conversation,
             help="Reduce conversation size by compacting message history",
         )
-        yield DiscoveryHit(
-            "Open Provider Setup",
-            self.open_provider_config,
-            help="⚙️ Manage API keys for available providers",
-        )
-        yield DiscoveryHit(
-            "Select AI Model",
-            self.open_model_picker,
-            help="🤖 Choose which AI model to use",
-        )
+        # Hide provider/model commands when using OpenAI-compatible endpoint
+        if not is_compat_mode:
+            yield DiscoveryHit(
+                "Open Provider Setup",
+                self.open_provider_config,
+                help="⚙️ Manage API keys for available providers",
+            )
+            yield DiscoveryHit(
+                "Select AI Model",
+                self.open_model_picker,
+                help="🤖 Choose which AI model to use",
+            )
         yield DiscoveryHit(
             "Share specs to workspace",
             self.chat_screen.share_specs_command,
@@ -292,6 +318,7 @@ class UnifiedCommandProvider(Provider):
     async def search(self, query: str) -> AsyncGenerator[Hit, None]:
         """Search for commands in alphabetical order."""
         matcher = self.matcher(query)
+        is_compat_mode = self._is_openai_compat_mode()
 
         # Define all commands in alphabetical order
         commands = [
@@ -316,16 +343,6 @@ class UnifiedCommandProvider(Provider):
                 "Reduce conversation size by compacting message history",
             ),
             (
-                "Open Provider Setup",
-                self.open_provider_config,
-                "⚙️ Manage API keys for available providers",
-            ),
-            (
-                "Select AI Model",
-                self.open_model_picker,
-                "🤖 Choose which AI model to use",
-            ),
-            (
                 "Share specs to workspace",
                 self.chat_screen.share_specs_command,
                 "📤 Upload .shotgun/ files to share with your team",
@@ -341,6 +358,25 @@ class UnifiedCommandProvider(Provider):
                 "Display usage information for the current session",
             ),
         ]
+
+        # Add provider/model commands only when NOT in OpenAI-compatible mode
+        if not is_compat_mode:
+            commands.insert(
+                4,  # After "Compact Conversation"
+                (
+                    "Open Provider Setup",
+                    self.open_provider_config,
+                    "⚙️ Manage API keys for available providers",
+                ),
+            )
+            commands.insert(
+                5,  # After "Open Provider Setup"
+                (
+                    "Select AI Model",
+                    self.open_model_picker,
+                    "🤖 Choose which AI model to use",
+                ),
+            )
 
         for title, callback, help_text in commands:
             score = matcher.match(title)

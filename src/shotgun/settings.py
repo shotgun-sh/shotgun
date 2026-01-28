@@ -241,6 +241,34 @@ class IndexingSettings(BaseSettings):
         return bool(v)
 
 
+class OpenAICompatSettings(BaseSettings):
+    """OpenAI-compatible endpoint settings.
+
+    When base_url is set, Shotgun bypasses normal provider configuration
+    and uses the specified endpoint directly for all LLM requests.
+
+    Environment variables:
+        SHOTGUN_OPENAI_COMPAT_BASE_URL: The base URL of the OpenAI-compatible endpoint
+        SHOTGUN_OPENAI_COMPAT_API_KEY: API key for authentication
+    """
+
+    base_url: str | None = Field(
+        default=None,
+        description="Base URL for OpenAI-compatible endpoint (e.g., https://api.example.com/v1)",
+    )
+    api_key: str | None = Field(
+        default=None,
+        description="API key for the OpenAI-compatible endpoint",
+    )
+
+    model_config = SettingsConfigDict(
+        env_prefix="SHOTGUN_OPENAI_COMPAT_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings with SHOTGUN_ prefix.
 
@@ -276,6 +304,7 @@ class Settings(BaseSettings):
     api: ApiSettings = Field(default_factory=ApiSettings)
     dev: DevelopmentSettings = Field(default_factory=DevelopmentSettings)
     indexing: IndexingSettings = Field(default_factory=IndexingSettings)
+    openai_compat: OpenAICompatSettings = Field(default_factory=OpenAICompatSettings)
 
     model_config = SettingsConfigDict(
         env_prefix="SHOTGUN_",

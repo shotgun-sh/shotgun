@@ -31,7 +31,60 @@ from .streaming_test import check_streaming_capability
 logger = get_logger(__name__)
 
 # Global cache for Model instances (singleton pattern)
-_model_cache: dict[tuple[ProviderType, KeyProvider, ModelName, str], Model] = {}
+_model_cache: dict[tuple[ProviderType, KeyProvider, ModelName | str, str], Model] = {}
+
+# Module-level model override for OpenAI-compatible mode (set via --model CLI flag)
+_openai_compat_model_override: str | None = None
+
+# Default model for OpenAI-compatible endpoints
+OPENAI_COMPAT_DEFAULT_MODEL = "gpt-5.2"
+
+
+def set_openai_compat_model(model: str | None) -> None:
+    """Set the model override for OpenAI-compatible endpoints.
+
+    This is called by the CLI when --model is specified.
+
+    Args:
+        model: Model name to use, or None to use the default.
+    """
+    global _openai_compat_model_override
+    _openai_compat_model_override = model
+
+
+def _create_openai_compat_model(
+    api_key: str, model_name: str, max_tokens: int
+) -> Model:
+    """Create a model for OpenAI-compatible endpoints.
+
+    Uses the SHOTGUN_OPENAI_COMPAT_BASE_URL from settings to configure
+    the LiteLLM provider with a custom base URL.
+
+    Args:
+        api_key: API key for the endpoint
+        model_name: Name of the model to use
+        max_tokens: Maximum output tokens
+
+    Returns:
+        Configured OpenAI-compatible Model instance
+    """
+    from shotgun.settings import settings
+
+    base_url = settings.openai_compat.base_url
+    if not base_url:
+        raise ValueError(
+            "SHOTGUN_OPENAI_COMPAT_BASE_URL is required for OpenAI-compatible mode"
+        )
+
+    # Use OpenAI provider with custom base_url
+    openai_provider = OpenAIProvider(api_key=api_key, base_url=base_url)
+
+    # Use OpenAIChatModel for broad compatibility with OpenAI-compatible APIs
+    return OpenAIChatModel(
+        model_name,
+        provider=openai_provider,
+        settings=ModelSettings(max_tokens=max_tokens),
+    )
 
 
 def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
@@ -65,7 +118,7 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
 def get_or_create_model(
     provider: ProviderType,
     key_provider: "KeyProvider",
-    model_name: ModelName,
+    model_name: ModelName | str,
     api_key: str,
 ) -> Model:
     """Get or create a singleton Model instance.
@@ -92,8 +145,8 @@ def get_or_create_model(
             model_name,
         )
 
-        # Get max_tokens from MODEL_SPECS
-        if model_name in MODEL_SPECS:
+        # Get max_tokens from MODEL_SPECS (only for known models)
+        if isinstance(model_name, ModelName) and model_name in MODEL_SPECS:
             max_tokens = MODEL_SPECS[model_name].max_output_tokens
         else:
             # Fallback defaults based on provider
@@ -101,9 +154,24 @@ def get_or_create_model(
                 ProviderType.OPENAI: 16_000,
                 ProviderType.ANTHROPIC: 32_000,
                 ProviderType.GOOGLE: 64_000,
+                ProviderType.OPENAI_COMPATIBLE: 16_000,
             }.get(provider, 16_000)
 
+        # Handle OpenAI-compatible endpoints (uses settings for base_url)
+        if provider == ProviderType.OPENAI_COMPATIBLE:
+            _model_cache[cache_key] = _create_openai_compat_model(
+                api_key, str(model_name), max_tokens
+            )
+            return _model_cache[cache_key]
+
         # Use LiteLLM proxy for Shotgun Account, native providers for BYOK
+        # At this point, model_name must be a ModelName (string handled above via OPENAI_COMPATIBLE)
+        if not isinstance(model_name, ModelName):
+            raise ValueError(
+                f"Unknown model name: {model_name}. "
+                "For custom models, set SHOTGUN_OPENAI_COMPAT_BASE_URL."
+            )
+
         if key_provider == KeyProvider.SHOTGUN:
             # Shotgun Account uses LiteLLM proxy with native model types where possible
             if model_name in MODEL_SPECS:
@@ -192,7 +260,43 @@ async def get_provider_model(
 
     Raises:
         ValueError: If provider is not configured properly or model not found
+
+    Note:
+        When SHOTGUN_OPENAI_COMPAT_BASE_URL is set, this function bypasses all
+        other provider configuration and uses the OpenAI-compatible endpoint.
+        The model name comes from SHOTGUN_OPENAI_COMPAT_DEFAULT_MODEL (default: gpt-4).
     """
+    from shotgun.settings import settings
+
+    # PRIORITY 0: Check for OpenAI-compatible mode
+    # When SHOTGUN_OPENAI_COMPAT_BASE_URL is set, bypass all other provider config
+    if settings.openai_compat.base_url:
+        api_key = settings.openai_compat.api_key
+        if not api_key:
+            raise ValueError(
+                "SHOTGUN_OPENAI_COMPAT_API_KEY is required when "
+                "SHOTGUN_OPENAI_COMPAT_BASE_URL is set"
+            )
+
+        # Use CLI override if set, otherwise use hardcoded default
+        model_name = _openai_compat_model_override or OPENAI_COMPAT_DEFAULT_MODEL
+
+        logger.info(
+            "Using OpenAI-compatible endpoint: %s with model: %s",
+            settings.openai_compat.base_url,
+            model_name,
+        )
+
+        return ModelConfig(
+            name=model_name,
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            key_provider=KeyProvider.BYOK,
+            max_input_tokens=128_000,  # Reasonable default for OpenAI-compatible
+            max_output_tokens=16_000,
+            api_key=api_key,
+            supports_streaming=True,
+        )
+
     config_manager = get_config_manager()
     # Use cached config for read-only access (performance)
     config = await config_manager.load(force_reload=False)

@@ -449,7 +449,7 @@ async def token_limit_compactor(
                 if hasattr(deps, "agent_mode") and deps.agent_mode
                 else "unknown",
                 # Model and provider info (no computation needed)
-                "model_name": deps.llm_model.name.value,
+                "model_name": deps.llm_model.name_str,
                 "provider": deps.llm_model.provider.value,
                 "key_provider": deps.llm_model.key_provider.value,
             },
@@ -614,7 +614,7 @@ async def _full_compaction(
             if hasattr(deps, "agent_mode") and deps.agent_mode
             else "unknown",
             # Model and provider info (no computation needed)
-            "model_name": deps.llm_model.name.value,
+            "model_name": deps.llm_model.name_str,
             "provider": deps.llm_model.provider.value,
             "key_provider": deps.llm_model.key_provider.value,
         },
@@ -686,7 +686,7 @@ async def _chunked_compaction(
                 1 for s in chunk_summaries if not s.startswith("[Chunk")
             ),
             "retention_window_size": len(retained_messages),
-            "model_name": deps.llm_model.name.value,
+            "model_name": deps.llm_model.name_str,
             "provider": deps.llm_model.provider.value,
         },
     )

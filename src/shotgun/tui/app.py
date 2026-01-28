@@ -130,13 +130,25 @@ class ShotgunApp(App[None]):
 
         # Run async config loading in worker
         async def _check_config() -> None:
+            from shotgun.settings import settings
+
+            # Check if OpenAI-compatible mode is enabled (provider via env vars)
+            is_openai_compat = bool(settings.openai_compat.base_url)
+            if is_openai_compat:
+                logger.info("OpenAI-compatible mode enabled, skipping provider setup")
+
             # Show welcome screen if no providers are configured OR if user hasn't seen it yet
             # Note: If config migration fails, ConfigManager will auto-create fresh config
             # and set migration_failed flag, which WelcomeScreen will display
+            # Skip this check when OpenAI-compatible mode is enabled
             config = await self.config_manager.load()
 
-            has_any_key = await self.config_manager.has_any_provider_key()
-            if not has_any_key or not config.shown_welcome_screen:
+            has_any_key = (
+                is_openai_compat or await self.config_manager.has_any_provider_key()
+            )
+            if not has_any_key or (
+                not is_openai_compat and not config.shown_welcome_screen
+            ):
                 if isinstance(self.screen, WelcomeScreen):
                     return
 
@@ -425,6 +437,7 @@ def serve(
     no_update_check: bool = False,
     continue_session: bool = False,
     force_reindex: bool = False,
+    model_override: str | None = None,
 ) -> None:
     """Serve the TUI application as a web application.
 
@@ -435,6 +448,7 @@ def serve(
         no_update_check: If True, disable automatic update checks.
         continue_session: If True, continue from previous conversation.
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
+        model_override: If provided, set SHOTGUN_OPENAI_COMPAT_DEFAULT_MODEL env var.
     """
     # Detect database issues BEFORE starting the TUI
     # Note: In serve mode, issues are logged but user interaction happens in
@@ -480,6 +494,8 @@ def serve(
         command += " --continue"
     if force_reindex:
         command += " --force-reindex"
+    if model_override:
+        command += f" --model={model_override}"
 
     # Get the path to our custom templates directory
     templates_path = Path(__file__).parent / "templates"

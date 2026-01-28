@@ -13,6 +13,7 @@ class ProviderType(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
+    OPENAI_COMPATIBLE = "openai_compatible"
 
 
 class KeyProvider(StrEnum):
@@ -51,8 +52,8 @@ class ModelSpec(BaseModel):
 class ModelConfig(BaseModel):
     """A fully configured model with API key and settings."""
 
-    name: ModelName  # Model identifier
-    provider: ProviderType  # Actual LLM provider (openai, anthropic, google)
+    name: ModelName | str  # Model identifier (str for OpenAI-compatible endpoints)
+    provider: ProviderType  # Actual LLM provider (openai, anthropic, google, openai_compatible)
     key_provider: KeyProvider  # Authentication method (byok or shotgun)
     max_input_tokens: int
     max_output_tokens: int
@@ -78,14 +79,27 @@ class ModelConfig(BaseModel):
         return self._model_instance
 
     @property
+    def name_str(self) -> str:
+        """Get the model name as a string.
+
+        Handles both ModelName enum and plain string (for OpenAI-compatible).
+        """
+        if isinstance(self.name, str):
+            return self.name
+        return self.name.value
+
+    @property
     def pydantic_model_name(self) -> str:
         """Compute the full Pydantic AI model identifier. For backward compatibility."""
+        if self.provider == ProviderType.OPENAI_COMPATIBLE:
+            # For OpenAI-compatible endpoints, use openai prefix with the model name
+            return f"openai:{self.name_str}"
         provider_prefix = {
             ProviderType.OPENAI: "openai",
             ProviderType.ANTHROPIC: "anthropic",
             ProviderType.GOOGLE: "google-gla",
         }
-        return f"{provider_prefix[self.provider]}:{self.name}"
+        return f"{provider_prefix[self.provider]}:{self.name_str}"
 
     @property
     def is_shotgun_account(self) -> bool:

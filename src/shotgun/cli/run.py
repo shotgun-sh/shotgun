@@ -37,6 +37,14 @@ def run(
         ProviderType | None,
         typer.Option("--provider", "-p", help="AI provider to use (overrides default)"),
     ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="Model name to use (requires SHOTGUN_OPENAI_COMPAT_BASE_URL to be set)",
+        ),
+    ] = None,
 ) -> None:
     """Execute a prompt using the Router agent in drafting mode.
 
@@ -44,6 +52,12 @@ def run(
     based on your prompt. In drafting mode, it auto-executes without confirmation.
     """
     logger.info("Running prompt: %s", prompt[:100])
+
+    # If --model is specified, set it for OpenAI-compatible mode
+    if model:
+        from shotgun.agents.config.provider import set_openai_compat_model
+
+        set_openai_compat_model(model)
 
     try:
         asyncio.run(async_run(prompt, non_interactive, provider))

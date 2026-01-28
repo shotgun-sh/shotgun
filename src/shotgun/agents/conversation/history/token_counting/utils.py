@@ -54,6 +54,10 @@ def get_token_counter(model_config: ModelConfig) -> TokenCounter:
     counter: TokenCounter
     if model_config.provider == ProviderType.OPENAI:
         counter = OpenAITokenCounter(model_config.name)
+    elif model_config.provider == ProviderType.OPENAI_COMPATIBLE:
+        # Use OpenAI token counter for OpenAI-compatible endpoints
+        # Fall back to a reasonable default model for tokenization
+        counter = OpenAITokenCounter(str(model_config.name))
     elif model_config.provider == ProviderType.ANTHROPIC:
         counter = AnthropicTokenCounter(
             model_config.name, model_config.api_key, model_config.key_provider

@@ -338,3 +338,146 @@ async def test_get_provider_model_api_key_environment_isolation(
         # Verify environment variables are NOT set (we no longer set them)
         assert os.environ.get("OPENAI_API_KEY") is None
         assert os.environ.get("ANTHROPIC_API_KEY") is None
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+        "SHOTGUN_OPENAI_COMPAT_API_KEY": "test-compat-key",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_mode():
+    """Test get_provider_model returns OpenAI-compatible config when env vars are set."""
+    from shotgun import settings as settings_module
+    from shotgun.agents.config.provider import set_openai_compat_model
+
+    settings_module.settings = settings_module.Settings()
+    set_openai_compat_model(None)  # Reset any previous override
+
+    try:
+        model = await get_provider_model()
+
+        assert isinstance(model, ModelConfig)
+        assert model.name == "gpt-5.2"  # Default model
+        assert model.provider == ProviderType.OPENAI_COMPATIBLE
+        assert model.api_key == "test-compat-key"
+        assert model.supports_streaming is True
+        assert model.max_input_tokens == 128_000
+        assert model.max_output_tokens == 16_000
+    finally:
+        settings_module.settings = settings_module.Settings()
+        set_openai_compat_model(None)
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+        "SHOTGUN_OPENAI_COMPAT_API_KEY": "test-compat-key",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_with_custom_model():
+    """Test get_provider_model uses --model override when set."""
+    from shotgun import settings as settings_module
+    from shotgun.agents.config.provider import set_openai_compat_model
+
+    settings_module.settings = settings_module.Settings()
+    set_openai_compat_model("custom-model")
+
+    try:
+        model = await get_provider_model()
+
+        assert isinstance(model, ModelConfig)
+        assert model.name == "custom-model"
+        assert model.provider == ProviderType.OPENAI_COMPATIBLE
+        assert model.api_key == "test-compat-key"
+    finally:
+        settings_module.settings = settings_module.Settings()
+        set_openai_compat_model(None)
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_missing_api_key():
+    """Test get_provider_model raises error when base_url is set but api_key is missing."""
+    from shotgun import settings as settings_module
+
+    settings_module.settings = settings_module.Settings()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="SHOTGUN_OPENAI_COMPAT_API_KEY is required when",
+        ):
+            await get_provider_model()
+    finally:
+        settings_module.settings = settings_module.Settings()
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+        "SHOTGUN_OPENAI_COMPAT_API_KEY": "test-key",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_default_model():
+    """Test get_provider_model uses 'gpt-5.2' as default when no --model is specified."""
+    from shotgun import settings as settings_module
+    from shotgun.agents.config.provider import set_openai_compat_model
+
+    settings_module.settings = settings_module.Settings()
+    set_openai_compat_model(None)  # Reset any previous override
+
+    try:
+        model = await get_provider_model()
+
+        assert isinstance(model, ModelConfig)
+        # Default model should be "gpt-5.2" when not specified
+        assert model.name == "gpt-5.2"
+        assert model.provider == ProviderType.OPENAI_COMPATIBLE
+    finally:
+        settings_module.settings = settings_module.Settings()
+        set_openai_compat_model(None)
+
+
+@patch.dict(
+    os.environ,
+    {
+        "SHOTGUN_OPENAI_COMPAT_BASE_URL": "https://api.example.com/v1",
+        "SHOTGUN_OPENAI_COMPAT_API_KEY": "test-key",
+    },
+    clear=False,
+)
+@pytest.mark.asyncio
+async def test_get_provider_model_openai_compatible_bypasses_other_providers():
+    """Test OpenAI-compatible mode takes priority over configured providers."""
+    from shotgun import settings as settings_module
+    from shotgun.agents.config.provider import set_openai_compat_model
+
+    settings_module.settings = settings_module.Settings()
+    set_openai_compat_model(None)  # Reset any previous override
+
+    try:
+        # Even when passing a specific provider, OpenAI-compat mode takes priority
+        model = await get_provider_model(ProviderType.ANTHROPIC)
+
+        assert isinstance(model, ModelConfig)
+        assert model.provider == ProviderType.OPENAI_COMPATIBLE
+        # Ignores the requested Anthropic provider
+    finally:
+        settings_module.settings = settings_module.Settings()
+        set_openai_compat_model(None)
