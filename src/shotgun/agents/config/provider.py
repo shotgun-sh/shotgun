@@ -271,7 +271,7 @@ async def get_provider_model(
     # PRIORITY 0: Check for OpenAI-compatible mode
     # When both SHOTGUN_OPENAI_COMPAT_BASE_URL and API_KEY are set, bypass all other providers
     if settings.openai_compat.base_url and settings.openai_compat.api_key:
-        api_key = settings.openai_compat.api_key
+        compat_api_key = settings.openai_compat.api_key
 
         # Use CLI override if set, otherwise use hardcoded default
         model_name = _openai_compat_model_override or OPENAI_COMPAT_DEFAULT_MODEL
@@ -288,7 +288,7 @@ async def get_provider_model(
             key_provider=KeyProvider.BYOK,
             max_input_tokens=128_000,  # Reasonable default for OpenAI-compatible
             max_output_tokens=16_000,
-            api_key=api_key,
+            api_key=compat_api_key,
             supports_streaming=True,
         )
 
