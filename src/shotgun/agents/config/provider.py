@@ -48,7 +48,7 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
-        return ModelName.CLAUDE_SONNET_4_5
+        return ModelName.CLAUDE_OPUS_4_5
 
     # Priority 2: Individual provider keys
     if _get_api_key(config.anthropic.api_key):
@@ -269,20 +269,34 @@ async def get_provider_model(
                 if isinstance(provider_or_model, ProviderType)
                 else ProviderType(provider_or_model)
             )
+            requested_model = None  # Will use provider's default model
         else:
-            # No provider specified - find first available provider with a key
-            provider_enum = None
-            for provider in ProviderType:
-                if _has_provider_key(config, provider):
-                    provider_enum = provider
-                    break
+            # No provider specified - check if user has a selected model
+            if config.selected_model and config.selected_model in MODEL_SPECS:
+                selected_spec = MODEL_SPECS[config.selected_model]
+                # Only use selected model if its provider has a configured key
+                if _has_provider_key(config, selected_spec.provider):
+                    provider_enum = selected_spec.provider
+                    requested_model = config.selected_model
+                else:
+                    # Selected model's provider has no key - fall back to finding available provider
+                    provider_enum = None
+                    requested_model = None
+            else:
+                provider_enum = None
+                requested_model = None
+
+            # If no selected model or its provider unavailable, find first available provider
+            if provider_enum is None:
+                for provider in ProviderType:
+                    if _has_provider_key(config, provider):
+                        provider_enum = provider
+                        break
 
             if provider_enum is None:
                 raise ValueError(
                     "No provider keys configured. Set via environment variables or config."
                 )
-
-        requested_model = None  # Will use provider's default model
 
     if provider_enum == ProviderType.OPENAI:
         api_key = _get_api_key(config.openai.api_key, "OPENAI_API_KEY")

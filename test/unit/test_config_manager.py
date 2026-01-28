@@ -419,6 +419,61 @@ async def test_get_provider_model_none_finds_first_available(mock_get_config_man
 
 @patch("shotgun.agents.config.provider.get_config_manager")
 @pytest.mark.asyncio
+async def test_get_provider_model_respects_selected_model(mock_get_config_manager):
+    """Test get_provider_model respects selected_model when provider has key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        import uuid
+
+        # User has selected Opus but also has OpenAI key (which would be first provider)
+        config = ShotgunConfig(
+            openai=OpenAIConfig(api_key=SecretStr("openai-key")),
+            anthropic=AnthropicConfig(api_key=SecretStr("anthropic-key")),
+            selected_model=ModelName.CLAUDE_OPUS_4_5,
+            shotgun_instance_id=str(uuid.uuid4()),
+        )
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        model = await get_provider_model(None)
+
+        # Should respect selected_model (Opus) not fall back to first provider (OpenAI)
+        assert isinstance(model, ModelConfig)
+        assert model.name == ModelName.CLAUDE_OPUS_4_5
+
+
+@patch("shotgun.agents.config.provider.get_config_manager")
+@pytest.mark.asyncio
+async def test_get_provider_model_falls_back_when_selected_model_provider_has_no_key(
+    mock_get_config_manager,
+):
+    """Test get_provider_model falls back when selected model's provider has no key."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+
+        import uuid
+
+        # User has selected Opus but only has OpenAI key (Anthropic has no key)
+        config = ShotgunConfig(
+            openai=OpenAIConfig(api_key=SecretStr("openai-key")),
+            selected_model=ModelName.CLAUDE_OPUS_4_5,
+            shotgun_instance_id=str(uuid.uuid4()),
+        )
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        model = await get_provider_model(None)
+
+        # Should fall back to OpenAI since Anthropic has no key
+        assert isinstance(model, ModelConfig)
+        assert model.name == ModelName.GPT_5_2
+
+
+@patch("shotgun.agents.config.provider.get_config_manager")
+@pytest.mark.asyncio
 async def test_get_provider_model_unsupported_provider(mock_get_config_manager):
     """Test get_provider_model with unsupported provider."""
     with tempfile.TemporaryDirectory() as temp_dir:
