@@ -410,16 +410,19 @@ async def test_get_provider_model_openai_compatible_with_custom_model():
 )
 @pytest.mark.asyncio
 async def test_get_provider_model_openai_compatible_missing_api_key():
-    """Test get_provider_model raises error when base_url is set but api_key is missing."""
+    """Test get_provider_model falls back to normal provider when only base_url is set.
+
+    OpenAI-compatible mode requires BOTH base_url AND api_key to be set.
+    If only base_url is set, it should be ignored and normal provider selection continues.
+    """
     from shotgun import settings as settings_module
 
     settings_module.settings = settings_module.Settings()
 
     try:
-        with pytest.raises(
-            ValueError,
-            match="SHOTGUN_OPENAI_COMPAT_API_KEY is required when",
-        ):
+        # Without api_key, OpenAI-compatible mode should NOT be activated
+        # This will fail if no other provider is configured, which is expected
+        with pytest.raises(ValueError, match="No provider keys configured"):
             await get_provider_model()
     finally:
         settings_module.settings = settings_module.Settings()
