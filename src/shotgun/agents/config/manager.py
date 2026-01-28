@@ -704,17 +704,26 @@ class ConfigManager:
     def _get_provider_config(
         self, config: ShotgunConfig, provider: ProviderType
     ) -> Any:
-        """Retrieve the provider-specific configuration section."""
+        """Retrieve the provider-specific configuration section.
+
+        Returns None for OPENAI_COMPATIBLE since it uses environment variables
+        instead of config file.
+        """
         if provider == ProviderType.OPENAI:
             return config.openai
         if provider == ProviderType.ANTHROPIC:
             return config.anthropic
         if provider == ProviderType.GOOGLE:
             return config.google
+        if provider == ProviderType.OPENAI_COMPATIBLE:
+            # OPENAI_COMPATIBLE uses env vars (SHOTGUN_OPENAI_COMPAT_*), not config
+            return None
         raise ValueError(f"Unsupported provider: {provider}")
 
     def _provider_has_api_key(self, provider_config: Any) -> bool:
         """Return True if the provider config contains a usable API key."""
+        if provider_config is None:
+            return False
         api_key = getattr(provider_config, API_KEY_FIELD, None)
         if api_key is None:
             return False

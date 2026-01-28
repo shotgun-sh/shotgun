@@ -414,7 +414,7 @@ class ContextAnalyzer:
             total_messages=total_messages,
             context_window=self.model_config.max_input_tokens,
             agent_context_tokens=agent_context_tokens,
-            model_name=self.model_config.name.value,
+            model_name=self.model_config.name_str,
             max_usable_tokens=max_usable_tokens,
             free_space_tokens=free_space_tokens,
         )

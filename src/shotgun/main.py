@@ -165,6 +165,14 @@ def main(
             help="Force re-indexing of codebase (ignores existing index)",
         ),
     ] = False,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="Model name to use (requires SHOTGUN_OPENAI_COMPAT_BASE_URL to be set)",
+        ),
+    ] = None,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
@@ -174,6 +182,12 @@ def main(
         perform_auto_update_async(no_update_check=no_update_check)
 
     if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
+        # If --model is specified, set it for OpenAI-compatible mode
+        if model:
+            from shotgun.agents.config.provider import set_openai_compat_model
+
+            set_openai_compat_model(model)
+
         if web:
             logger.debug("Launching shotgun TUI as web application")
             try:
@@ -184,6 +198,7 @@ def main(
                     no_update_check=no_update_check,
                     continue_session=continue_session,
                     force_reindex=force_reindex,
+                    model_override=model,  # Passed to construct command line for spawned process
                 )
             finally:
                 # Ensure PostHog is shut down cleanly even if server exits unexpectedly

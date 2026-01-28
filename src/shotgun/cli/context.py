@@ -96,7 +96,7 @@ async def analyze_context() -> ContextAnalysisOutput:
     model_config = await get_provider_model()
 
     # Debug: Log the model being used
-    logger.debug(f"Using model: {model_config.name.value}")
+    logger.debug(f"Using model: {model_config.name_str}")
     logger.debug(f"Provider: {model_config.provider.value}")
     logger.debug(f"Key provider: {model_config.key_provider.value}")
     logger.debug(f"Max input tokens: {model_config.max_input_tokens}")

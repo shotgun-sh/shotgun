@@ -338,3 +338,49 @@ def test_settings_dotenv_file_support(tmp_path, monkeypatch):
 
     # Note: This test verifies the .env file support is configured,
     # but actual loading may depend on working directory at runtime
+
+
+def test_openai_compat_settings_defaults():
+    """Test OpenAICompatSettings loads with default values."""
+    from shotgun.settings import OpenAICompatSettings
+
+    settings = OpenAICompatSettings()
+
+    assert settings.base_url is None
+    assert settings.api_key is None
+
+
+def test_openai_compat_settings_from_env(monkeypatch):
+    """Test OpenAICompatSettings loads from SHOTGUN_OPENAI_COMPAT_ prefixed env vars."""
+    monkeypatch.setenv("SHOTGUN_OPENAI_COMPAT_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.setenv("SHOTGUN_OPENAI_COMPAT_API_KEY", "test-api-key")
+
+    from shotgun.settings import OpenAICompatSettings
+
+    settings = OpenAICompatSettings()
+
+    assert settings.base_url == "https://api.example.com/v1"
+    assert settings.api_key == "test-api-key"
+
+
+def test_main_settings_includes_openai_compat():
+    """Test main Settings class includes openai_compat sub-settings."""
+    from shotgun.settings import Settings
+
+    settings = Settings()
+
+    assert hasattr(settings, "openai_compat")
+    assert settings.openai_compat.base_url is None
+
+
+def test_openai_compat_settings_partial_config(monkeypatch):
+    """Test OpenAICompatSettings works with partial configuration."""
+    monkeypatch.setenv("SHOTGUN_OPENAI_COMPAT_BASE_URL", "https://api.example.com/v1")
+    # No API key set
+
+    from shotgun.settings import OpenAICompatSettings
+
+    settings = OpenAICompatSettings()
+
+    assert settings.base_url == "https://api.example.com/v1"
+    assert settings.api_key is None  # Not set

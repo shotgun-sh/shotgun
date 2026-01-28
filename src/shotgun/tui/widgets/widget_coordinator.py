@@ -176,22 +176,20 @@ class WidgetCoordinator:
             logger.exception(f"Failed to set partial response: {e}")
 
     def update_context_indicator(
-        self, analysis: "ContextAnalysis | None", model_name: str
+        self, analysis: "ContextAnalysis | None", model_name: ModelName | str | None
     ) -> None:
         """Update context indicator with new analysis.
 
         Args:
             analysis: The context analysis results.
-            model_name: The current model name.
+            model_name: The current model name (ModelName enum or string for custom models).
         """
         if not self.screen.is_mounted:
             return
 
         try:
             context_indicator = self.screen.query_one(ContextIndicator)
-            # Cast the string model name to ModelName type
-            model = ModelName(model_name) if model_name else None
-            context_indicator.update_context(analysis, model)
+            context_indicator.update_context(analysis, model_name)
         except Exception as e:
             logger.exception(f"Failed to update context indicator: {e}")
 
