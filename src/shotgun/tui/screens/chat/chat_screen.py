@@ -100,6 +100,8 @@ from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
 )
 from shotgun.tui.screens.chat.codebase_index_selection import CodebaseIndexSelection
 from shotgun.tui.screens.chat.help_text import (
+    GETTING_STARTED_LINK,
+    GETTING_STARTED_LINK_TEXT,
     help_text_empty_dir,
     help_text_with_codebase,
 )
@@ -502,16 +504,28 @@ class ChatScreen(Screen[None]):
             await self.codebase_sdk.list_codebases_for_directory()
         ).graphs
         if accessible_graphs:
-            self.mount_hint(help_text_with_codebase(already_indexed=True))
+            self.mount_hint(
+                help_text_with_codebase(already_indexed=True),
+                link=GETTING_STARTED_LINK,
+                link_text=GETTING_STARTED_LINK_TEXT,
+            )
             return
 
         # Ask user if they want to index the current directory
         should_index = await self.app.push_screen_wait(CodebaseIndexPromptScreen())
         if not should_index:
-            self.mount_hint(help_text_empty_dir())
+            self.mount_hint(
+                help_text_empty_dir(),
+                link=GETTING_STARTED_LINK,
+                link_text=GETTING_STARTED_LINK_TEXT,
+            )
             return
 
-        self.mount_hint(help_text_with_codebase(already_indexed=False))
+        self.mount_hint(
+            help_text_with_codebase(already_indexed=False),
+            link=GETTING_STARTED_LINK,
+            link_text=GETTING_STARTED_LINK_TEXT,
+        )
 
         # Auto-index the current directory with its name
         cwd_name = cur_dir.name
@@ -963,8 +977,14 @@ class ChatScreen(Screen[None]):
                         yield ContextIndicator(id="context-indicator")
                         yield Static("", id="indexing-job-display")
 
-    def mount_hint(self, markdown: str) -> None:
-        hint = HintMessage(message=markdown)
+    def mount_hint(
+        self,
+        markdown: str,
+        *,
+        link: str | None = None,
+        link_text: str | None = None,
+    ) -> None:
+        hint = HintMessage(message=markdown, link=link, link_text=link_text)
         self.agent_manager.add_hint_message(hint)
 
     def _show_pull_hint(self) -> None:

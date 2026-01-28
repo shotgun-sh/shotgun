@@ -1,5 +1,9 @@
 """Helper functions for chat screen help text."""
 
+# Getting started guide link shown in welcome messages
+GETTING_STARTED_LINK = "https://app.shotgun.sh/how-to-use"
+GETTING_STARTED_LINK_TEXT = "Link to Getting started guide"
+
 
 def help_text_with_codebase(already_indexed: bool = False) -> str:
     """Generate help text for when a codebase is available.

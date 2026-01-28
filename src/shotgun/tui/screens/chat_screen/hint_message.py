@@ -1,3 +1,4 @@
+import webbrowser
 from typing import Literal
 
 from pydantic import BaseModel
@@ -18,6 +19,9 @@ class HintMessage(BaseModel):
     # Optional email copy functionality
     email: str | None = None
     markdown_after: str | None = None
+    # Optional link functionality
+    link: str | None = None
+    link_text: str | None = None  # Button label, defaults to "Open link"
 
 
 class HintMessageWidget(Widget):
@@ -63,6 +67,31 @@ class HintMessageWidget(Widget):
             content-align: left middle;
         }
 
+        HintMessageWidget .link-row {
+            width: auto;
+            height: auto;
+            margin: 1 0;
+        }
+
+        HintMessageWidget .link-text {
+            width: auto;
+            margin-right: 1;
+            content-align: left middle;
+        }
+
+        HintMessageWidget .link-btn {
+            width: auto;
+            min-width: 16;
+            margin-right: 1;
+        }
+
+        HintMessageWidget #link-status {
+            height: 1;
+            width: 100%;
+            margin-top: 1;
+            content-align: left middle;
+        }
+
     """
 
     def __init__(self, message: HintMessage) -> None:
@@ -86,6 +115,18 @@ class HintMessageWidget(Widget):
             # Optional markdown after email
             if self.message.markdown_after:
                 yield Markdown(self.message.markdown_after)
+
+        # Optional link section
+        if self.message.link:
+            button_label = self.message.link_text or "Open link"
+            # Link buttons on same line
+            with Horizontal(classes="link-row"):
+                yield Static(f"{button_label}:", classes="link-text")
+                yield Button("Open in browser", id="open-link-btn", classes="link-btn")
+                yield Button("Copy link", id="copy-link-btn", classes="link-btn")
+
+            # Status feedback label for link operations
+            yield Label("", id="link-status")
 
     @on(Button.Pressed, "#copy-email-btn")
     def _copy_email(self) -> None:
@@ -113,3 +154,45 @@ class HintMessageWidget(Widget):
         except Exception as e:
             status_label.update(f"⚠️ Copy failed: {e}")
             logger.error(f"Failed to copy email to clipboard: {e}", exc_info=True)
+
+    @on(Button.Pressed, "#open-link-btn")
+    def _open_link(self) -> None:
+        """Open link in browser when button is pressed."""
+        if not self.message.link:
+            return
+
+        status_label = self.query_one("#link-status", Label)
+
+        try:
+            webbrowser.open(self.message.link)
+            status_label.update("✓ Opened in browser!")
+            logger.debug(f"Successfully opened link in browser: {self.message.link}")
+
+        except Exception as e:
+            status_label.update(f"⚠️ Failed to open browser: {e}")
+            logger.error(f"Failed to open link in browser: {e}", exc_info=True)
+
+    @on(Button.Pressed, "#copy-link-btn")
+    def _copy_link(self) -> None:
+        """Copy link to clipboard when button is pressed."""
+        if not self.message.link:
+            return
+
+        status_label = self.query_one("#link-status", Label)
+
+        try:
+            import pyperclip
+
+            pyperclip.copy(self.message.link)
+            status_label.update("✓ Copied to clipboard!")
+            logger.debug(f"Successfully copied link to clipboard: {self.message.link}")
+
+        except ImportError:
+            status_label.update(
+                f"⚠️ Clipboard unavailable. Please manually copy: {self.message.link}"
+            )
+            logger.warning("pyperclip not available for clipboard operations")
+
+        except Exception as e:
+            status_label.update(f"⚠️ Copy failed: {e}")
+            logger.error(f"Failed to copy link to clipboard: {e}", exc_info=True)
