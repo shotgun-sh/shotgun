@@ -45,7 +45,7 @@ It includes research on existing patterns, implementation plans that respect you
 
 # 📦 Installation
 
-Choose your platform:
+**Select your operating system below and click to view installation instructions:**
 
 <details>
 <summary><h3>MacOS Install Instructions (click to expand)</h3></summary>
