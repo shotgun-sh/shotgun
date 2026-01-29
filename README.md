@@ -32,10 +32,14 @@
 <table>
 <tr>
 <td>
-  
-**Shotgun is a CLI tool** that generates codebase-aware specs for AI coding agents like Cursor, Claude Code, and Lovable. **It reads your entire repository**, researches how new features should fit your architecture, and produces technical specifications that keep AI agents on track—so they build what you actually want instead of derailing halfway through. **Bring your own key (BYOK) or use a Shotgun subscription — $10 for $10 in usage.**
 
-It includes research on existing patterns, implementation plans that respect your architecture, and task breakdowns ready to export as **AGENTS.md** files. Each spec is complete enough that your AI agent can work longer and further without losing context or creating conflicts.
+**AI agents are great at small tasks but derail on big features.** They forget context, rebuild things that already exist, and go off-spec halfway through.
+
+**Shotgun fixes this.** It reads your entire codebase, plans the full feature upfront, then splits it into staged PRs—each with file-by-file instructions your AI agent can actually follow.
+
+Instead of one 10k-line monster PR nobody will review, you get 5 focused PRs that ship.
+
+**Export to Cursor, Claude Code, Windsurf, or Codex.** BYOK or use Shotgun credits ($10 = $10 in usage).
 
 </td>
 </tr>
