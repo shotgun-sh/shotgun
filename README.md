@@ -39,7 +39,7 @@
 
 Instead of one 10k-line monster PR nobody will review, you get 5 focused PRs that ship.
 
-**Export to Cursor, Claude Code, Windsurf, or Codex.** BYOK or use Shotgun credits ($10 = $10 in usage).
+Works great with Cursor, Claude Code, Antigravity, or Codex. BYOK or use Shotgun credits ($10 = $10 in usage).
 
 </td>
 </tr>
