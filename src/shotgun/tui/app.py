@@ -438,6 +438,7 @@ def serve(
     continue_session: bool = False,
     force_reindex: bool = False,
     model_override: str | None = None,
+    sub_agent_model_override: str | None = None,
 ) -> None:
     """Serve the TUI application as a web application.
 
@@ -448,7 +449,8 @@ def serve(
         no_update_check: If True, disable automatic update checks.
         continue_session: If True, continue from previous conversation.
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
-        model_override: If provided, set SHOTGUN_OPENAI_COMPAT_DEFAULT_MODEL env var.
+        model_override: If provided, pass --model flag to spawned process.
+        sub_agent_model_override: If provided, pass --sub-agent-model flag to spawned process.
     """
     # Detect database issues BEFORE starting the TUI
     # Note: In serve mode, issues are logged but user interaction happens in
@@ -496,6 +498,8 @@ def serve(
         command += " --force-reindex"
     if model_override:
         command += f" --model={model_override}"
+    if sub_agent_model_override:
+        command += f" --sub-agent-model={sub_agent_model_override}"
 
     # Get the path to our custom templates directory
     templates_path = Path(__file__).parent / "templates"
