@@ -45,46 +45,50 @@ It includes research on existing patterns, implementation plans that respect you
 
 # 📦 Installation
 
-### 1. Install uv
+Choose your platform:
 
-Shotgun runs via `uvx` or `uv tool install`. First, install `uv` for your platform:
+<details open>
+<summary><strong>🍎 macOS</strong></summary>
 
-<table>
-<tr>
-<th>Platform</th>
-<th>Installation Command</th>
-</tr>
-<tr>
-<td><strong>macOS</strong> (Homebrew)</td>
-<td>
+**Step 1: Install uv**
 
 ```bash
+# Using Homebrew
 brew install uv
+
+# Or using curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-</td>
-</tr>
-<tr>
-<td><strong>macOS/Linux</strong> (curl)</td>
-<td>
+
+**Step 2: Run Shotgun**
+
+```bash
+uvx shotgun-sh@latest
+```
+
+</details>
+
+<details open>
+<summary><strong>🐧 Linux</strong></summary>
+
+**Step 1: Install uv**
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-</td>
-</tr>
-<tr>
-<td><strong>Windows</strong> (PowerShell)</td>
-<td>
 
-```powershell
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+**Step 2: Run Shotgun**
+
+```bash
+uvx shotgun-sh@latest
 ```
-</td>
-</tr>
-</table>
 
-<details>
-<summary><strong>Windows Installation</strong></summary>
+</details>
+
+<details open>
+<summary><strong>🪟 Windows</strong></summary>
+
+Open PowerShell and run these commands:
 
 ```powershell
 # Set execution policy (one-time)
@@ -96,11 +100,13 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 # Add to PATH (or restart terminal)
 $env:Path = "C:\Users\$env:USERNAME\.local\bin;$env:Path"
 
-# Run Shotgun (ephemeral)
-uvx --python 3.12 shotgun-sh@latest
+# OPTIONAL: Enable code indexing (run as Administrator)
+Import-Module BitsTransfer
+Start-BitsTransfer -Source "https://aka.ms/vs/17/release/vc_redist.x64.exe" -Destination "$env:TEMP\vc_redist.x64.exe"
+Start-Process -FilePath "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
 
-# Or install permanently
-uv tool install --python 3.12 shotgun-sh
+# Run Shotgun
+uvx --python 3.12 shotgun-sh@latest
 ```
 
 | Supported | Not Supported |
@@ -110,28 +116,13 @@ uv tool install --python 3.12 shotgun-sh
 
 **Important:** Run in **PowerShell**, not Command Prompt or VS Developer shells.
 
-#### Optional: Enable Code Indexing
-
-Code indexing requires the Visual C++ Redistributable. Run this in PowerShell (as Administrator):
-
-```powershell
-# Download and install Visual C++ Redistributable
-Import-Module BitsTransfer
-Start-BitsTransfer -Source "https://aka.ms/vs/17/release/vc_redist.x64.exe" -Destination "$env:TEMP\vc_redist.x64.exe"
-Start-Process -FilePath "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
-```
-
 </details>
 
 _💡 Restart your terminal after installation_
 
-### 2. Run Shotgun
-
-```bash
-uvx shotgun-sh@latest    
-```
-
 _**Why uv?** It's 10-100x faster than pip and handles binary wheels reliably—no cmake/build tool errors._
+
+Need help? [View uv installation docs](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### 3. Get Started
 
