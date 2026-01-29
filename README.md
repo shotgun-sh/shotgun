@@ -32,10 +32,14 @@
 <table>
 <tr>
 <td>
-  
-**Shotgun is a CLI tool** that generates codebase-aware specs for AI coding agents like Cursor, Claude Code, and Lovable. **It reads your entire repository**, researches how new features should fit your architecture, and produces technical specifications that keep AI agents on track—so they build what you actually want instead of derailing halfway through. **Bring your own key (BYOK) or use a Shotgun subscription — $10 for $10 in usage.**
 
-It includes research on existing patterns, implementation plans that respect your architecture, and task breakdowns ready to export as **AGENTS.md** files. Each spec is complete enough that your AI agent can work longer and further without losing context or creating conflicts.
+**AI agents are great at small tasks but derail on big features.** They forget context, rebuild things that already exist, and go off-spec halfway through.
+
+**Shotgun fixes this.** It reads your entire codebase, plans the full feature upfront, then splits it into staged PRs—each with file-by-file instructions your AI agent can actually follow.
+
+Instead of one 10k-line monster PR nobody will review, you get 5 focused PRs that ship.
+
+Works great with Cursor, Claude Code, Antigravity, or Codex. BYOK or use Shotgun credits ($10 = $10 in usage).
 
 </td>
 </tr>
@@ -45,46 +49,50 @@ It includes research on existing patterns, implementation plans that respect you
 
 # 📦 Installation
 
-### 1. Install uv
+**Select your operating system below and click to view installation instructions:**
 
-Shotgun runs via `uvx` or `uv tool install`. First, install `uv` for your platform:
+<details>
+<summary><h3>► MacOS Install Instructions (click to expand)</h3></summary>
 
-<table>
-<tr>
-<th>Platform</th>
-<th>Installation Command</th>
-</tr>
-<tr>
-<td><strong>macOS</strong> (Homebrew)</td>
-<td>
+**Step 1: Install uv**
 
 ```bash
+# Using Homebrew
 brew install uv
+
+# Or using curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-</td>
-</tr>
-<tr>
-<td><strong>macOS/Linux</strong> (curl)</td>
-<td>
+
+**Step 2: Run Shotgun**
+
+```bash
+uvx shotgun-sh@latest
+```
+
+</details>
+
+<details>
+<summary><h3>► Linux Install Instructions (click to expand)</h3></summary>
+
+**Step 1: Install uv**
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-</td>
-</tr>
-<tr>
-<td><strong>Windows</strong> (PowerShell)</td>
-<td>
 
-```powershell
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+**Step 2: Run Shotgun**
+
+```bash
+uvx shotgun-sh@latest
 ```
-</td>
-</tr>
-</table>
+
+</details>
 
 <details>
-<summary><strong>Windows Installation</strong></summary>
+<summary><h3>► Windows Install Instructions (click to expand)</h3></summary>
+
+Open PowerShell and run these commands:
 
 ```powershell
 # Set execution policy (one-time)
@@ -96,11 +104,13 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 # Add to PATH (or restart terminal)
 $env:Path = "C:\Users\$env:USERNAME\.local\bin;$env:Path"
 
-# Run Shotgun (ephemeral)
-uvx --python 3.12 shotgun-sh@latest
+# OPTIONAL: Enable code indexing (run as Administrator)
+Import-Module BitsTransfer
+Start-BitsTransfer -Source "https://aka.ms/vs/17/release/vc_redist.x64.exe" -Destination "$env:TEMP\vc_redist.x64.exe"
+Start-Process -FilePath "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
 
-# Or install permanently
-uv tool install --python 3.12 shotgun-sh
+# Run Shotgun
+uvx --python 3.12 shotgun-sh@latest
 ```
 
 | Supported | Not Supported |
@@ -110,28 +120,13 @@ uv tool install --python 3.12 shotgun-sh
 
 **Important:** Run in **PowerShell**, not Command Prompt or VS Developer shells.
 
-#### Optional: Enable Code Indexing
-
-Code indexing requires the Visual C++ Redistributable. Run this in PowerShell (as Administrator):
-
-```powershell
-# Download and install Visual C++ Redistributable
-Import-Module BitsTransfer
-Start-BitsTransfer -Source "https://aka.ms/vs/17/release/vc_redist.x64.exe" -Destination "$env:TEMP\vc_redist.x64.exe"
-Start-Process -FilePath "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install", "/quiet", "/norestart" -Wait
-```
-
 </details>
 
 _💡 Restart your terminal after installation_
 
-### 2. Run Shotgun
-
-```bash
-uvx shotgun-sh@latest    
-```
-
 _**Why uv?** It's 10-100x faster than pip and handles binary wheels reliably—no cmake/build tool errors._
+
+Need help? [View uv installation docs](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### 3. Get Started
 
@@ -163,8 +158,10 @@ _Click the image above to watch the full demo on YouTube_
 
 ### Launch Shotgun in your project directory:
 
+_See [install instructions](#-installation) for your platform first!_
+
 ```bash
-uvx shotgun-sh@latest    
+uvx shotgun-sh@latest
 ```
 
 ### Planning vs Drafting
@@ -174,7 +171,7 @@ uvx shotgun-sh@latest
 | **Planning** (default) | Shotgun proposes an execution plan, shows each step, and asks for confirmation before running agents that change files. You get checkpoints, can refine the plan, and can confirm or skip cascaded updates when one change affects other docs. | When you want control, visibility, and the ability to refine the plan before execution. |
 | **Drafting** | Shotgun runs the full plan in one go, without intermediate confirmations. Progress is still tracked internally, but you won’t be prompted at each step. | When you’re confident in the plan and want fast, end-to-end execution. |
 
-_The TUI opens automatically. **Press `Shift+Tab` to switch between Planning & Drafting** or `Ctrl+P` for the command palette._
+_The TUI opens automatically. **Press `Shift+Tab` to switch between Planning & Drafting** or `/` for the command palette._
 
 ### How the Router Works Internally
 Under the hood, the Router relies on specialized sub-agents. You don’t select or manage them manually.
@@ -202,8 +199,8 @@ _**Mode switching:** `Shift+Tab` cycles through modes_
 | Shortcut | Action |
 |----------|--------|
 | `Shift+Tab` | Switch modes |
-| `Ctrl+P` | Open command palette |
-| `Ctrl+C` | Cancel operation |
+| `/` | Open command palette |
+| `Ctrl+C` | Cancel operation (or copy if text selected) |
 | `Escape` | Exit Q&A / stop agent |
 | `Ctrl+U` | View usage stats |
 
@@ -230,7 +227,7 @@ Shotgun lets you share specs externally by publishing them to a **workspace**. T
 
 ### How to Share a Spec
 
-1. Hit `Ctrl+P` → select _Share specs to workspace_
+1. Hit `/` → select _Share specs to workspace_
 2. Choose one option:
 - **Create new spec** — publish a fresh spec from your current `.shotgun/` files
 - **Add new version** — publish an updated version of an existing spec
