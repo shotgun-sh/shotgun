@@ -171,7 +171,7 @@ uvx shotgun-sh@latest
 | **Planning** (default) | Shotgun proposes an execution plan, shows each step, and asks for confirmation before running agents that change files. You get checkpoints, can refine the plan, and can confirm or skip cascaded updates when one change affects other docs. | When you want control, visibility, and the ability to refine the plan before execution. |
 | **Drafting** | Shotgun runs the full plan in one go, without intermediate confirmations. Progress is still tracked internally, but you won’t be prompted at each step. | When you’re confident in the plan and want fast, end-to-end execution. |
 
-_The TUI opens automatically. **Press `Shift+Tab` to switch between Planning & Drafting** or `Ctrl+P` for the command palette._
+_The TUI opens automatically. **Press `Shift+Tab` to switch between Planning & Drafting** or `/` for the command palette._
 
 ### How the Router Works Internally
 Under the hood, the Router relies on specialized sub-agents. You don’t select or manage them manually.
@@ -199,8 +199,8 @@ _**Mode switching:** `Shift+Tab` cycles through modes_
 | Shortcut | Action |
 |----------|--------|
 | `Shift+Tab` | Switch modes |
-| `Ctrl+P` | Open command palette |
-| `Ctrl+C` | Cancel operation |
+| `/` | Open command palette |
+| `Ctrl+C` | Cancel operation (or copy if text selected) |
 | `Escape` | Exit Q&A / stop agent |
 | `Ctrl+U` | View usage stats |
 
@@ -227,7 +227,7 @@ Shotgun lets you share specs externally by publishing them to a **workspace**. T
 
 ### How to Share a Spec
 
-1. Hit `Ctrl+P` → select _Share specs to workspace_
+1. Hit `/` → select _Share specs to workspace_
 2. Choose one option:
 - **Create new spec** — publish a fresh spec from your current `.shotgun/` files
 - **Add new version** — publish an updated version of an existing spec
