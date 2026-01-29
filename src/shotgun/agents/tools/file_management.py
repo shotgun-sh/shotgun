@@ -10,6 +10,7 @@ import aiofiles
 import aiofiles.os
 from pydantic_ai import RunContext
 
+from shotgun.agents.constants import BINARY_EXTENSIONS
 from shotgun.agents.models import AgentDeps, AgentType, FileOperationType
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
@@ -186,10 +187,6 @@ def _validate_shotgun_path(filename: str) -> Path:
         ) from e
 
     return full_path
-
-
-# Binary file extensions that should be loaded via file_requests
-BINARY_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 @register_tool(
