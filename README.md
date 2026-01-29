@@ -158,8 +158,10 @@ _Click the image above to watch the full demo on YouTube_
 
 ### Launch Shotgun in your project directory:
 
+_See [install instructions](#-installation) for your platform first!_
+
 ```bash
-uvx shotgun-sh@latest    
+uvx shotgun-sh@latest
 ```
 
 ### Planning vs Drafting
