@@ -1,5 +1,6 @@
 """Tests for ChatHistory widget."""
 
+import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from shotgun.tui.screens.chat_screen.history.agent_response import AgentResponseWidget
@@ -9,15 +10,53 @@ from shotgun.tui.screens.chat_screen.history.partial_response import (
 )
 
 
-def test_update_messages_removes_widgets_when_cleared():
+class MockWidget:
+    """Mock widget that tracks removal state."""
+
+    def __init__(self):
+        self.removed = False
+
+    def remove(self):
+        self.removed = True
+
+
+class MockPartialResponseWidget(PartialResponseWidget):
+    """Mock PartialResponseWidget that tracks removal state."""
+
+    def __init__(self):
+        self.removed = False
+
+    def remove(self):
+        self.removed = True
+
+
+class MockVerticalTail:
+    """Mock VerticalTail container for testing widget mounting/removal."""
+
+    def __init__(self, children: list):
+        self.children = children
+        self.mounted: list = []
+
+    def mount(self, widget, before=None):
+        self.mounted.append(widget)
+
+    def scroll_end(self, animate=False):
+        pass
+
+
+@pytest.fixture
+def chat_history():
+    """Create a fresh ChatHistory instance for each test."""
+    return ChatHistory()
+
+
+def test_update_messages_removes_widgets_when_cleared(chat_history):
     """Test that clearing messages removes existing widgets from the UI.
 
     This tests the fix for issue #355 where clearing conversation didn't
     clear the UI - the message widgets remained visible even though the
     message list was empty.
     """
-    chat_history = ChatHistory()
-
     # Simulate some initial messages
     messages = [
         ModelRequest(parts=[UserPromptPart(content="Hello")]),
@@ -27,36 +66,13 @@ def test_update_messages_removes_widgets_when_cleared():
     chat_history._rendered_count = 2
 
     # Simulate vertical_tail with mock children (2 message widgets + PartialResponseWidget)
-    class MockWidget:
-        def __init__(self, is_partial=False):
-            self.is_partial = is_partial
-            self.removed = False
-
-        def remove(self):
-            self.removed = True
-
-    class MockPartialResponseWidget(PartialResponseWidget):
-        def __init__(self):
-            self.removed = False
-
-        def remove(self):
-            self.removed = True
-
-    class MockVerticalTail:
-        def __init__(self):
-            self.children = [
-                MockWidget(),  # UserQuestionWidget
-                MockWidget(),  # AgentResponseWidget
-                MockPartialResponseWidget(),  # PartialResponseWidget
-            ]
-
-        def mount(self, widget, before=None):
-            pass
-
-        def scroll_end(self, animate=False):
-            pass
-
-    mock_vertical_tail = MockVerticalTail()
+    mock_vertical_tail = MockVerticalTail(
+        children=[
+            MockWidget(),  # UserQuestionWidget
+            MockWidget(),  # AgentResponseWidget
+            MockPartialResponseWidget(),  # PartialResponseWidget
+        ]
+    )
     chat_history.vertical_tail = mock_vertical_tail
 
     # Clear messages
@@ -71,14 +87,12 @@ def test_update_messages_removes_widgets_when_cleared():
     assert chat_history._rendered_count == 0
 
 
-def test_update_messages_removes_widgets_when_reduced():
+def test_update_messages_removes_widgets_when_reduced(chat_history):
     """Test that reducing messages removes excess widgets.
 
     When messages are compacted or filtered, the old widgets should be
     removed so new ones can be mounted correctly.
     """
-    chat_history = ChatHistory()
-
     # Simulate 3 messages initially rendered
     chat_history.items = [
         ModelRequest(parts=[UserPromptPart(content="Msg 1")]),
@@ -87,36 +101,14 @@ def test_update_messages_removes_widgets_when_reduced():
     ]
     chat_history._rendered_count = 3
 
-    class MockWidget:
-        def __init__(self):
-            self.removed = False
-
-        def remove(self):
-            self.removed = True
-
-    class MockPartialResponseWidget(PartialResponseWidget):
-        def __init__(self):
-            self.removed = False
-
-        def remove(self):
-            self.removed = True
-
-    class MockVerticalTail:
-        def __init__(self):
-            self.children = [
-                MockWidget(),
-                MockWidget(),
-                MockWidget(),
-                MockPartialResponseWidget(),
-            ]
-
-        def mount(self, widget, before=None):
-            pass
-
-        def scroll_end(self, animate=False):
-            pass
-
-    mock_vertical_tail = MockVerticalTail()
+    mock_vertical_tail = MockVerticalTail(
+        children=[
+            MockWidget(),
+            MockWidget(),
+            MockWidget(),
+            MockPartialResponseWidget(),
+        ]
+    )
     chat_history.vertical_tail = mock_vertical_tail
 
     # Reduce to 1 message
@@ -136,45 +128,20 @@ def test_update_messages_removes_widgets_when_reduced():
     assert chat_history._rendered_count == 1
 
 
-def test_update_messages_appends_new_messages():
+def test_update_messages_appends_new_messages(chat_history):
     """Test that appending new messages works correctly without removing existing."""
-    chat_history = ChatHistory()
-
     # Start with 1 message rendered
     chat_history.items = [
         ModelRequest(parts=[UserPromptPart(content="Msg 1")]),
     ]
     chat_history._rendered_count = 1
 
-    class MockWidget:
-        def __init__(self):
-            self.removed = False
-
-        def remove(self):
-            self.removed = True
-
-    class MockPartialResponseWidget(PartialResponseWidget):
-        def __init__(self):
-            self.removed = False
-
-        def remove(self):
-            self.removed = True
-
-    class MockVerticalTail:
-        def __init__(self):
-            self.children = [
-                MockWidget(),  # Existing message
-                MockPartialResponseWidget(),
-            ]
-            self.mounted = []
-
-        def mount(self, widget, before=None):
-            self.mounted.append(widget)
-
-        def scroll_end(self, animate=False):
-            pass
-
-    mock_vertical_tail = MockVerticalTail()
+    mock_vertical_tail = MockVerticalTail(
+        children=[
+            MockWidget(),  # Existing message
+            MockPartialResponseWidget(),
+        ]
+    )
     chat_history.vertical_tail = mock_vertical_tail
 
     # Add a new message (2 total now)
