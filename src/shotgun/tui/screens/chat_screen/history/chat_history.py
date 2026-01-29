@@ -104,16 +104,20 @@ class ChatHistory(Widget):
         filtered = list(self.filtered_items())
 
         # If rendered count is higher than filtered count, the message list was
-        # modified (not just appended). Reset rendered count to allow new messages
-        # to be mounted. This can happen when messages are compacted or filtered.
+        # modified (not just appended). Remove existing widgets and reset.
+        # This can happen when messages are compacted, filtered, or cleared.
         if self._rendered_count > len(filtered):
             logger.debug(
                 "[CHAT_HISTORY] Rendered count (%d) > filtered count (%d), "
-                "resetting to allow new messages to be mounted",
+                "removing existing widgets to rebuild",
                 self._rendered_count,
                 len(filtered),
             )
-            self._rendered_count = len(filtered)
+            # Remove all message widgets except PartialResponseWidget
+            for child in list(self.vertical_tail.children):
+                if not isinstance(child, PartialResponseWidget):
+                    child.remove()
+            self._rendered_count = 0
 
         # Only mount new messages that haven't been rendered yet
         if len(filtered) > self._rendered_count:
