@@ -33,7 +33,9 @@ class MultimodalFileReadResult(BaseModel):
     file_name: str = Field(default="", description="The file name")
     file_size_bytes: int = Field(default=0, description="File size in bytes")
     mime_type: str = Field(default="", description="MIME type of the file (for binary)")
-    file_type: str = Field(default="", description="File type category (PDF, Image, Text)")
+    file_type: str = Field(
+        default="", description="File type category (PDF, Image, Text)"
+    )
     error: str | None = Field(default=None, description="Error message if failed")
 
     def __str__(self) -> str:

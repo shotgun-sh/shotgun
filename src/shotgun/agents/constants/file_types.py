@@ -12,68 +12,72 @@ from pydantic_ai import BinaryContent
 FileContent: TypeAlias = str | BinaryContent
 
 # Binary file extensions that require BinaryContent loading
-BINARY_EXTENSIONS: frozenset[str] = frozenset({
-    ".pdf",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-})
+BINARY_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+    }
+)
 
 # Text file extensions that can be read as strings
-TEXT_EXTENSIONS: frozenset[str] = frozenset({
-    # Documentation
-    ".md",
-    ".txt",
-    ".rst",
-    # Data formats
-    ".json",
-    ".yaml",
-    ".yml",
-    ".toml",
-    ".xml",
-    ".csv",
-    # Web
-    ".html",
-    ".css",
-    ".js",
-    ".ts",
-    ".jsx",
-    ".tsx",
-    # Programming languages
-    ".py",
-    ".java",
-    ".go",
-    ".rs",
-    ".rb",
-    ".php",
-    ".c",
-    ".cpp",
-    ".h",
-    ".hpp",
-    ".cs",
-    ".swift",
-    ".kt",
-    ".scala",
-    # Scripts
-    ".sh",
-    ".bash",
-    ".sql",
-    ".ps1",
-    # Config
-    ".ini",
-    ".cfg",
-    ".conf",
-    ".env",
-    ".properties",
-    # Other
-    ".log",
-    ".diff",
-    ".patch",
-    ".gitignore",
-    ".dockerignore",
-})
+TEXT_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        # Documentation
+        ".md",
+        ".txt",
+        ".rst",
+        # Data formats
+        ".json",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".xml",
+        ".csv",
+        # Web
+        ".html",
+        ".css",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        # Programming languages
+        ".py",
+        ".java",
+        ".go",
+        ".rs",
+        ".rb",
+        ".php",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".cs",
+        ".swift",
+        ".kt",
+        ".scala",
+        # Scripts
+        ".sh",
+        ".bash",
+        ".sql",
+        ".ps1",
+        # Config
+        ".ini",
+        ".cfg",
+        ".conf",
+        ".env",
+        ".properties",
+        # Other
+        ".log",
+        ".diff",
+        ".patch",
+        ".gitignore",
+        ".dockerignore",
+    }
+)
 
 # MIME type mapping for binary file types
 MIME_TYPES: dict[str, str] = {
