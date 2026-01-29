@@ -47,8 +47,8 @@ It includes research on existing patterns, implementation plans that respect you
 
 Choose your platform:
 
-<details open>
-<summary><strong>🍎 macOS</strong></summary>
+<details>
+<summary><strong>🍎 macOS — Click to expand install instructions</strong></summary>
 
 **Step 1: Install uv**
 
@@ -68,8 +68,8 @@ uvx shotgun-sh@latest
 
 </details>
 
-<details open>
-<summary><strong>🐧 Linux</strong></summary>
+<details>
+<summary><strong>🐧 Linux — Click to expand install instructions</strong></summary>
 
 **Step 1: Install uv**
 
@@ -85,8 +85,8 @@ uvx shotgun-sh@latest
 
 </details>
 
-<details open>
-<summary><strong>🪟 Windows</strong></summary>
+<details>
+<summary><strong>🪟 Windows — Click to expand install instructions</strong></summary>
 
 Open PowerShell and run these commands:
 
