@@ -114,7 +114,7 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
-        return ModelName.CLAUDE_OPUS_4_5
+        return ModelName.CLAUDE_SONNET_4_5
 
     # Priority 2: Individual provider keys
     if _get_api_key(config.anthropic.api_key):
