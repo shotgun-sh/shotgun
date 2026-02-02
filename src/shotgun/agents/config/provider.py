@@ -148,7 +148,7 @@ def _create_openai_compat_model(
 
     Args:
         api_key: API key for the endpoint
-        model_name: Name of the model to use
+        model_name: Name of the model to use (may include "ollama/" prefix)
         max_tokens: Maximum output tokens
         base_url: Base URL for the endpoint (optional, falls back to settings)
 
@@ -161,6 +161,17 @@ def _create_openai_compat_model(
         base_url = settings.openai_compat.base_url
     if not base_url:
         raise ValueError("base_url is required for OpenAI-compatible mode")
+
+    # Strip "ollama/" prefix if present - Ollama expects just the model name
+    # The prefix is used internally to identify Ollama models in the config
+    is_ollama = model_name.startswith("ollama/")
+    if is_ollama:
+        model_name = model_name[7:]
+
+    # For Ollama, ensure the base URL includes /v1 for OpenAI compatibility
+    # Ollama's OpenAI-compatible API is at /v1/chat/completions
+    if is_ollama and base_url and not base_url.rstrip("/").endswith("/v1"):
+        base_url = base_url.rstrip("/") + "/v1"
 
     # Use OpenAI provider with custom base_url
     openai_provider = OpenAIProvider(api_key=api_key, base_url=base_url)
