@@ -28,7 +28,9 @@ from .models import (
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_ollama_model_name,
     get_sub_agent_model,
+    is_ollama_model,
 )
 from .streaming_test import check_streaming_capability
 
@@ -164,9 +166,9 @@ def _create_openai_compat_model(
 
     # Strip "ollama/" prefix if present - Ollama expects just the model name
     # The prefix is used internally to identify Ollama models in the config
-    is_ollama = model_name.startswith("ollama/")
+    is_ollama = is_ollama_model(model_name)
     if is_ollama:
-        model_name = model_name[7:]
+        model_name = get_ollama_model_name(model_name)
 
     # For Ollama, ensure the base URL includes /v1 for OpenAI compatibility
     # Ollama's OpenAI-compatible API is at /v1/chat/completions
@@ -479,20 +481,16 @@ async def get_provider_model(
 
     # Priority 1.5: Check for Ollama model (selected via TUI)
     # Handle when user has selected an Ollama model without any cloud API keys
-    if (
-        config.selected_model
-        and isinstance(config.selected_model, str)
-        and config.selected_model.startswith("ollama/")
-        and config.ollama.enabled
-    ):
-        model_name = config.selected_model
+    if is_ollama_model(config.selected_model) and config.ollama.enabled:
+        # is_ollama_model TypeGuard narrows type to str
+        ollama_model = config.selected_model
         logger.info(
             "Using Ollama model from config: %s (base_url: %s)",
-            model_name,
+            ollama_model,
             config.ollama.base_url,
         )
         return ModelConfig(
-            name=model_name,
+            name=ollama_model,
             provider=ProviderType.OPENAI_COMPATIBLE,
             key_provider=KeyProvider.BYOK,
             max_input_tokens=128_000,  # Reasonable default for Ollama

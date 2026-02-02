@@ -12,6 +12,7 @@ from pydantic_ai import RunContext, ToolReturn
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
+from shotgun.utils import format_file_size
 
 logger = get_logger(__name__)
 
@@ -51,16 +52,6 @@ def _get_mime_type(file_path: Path) -> str | None:
     """Get MIME type for a file based on extension."""
     suffix = file_path.suffix.lower()
     return MIME_TYPES.get(suffix)
-
-
-def _format_file_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
 # Image file extensions
@@ -149,21 +140,21 @@ async def multimodal_file_read(
                 success=False,
                 file_path=str(path),
                 file_size_bytes=file_size,
-                error=f"File too large: {_format_file_size(file_size)} (max: {_format_file_size(MAX_FILE_SIZE_BYTES)})",
+                error=f"File too large: {format_file_size(file_size)} (max: {format_file_size(MAX_FILE_SIZE_BYTES)})",
             )
             return ToolReturn(return_value=str(error_result))
 
         logger.debug(
             "Found multimodal file: %s (%s, %s)",
             path.name,
-            _format_file_size(file_size),
+            format_file_size(file_size),
             mime_type,
         )
 
         # Return file info with absolute path
         file_type = "PDF" if mime_type == "application/pdf" else "Image"
         summary = f"""{file_type} found: {path.name}
-Size: {_format_file_size(file_size)}
+Size: {format_file_size(file_size)}
 Type: {mime_type}
 Absolute path: {path}
 

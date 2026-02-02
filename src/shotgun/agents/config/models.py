@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import TypeGuard
 
 from pydantic import BaseModel, Field, PrivateAttr, SecretStr
 from pydantic_ai.models import Model
@@ -253,6 +254,37 @@ class ShotgunAccountConfig(BaseModel):
             return False
         value = self.api_key.get_secret_value()
         return bool(value and value.strip())
+
+
+# Ollama model name prefix - used to identify Ollama models in config
+# Format: "ollama/<model_name>" (e.g., "ollama/llama3:8b")
+OLLAMA_MODEL_PREFIX = "ollama/"
+
+
+def is_ollama_model(model_name: ModelName | str | None) -> TypeGuard[str]:
+    """Check if a model name represents an Ollama model.
+
+    This is a TypeGuard that narrows the type to str when True.
+
+    Args:
+        model_name: Model name (ModelName enum, string, or None).
+
+    Returns:
+        True if model name is a string starting with the Ollama prefix.
+    """
+    return isinstance(model_name, str) and model_name.startswith(OLLAMA_MODEL_PREFIX)
+
+
+def get_ollama_model_name(prefixed_name: str) -> str:
+    """Extract the actual Ollama model name from a prefixed name.
+
+    Args:
+        prefixed_name: Model name with "ollama/" prefix.
+
+    Returns:
+        Model name without the prefix.
+    """
+    return prefixed_name.removeprefix(OLLAMA_MODEL_PREFIX)
 
 
 class OllamaConfig(BaseModel):

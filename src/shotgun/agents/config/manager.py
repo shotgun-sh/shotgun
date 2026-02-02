@@ -354,12 +354,12 @@ class ConfigManager:
 
             # Clean up invalid selected_model before Pydantic validation
             if "selected_model" in data and data["selected_model"] is not None:
-                from .models import MODEL_SPECS, ModelName
+                from .models import MODEL_SPECS, ModelName, is_ollama_model
 
                 selected = data["selected_model"]
 
                 # Allow Ollama model strings (format: "ollama/<model_name>")
-                if isinstance(selected, str) and selected.startswith("ollama/"):
+                if is_ollama_model(selected):
                     # Valid Ollama model string - keep it as-is
                     pass
                 else:
@@ -387,9 +387,8 @@ class ConfigManager:
             if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
                 # (Skip validation for Ollama models which don't need API keys)
-                if self._config.selected_model and not (
-                    isinstance(self._config.selected_model, str)
-                    and self._config.selected_model.startswith("ollama/")
+                if self._config.selected_model and not is_ollama_model(
+                    self._config.selected_model
                 ):
                     from .models import MODEL_SPECS, ModelName
 

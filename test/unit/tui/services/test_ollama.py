@@ -10,37 +10,37 @@ from shotgun.tui.services.ollama import (
     DEFAULT_OLLAMA_URL,
     OllamaModel,
     OllamaStatus,
-    format_size,
     get_ollama_status,
 )
+from shotgun.utils import format_file_size
 
 
-def test_format_size_bytes():
+def test_format_file_size_bytes():
     """Test formatting small byte sizes."""
-    assert format_size(0) == "0 B"
-    assert format_size(500) == "500 B"
-    assert format_size(1023) == "1023 B"
+    assert format_file_size(0) == "0 B"
+    assert format_file_size(500) == "500 B"
+    assert format_file_size(1023) == "1023 B"
 
 
-def test_format_size_kilobytes():
+def test_format_file_size_kilobytes():
     """Test formatting kilobyte sizes."""
-    assert format_size(1024) == "1.0 KB"
-    assert format_size(2048) == "2.0 KB"
-    assert format_size(1536) == "1.5 KB"
+    assert format_file_size(1024) == "1.0 KB"
+    assert format_file_size(2048) == "2.0 KB"
+    assert format_file_size(1536) == "1.5 KB"
 
 
-def test_format_size_megabytes():
+def test_format_file_size_megabytes():
     """Test formatting megabyte sizes."""
-    assert format_size(1024 * 1024) == "1.0 MB"
-    assert format_size(1024 * 1024 * 2) == "2.0 MB"
-    assert format_size(int(1024 * 1024 * 1.5)) == "1.5 MB"
+    assert format_file_size(1024 * 1024) == "1.0 MB"
+    assert format_file_size(1024 * 1024 * 2) == "2.0 MB"
+    assert format_file_size(int(1024 * 1024 * 1.5)) == "1.5 MB"
 
 
-def test_format_size_gigabytes():
+def test_format_file_size_gigabytes():
     """Test formatting gigabyte sizes."""
-    assert format_size(1024 * 1024 * 1024) == "1.0 GB"
-    assert format_size(1024 * 1024 * 1024 * 4) == "4.0 GB"
-    assert format_size(int(1024 * 1024 * 1024 * 19.2)) == "19.2 GB"
+    assert format_file_size(1024 * 1024 * 1024) == "1.0 GB"
+    assert format_file_size(1024 * 1024 * 1024 * 4) == "4.0 GB"
+    assert format_file_size(int(1024 * 1024 * 1024 * 19.2)) == "19.2 GB"
 
 
 def test_ollama_model_creation():

@@ -23,18 +23,22 @@ from shotgun.agents.agent_manager import ModelConfigUpdated
 from shotgun.agents.config import ConfigManager
 from shotgun.agents.config.models import (
     MODEL_SPECS,
+    OLLAMA_MODEL_PREFIX,
     KeyProvider,
     ModelConfig,
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_ollama_model_name,
+    is_ollama_model,
 )
 from shotgun.agents.config.provider import (
     get_default_model_for_provider,
     get_provider_model,
 )
 from shotgun.logging_config import get_logger
-from shotgun.tui.services.ollama import OllamaStatus, format_size, get_ollama_status
+from shotgun.tui.services.ollama import OllamaStatus, get_ollama_status
+from shotgun.utils import format_file_size
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -180,9 +184,9 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         current_model = config.selected_model or get_default_model_for_provider(config)
         # Handle both cloud models (ModelName enum) and Ollama models (strings)
-        if isinstance(current_model, str) and current_model.startswith("ollama/"):
+        if is_ollama_model(current_model):
             # Ollama model - extract model name without prefix for display
-            self.selected_ollama_model = current_model.removeprefix("ollama/")
+            self.selected_ollama_model = get_ollama_model_name(current_model)
         elif isinstance(current_model, ModelName):
             self.selected_model = current_model
         else:
@@ -266,7 +270,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         # Add model items
         for model in status.models:
-            size_str = format_size(model.size)
+            size_str = format_file_size(model.size)
             label = Label(f"{model.name} · {size_str}")
             # Sanitize model name for DOM id
             safe_id = self._sanitize_ollama_model_name(model.name)
@@ -554,7 +558,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             ollama_base_url = f"{config.ollama.base_url}/v1"
 
             # Store the model name in "ollama/<model>" format for config persistence
-            ollama_model_name = f"ollama/{self.selected_ollama_model}"
+            ollama_model_name = f"{OLLAMA_MODEL_PREFIX}{self.selected_ollama_model}"
 
             model_config = ModelConfig(
                 name=ollama_model_name,

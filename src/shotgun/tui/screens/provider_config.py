@@ -25,7 +25,8 @@ from textual.widgets import (
 
 from shotgun.agents.config import ConfigManager, ProviderType
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
-from shotgun.tui.services.ollama import OllamaStatus, format_size, get_ollama_status
+from shotgun.tui.services.ollama import OllamaStatus, get_ollama_status
+from shotgun.utils import format_file_size
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -311,7 +312,7 @@ class ProviderConfigScreen(Screen[None]):
                 models_header.display = True
                 models_list.display = True
                 for model in status.models:
-                    size_str = format_size(model.size)
+                    size_str = format_file_size(model.size)
                     label = Label(f"{model.name} · {size_str}")
                     # Sanitize model name for DOM id (colons not allowed)
                     safe_id = model.name.replace(":", "-").replace("/", "-")

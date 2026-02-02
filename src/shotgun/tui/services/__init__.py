@@ -2,16 +2,16 @@
 
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.services.ollama import (
+    OllamaCapability,
     OllamaModel,
     OllamaStatus,
-    format_size,
     get_ollama_status,
 )
 
 __all__ = [
     "ConversationService",
+    "OllamaCapability",
     "OllamaModel",
     "OllamaStatus",
-    "format_size",
     "get_ollama_status",
 ]

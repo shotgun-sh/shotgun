@@ -5,6 +5,7 @@ and list available models.
 """
 
 from datetime import datetime
+from enum import StrEnum
 
 import httpx
 from pydantic import BaseModel
@@ -15,6 +16,13 @@ logger = get_logger(__name__)
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_TIMEOUT = 3.0
+
+
+class OllamaCapability(StrEnum):
+    """Capabilities that an Ollama model may support."""
+
+    COMPLETION = "completion"
+    VISION = "vision"
 
 
 class OllamaModel(BaseModel):
@@ -28,7 +36,7 @@ class OllamaModel(BaseModel):
     @property
     def supports_vision(self) -> bool:
         """Check if this model supports vision/image input."""
-        return "vision" in self.capabilities
+        return OllamaCapability.VISION in self.capabilities
 
 
 class OllamaStatus(BaseModel):
@@ -37,25 +45,6 @@ class OllamaStatus(BaseModel):
     running: bool
     models: list[OllamaModel]
     error: str | None = None
-
-
-def format_size(size_bytes: int) -> str:
-    """Format byte size to human-readable string.
-
-    Args:
-        size_bytes: Size in bytes.
-
-    Returns:
-        Human-readable size string (e.g., "4.7 GB").
-    """
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024**2:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024**3:
-        return f"{size_bytes / 1024**2:.1f} MB"
-    else:
-        return f"{size_bytes / 1024**3:.1f} GB"
 
 
 async def get_model_capabilities(
@@ -71,7 +60,7 @@ async def get_model_capabilities(
         client: HTTP client to use.
 
     Returns:
-        List of capability strings (e.g., ["completion", "vision"]).
+        List of capability strings (OllamaCapability values).
     """
     try:
         response = await client.post(
@@ -90,10 +79,10 @@ async def get_model_capabilities(
                     # Check for vision capability markers
                     # Vision models typically have projector architecture
                     arch = model_info.get("general.architecture", "")
-                    if "clip" in arch.lower() or "vision" in str(model_info).lower():
-                        capabilities = ["completion", "vision"]
+                    if "clip" in arch.lower() or OllamaCapability.VISION in str(model_info).lower():
+                        capabilities = [OllamaCapability.COMPLETION, OllamaCapability.VISION]
                     else:
-                        capabilities = ["completion"]
+                        capabilities = [OllamaCapability.COMPLETION]
             return capabilities
     except Exception as e:
         logger.debug(f"Failed to fetch capabilities for {model_name}: {e}")
@@ -189,9 +178,9 @@ async def get_ollama_status(
 
 
 __all__ = [
+    "OllamaCapability",
     "OllamaModel",
     "OllamaStatus",
-    "format_size",
     "get_model_capabilities",
     "get_ollama_status",
     "DEFAULT_OLLAMA_URL",
