@@ -369,6 +369,9 @@ class ConfigManager:
                         # Check if it exists in MODEL_SPECS
                         if model_name not in MODEL_SPECS:
                             data["selected_model"] = None
+                        else:
+                            # Store the enum so Pydantic uses it (not the string)
+                            data["selected_model"] = model_name
                     except (ValueError, KeyError):
                         # Invalid model name - reset to None
                         data["selected_model"] = None
