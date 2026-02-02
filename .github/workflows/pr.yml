@@ -526,6 +526,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validate-pr-title, lint-and-typecheck, test-group-1, test-group-2, test-group-3, coverage-report, test-cli-basics, check-permissions, test-cli-run, secret-scanning, docker-build-test]
     if: always()
+    timeout-minutes: 1
 
     steps:
       - name: Check job results
