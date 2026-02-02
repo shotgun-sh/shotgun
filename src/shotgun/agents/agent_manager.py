@@ -566,14 +566,10 @@ class AgentManager(Widget):
 
                 # Filter out unsupported file types based on model capabilities
                 if suffix == ".pdf" and not supports_pdf:
-                    logger.warning(
-                        f"Skipping PDF {path} - not supported by model"
-                    )
+                    logger.warning(f"Skipping PDF {path} - not supported by model")
                     continue
                 if suffix in IMAGE_EXTENSIONS and not supports_images:
-                    logger.warning(
-                        f"Skipping image {path} - not supported by model"
-                    )
+                    logger.warning(f"Skipping image {path} - not supported by model")
                     continue
 
                 if not path.exists():

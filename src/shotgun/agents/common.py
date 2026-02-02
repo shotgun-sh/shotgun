@@ -163,7 +163,9 @@ async def create_base_agent(
             )
         else:
             # Fall back to getting provider model from global config
-            model_config = await get_provider_model(provider, for_sub_agent=for_sub_agent)
+            model_config = await get_provider_model(
+                provider, for_sub_agent=for_sub_agent
+            )
             logger.debug(
                 "🤖 Creating agent with configured %s model: %s",
                 model_config.provider.value.upper(),

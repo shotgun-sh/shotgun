@@ -79,8 +79,14 @@ async def get_model_capabilities(
                     # Check for vision capability markers
                     # Vision models typically have projector architecture
                     arch = model_info.get("general.architecture", "")
-                    if "clip" in arch.lower() or OllamaCapability.VISION in str(model_info).lower():
-                        capabilities = [OllamaCapability.COMPLETION, OllamaCapability.VISION]
+                    if (
+                        "clip" in arch.lower()
+                        or OllamaCapability.VISION in str(model_info).lower()
+                    ):
+                        capabilities = [
+                            OllamaCapability.COMPLETION,
+                            OllamaCapability.VISION,
+                        ]
                     else:
                         capabilities = [OllamaCapability.COMPLETION]
             return capabilities
