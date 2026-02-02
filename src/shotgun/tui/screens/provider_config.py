@@ -48,11 +48,12 @@ class ProviderConfigScreen(Screen[None]):
     """Collect API keys for available providers."""
 
     CSS = """
-        ProviderConfig {
+        ProviderConfigScreen {
             layout: vertical;
+            overflow: hidden;
         }
 
-        ProviderConfig > * {
+        ProviderConfigScreen > * {
             height: auto;
         }
 
@@ -107,7 +108,12 @@ class ProviderConfigScreen(Screen[None]):
             margin: 0;
         }
 
+        #provider-tabs > ContentSwitcher {
+            height: auto;
+        }
+
         TabPane {
+            height: auto;
             padding: 1 0;
         }
 
