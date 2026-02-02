@@ -356,15 +356,22 @@ class ConfigManager:
             if "selected_model" in data and data["selected_model"] is not None:
                 from .models import MODEL_SPECS, ModelName
 
-                try:
-                    # Try to convert to ModelName enum
-                    model_name = ModelName(data["selected_model"])
-                    # Check if it exists in MODEL_SPECS
-                    if model_name not in MODEL_SPECS:
+                selected = data["selected_model"]
+
+                # Allow Ollama model strings (format: "ollama/<model_name>")
+                if isinstance(selected, str) and selected.startswith("ollama/"):
+                    # Valid Ollama model string - keep it as-is
+                    pass
+                else:
+                    try:
+                        # Try to convert to ModelName enum
+                        model_name = ModelName(selected)
+                        # Check if it exists in MODEL_SPECS
+                        if model_name not in MODEL_SPECS:
+                            data["selected_model"] = None
+                    except (ValueError, KeyError):
+                        # Invalid model name - reset to None
                         data["selected_model"] = None
-                except (ValueError, KeyError):
-                    # Invalid model name - reset to None
-                    data["selected_model"] = None
 
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
