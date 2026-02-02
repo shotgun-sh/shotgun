@@ -21,6 +21,7 @@ from .constants import (
     ConfigSection,
 )
 from .models import (
+    MODEL_SPECS,
     AnthropicConfig,
     GoogleConfig,
     ModelName,
@@ -28,6 +29,7 @@ from .models import (
     ProviderType,
     ShotgunAccountConfig,
     ShotgunConfig,
+    is_ollama_model,
 )
 
 logger = get_logger(__name__)
@@ -354,8 +356,6 @@ class ConfigManager:
 
             # Clean up invalid selected_model before Pydantic validation
             if "selected_model" in data and data["selected_model"] is not None:
-                from .models import MODEL_SPECS, ModelName, is_ollama_model
-
                 selected = data["selected_model"]
 
                 # Allow Ollama model strings (format: "ollama/<model_name>")
@@ -393,8 +393,6 @@ class ConfigManager:
                 if self._config.selected_model and not is_ollama_model(
                     self._config.selected_model
                 ):
-                    from .models import MODEL_SPECS, ModelName
-
                     # Only validate cloud models (ModelName enum values)
                     if isinstance(self._config.selected_model, ModelName):
                         spec = MODEL_SPECS[self._config.selected_model]
@@ -411,9 +409,6 @@ class ConfigManager:
                 if not self._config.selected_model:
                     for provider in ProviderType:
                         if await self.has_provider_key(provider):
-                            # Set to that provider's default model
-                            from .models import MODEL_SPECS, ModelName
-
                             # Find default model for this provider
                             provider_models = {
                                 ProviderType.OPENAI: ModelName.GPT_5_2,
