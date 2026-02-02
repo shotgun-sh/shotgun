@@ -332,7 +332,8 @@ class ProviderConfigScreen(Screen[None]):
             models_list.display = False
 
             help_text.update(
-                "Start Ollama with: ollama serve\nLearn more: https://ollama.com"
+                "Start Ollama on port 11434: ollama serve\n"
+                "Learn more: https://ollama.com"
             )
 
     def action_done(self) -> None:
