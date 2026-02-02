@@ -28,7 +28,6 @@ from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.services.ollama import (
     OllamaStatus,
     get_ollama_status,
-    sanitize_ollama_model_name_for_id,
 )
 from shotgun.utils import format_file_size
 
@@ -314,16 +313,16 @@ class ProviderConfigScreen(Screen[None]):
             if status.models:
                 models_header.display = True
                 models_list.display = True
-                # Deduplicate by sanitized ID to avoid duplicate DOM IDs
-                seen_ids: set[str] = set()
+                # Deduplicate by model name to avoid showing duplicates
+                seen_names: set[str] = set()
                 for model in status.models:
-                    safe_id = sanitize_ollama_model_name_for_id(model.name)
-                    if safe_id in seen_ids:
+                    if model.name in seen_names:
                         continue
-                    seen_ids.add(safe_id)
+                    seen_names.add(model.name)
                     size_str = format_file_size(model.size)
                     label = Label(f"{model.name} · {size_str}")
-                    models_list.append(ListItem(label, id=f"ollama-model-{safe_id}"))
+                    # No ID needed - this list is display-only
+                    models_list.append(ListItem(label))
 
                 help_text.update(
                     "Tip: Use --model=ollama/<model-name> to run with a local model"
