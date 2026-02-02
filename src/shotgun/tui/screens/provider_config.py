@@ -303,9 +303,8 @@ class ProviderConfigScreen(Screen[None]):
         help_text = self.query_one("#ollama-help", Static)
         models_header = self.query_one("#ollama-models-header", Static)
 
-        # Remove all existing model items explicitly to avoid duplicate ID issues
-        for child in list(models_list.children):
-            child.remove()
+        # Clear all existing items before adding new ones
+        models_list.clear()
 
         if status.running:
             status_label.update("Status: ● Ollama is running")
