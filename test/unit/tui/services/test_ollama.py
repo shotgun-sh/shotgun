@@ -11,6 +11,7 @@ from shotgun.tui.services.ollama import (
     OllamaModel,
     OllamaStatus,
     get_ollama_status,
+    sanitize_ollama_model_name_for_id,
 )
 from shotgun.utils import format_file_size
 
@@ -293,3 +294,29 @@ async def test_get_ollama_status_request_error():
 def test_default_ollama_url():
     """Test that default URL is correct."""
     assert DEFAULT_OLLAMA_URL == "http://localhost:11434"
+
+
+def test_sanitize_ollama_model_name_for_id_replaces_colon():
+    """Test that colons are replaced with hyphens."""
+    assert sanitize_ollama_model_name_for_id("llama3:latest") == "llama3-latest"
+    assert sanitize_ollama_model_name_for_id("qwen3:32b") == "qwen3-32b"
+
+
+def test_sanitize_ollama_model_name_for_id_replaces_slash():
+    """Test that slashes are replaced with hyphens."""
+    assert sanitize_ollama_model_name_for_id("library/model") == "library-model"
+
+
+def test_sanitize_ollama_model_name_for_id_replaces_dot():
+    """Test that dots are replaced with hyphens."""
+    assert sanitize_ollama_model_name_for_id("model.v1") == "model-v1"
+
+
+def test_sanitize_ollama_model_name_for_id_replaces_multiple_chars():
+    """Test that multiple special characters are all replaced."""
+    assert sanitize_ollama_model_name_for_id("lib/model:v1.0") == "lib-model-v1-0"
+
+
+def test_sanitize_ollama_model_name_for_id_preserves_hyphens():
+    """Test that existing hyphens are preserved."""
+    assert sanitize_ollama_model_name_for_id("my-model") == "my-model"

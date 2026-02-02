@@ -25,7 +25,11 @@ from textual.widgets import (
 
 from shotgun.agents.config import ConfigManager, ProviderType
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
-from shotgun.tui.services.ollama import OllamaStatus, get_ollama_status
+from shotgun.tui.services.ollama import (
+    OllamaStatus,
+    get_ollama_status,
+    sanitize_ollama_model_name_for_id,
+)
 from shotgun.utils import format_file_size
 
 if TYPE_CHECKING:
@@ -311,11 +315,15 @@ class ProviderConfigScreen(Screen[None]):
             if status.models:
                 models_header.display = True
                 models_list.display = True
+                # Deduplicate by sanitized ID to avoid duplicate DOM IDs
+                seen_ids: set[str] = set()
                 for model in status.models:
+                    safe_id = sanitize_ollama_model_name_for_id(model.name)
+                    if safe_id in seen_ids:
+                        continue
+                    seen_ids.add(safe_id)
                     size_str = format_file_size(model.size)
                     label = Label(f"{model.name} · {size_str}")
-                    # Sanitize model name for DOM id (colons not allowed)
-                    safe_id = model.name.replace(":", "-").replace("/", "-")
                     models_list.append(ListItem(label, id=f"ollama-model-{safe_id}"))
 
                 help_text.update(

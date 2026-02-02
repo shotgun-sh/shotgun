@@ -198,6 +198,20 @@ async def has_ollama_models_available(base_url: str = DEFAULT_OLLAMA_URL) -> boo
     return status.running and bool(status.models)
 
 
+def sanitize_ollama_model_name_for_id(name: str) -> str:
+    """Sanitize Ollama model name for use as a DOM ID.
+
+    Replaces characters not allowed in Textual widget IDs.
+
+    Args:
+        name: The Ollama model name (e.g., "llama3:latest").
+
+    Returns:
+        Sanitized string safe for use as DOM ID.
+    """
+    return name.replace(":", "-").replace("/", "-").replace(".", "-")
+
+
 __all__ = [
     "OllamaCapability",
     "OllamaModel",
@@ -205,6 +219,7 @@ __all__ = [
     "get_model_capabilities",
     "get_ollama_status",
     "has_ollama_models_available",
+    "sanitize_ollama_model_name_for_id",
     "DEFAULT_OLLAMA_URL",
     "DEFAULT_TIMEOUT",
 ]

@@ -39,7 +39,11 @@ from shotgun.agents.config.provider import (
     get_provider_model,
 )
 from shotgun.logging_config import get_logger
-from shotgun.tui.services.ollama import OllamaStatus, get_ollama_status
+from shotgun.tui.services.ollama import (
+    OllamaStatus,
+    get_ollama_status,
+    sanitize_ollama_model_name_for_id,
+)
 from shotgun.utils import format_file_size
 
 if TYPE_CHECKING:
@@ -270,22 +274,22 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         list_view.display = True
         help_text.update("")
 
-        # Add model items
+        # Add model items, deduplicating by sanitized ID to avoid duplicate DOM IDs
+        seen_ids: set[str] = set()
         for model in status.models:
+            safe_id = sanitize_ollama_model_name_for_id(model.name)
+            if safe_id in seen_ids:
+                logger.debug("Skipping duplicate Ollama model ID: %s", safe_id)
+                continue
+            seen_ids.add(safe_id)
             size_str = format_file_size(model.size)
             label = Label(f"{model.name} · {size_str}")
-            # Sanitize model name for DOM id
-            safe_id = self._sanitize_ollama_model_name(model.name)
             list_view.append(ListItem(label, id=f"ollama-model-{safe_id}"))
-
-    def _sanitize_ollama_model_name(self, name: str) -> str:
-        """Sanitize Ollama model name for use as DOM ID."""
-        return name.replace(":", "-").replace("/", "-").replace(".", "-")
 
     def on_show(self) -> None:
         """Rebuild model list when screen is first shown."""
         logger.debug("ModelPickerScreen.on_show() called")
-        self.run_worker(self._rebuild_model_list(), exclusive=False)
+        self.run_worker(self._rebuild_model_list(), exclusive=True)
 
     def on_screenresume(self) -> None:
         """Rebuild model list when screen is resumed (subsequent visits).
@@ -294,7 +298,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         ensuring the model list reflects any config changes made while away.
         """
         logger.debug("ModelPickerScreen.on_screenresume() called")
-        self.run_worker(self._rebuild_model_list(), exclusive=False)
+        self.run_worker(self._rebuild_model_list(), exclusive=True)
 
     def action_done(self) -> None:
         self.dismiss()
@@ -350,7 +354,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         sanitized_id = item.id.removeprefix("ollama-model-")
         if self.ollama_status and self.ollama_status.models:
             for model in self.ollama_status.models:
-                if self._sanitize_ollama_model_name(model.name) == sanitized_id:
+                if sanitize_ollama_model_name_for_id(model.name) == sanitized_id:
                     return model.name
         return None
 
