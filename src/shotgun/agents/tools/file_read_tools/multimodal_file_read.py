@@ -1,7 +1,8 @@
 """Multimodal file reading tool that verifies files exist and returns paths.
 
-This tool verifies PDFs/images exist and returns their paths for the agent
-to include in `files_found`. The Router then loads these via `file_requests`.
+This tool verifies PDFs, images, and text files exist and returns their paths
+for the agent to include in `files_found`. The Router then loads these via
+`file_requests`.
 """
 
 from pathlib import Path
@@ -9,25 +10,21 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext, ToolReturn
 
+from shotgun.agents.constants import (
+    IMAGE_EXTENSIONS,
+    MAX_BINARY_FILE_SIZE_BYTES,
+    MAX_TEXT_FILE_SIZE_BYTES,
+    MIME_TYPES,
+    is_binary_extension,
+    is_supported_extension,
+    is_text_extension,
+)
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 from shotgun.utils import format_file_size
 
 logger = get_logger(__name__)
-
-# MIME type mapping for supported file types
-MIME_TYPES: dict[str, str] = {
-    ".pdf": "application/pdf",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-}
-
-# Maximum file size for multimodal reading (32MB - Anthropic's limit)
-MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024
 
 
 class MultimodalFileReadResult(BaseModel):
@@ -37,25 +34,17 @@ class MultimodalFileReadResult(BaseModel):
     file_path: str = Field(description="The absolute path to the file")
     file_name: str = Field(default="", description="The file name")
     file_size_bytes: int = Field(default=0, description="File size in bytes")
-    mime_type: str = Field(default="", description="MIME type of the file")
+    mime_type: str = Field(default="", description="MIME type of the file (for binary)")
+    file_type: str = Field(
+        default="", description="File type category (PDF, Image, Text)"
+    )
     error: str | None = Field(default=None, description="Error message if failed")
 
     def __str__(self) -> str:
         if not self.success:
             return f"Error: {self.error}"
-        return (
-            f"Found: {self.file_name} ({self.file_size_bytes} bytes, {self.mime_type})"
-        )
-
-
-def _get_mime_type(file_path: Path) -> str | None:
-    """Get MIME type for a file based on extension."""
-    suffix = file_path.suffix.lower()
-    return MIME_TYPES.get(suffix)
-
-
-# Image file extensions
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+        type_info = self.mime_type if self.mime_type else self.file_type
+        return f"Found: {self.file_name} ({self.file_size_bytes} bytes, {type_info})"
 
 
 @register_tool(
@@ -67,11 +56,17 @@ async def multimodal_file_read(
     ctx: RunContext[AgentDeps],
     file_path: str,
 ) -> ToolReturn:
-    """Verify a PDF or image file exists and return its path.
+    """Verify a PDF, image, or text file exists and return its path.
 
-    This tool checks that the file exists and is a supported type (PDF, image),
-    then returns the absolute path. Include this path in your `files_found`
-    response so the Router can load it for visual analysis.
+    This tool checks that the file exists and is a supported type (PDF, image,
+    or text file), then returns the absolute path. Include this path in your
+    `files_found` response so the Router can load it via file_requests.
+
+    Supported file types:
+    - Binary: .pdf, .png, .jpg, .jpeg, .gif, .webp
+    - Text: .md, .txt, .rst, .json, .yaml, .yml, .toml, .xml, .csv,
+            .html, .css, .js, .ts, .jsx, .tsx, .py, .java, .go, .rs,
+            .rb, .php, .sh, .bash, .sql, .ini, .cfg, .conf, .env, .log
 
     Args:
         ctx: RunContext containing AgentDeps
@@ -122,44 +117,86 @@ async def multimodal_file_read(
             )
             return ToolReturn(return_value=str(error_result))
 
-        # Check MIME type
-        mime_type = _get_mime_type(path)
-        if mime_type is None:
-            supported = ", ".join(MIME_TYPES.keys())
+        # Check if file type is supported
+        suffix = path.suffix.lower()
+        if not is_supported_extension(suffix):
             error_result = MultimodalFileReadResult(
                 success=False,
                 file_path=str(path),
-                error=f"Unsupported file type: {path.suffix}. Supported: {supported}",
+                error=f"Unsupported file type: {suffix}. Use file_requests for supported types.",
             )
             return ToolReturn(return_value=str(error_result))
 
-        # Check file size
+        # Get file size
         file_size = path.stat().st_size
-        if file_size > MAX_FILE_SIZE_BYTES:
-            error_result = MultimodalFileReadResult(
-                success=False,
-                file_path=str(path),
-                file_size_bytes=file_size,
-                error=f"File too large: {format_file_size(file_size)} (max: {format_file_size(MAX_FILE_SIZE_BYTES)})",
+
+        # Determine file type and check size limits
+        if is_binary_extension(suffix):
+            # Binary file (PDF, image)
+            mime_type = MIME_TYPES.get(suffix, "")
+            file_type = "PDF" if mime_type == "application/pdf" else "Image"
+            max_size = MAX_BINARY_FILE_SIZE_BYTES
+
+            if file_size > max_size:
+                error_result = MultimodalFileReadResult(
+                    success=False,
+                    file_path=str(path),
+                    file_size_bytes=file_size,
+                    error=f"File too large: {format_file_size(file_size)} (max: {format_file_size(max_size)})",
+                )
+                return ToolReturn(return_value=str(error_result))
+
+            logger.debug(
+                "Found binary file: %s (%s, %s)",
+                path.name,
+                format_file_size(file_size),
+                mime_type,
             )
-            return ToolReturn(return_value=str(error_result))
 
-        logger.debug(
-            "Found multimodal file: %s (%s, %s)",
-            path.name,
-            format_file_size(file_size),
-            mime_type,
-        )
-
-        # Return file info with absolute path
-        file_type = "PDF" if mime_type == "application/pdf" else "Image"
-        summary = f"""{file_type} found: {path.name}
+            summary = f"""{file_type} found: {path.name}
 Size: {format_file_size(file_size)}
 Type: {mime_type}
 Absolute path: {path}
 
 IMPORTANT: Include the absolute path above in your `files_found` response field.
-The Router will then be able to load and analyze this file's visual content."""
+The Router will then be able to load and analyze this file's content."""
+
+        elif is_text_extension(suffix):
+            # Text file
+            file_type = "Text"
+            max_size = MAX_TEXT_FILE_SIZE_BYTES
+
+            if file_size > max_size:
+                error_result = MultimodalFileReadResult(
+                    success=False,
+                    file_path=str(path),
+                    file_size_bytes=file_size,
+                    error=f"File too large: {format_file_size(file_size)} (max: {format_file_size(max_size)})",
+                )
+                return ToolReturn(return_value=str(error_result))
+
+            logger.debug(
+                "Found text file: %s (%s)",
+                path.name,
+                format_file_size(file_size),
+            )
+
+            summary = f"""Text file found: {path.name}
+Size: {format_file_size(file_size)}
+Extension: {suffix}
+Absolute path: {path}
+
+IMPORTANT: Include the absolute path above in your `files_found` response field.
+The Router will then be able to load and analyze this file's content."""
+
+        else:
+            # Should not reach here due to is_supported_extension check
+            error_result = MultimodalFileReadResult(
+                success=False,
+                file_path=str(path),
+                error=f"Unsupported file type: {suffix}",
+            )
+            return ToolReturn(return_value=str(error_result))
 
         return ToolReturn(return_value=summary)
 

@@ -1,5 +1,6 @@
 """Agent manager for coordinating multiple AI agents with shared message history."""
 
+import base64
 import json
 import logging
 from collections.abc import AsyncIterable, Sequence
@@ -8,19 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import logfire
-from tenacity import (
-    before_sleep_log,
-    retry,
-    retry_if_exception,
-    stop_after_attempt,
-    wait_exponential,
-)
-
-if TYPE_CHECKING:
-    from shotgun.agents.conversation import ConversationState
-
-import base64
-
 from pydantic_ai import (
     BinaryContent,
     RunContext,
@@ -46,6 +34,13 @@ from pydantic_ai.messages import (
     UserContent,
     UserPromptPart,
 )
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 from textual.message import Message
 from textual.widget import Widget
 
@@ -56,6 +51,15 @@ from shotgun.agents.config.models import (
     ModelConfig,
     ModelName,
     ProviderType,
+)
+from shotgun.agents.constants import (
+    IMAGE_EXTENSIONS,
+    MAX_BINARY_FILE_SIZE_BYTES,
+    MAX_TEXT_FILE_SIZE_BYTES,
+    FileContent,
+    get_mime_type,
+    is_binary_extension,
+    is_text_extension,
 )
 from shotgun.agents.context_analyzer import (
     ContextAnalysis,
@@ -72,10 +76,6 @@ from shotgun.agents.models import (
     RouterAgent,
     ShotgunAgent,
 )
-from shotgun.agents.tools.file_read_tools.multimodal_file_read import (
-    IMAGE_EXTENSIONS,
-    MIME_TYPES,
-)
 from shotgun.attachments import FileAttachment
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -91,6 +91,9 @@ from .router import create_router_agent
 from .router.models import RouterDeps, RouterMode
 from .specify import create_specify_agent
 from .tasks import create_tasks_agent
+
+if TYPE_CHECKING:
+    from shotgun.agents.conversation import ConversationState
 
 logger = logging.getLogger(__name__)
 
@@ -533,15 +536,17 @@ class AgentManager(Widget):
         """Get the list of pending file requests."""
         return self._pending_file_requests
 
-    def process_file_requests(self) -> list[tuple[str, BinaryContent]]:
+    def process_file_requests(self) -> list[tuple[str, FileContent]]:
         """Process pending file requests and return loaded content.
 
         This method is called by the TUI after FileRequestPendingMessage is received.
-        It loads the requested files as BinaryContent and clears the pending state.
+        It loads the requested files as BinaryContent (for PDFs/images) or strings
+        (for text files) and clears the pending state.
         Files that are unsupported by the current model are filtered out.
 
         Returns:
-            List of (file_path, BinaryContent) tuples for files that were successfully loaded.
+            List of (file_path, FileContent) tuples for files that were successfully loaded.
+            FileContent is either BinaryContent (for binary files) or str (for text files).
         """
         if not self._file_request_pending:
             return []
@@ -551,8 +556,8 @@ class AgentManager(Widget):
         supports_pdf = model_config.supports_pdf if model_config else True
         supports_images = model_config.supports_images if model_config else True
 
-        loaded_files: list[tuple[str, BinaryContent]] = []
-        original_count = len(self._pending_file_requests)
+        loaded_files: list[tuple[str, FileContent]] = []
+        total_requested = len(self._pending_file_requests)
 
         for file_path_str in self._pending_file_requests:
             try:
@@ -575,18 +580,51 @@ class AgentManager(Widget):
                     logger.warning(f"Requested file not found: {path}")
                     continue
 
-                # Get MIME type
-                mime_type = MIME_TYPES.get(suffix)
-                if mime_type is None:
+                file_size = path.stat().st_size
+
+                # Handle binary files (PDF, images)
+                if is_binary_extension(suffix):
+                    mime_type = get_mime_type(suffix)
+                    if mime_type is None:
+                        logger.warning(f"No MIME type for binary extension: {suffix}")
+                        continue
+
+                    # Check size limit for binary files
+                    if file_size > MAX_BINARY_FILE_SIZE_BYTES:
+                        logger.warning(
+                            f"Binary file too large: {path} ({file_size} bytes, "
+                            f"max {MAX_BINARY_FILE_SIZE_BYTES})"
+                        )
+                        continue
+
+                    data = path.read_bytes()
+                    loaded_files.append(
+                        (str(path), BinaryContent(data=data, media_type=mime_type))
+                    )
+                    logger.debug(f"Loaded binary file: {path} ({len(data)} bytes)")
+
+                # Handle text files
+                elif is_text_extension(suffix):
+                    # Check size limit for text files
+                    if file_size > MAX_TEXT_FILE_SIZE_BYTES:
+                        logger.warning(
+                            f"Text file too large: {path} ({file_size} bytes, "
+                            f"max {MAX_TEXT_FILE_SIZE_BYTES})"
+                        )
+                        continue
+
+                    # Try UTF-8 first, fall back to latin-1
+                    try:
+                        content = path.read_text(encoding="utf-8")
+                    except UnicodeDecodeError:
+                        content = path.read_text(encoding="latin-1")
+
+                    loaded_files.append((str(path), content))
+                    logger.debug(f"Loaded text file: {path} ({len(content)} chars)")
+
+                else:
                     logger.warning(f"Unsupported file type: {suffix} for {path}")
                     continue
-
-                # Read file and create BinaryContent
-                data = path.read_bytes()
-                loaded_files.append(
-                    (str(path), BinaryContent(data=data, media_type=mime_type))
-                )
-                logger.debug(f"Loaded file: {path} ({len(data)} bytes)")
 
             except Exception as e:
                 logger.error(f"Error loading file {file_path_str}: {e}")
@@ -595,9 +633,7 @@ class AgentManager(Widget):
         self._file_request_pending = False
         self._pending_file_requests = []
 
-        logger.info(
-            f"Loaded {len(loaded_files)} of {original_count} requested files"
-        )
+        logger.info(f"Loaded {len(loaded_files)} of {total_requested} requested files")
         return loaded_files
 
     def _get_agent(self, agent_type: AgentType) -> AnyAgent:
@@ -746,7 +782,7 @@ class AgentManager(Widget):
         prompt: str | None = None,
         *,
         attachment: FileAttachment | None = None,
-        file_contents: list[tuple[str, BinaryContent]] | None = None,
+        file_contents: list[tuple[str, FileContent]] | None = None,
         deps: AgentDeps | None = None,
         usage_limits: UsageLimits | None = None,
         **kwargs: Any,
@@ -759,8 +795,9 @@ class AgentManager(Widget):
         Args:
             prompt: Optional prompt to send to the agent.
             attachment: Optional file attachment to include as multimodal content.
-            file_contents: Optional list of (file_path, BinaryContent) tuples to include
-                          as multimodal content. Used when resuming after file_requests.
+            file_contents: Optional list of (file_path, FileContent) tuples to include
+                          as multimodal content. FileContent is str for text files or
+                          BinaryContent for binary files. Used when resuming after file_requests.
             deps: Optional dependencies override (defaults to manager's deps).
             usage_limits: Optional usage limits for the agent run.
             **kwargs: Additional keyword arguments to pass to the agent.
@@ -898,12 +935,18 @@ class AgentManager(Widget):
 
         if file_contents:
             # File contents from file_requests - construct multimodal prompt with files
+            # FileContent can be str (text files) or BinaryContent (binary files)
             content_parts: list[UserContent] = [
                 prompt or "Here are the files you requested:"
             ]
-            for file_path, binary in file_contents:
+            for file_path, content in file_contents:
                 content_parts.append(f"\n\n--- File: {file_path} ---")
-                content_parts.append(binary)
+                if isinstance(content, str):
+                    # Text file - append content directly as string
+                    content_parts.append(f"\n{content}")
+                else:
+                    # Binary file - append as BinaryContent
+                    content_parts.append(content)
             user_prompt = content_parts
             logger.debug(
                 "Constructed multimodal prompt with requested files",

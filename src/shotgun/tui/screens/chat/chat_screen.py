@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from shotgun.agents.constants import FileContent
     from shotgun.agents.router.models import ExecutionStep
 
-from pydantic_ai import BinaryContent
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -2016,7 +2016,7 @@ class ChatScreen(Screen[None]):
         self,
         message: str,
         attachment: FileAttachment | None = None,
-        file_contents: list[tuple[str, BinaryContent]] | None = None,
+        file_contents: list[tuple[str, "FileContent"]] | None = None,
     ) -> None:
         # Start processing with spinner
         from textual.worker import get_current_worker

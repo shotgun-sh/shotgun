@@ -30,9 +30,8 @@ from shotgun.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from pydantic_ai import BinaryContent
-
     from shotgun.agents.agent_manager import AgentManager
+    from shotgun.agents.constants import FileContent
 
 logger = logging.getLogger(__name__)
 
@@ -73,15 +72,16 @@ class AgentRunner:
         self,
         prompt: str,
         attachment: FileAttachment | None = None,
-        file_contents: list[tuple[str, "BinaryContent"]] | None = None,
+        file_contents: list[tuple[str, "FileContent"]] | None = None,
     ) -> None:
         """Run the agent with the given prompt.
 
         Args:
             prompt: The user's prompt/query
             attachment: Optional file attachment to include as multimodal content.
-            file_contents: Optional list of (file_path, BinaryContent) tuples to include
-                          as multimodal content. Used when resuming after file_requests.
+            file_contents: Optional list of (file_path, FileContent) tuples to include
+                          as multimodal content. FileContent is str for text files or
+                          BinaryContent for binary files. Used when resuming after file_requests.
 
         Raises:
             Custom exceptions for different error types:

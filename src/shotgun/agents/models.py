@@ -109,9 +109,10 @@ The delegation tool can then load these files as multimodal content.
         default=None,
         description="""
 Optional list of file paths the agent wants to read.
-When set, the agent loop exits, files are loaded as BinaryContent,
-and the loop resumes with file content in the next prompt.
-Use this for PDFs, images, or other binary files you need to analyze.
+When set, the agent loop exits, files are loaded (as BinaryContent for
+PDFs/images or as strings for text files), and the loop resumes with
+file content in the next prompt.
+Use this for PDFs, images, or text files (.md, .txt, .json, etc.) you need to analyze.
 """,
     )
 
