@@ -65,6 +65,14 @@ class AgentSystemPromptContext(BaseModel):
         default=None,
         description="Router mode value (planning/drafting) if router agent",
     )
+    supports_pdf: bool = Field(
+        default=True,
+        description="Whether the current model supports PDF file input",
+    )
+    supports_images: bool = Field(
+        default=True,
+        description="Whether the current model supports image file input",
+    )
 
 
 class AgentResponse(BaseModel):

@@ -453,11 +453,18 @@ def build_agent_system_prompt(
     if isinstance(ctx.deps, RouterDeps):
         router_mode = ctx.deps.router_mode.value
 
+    # Get model capabilities from deps
+    model_config = ctx.deps.llm_model
+    supports_pdf = model_config.supports_pdf if model_config else True
+    supports_images = model_config.supports_images if model_config else True
+
     template_context = AgentSystemPromptContext(
         interactive_mode=ctx.deps.interactive_mode,
         mode=agent_type,
         sub_agent_context=ctx.deps.sub_agent_context,
         router_mode=router_mode,
+        supports_pdf=supports_pdf,
+        supports_images=supports_images,
     )
 
     result = prompt_loader.render(

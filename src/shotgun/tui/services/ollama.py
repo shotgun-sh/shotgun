@@ -23,6 +23,12 @@ class OllamaModel(BaseModel):
     name: str
     size: int  # bytes
     modified_at: datetime
+    capabilities: list[str] = []  # e.g., ["completion", "vision"]
+
+    @property
+    def supports_vision(self) -> bool:
+        """Check if this model supports vision/image input."""
+        return "vision" in self.capabilities
 
 
 class OllamaStatus(BaseModel):
@@ -50,6 +56,48 @@ def format_size(size_bytes: int) -> str:
         return f"{size_bytes / 1024**2:.1f} MB"
     else:
         return f"{size_bytes / 1024**3:.1f} GB"
+
+
+async def get_model_capabilities(
+    base_url: str,
+    model_name: str,
+    client: httpx.AsyncClient,
+) -> list[str]:
+    """Fetch model capabilities from Ollama /api/show endpoint.
+
+    Args:
+        base_url: Base URL for Ollama API.
+        model_name: Name of the model to query.
+        client: HTTP client to use.
+
+    Returns:
+        List of capability strings (e.g., ["completion", "vision"]).
+    """
+    try:
+        response = await client.post(
+            f"{base_url}/api/show",
+            json={"name": model_name},
+        )
+        if response.status_code == 200:
+            data = response.json()
+            # Ollama returns capabilities in model_info or details
+            # The format varies, so we check multiple locations
+            capabilities: list[str] = data.get("capabilities", [])
+            if not capabilities:
+                # Some versions put it in model_info
+                model_info = data.get("model_info", {})
+                if model_info:
+                    # Check for vision capability markers
+                    # Vision models typically have projector architecture
+                    arch = model_info.get("general.architecture", "")
+                    if "clip" in arch.lower() or "vision" in str(model_info).lower():
+                        capabilities = ["completion", "vision"]
+                    else:
+                        capabilities = ["completion"]
+            return capabilities
+    except Exception as e:
+        logger.debug(f"Failed to fetch capabilities for {model_name}: {e}")
+    return []
 
 
 async def get_ollama_status(
@@ -106,10 +154,16 @@ async def get_ollama_status(
             models = []
             for model_data in data.get("models", []):
                 try:
+                    model_name = model_data.get("name", "")
+                    # Fetch capabilities for each model
+                    capabilities = await get_model_capabilities(
+                        base_url, model_name, client
+                    )
                     model = OllamaModel(
-                        name=model_data.get("name", ""),
+                        name=model_name,
                         size=model_data.get("size", 0),
                         modified_at=model_data.get("modified_at", datetime.now()),
+                        capabilities=capabilities,
                     )
                     models.append(model)
                 except Exception as e:
@@ -138,6 +192,7 @@ __all__ = [
     "OllamaModel",
     "OllamaStatus",
     "format_size",
+    "get_model_capabilities",
     "get_ollama_status",
     "DEFAULT_OLLAMA_URL",
     "DEFAULT_TIMEOUT",

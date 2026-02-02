@@ -534,6 +534,7 @@ class AgentManager(Widget):
 
         This method is called by the TUI after FileRequestPendingMessage is received.
         It loads the requested files as BinaryContent and clears the pending state.
+        Files that are unsupported by the current model are filtered out.
 
         Returns:
             List of (file_path, BinaryContent) tuples for files that were successfully loaded.
@@ -551,16 +552,39 @@ class AgentManager(Widget):
             ".webp": "image/webp",
         }
 
+        # Image extensions for capability filtering
+        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+        # Get model capabilities
+        model_config = self.deps.llm_model if self.deps else None
+        supports_pdf = model_config.supports_pdf if model_config else True
+        supports_images = model_config.supports_images if model_config else True
+
         loaded_files: list[tuple[str, BinaryContent]] = []
+        original_count = len(self._pending_file_requests)
+
         for file_path_str in self._pending_file_requests:
             try:
                 path = Path(file_path_str).expanduser().resolve()
+                suffix = path.suffix.lower()
+
+                # Filter out unsupported file types based on model capabilities
+                if suffix == ".pdf" and not supports_pdf:
+                    logger.warning(
+                        f"Skipping PDF {path} - not supported by model"
+                    )
+                    continue
+                if suffix in image_extensions and not supports_images:
+                    logger.warning(
+                        f"Skipping image {path} - not supported by model"
+                    )
+                    continue
+
                 if not path.exists():
                     logger.warning(f"Requested file not found: {path}")
                     continue
 
                 # Get MIME type
-                suffix = path.suffix.lower()
                 mime_type = mime_types.get(suffix)
                 if mime_type is None:
                     logger.warning(f"Unsupported file type: {suffix} for {path}")
@@ -581,7 +605,7 @@ class AgentManager(Widget):
         self._pending_file_requests = []
 
         logger.info(
-            f"Loaded {len(loaded_files)} of {len(self._pending_file_requests)} requested files"
+            f"Loaded {len(loaded_files)} of {original_count} requested files"
         )
         return loaded_files
 

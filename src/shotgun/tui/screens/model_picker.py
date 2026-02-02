@@ -532,6 +532,14 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         try:
             config = await self.config_manager.load()
 
+            # Find the OllamaModel to get its capabilities
+            supports_vision = False
+            if self.ollama_status and self.ollama_status.models:
+                for model in self.ollama_status.models:
+                    if model.name == self.selected_ollama_model:
+                        supports_vision = model.supports_vision
+                        break
+
             # Create a ModelConfig for the Ollama model using OpenAI-compatible settings
             # Ollama provides an OpenAI-compatible API at /v1
             # Use the configured base URL from ollama settings, appending /v1 for OpenAI compatibility
@@ -544,6 +552,8 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 max_output_tokens=16_000,  # Conservative default
                 api_key="ollama",  # Ollama doesn't require auth
                 supports_streaming=True,
+                supports_pdf=False,  # Ollama never supports PDFs
+                supports_images=supports_vision,  # From model capabilities
                 base_url=ollama_base_url,
             )
 

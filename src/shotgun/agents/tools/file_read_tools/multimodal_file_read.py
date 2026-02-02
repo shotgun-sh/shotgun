@@ -63,6 +63,10 @@ def _format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
+# Image file extensions
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
 @register_tool(
     category=ToolCategory.CODEBASE_UNDERSTANDING,
     display_text="Reading file (multimodal)",
@@ -86,6 +90,25 @@ async def multimodal_file_read(
         ToolReturn with file info and absolute path
     """
     logger.debug("Checking multimodal file: %s", file_path)
+
+    # Check model capabilities before proceeding
+    model_config = ctx.deps.llm_model
+    path = Path(file_path)
+    suffix = path.suffix.lower()
+
+    # Check PDF support
+    if suffix == ".pdf" and not model_config.supports_pdf:
+        return ToolReturn(
+            return_value=f"PDF files are not supported by this model ({model_config.name_str}). "
+            "Please ask the user to copy/paste relevant text content instead."
+        )
+
+    # Check image support
+    if suffix in IMAGE_EXTENSIONS and not model_config.supports_images:
+        return ToolReturn(
+            return_value=f"Image files are not supported by this model ({model_config.name_str}). "
+            "Please ask the user to describe the image content instead."
+        )
 
     try:
         # Resolve the path

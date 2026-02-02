@@ -62,6 +62,14 @@ class ModelConfig(BaseModel):
         default=True,
         description="Whether this model configuration supports streaming. False only for BYOK GPT-5 models without streaming enabled.",
     )
+    supports_pdf: bool = Field(
+        default=True,
+        description="Whether this model supports PDF file input. False for Ollama models.",
+    )
+    supports_images: bool = Field(
+        default=True,
+        description="Whether this model supports image file input. Depends on model capabilities for Ollama.",
+    )
     base_url: str | None = Field(
         default=None,
         description="Base URL for OpenAI-compatible endpoints (e.g., Ollama). If not set, uses settings.",
