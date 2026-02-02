@@ -254,8 +254,8 @@ class ProviderConfigScreen(Screen[None]):
         # Refresh UI asynchronously
         self.run_worker(self._refresh_ui(), exclusive=False)
 
-        # Load Ollama status
-        self.run_worker(self._refresh_ollama_status(), exclusive=False)
+        # Load Ollama status (exclusive to prevent duplicate widget IDs on concurrent refresh)
+        self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
         # Apply layout based on terminal height
         self._apply_layout_for_height(self.app.size.height)
@@ -278,7 +278,7 @@ class ProviderConfigScreen(Screen[None]):
         This ensures the UI reflects any provider changes made elsewhere.
         """
         self.run_worker(self._refresh_ui(), exclusive=False)
-        self.run_worker(self._refresh_ollama_status(), exclusive=False)
+        self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
     async def _refresh_ui(self) -> None:
         """Refresh provider status and button visibility."""
@@ -379,7 +379,7 @@ class ProviderConfigScreen(Screen[None]):
 
     @on(Button.Pressed, "#ollama-refresh")
     def _on_ollama_refresh_pressed(self) -> None:
-        self.run_worker(self._refresh_ollama_status(), exclusive=True)
+        self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
     @on(Checkbox.Changed, "#ollama-enable-checkbox")
     def _on_ollama_enable_changed(self, event: Checkbox.Changed) -> None:
