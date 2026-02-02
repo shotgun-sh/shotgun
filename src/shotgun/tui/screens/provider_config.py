@@ -411,26 +411,9 @@ class ProviderConfigScreen(Screen[None]):
             label.update(await self._provider_label(provider_id))
 
     async def _update_done_button_visibility(self) -> None:
-        """Show/hide Done button based on whether any provider is available.
-
-        Done button is shown if:
-        - Any provider API key is configured, OR
-        - Ollama is enabled and running with at least one model
-        """
+        """Ensure Done button is always visible so users can exit the screen."""
         done_button = self.query_one("#done", Button)
-        has_keys = await self.config_manager.has_any_provider_key()
-
-        # Also check if Ollama is enabled and has models
-        has_ollama = False
-        if await self.config_manager.is_ollama_enabled():
-            if (
-                self.ollama_status
-                and self.ollama_status.running
-                and self.ollama_status.models
-            ):
-                has_ollama = True
-
-        done_button.display = has_keys or has_ollama
+        done_button.display = True
 
     def _build_provider_items_sync(self) -> list[ListItem]:
         """Build provider items synchronously for compose().
