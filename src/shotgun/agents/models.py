@@ -238,6 +238,13 @@ class AgentRuntimeOptions(BaseModel):
         description="Usage manager for tracking usage",
     )
 
+    # Optional model config for sub-agents to inherit from parent
+    # When set, sub-agents use this model instead of calling get_provider_model()
+    inherited_model_config: ModelConfig | None = Field(
+        default=None,
+        description="Model config inherited from parent agent (e.g., Router passing to sub-agents)",
+    )
+
 
 class FileOperationType(StrEnum):
     """Types of file operations that can be tracked."""

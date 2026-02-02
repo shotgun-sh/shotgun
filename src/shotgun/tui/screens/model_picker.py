@@ -179,7 +179,15 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         )
 
         current_model = config.selected_model or get_default_model_for_provider(config)
-        self.selected_model = current_model
+        # Handle both cloud models (ModelName enum) and Ollama models (strings)
+        if isinstance(current_model, str) and current_model.startswith("ollama/"):
+            # Ollama model - extract model name without prefix for display
+            self.selected_ollama_model = current_model.removeprefix("ollama/")
+        elif isinstance(current_model, ModelName):
+            self.selected_model = current_model
+        else:
+            # Default fallback for unknown string models
+            self.selected_model = get_default_model_for_provider(config)
         logger.debug("Current selected model: %s", current_model)
 
         # Rebuild the cloud model list with current available models
@@ -544,8 +552,12 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             # Ollama provides an OpenAI-compatible API at /v1
             # Use the configured base URL from ollama settings, appending /v1 for OpenAI compatibility
             ollama_base_url = f"{config.ollama.base_url}/v1"
+
+            # Store the model name in "ollama/<model>" format for config persistence
+            ollama_model_name = f"ollama/{self.selected_ollama_model}"
+
             model_config = ModelConfig(
-                name=self.selected_ollama_model,
+                name=ollama_model_name,
                 provider=ProviderType.OPENAI_COMPATIBLE,
                 key_provider=KeyProvider.BYOK,
                 max_input_tokens=128_000,  # Conservative default
@@ -557,13 +569,16 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 base_url=ollama_base_url,
             )
 
+            # Save the selected Ollama model to config for persistence across restarts
+            await self.config_manager.update_selected_model(ollama_model_name)
+
             # Dismiss the screen and return the model config
             # Note: For Ollama, we return new_model as a string (not ModelName enum)
             # The caller handles this via model_config.name
             self.dismiss(
                 ModelConfigUpdated(
                     old_model=config.selected_model,
-                    new_model=self.selected_ollama_model,  # Pass the Ollama model name
+                    new_model=ollama_model_name,  # Pass the Ollama model name with prefix
                     provider=ProviderType.OPENAI_COMPATIBLE,
                     key_provider=KeyProvider.BYOK,
                     model_config=model_config,

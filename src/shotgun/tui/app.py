@@ -143,10 +143,19 @@ class ShotgunApp(App[None]):
             # Skip this check when OpenAI-compatible mode is enabled
             config = await self.config_manager.load()
 
-            has_any_key = (
-                is_openai_compat or await self.config_manager.has_any_provider_key()
-            )
-            if not has_any_key or (
+            # Check if any model is available (API keys OR Ollama)
+            has_any_key = await self.config_manager.has_any_provider_key()
+
+            # Check if Ollama is available
+            has_ollama_available = False
+            if await self.config_manager.is_ollama_enabled():
+                from shotgun.tui.services.ollama import get_ollama_status
+
+                status = await get_ollama_status(base_url=config.ollama.base_url)
+                has_ollama_available = status.running and bool(status.models)
+
+            has_any_model = is_openai_compat or has_any_key or has_ollama_available
+            if not has_any_model or (
                 not is_openai_compat and not config.shown_welcome_screen
             ):
                 if isinstance(self.screen, WelcomeScreen):

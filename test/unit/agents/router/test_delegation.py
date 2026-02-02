@@ -9,6 +9,7 @@ from pydantic_ai import RunContext
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.tools import ToolDefinition
 
+from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
 from shotgun.agents.models import (
     AgentResponse,
     AgentType,
@@ -61,6 +62,15 @@ def mock_router_deps():
     deps.parent_stream_handler = None  # For streaming support
     deps.pending_approval = None  # No pending approval by default
     deps.cancellation_event = None  # For ESC cancellation support
+    # Create a real ModelConfig for sub-agent inheritance testing
+    deps.llm_model = ModelConfig(
+        name="test-model",
+        provider=ProviderType.OPENAI_COMPATIBLE,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=128000,
+        max_output_tokens=16000,
+        api_key="test-key",
+    )
     return deps
 
 
@@ -142,6 +152,8 @@ def test_create_agent_runtime_options(mock_router_deps):
     assert options.working_directory == mock_router_deps.working_directory
     assert options.is_tui_context == mock_router_deps.is_tui_context
     assert options.max_iterations == mock_router_deps.max_iterations
+    # Verify model config is passed through for sub-agent inheritance
+    assert options.inherited_model_config == mock_router_deps.llm_model
 
 
 # =============================================================================

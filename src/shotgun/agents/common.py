@@ -151,22 +151,36 @@ async def create_base_agent(
     """
     ensure_shotgun_directory_exists()
 
-    # Get configured model or fall back to first available provider
+    # Get configured model - use inherited config from parent agent if available
     try:
-        model_config = await get_provider_model(provider, for_sub_agent=for_sub_agent)
-        provider_name = model_config.provider
-        logger.debug(
-            "🤖 Creating agent with configured %s model: %s",
-            provider_name.value.upper(),
-            model_config.name,
-        )
+        # Check if we have an inherited model config (e.g., from Router to sub-agents)
+        # This ensures sub-agents use the same model as their parent (e.g., Ollama model)
+        if agent_runtime_options.inherited_model_config is not None:
+            model_config = agent_runtime_options.inherited_model_config
+            logger.debug(
+                "🤖 Creating agent with inherited model config: %s",
+                model_config.name,
+            )
+        else:
+            # Fall back to getting provider model from global config
+            model_config = await get_provider_model(provider, for_sub_agent=for_sub_agent)
+            logger.debug(
+                "🤖 Creating agent with configured %s model: %s",
+                model_config.provider.value.upper(),
+                model_config.name,
+            )
+
         # Use the Model instance directly (has API key baked in)
         model = model_config.model_instance
 
         # Create deps with model config and services
+        # Exclude inherited_model_config from model_dump to avoid passing it to AgentDeps
+        runtime_options_dict = agent_runtime_options.model_dump(
+            exclude={"inherited_model_config"}
+        )
         codebase_service = get_codebase_service()
         deps = AgentDeps(
-            **agent_runtime_options.model_dump(),
+            **runtime_options_dict,
             llm_model=model_config,
             codebase_service=codebase_service,
             system_prompt_fn=system_prompt_fn,

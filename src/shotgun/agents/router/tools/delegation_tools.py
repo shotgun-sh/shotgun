@@ -144,6 +144,9 @@ def _create_agent_runtime_options(deps: RouterDeps) -> AgentRuntimeOptions:
         max_iterations=deps.max_iterations,
         queue=deps.queue,
         tasks=deps.tasks,
+        # Pass the model config so sub-agents use the same model as the Router
+        # This is critical for Ollama/OpenAI-compatible models selected in TUI
+        inherited_model_config=deps.llm_model,
     )
 
 

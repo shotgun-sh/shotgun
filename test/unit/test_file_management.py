@@ -143,7 +143,7 @@ class TestReadFile:
                 mock_ctx = MagicMock()
                 mock_ctx.deps = MagicMock()
 
-                result = await read_file(mock_ctx, "test.md")
+                result = await read_file(mock_ctx, "test.md", "test read")
 
                 assert result == test_content
 
@@ -162,7 +162,7 @@ class TestReadFile:
                 mock_ctx = MagicMock()
                 mock_ctx.deps = MagicMock()
 
-                result = await read_file(mock_ctx, "nonexistent.md")
+                result = await read_file(mock_ctx, "nonexistent.md", "test read")
 
                 assert "File not found: nonexistent.md" in result
 
@@ -178,7 +178,7 @@ class TestReadFile:
             mock_ctx = MagicMock()
             mock_ctx.deps = MagicMock()
 
-            result = await read_file(mock_ctx, "../bad/path.md")
+            result = await read_file(mock_ctx, "../bad/path.md", "test read")
 
             assert "Error reading file" in result
             assert "Access denied" in result
@@ -202,7 +202,7 @@ class TestReadFile:
                 mock_ctx = MagicMock()
                 mock_ctx.deps = MagicMock()
 
-                result = await read_file(mock_ctx, "document.pdf")
+                result = await read_file(mock_ctx, "document.pdf", "test read")
 
                 assert "binary file" in result
                 assert "file_requests" in result
@@ -227,7 +227,7 @@ class TestReadFile:
                 mock_ctx = MagicMock()
                 mock_ctx.deps = MagicMock()
 
-                result = await read_file(mock_ctx, "image.png")
+                result = await read_file(mock_ctx, "image.png", "test read")
 
                 assert "binary file" in result
                 assert ".png" in result
@@ -256,7 +256,7 @@ class TestReadFile:
                     test_file = shotgun_dir / f"test{ext}"
                     test_file.write_bytes(b"binary content")
 
-                    result = await read_file(mock_ctx, f"test{ext}")
+                    result = await read_file(mock_ctx, f"test{ext}", "test read")
 
                     assert "binary file" in result, f"Failed for extension {ext}"
                     assert "file_requests" in result, f"Failed for extension {ext}"
@@ -289,7 +289,7 @@ class TestReadFile:
                     mock_ctx = MagicMock()
                     mock_ctx.deps = MagicMock()
 
-                    result = await read_file(mock_ctx, "protected.md")
+                    result = await read_file(mock_ctx, "protected.md", "test read")
 
                     assert "Error reading file" in result
                     assert "Permission denied" in result
@@ -579,7 +579,7 @@ class TestIntegrationScenarios:
                 assert "Successfully wrote" in write_result
 
                 # 2. Read the content
-                read_result = await read_file(mock_ctx, filename)
+                read_result = await read_file(mock_ctx, filename, "verify write")
                 assert read_result == initial_content
 
                 # 3. Append more content
@@ -588,7 +588,7 @@ class TestIntegrationScenarios:
                 assert "Successfully appended" in append_result
 
                 # 4. Read final content
-                final_content = await read_file(mock_ctx, filename)
+                final_content = await read_file(mock_ctx, filename, "verify append")
                 assert final_content == initial_content + append_content
 
                 # 5. Overwrite with new content
@@ -599,7 +599,7 @@ class TestIntegrationScenarios:
                 assert "Successfully wrote" in overwrite_result
 
                 # 6. Verify overwrite
-                final_read = await read_file(mock_ctx, filename)
+                final_read = await read_file(mock_ctx, filename, "verify overwrite")
                 assert final_read == new_content
 
     @pytest.mark.asyncio
@@ -625,7 +625,7 @@ class TestIntegrationScenarios:
 
                 for malicious_path in malicious_paths:
                     # All operations should fail with security error
-                    read_result = await read_file(mock_ctx, malicious_path)
+                    read_result = await read_file(mock_ctx, malicious_path, "test security")
                     assert "Error reading file" in read_result
 
                     write_result = await write_file(

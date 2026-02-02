@@ -284,10 +284,8 @@ class WelcomeScreen(Screen[None]):
         """Launch BYOK provider configuration flow."""
         await self._mark_welcome_shown()
 
-        app = cast("ShotgunApp", self.app)
-
-        # If user already has providers, just dismiss and continue to chat
-        if await app.config_manager.has_any_provider_key():
+        # If user already has providers or Ollama, just dismiss and continue to chat
+        if await self._has_any_model_available():
             self.dismiss()
             return
 
@@ -296,9 +294,32 @@ class WelcomeScreen(Screen[None]):
 
         await self.app.push_screen_wait(ProviderConfigScreen())
 
-        # Dismiss welcome screen after config if providers are now configured
-        if await app.config_manager.has_any_provider_key():
+        # Dismiss welcome screen after config if providers or Ollama are now available
+        if await self._has_any_model_available():
             self.dismiss()
+
+    async def _has_any_model_available(self) -> bool:
+        """Check if any model is available (API keys or Ollama).
+
+        Returns:
+            True if user has API keys configured OR Ollama is enabled and running.
+        """
+        app = cast("ShotgunApp", self.app)
+
+        # Check for API keys
+        if await app.config_manager.has_any_provider_key():
+            return True
+
+        # Check for Ollama availability
+        if await app.config_manager.is_ollama_enabled():
+            from shotgun.tui.services.ollama import get_ollama_status
+
+            config = await app.config_manager.load()
+            status = await get_ollama_status(base_url=config.ollama.base_url)
+            if status.running and status.models:
+                return True
+
+        return False
 
     async def _start_shotgun_auth(self) -> None:
         """Launch Shotgun Account authentication flow."""

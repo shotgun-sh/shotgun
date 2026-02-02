@@ -291,9 +291,9 @@ class ShotgunConfig(BaseModel):
     google: GoogleConfig = Field(default_factory=GoogleConfig)
     shotgun: ShotgunAccountConfig = Field(default_factory=ShotgunAccountConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
-    selected_model: ModelName | None = Field(
+    selected_model: ModelName | str | None = Field(
         default=None,
-        description="User-selected model",
+        description="User-selected model (ModelName enum or 'ollama/<model>' string)",
     )
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",

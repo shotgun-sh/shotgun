@@ -422,13 +422,20 @@ async def get_provider_model(
                 ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
                 ProviderType.GOOGLE: ModelName.GEMINI_3_FLASH_PREVIEW,
             }
-            model_name = provider_defaults.get(
-                provider_or_model,
-                config.selected_model or get_default_model_for_provider(config),
+            # For provider-based requests, use selected ModelName or default
+            selected = (
+                config.selected_model
+                if isinstance(config.selected_model, ModelName)
+                else get_default_model_for_provider(config)
             )
+            model_name = provider_defaults.get(provider_or_model, selected)
         else:
             # No specific model requested - use selected or default
-            model_name = config.selected_model or get_default_model_for_provider(config)
+            # Only use selected_model if it's a ModelName enum (not Ollama string)
+            if isinstance(config.selected_model, ModelName):
+                model_name = config.selected_model
+            else:
+                model_name = get_default_model_for_provider(config)
 
         # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
         if model_name not in MODEL_SPECS:
@@ -459,6 +466,31 @@ async def get_provider_model(
             supports_streaming=True,  # Shotgun accounts always support streaming
         )
 
+    # Priority 1.5: Check for Ollama model (selected via TUI)
+    # Handle when user has selected an Ollama model without any cloud API keys
+    if (
+        config.selected_model
+        and isinstance(config.selected_model, str)
+        and config.selected_model.startswith("ollama/")
+        and config.ollama.enabled
+    ):
+        model_name = config.selected_model
+        logger.info(
+            "Using Ollama model from config: %s (base_url: %s)",
+            model_name,
+            config.ollama.base_url,
+        )
+        return ModelConfig(
+            name=model_name,
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            key_provider=KeyProvider.BYOK,
+            max_input_tokens=128_000,  # Reasonable default for Ollama
+            max_output_tokens=16_000,
+            api_key="ollama",  # Ollama doesn't require an API key
+            supports_streaming=True,
+            base_url=config.ollama.base_url,
+        )
+
     # Priority 2: Fall back to individual provider keys
 
     # Check if a specific model was requested
@@ -482,7 +514,11 @@ async def get_provider_model(
             requested_model = None  # Will use provider's default model
         else:
             # No provider specified - check if user has a selected model
-            if config.selected_model and config.selected_model in MODEL_SPECS:
+            # Only use selected_model if it's a ModelName enum (not Ollama string)
+            if (
+                isinstance(config.selected_model, ModelName)
+                and config.selected_model in MODEL_SPECS
+            ):
                 selected_spec = MODEL_SPECS[config.selected_model]
                 # Only use selected model if its provider has a configured key
                 if _has_provider_key(config, selected_spec.provider):

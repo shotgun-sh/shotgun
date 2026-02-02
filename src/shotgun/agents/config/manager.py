@@ -379,18 +379,24 @@ class ConfigManager:
             # Validate selected_model for BYOK mode - verify provider has a key
             if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
-                if self._config.selected_model:
-                    from .models import MODEL_SPECS
+                # (Skip validation for Ollama models which don't need API keys)
+                if self._config.selected_model and not (
+                    isinstance(self._config.selected_model, str)
+                    and self._config.selected_model.startswith("ollama/")
+                ):
+                    from .models import MODEL_SPECS, ModelName
 
-                    spec = MODEL_SPECS[self._config.selected_model]
-                    if not await self.has_provider_key(spec.provider):
-                        # Provider has no key - reset to None
-                        logger.info(
-                            "Selected model %s provider has no API key, finding available model",
-                            self._config.selected_model.value,
-                        )
-                        self._config.selected_model = None
-                        should_save = True
+                    # Only validate cloud models (ModelName enum values)
+                    if isinstance(self._config.selected_model, ModelName):
+                        spec = MODEL_SPECS[self._config.selected_model]
+                        if not await self.has_provider_key(spec.provider):
+                            # Provider has no key - reset to None
+                            logger.info(
+                                "Selected model %s provider has no API key, finding available model",
+                                self._config.selected_model.value,
+                            )
+                            self._config.selected_model = None
+                            should_save = True
 
                 # If no selected_model or it was invalid, find first available model
                 if not self._config.selected_model:
@@ -596,11 +602,11 @@ class ConfigManager:
 
         await self.save(config)
 
-    async def update_selected_model(self, model_name: "ModelName") -> None:
+    async def update_selected_model(self, model_name: "ModelName | str") -> None:
         """Update the selected model.
 
         Args:
-            model_name: Model to select
+            model_name: Model to select (ModelName enum or 'ollama/<model>' string)
         """
         config = await self.load()
         config.selected_model = model_name

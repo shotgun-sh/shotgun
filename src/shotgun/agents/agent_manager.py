@@ -296,7 +296,7 @@ class ModelConfigUpdated:
         model_config: Complete model configuration
     """
 
-    old_model: ModelName | None
+    old_model: ModelName | str | None  # String for Ollama/OpenAI-compatible models
     new_model: ModelName | str  # String for Ollama/OpenAI-compatible models
     provider: ProviderType
     key_provider: KeyProvider

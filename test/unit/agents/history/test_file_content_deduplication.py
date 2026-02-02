@@ -158,7 +158,9 @@ class TestDeduplicateFileContent:
         # Find the tool return and check it was replaced
         tool_return = result[2].parts[0]
         assert isinstance(tool_return, ToolReturnPart)
-        assert "Removed for compaction" in tool_return.content
+        # Placeholder should indicate success to prevent model retry loops
+        assert "SUCCESS" in tool_return.content
+        assert "Content removed for context efficiency" in tool_return.content
         assert "src/large_file.py" in tool_return.content
         assert large_content not in tool_return.content
 
@@ -198,7 +200,9 @@ class TestDeduplicateFileContent:
         # Find the tool return and check it was replaced
         tool_return = result[2].parts[0]
         assert isinstance(tool_return, ToolReturnPart)
-        assert "Removed for compaction" in tool_return.content
+        # Placeholder should indicate success to prevent model retry loops
+        assert "SUCCESS" in tool_return.content
+        assert "Content removed for context efficiency" in tool_return.content
         assert ".shotgun/" in tool_return.content
         assert "Lorem ipsum" not in tool_return.content
 
@@ -387,7 +391,8 @@ x = 1
 
         # Both should be deduplicated
         assert tokens_saved > 0
-        assert "Removed for compaction" in result[0].parts[0].content
-        assert "Removed for compaction" in result[0].parts[1].content
+        # Placeholders should indicate success to prevent model retry loops
+        assert "SUCCESS" in result[0].parts[0].content
+        assert "SUCCESS" in result[0].parts[1].content
         assert "file1.py" in result[0].parts[0].content
         assert "file2.py" in result[0].parts[1].content
