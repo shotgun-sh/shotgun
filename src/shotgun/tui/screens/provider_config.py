@@ -124,19 +124,6 @@ class ProviderConfigScreen(Screen[None]):
             color: $text-muted;
         }
 
-        #ollama-help {
-            padding: 0;
-            color: $text-muted;
-        }
-
-        #ollama-actions {
-            padding: 0;
-        }
-
-        #ollama-actions > * {
-            margin-right: 2;
-        }
-
         /* Ollama enable section */
         #ollama-enable-container {
             padding: 0;
@@ -173,10 +160,6 @@ class ProviderConfigScreen(Screen[None]):
 
         ProviderConfigScreen.compact #provider-actions {
             padding: 0;
-        }
-
-        ProviderConfigScreen.compact #ollama-help {
-            display: none;
         }
     """
 
@@ -222,9 +205,6 @@ class ProviderConfigScreen(Screen[None]):
                         id="ollama-enable-checkbox",
                     )
                     yield Static("Experimental", id="ollama-experimental-label")
-                yield Static("", id="ollama-help")
-                with Horizontal(id="ollama-actions"):
-                    yield Button("Refresh", id="ollama-refresh")
 
         with Horizontal(id="done-container"):
             yield Button("Done \\[ESC]", id="done")
@@ -287,7 +267,6 @@ class ProviderConfigScreen(Screen[None]):
     def _update_ollama_ui(self, status: OllamaStatus) -> None:
         """Update the Ollama tab UI based on status."""
         status_label = self.query_one("#ollama-status", Static)
-        help_text = self.query_one("#ollama-help", Static)
 
         if status.running:
             model_count = len(status.models)
@@ -297,21 +276,10 @@ class ProviderConfigScreen(Screen[None]):
                 status_label.update("● Connected (no models installed)")
             status_label.remove_class("not-running")
             status_label.add_class("running")
-
-            if status.models:
-                help_text.update(
-                    "Tip: Use --model=ollama/<model-name> to run with a local model"
-                )
-            else:
-                help_text.update("Install a model with: ollama pull <model-name>")
         else:
             status_label.update("○ Not connected")
             status_label.remove_class("running")
             status_label.add_class("not-running")
-            help_text.update(
-                "Start Ollama: ollama serve\n"
-                "Learn more: https://ollama.com"
-            )
 
     def action_done(self) -> None:
         self.dismiss()
@@ -344,10 +312,6 @@ class ProviderConfigScreen(Screen[None]):
     @on(Button.Pressed, "#done")
     def _on_done_pressed(self) -> None:
         self.action_done()
-
-    @on(Button.Pressed, "#ollama-refresh")
-    def _on_ollama_refresh_pressed(self) -> None:
-        self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
     @on(Checkbox.Changed, "#ollama-enable-checkbox")
     def _on_ollama_enable_changed(self, event: Checkbox.Changed) -> None:
