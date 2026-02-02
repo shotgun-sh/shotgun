@@ -260,6 +260,9 @@ class ShotgunAccountConfig(BaseModel):
 # Format: "ollama/<model_name>" (e.g., "ollama/llama3:8b")
 OLLAMA_MODEL_PREFIX = "ollama/"
 
+# Placeholder API key for Ollama (which doesn't require authentication)
+OLLAMA_PLACEHOLDER_API_KEY = "ollama"
+
 
 def is_ollama_model(model_name: ModelName | str | None) -> TypeGuard[str]:
     """Check if a model name represents an Ollama model.
@@ -285,6 +288,24 @@ def get_ollama_model_name(prefixed_name: str) -> str:
         Model name without the prefix.
     """
     return prefixed_name.removeprefix(OLLAMA_MODEL_PREFIX)
+
+
+def get_ollama_api_base_url(base_url: str) -> str:
+    """Get the OpenAI-compatible API base URL for Ollama.
+
+    Ollama's OpenAI-compatible API is at /v1/chat/completions, so we need
+    to append /v1 to the base URL if not already present.
+
+    Args:
+        base_url: Ollama base URL (e.g., "http://localhost:11434").
+
+    Returns:
+        API base URL with /v1 suffix (e.g., "http://localhost:11434/v1").
+    """
+    base_url = base_url.rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url = f"{base_url}/v1"
+    return base_url
 
 
 class OllamaConfig(BaseModel):

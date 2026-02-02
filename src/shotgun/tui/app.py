@@ -24,6 +24,7 @@ from shotgun.logging_config import get_logger
 from shotgun.tui.containers import TUIContainer
 from shotgun.tui.dependencies import create_default_router_deps
 from shotgun.tui.screens.splash import SplashScreen
+from shotgun.tui.services.ollama import has_ollama_models_available
 from shotgun.utils.file_system_utils import (
     ensure_shotgun_directory_exists,
     get_shotgun_base_path,
@@ -147,12 +148,10 @@ class ShotgunApp(App[None]):
             has_any_key = await self.config_manager.has_any_provider_key()
 
             # Check if Ollama is available
-            has_ollama_available = False
-            if await self.config_manager.is_ollama_enabled():
-                from shotgun.tui.services.ollama import get_ollama_status
-
-                status = await get_ollama_status(base_url=config.ollama.base_url)
-                has_ollama_available = status.running and bool(status.models)
+            has_ollama_available = (
+                await self.config_manager.is_ollama_enabled()
+                and await has_ollama_models_available(base_url=config.ollama.base_url)
+            )
 
             has_any_model = is_openai_compat or has_any_key or has_ollama_available
             if not has_any_model or (

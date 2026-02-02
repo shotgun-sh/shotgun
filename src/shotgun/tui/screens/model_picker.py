@@ -24,11 +24,13 @@ from shotgun.agents.config import ConfigManager
 from shotgun.agents.config.models import (
     MODEL_SPECS,
     OLLAMA_MODEL_PREFIX,
+    OLLAMA_PLACEHOLDER_API_KEY,
     KeyProvider,
     ModelConfig,
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_ollama_api_base_url,
     get_ollama_model_name,
     is_ollama_model,
 )
@@ -554,8 +556,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
             # Create a ModelConfig for the Ollama model using OpenAI-compatible settings
             # Ollama provides an OpenAI-compatible API at /v1
-            # Use the configured base URL from ollama settings, appending /v1 for OpenAI compatibility
-            ollama_base_url = f"{config.ollama.base_url}/v1"
+            ollama_base_url = get_ollama_api_base_url(config.ollama.base_url)
 
             # Store the model name in "ollama/<model>" format for config persistence
             ollama_model_name = f"{OLLAMA_MODEL_PREFIX}{self.selected_ollama_model}"
@@ -566,7 +567,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 key_provider=KeyProvider.BYOK,
                 max_input_tokens=128_000,  # Conservative default
                 max_output_tokens=16_000,  # Conservative default
-                api_key="ollama",  # Ollama doesn't require auth
+                api_key=OLLAMA_PLACEHOLDER_API_KEY,
                 supports_streaming=True,
                 supports_pdf=False,  # Ollama never supports PDFs
                 supports_images=supports_vision,  # From model capabilities

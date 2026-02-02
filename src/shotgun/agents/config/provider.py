@@ -23,11 +23,13 @@ from shotgun.logging_config import get_logger
 from .manager import get_config_manager
 from .models import (
     MODEL_SPECS,
+    OLLAMA_PLACEHOLDER_API_KEY,
     KeyProvider,
     ModelConfig,
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_ollama_api_base_url,
     get_ollama_model_name,
     get_sub_agent_model,
     is_ollama_model,
@@ -169,11 +171,8 @@ def _create_openai_compat_model(
     is_ollama = is_ollama_model(model_name)
     if is_ollama:
         model_name = get_ollama_model_name(model_name)
-
-    # For Ollama, ensure the base URL includes /v1 for OpenAI compatibility
-    # Ollama's OpenAI-compatible API is at /v1/chat/completions
-    if is_ollama and base_url and not base_url.rstrip("/").endswith("/v1"):
-        base_url = base_url.rstrip("/") + "/v1"
+        # Ensure the base URL includes /v1 for OpenAI compatibility
+        base_url = get_ollama_api_base_url(base_url)
 
     # Use OpenAI provider with custom base_url
     openai_provider = OpenAIProvider(api_key=api_key, base_url=base_url)
@@ -495,7 +494,7 @@ async def get_provider_model(
             key_provider=KeyProvider.BYOK,
             max_input_tokens=128_000,  # Reasonable default for Ollama
             max_output_tokens=16_000,
-            api_key="ollama",  # Ollama doesn't require an API key
+            api_key=OLLAMA_PLACEHOLDER_API_KEY,
             supports_streaming=True,
             base_url=config.ollama.base_url,
         )

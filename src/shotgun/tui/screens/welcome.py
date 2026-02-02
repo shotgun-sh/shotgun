@@ -13,6 +13,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Markdown, Static
 
 from shotgun.tui.layout import TINY_HEIGHT_THRESHOLD
+from shotgun.tui.services.ollama import has_ollama_models_available
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -312,11 +313,8 @@ class WelcomeScreen(Screen[None]):
 
         # Check for Ollama availability
         if await app.config_manager.is_ollama_enabled():
-            from shotgun.tui.services.ollama import get_ollama_status
-
             config = await app.config_manager.load()
-            status = await get_ollama_status(base_url=config.ollama.base_url)
-            if status.running and status.models:
+            if await has_ollama_models_available(base_url=config.ollama.base_url):
                 return True
 
         return False

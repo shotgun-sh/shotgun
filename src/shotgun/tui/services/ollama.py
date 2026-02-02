@@ -177,12 +177,28 @@ async def get_ollama_status(
             )
 
 
+async def has_ollama_models_available(base_url: str = DEFAULT_OLLAMA_URL) -> bool:
+    """Check if Ollama is running and has at least one model available.
+
+    This is a convenience function that combines get_ollama_status checks.
+
+    Args:
+        base_url: Base URL for Ollama API.
+
+    Returns:
+        True if Ollama is running and has models, False otherwise.
+    """
+    status = await get_ollama_status(base_url=base_url)
+    return status.running and bool(status.models)
+
+
 __all__ = [
     "OllamaCapability",
     "OllamaModel",
     "OllamaStatus",
     "get_model_capabilities",
     "get_ollama_status",
+    "has_ollama_models_available",
     "DEFAULT_OLLAMA_URL",
     "DEFAULT_TIMEOUT",
 ]

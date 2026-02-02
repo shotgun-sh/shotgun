@@ -6,6 +6,7 @@ from shotgun.tui.services.ollama import (
     OllamaModel,
     OllamaStatus,
     get_ollama_status,
+    has_ollama_models_available,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "OllamaModel",
     "OllamaStatus",
     "get_ollama_status",
+    "has_ollama_models_available",
 ]
