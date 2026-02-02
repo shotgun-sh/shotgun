@@ -51,7 +51,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 6
+CURRENT_CONFIG_VERSION = 7
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -203,6 +203,29 @@ def _migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 6 to version 7.
+
+    Changes:
+    - Add 'ollama' section with enabled=False and default base_url
+
+    Args:
+        data: Config data dict at version 6
+
+    Returns:
+        Modified config data dict at version 7
+    """
+    if "ollama" not in data:
+        data["ollama"] = {
+            "enabled": False,
+            "base_url": "http://localhost:11434",
+        }
+        logger.info("Migrated config v6->v7: added ollama configuration")
+
+    data["config_version"] = 7
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -224,6 +247,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         3: _migrate_v3_to_v4,
         4: _migrate_v4_to_v5,
         5: _migrate_v5_to_v6,
+        6: _migrate_v6_to_v7,
     }
 
     # Apply migrations sequentially
@@ -824,6 +848,26 @@ class ConfigManager:
         config.router_mode = mode
         await self.save(config)
         logger.debug("Router mode saved: %s", mode)
+
+    async def update_ollama_enabled(self, enabled: bool) -> None:
+        """Update whether Ollama is enabled as a provider.
+
+        Args:
+            enabled: Whether Ollama should be enabled
+        """
+        config = await self.load()
+        config.ollama.enabled = enabled
+        await self.save(config)
+        logger.info("Ollama enabled: %s", enabled)
+
+    async def is_ollama_enabled(self) -> bool:
+        """Check if Ollama is enabled in configuration.
+
+        Returns:
+            True if Ollama is enabled, False otherwise
+        """
+        config = await self.load(force_reload=False)
+        return config.ollama.enabled
 
 
 # Global singleton instance

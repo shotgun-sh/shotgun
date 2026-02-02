@@ -41,7 +41,7 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
-from shotgun.agents.config.models import MODEL_SPECS
+from shotgun.agents.config.models import MODEL_SPECS, ModelName
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
 from shotgun.agents.conversation.history.token_estimation import (
@@ -1433,7 +1433,12 @@ class ChatScreen(Screen[None]):
             self.widget_coordinator.update_context_indicator(analysis, result.new_model)
 
             # Get model display name for user feedback
-            model_spec = MODEL_SPECS.get(result.new_model)
+            # For Ollama models, new_model can be a string, so check if it's a ModelName first
+            model_spec = (
+                MODEL_SPECS.get(result.new_model)
+                if isinstance(result.new_model, ModelName)
+                else None
+            )
             model_display = (
                 model_spec.short_name if model_spec else str(result.new_model)
             )

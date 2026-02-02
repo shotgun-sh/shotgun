@@ -62,6 +62,10 @@ class ModelConfig(BaseModel):
         default=True,
         description="Whether this model configuration supports streaming. False only for BYOK GPT-5 models without streaming enabled.",
     )
+    base_url: str | None = Field(
+        default=None,
+        description="Base URL for OpenAI-compatible endpoints (e.g., Ollama). If not set, uses settings.",
+    )
     _model_instance: Model | None = PrivateAttr(default=None)
 
     class Config:
@@ -74,7 +78,7 @@ class ModelConfig(BaseModel):
             from .provider import get_or_create_model
 
             self._model_instance = get_or_create_model(
-                self.provider, self.key_provider, self.name, self.api_key
+                self.provider, self.key_provider, self.name, self.api_key, self.base_url
             )
         return self._model_instance
 
@@ -243,6 +247,19 @@ class ShotgunAccountConfig(BaseModel):
         return bool(value and value.strip())
 
 
+class OllamaConfig(BaseModel):
+    """Configuration for local Ollama provider."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Whether Ollama is enabled as a provider",
+    )
+    base_url: str = Field(
+        default="http://localhost:11434",
+        description="Ollama API base URL",
+    )
+
+
 class MarketingMessageRecord(BaseModel):
     """Record of when a marketing message was shown to the user."""
 
@@ -265,6 +282,7 @@ class ShotgunConfig(BaseModel):
     anthropic: AnthropicConfig = Field(default_factory=AnthropicConfig)
     google: GoogleConfig = Field(default_factory=GoogleConfig)
     shotgun: ShotgunAccountConfig = Field(default_factory=ShotgunAccountConfig)
+    ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     selected_model: ModelName | None = Field(
         default=None,
         description="User-selected model",

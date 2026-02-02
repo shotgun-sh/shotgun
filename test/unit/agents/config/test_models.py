@@ -1,6 +1,13 @@
 """Tests for agents.config.models module."""
 
-from shotgun.agents.config.models import MODEL_SPECS, ModelName
+from shotgun.agents.config.models import (
+    MODEL_SPECS,
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    OllamaConfig,
+    ProviderType,
+)
 
 
 def test_model_spec_short_name_claude_sonnet():
@@ -55,3 +62,46 @@ def test_all_models_have_short_name():
         assert spec.short_name != str(model_name)
         # Should return a non-empty string
         assert len(spec.short_name) > 0
+
+
+def test_ollama_config_default_values():
+    """Test OllamaConfig has correct default values."""
+    config = OllamaConfig()
+    assert config.enabled is False
+    assert config.base_url == "http://localhost:11434"
+
+
+def test_ollama_config_custom_values():
+    """Test OllamaConfig can be created with custom values."""
+    config = OllamaConfig(enabled=True, base_url="http://192.168.1.100:11434")
+    assert config.enabled is True
+    assert config.base_url == "http://192.168.1.100:11434"
+
+
+def test_model_config_base_url_default():
+    """Test ModelConfig has None base_url by default."""
+    config = ModelConfig(
+        name=ModelName.GPT_5_2,
+        provider=ProviderType.OPENAI,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=128_000,
+        max_output_tokens=16_000,
+        api_key="test-key",
+    )
+    assert config.base_url is None
+
+
+def test_model_config_with_base_url():
+    """Test ModelConfig can have a base_url for OpenAI-compatible endpoints."""
+    config = ModelConfig(
+        name="qwen3:32b",
+        provider=ProviderType.OPENAI_COMPATIBLE,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=128_000,
+        max_output_tokens=16_000,
+        api_key="ollama",
+        base_url="http://localhost:11434/v1",
+    )
+    assert config.base_url == "http://localhost:11434/v1"
+    assert config.name == "qwen3:32b"
+    assert config.provider == ProviderType.OPENAI_COMPATIBLE

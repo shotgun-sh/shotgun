@@ -286,14 +286,14 @@ class ModelConfigUpdated:
 
     Attributes:
         old_model: Previous model name (None if first selection)
-        new_model: New model name
-        provider: LLM provider (OpenAI, Anthropic, Google)
+        new_model: New model name (ModelName enum or string for OpenAI-compatible)
+        provider: LLM provider (OpenAI, Anthropic, Google, OpenAI-compatible)
         key_provider: Authentication method (BYOK or Shotgun)
         model_config: Complete model configuration
     """
 
     old_model: ModelName | None
-    new_model: ModelName
+    new_model: ModelName | str  # String for Ollama/OpenAI-compatible models
     provider: ProviderType
     key_provider: KeyProvider
     model_config: ModelConfig
