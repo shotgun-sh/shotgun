@@ -144,6 +144,11 @@ class ProviderConfigScreen(Screen[None]):
             padding: 0 1;
         }
 
+        #done-container {
+            margin-top: 1;
+            padding: 1 0;
+        }
+
         /* Compact styles for short terminals */
         ProviderConfigScreen.compact #titlebox {
             margin: 0;
@@ -213,7 +218,7 @@ class ProviderConfigScreen(Screen[None]):
                     yield Static("Experimental", id="ollama-experimental-label")
 
         with Horizontal(id="done-container"):
-            yield Button("Done \\[ESC]", id="done")
+            yield Button("Back \\[ESC]", id="done", variant="primary")
 
     def on_mount(self) -> None:
         list_view = self.query_one("#provider-list", ListView)
