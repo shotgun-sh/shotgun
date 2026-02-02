@@ -72,6 +72,10 @@ from shotgun.agents.models import (
     RouterAgent,
     ShotgunAgent,
 )
+from shotgun.agents.tools.file_read_tools.multimodal_file_read import (
+    IMAGE_EXTENSIONS,
+    MIME_TYPES,
+)
 from shotgun.attachments import FileAttachment
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
@@ -542,19 +546,6 @@ class AgentManager(Widget):
         if not self._file_request_pending:
             return []
 
-        # MIME type mapping for supported file types
-        mime_types: dict[str, str] = {
-            ".pdf": "application/pdf",
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".gif": "image/gif",
-            ".webp": "image/webp",
-        }
-
-        # Image extensions for capability filtering
-        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-
         # Get model capabilities
         model_config = self.deps.llm_model if self.deps else None
         supports_pdf = model_config.supports_pdf if model_config else True
@@ -574,7 +565,7 @@ class AgentManager(Widget):
                         f"Skipping PDF {path} - not supported by model"
                     )
                     continue
-                if suffix in image_extensions and not supports_images:
+                if suffix in IMAGE_EXTENSIONS and not supports_images:
                     logger.warning(
                         f"Skipping image {path} - not supported by model"
                     )
@@ -585,7 +576,7 @@ class AgentManager(Widget):
                     continue
 
                 # Get MIME type
-                mime_type = mime_types.get(suffix)
+                mime_type = MIME_TYPES.get(suffix)
                 if mime_type is None:
                     logger.warning(f"Unsupported file type: {suffix} for {path}")
                     continue
