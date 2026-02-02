@@ -29,7 +29,6 @@ from shotgun.tui.services.ollama import (
     OllamaStatus,
     get_ollama_status,
 )
-from shotgun.utils import format_file_size
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -125,12 +124,6 @@ class ProviderConfigScreen(Screen[None]):
 
         #ollama-status.not-running {
             color: $text-muted;
-        }
-
-        #ollama-models-list {
-            height: auto;
-            max-height: 12;
-            margin: 1 0;
         }
 
         #ollama-help {
@@ -231,8 +224,6 @@ class ProviderConfigScreen(Screen[None]):
                         id="ollama-enable-checkbox",
                     )
                     yield Static("Experimental", id="ollama-experimental-label")
-                yield Static("Available Models:", id="ollama-models-header")
-                yield ListView(id="ollama-models-list")
                 yield Static("", id="ollama-help")
                 with Horizontal(id="ollama-actions"):
                     yield Button("Refresh", id="ollama-refresh")
@@ -298,48 +289,29 @@ class ProviderConfigScreen(Screen[None]):
     def _update_ollama_ui(self, status: OllamaStatus) -> None:
         """Update the Ollama tab UI based on status."""
         status_label = self.query_one("#ollama-status", Static)
-        models_list = self.query_one("#ollama-models-list", ListView)
         help_text = self.query_one("#ollama-help", Static)
-        models_header = self.query_one("#ollama-models-header", Static)
-
-        # Clear all existing items before adding new ones
-        models_list.clear()
 
         if status.running:
-            status_label.update("Status: ● Ollama is running")
+            model_count = len(status.models)
+            if model_count > 0:
+                status_label.update(f"● Connected ({model_count} model{'s' if model_count != 1 else ''} available)")
+            else:
+                status_label.update("● Connected (no models installed)")
             status_label.remove_class("not-running")
             status_label.add_class("running")
 
             if status.models:
-                models_header.display = True
-                models_list.display = True
-                # Deduplicate by model name to avoid showing duplicates
-                seen_names: set[str] = set()
-                for model in status.models:
-                    if model.name in seen_names:
-                        continue
-                    seen_names.add(model.name)
-                    size_str = format_file_size(model.size)
-                    label = Label(f"{model.name} · {size_str}")
-                    # No ID needed - this list is display-only
-                    models_list.append(ListItem(label))
-
                 help_text.update(
                     "Tip: Use --model=ollama/<model-name> to run with a local model"
                 )
             else:
-                models_header.display = False
-                models_list.display = False
-                help_text.update("No models installed. Run: ollama pull <model-name>")
+                help_text.update("Install a model with: ollama pull <model-name>")
         else:
-            status_label.update("Status: ○ Ollama is not running")
+            status_label.update("○ Not connected")
             status_label.remove_class("running")
             status_label.add_class("not-running")
-            models_header.display = False
-            models_list.display = False
-
             help_text.update(
-                "Start Ollama on port 11434: ollama serve\n"
+                "Start Ollama: ollama serve\n"
                 "Learn more: https://ollama.com"
             )
 
