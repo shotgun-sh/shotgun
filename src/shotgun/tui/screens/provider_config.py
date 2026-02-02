@@ -58,8 +58,8 @@ class ProviderConfigScreen(Screen[None]):
 
         #titlebox {
             height: auto;
-            margin: 2 0;
-            padding: 1;
+            margin: 1 0;
+            padding: 0 1;
             border: hkey $border;
             content-align: center middle;
 
@@ -69,36 +69,34 @@ class ProviderConfigScreen(Screen[None]):
         }
 
         #provider-config-title {
-            padding: 1 0;
             text-style: bold;
             color: $text-accent;
         }
 
         #provider-links {
-            padding: 1 0;
+            padding: 0;
         }
 
         #provider-list {
-            margin: 2 0;
+            margin: 1 0;
             height: auto;
-            & > * {
-            padding: 1 0;
-            }
+            padding: 0;
         }
+
         #provider-actions {
-            padding: 1;
+            padding: 0;
         }
+
         #provider-actions > * {
-        margin-right: 2;
+            margin-right: 2;
         }
-        #provider-list {
-            padding: 1;
-        }
+
         #provider-status {
             height: auto;
             padding: 0 1;
             min-height: 1;
         }
+
         #provider-status.error {
             color: $error;
         }
@@ -106,16 +104,16 @@ class ProviderConfigScreen(Screen[None]):
         /* Tabbed content styling */
         #provider-tabs {
             height: auto;
-            margin: 1 0;
+            margin: 0;
         }
 
         TabPane {
-            padding: 1;
+            padding: 1 0;
         }
 
         /* Ollama tab styling */
         #ollama-status {
-            padding: 1 0;
+            padding: 0;
         }
 
         #ollama-status.running {
@@ -127,12 +125,12 @@ class ProviderConfigScreen(Screen[None]):
         }
 
         #ollama-help {
-            padding: 1 0;
+            padding: 0;
             color: $text-muted;
         }
 
         #ollama-actions {
-            padding: 1 0;
+            padding: 0;
         }
 
         #ollama-actions > * {
@@ -141,7 +139,7 @@ class ProviderConfigScreen(Screen[None]):
 
         /* Ollama enable section */
         #ollama-enable-container {
-            padding: 1 0;
+            padding: 0;
         }
 
         #ollama-enable-checkbox {
