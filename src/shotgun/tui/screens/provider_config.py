@@ -145,8 +145,10 @@ class ProviderConfigScreen(Screen[None]):
         }
 
         #done-container {
-            margin-top: 1;
+            dock: bottom;
+            height: auto;
             padding: 1 0;
+            background: $surface;
         }
 
         /* Compact styles for short terminals */
