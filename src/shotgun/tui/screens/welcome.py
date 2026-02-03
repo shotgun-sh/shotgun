@@ -240,11 +240,14 @@ class WelcomeScreen(Screen[None]):
 
                 # Right box - Local Models
                 with Vertical(classes="option-box", id="local-box"):
-                    yield Static("Local Models (Free!)", classes="option-title")
+                    yield Static(
+                        "Local Models (Experimental)", classes="option-title"
+                    )
                     yield Markdown(
                         "**Benefits:**\n"
                         "• Completely free, runs on your machine\n"
-                        "• Private - your data never leaves your computer",
+                        "• Private - data stays on your computer\n"
+                        "• Drafting mode only",
                         classes="option-benefits",
                     )
                     yield Button(

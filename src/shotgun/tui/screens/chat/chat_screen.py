@@ -41,7 +41,7 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
-from shotgun.agents.config.models import MODEL_SPECS, ModelName
+from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
 from shotgun.agents.conversation.history.token_estimation import (
@@ -614,8 +614,20 @@ class ChatScreen(Screen[None]):
             )
             return
 
-        # Toggle mode
-        if self.deps.router_mode == RouterMode.PLANNING:
+        # Check if using Ollama model - lock to Drafting mode only
+        if is_ollama_model(self.deps.llm_model.name):
+            if self.deps.router_mode == RouterMode.DRAFTING:
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message="⚠️ Local models are locked to Drafting mode (experimental)"
+                    )
+                )
+                return
+            # Allow switching TO Drafting mode, just not away from it
+            self.deps.router_mode = RouterMode.DRAFTING
+            mode_name = "Drafting"
+        elif self.deps.router_mode == RouterMode.PLANNING:
+            # Toggle mode for cloud models
             self.deps.router_mode = RouterMode.DRAFTING
             mode_name = "Drafting"
         else:
@@ -1646,6 +1658,9 @@ class ChatScreen(Screen[None]):
         Returns:
             Dynamic placeholder hint based on mode and progress.
         """
+        # Check if using Ollama - show special placeholder
+        if is_ollama_model(self.deps.llm_model.name):
+            return "Local model - Drafting mode only (experimental)"
         return self.placeholder_hints.get_placeholder_for_mode(mode)
 
     def index_codebase_command(self) -> None:
