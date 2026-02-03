@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_TIMEOUT = 3.0
+OLLAMA_DOWNLOAD_URL = "https://ollama.com/download"
 
 
 class OllamaCapability(StrEnum):

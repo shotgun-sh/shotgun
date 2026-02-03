@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import webbrowser
 from typing import TYPE_CHECKING, cast
 
 from textual import on
@@ -40,6 +41,7 @@ from shotgun.agents.config.provider import (
 )
 from shotgun.logging_config import get_logger
 from shotgun.tui.services.ollama import (
+    OLLAMA_DOWNLOAD_URL,
     OllamaStatus,
     get_ollama_status,
     sanitize_ollama_model_name_for_id,
@@ -145,6 +147,20 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         #cloud-models-disabled-msg.visible {
             display: block;
         }
+
+        /* Ollama setup buttons */
+        #ollama-setup-container {
+            display: none;
+            padding: 1 0;
+        }
+
+        #ollama-setup-container.visible {
+            display: block;
+        }
+
+        #ollama-setup-container Button {
+            margin-right: 1;
+        }
     """
 
     BINDINGS = [
@@ -173,6 +189,17 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
             with TabPane("Local Models", id="local-models-tab"):
                 yield Static("Checking Ollama status...", id="local-models-status")
+                with Horizontal(id="ollama-setup-container"):
+                    yield Button(
+                        "Enable Ollama",
+                        id="enable-ollama-button",
+                        variant="primary",
+                    )
+                    yield Button(
+                        "Install Ollama",
+                        id="install-ollama-button",
+                        variant="success",
+                    )
                 yield ListView(id="local-model-list")
                 yield Static("", id="local-models-help")
 
@@ -278,6 +305,9 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         status_label = self.query_one("#local-models-status", Static)
         list_view = self.query_one("#local-model-list", ListView)
         help_text = self.query_one("#local-models-help", Static)
+        setup_container = self.query_one("#ollama-setup-container", Horizontal)
+        enable_button = self.query_one("#enable-ollama-button", Button)
+        install_button = self.query_one("#install-ollama-button", Button)
 
         # Clear existing items
         list_view.clear()
@@ -287,7 +317,11 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             status_label.update("Ollama is not enabled")
             status_label.remove_class("success")
             list_view.display = False
-            help_text.update("Enable Ollama in Provider Setup to use local models")
+            help_text.update("Enable Ollama to use free, local AI models")
+            # Show setup buttons - enable button visible, install hidden
+            setup_container.add_class("visible")
+            enable_button.display = True
+            install_button.display = False
             return
 
         # Check Ollama status
@@ -298,7 +332,11 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             status_label.update("Ollama is not running")
             status_label.remove_class("success")
             list_view.display = False
-            help_text.update("Start Ollama with: ollama serve")
+            help_text.update("Install and start Ollama to use local models")
+            # Show setup buttons - both visible
+            setup_container.add_class("visible")
+            enable_button.display = False
+            install_button.display = True
             return
 
         if not status.models:
@@ -306,13 +344,17 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             status_label.remove_class("success")
             list_view.display = False
             help_text.update("Install a model with: ollama pull <model-name>")
+            # Hide setup buttons when Ollama is running
+            setup_container.remove_class("visible")
             return
 
         # Ollama is running and has models
-        status_label.update(f"● {len(status.models)} model(s) available")
+        status_label.update(f"● {len(status.models)} model(s) available (Experimental)")
         status_label.add_class("success")
         list_view.display = True
         help_text.update("")
+        # Hide setup buttons
+        setup_container.remove_class("visible")
 
         # Add model items, deduplicating by sanitized ID to avoid duplicate DOM IDs
         seen_ids: set[str] = set()
@@ -383,6 +425,24 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     @on(Button.Pressed, "#done")
     def _on_done_pressed(self) -> None:
         self.action_done()
+
+    @on(Button.Pressed, "#enable-ollama-button")
+    def _on_enable_ollama_pressed(self) -> None:
+        """Open provider setup screen to Ollama tab."""
+        self.run_worker(self._open_provider_setup(), exclusive=True)
+
+    @on(Button.Pressed, "#install-ollama-button")
+    def _on_install_ollama_pressed(self) -> None:
+        """Open Ollama download page in browser."""
+        webbrowser.open(OLLAMA_DOWNLOAD_URL)
+
+    async def _open_provider_setup(self) -> None:
+        """Open provider setup screen to Ollama tab and refresh on return."""
+        from .provider_config import ProviderConfigScreen
+
+        await self.app.push_screen_wait(ProviderConfigScreen(initial_tab="ollama-tab"))
+        # Refresh local models after returning from provider setup
+        await self._refresh_local_models()
 
     def _ollama_model_from_item(self, item: ListItem | None) -> str | None:
         """Get Ollama model name from a ListItem."""
