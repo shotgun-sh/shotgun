@@ -15,6 +15,10 @@ def mock_context():
     context.deps = MagicMock(spec=AgentDeps)
     context.deps.interactive_mode = True
     context.deps.sub_agent_context = None
+    # Mock llm_model for multimodal capability checks
+    context.deps.llm_model = MagicMock()
+    context.deps.llm_model.supports_pdf = True
+    context.deps.llm_model.supports_images = True
     return context
 
 
@@ -62,6 +66,10 @@ def test_research_system_prompt_template_loading():
     mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = True
     mock_context.deps.sub_agent_context = None
+    # Mock llm_model for multimodal capability checks
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -77,5 +85,7 @@ def test_research_system_prompt_template_loading():
             mode="research",
             sub_agent_context=None,
             router_mode=None,
+            supports_pdf=True,
+            supports_images=True,
         )
         assert result == "Test system prompt"

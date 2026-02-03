@@ -10,10 +10,25 @@ from textual.containers import Horizontal, Vertical
 from textual.events import Resize
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, ListItem, ListView, Markdown, Static
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Input,
+    Label,
+    ListItem,
+    ListView,
+    Markdown,
+    Static,
+    TabbedContent,
+    TabPane,
+)
 
 from shotgun.agents.config import ConfigManager, ProviderType
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.services.ollama import (
+    OllamaStatus,
+    get_ollama_status,
+)
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -33,18 +48,19 @@ class ProviderConfigScreen(Screen[None]):
     """Collect API keys for available providers."""
 
     CSS = """
-        ProviderConfig {
+        ProviderConfigScreen {
             layout: vertical;
+            overflow: hidden;
         }
 
-        ProviderConfig > * {
+        ProviderConfigScreen > * {
             height: auto;
         }
 
         #titlebox {
             height: auto;
-            margin: 2 0;
-            padding: 1;
+            margin: 1 0;
+            padding: 0 1;
             border: hkey $border;
             content-align: center middle;
 
@@ -54,38 +70,85 @@ class ProviderConfigScreen(Screen[None]):
         }
 
         #provider-config-title {
-            padding: 1 0;
             text-style: bold;
             color: $text-accent;
         }
 
         #provider-links {
-            padding: 1 0;
+            padding: 0;
         }
 
         #provider-list {
-            margin: 2 0;
+            margin: 1 0;
             height: auto;
-            & > * {
-            padding: 1 0;
-            }
+            padding: 0;
         }
+
         #provider-actions {
-            padding: 1;
+            padding: 0;
         }
+
         #provider-actions > * {
-        margin-right: 2;
+            margin-right: 2;
         }
-        #provider-list {
-            padding: 1;
-        }
+
         #provider-status {
             height: auto;
             padding: 0 1;
             min-height: 1;
         }
+
         #provider-status.error {
             color: $error;
+        }
+
+        /* Tabbed content styling */
+        #provider-tabs {
+            height: auto;
+            margin: 0;
+        }
+
+        #provider-tabs > ContentSwitcher {
+            height: auto;
+        }
+
+        TabPane {
+            height: auto;
+            padding: 1 0;
+        }
+
+        /* Ollama tab styling */
+        #ollama-status {
+            padding: 0;
+        }
+
+        #ollama-status.running {
+            color: $success;
+        }
+
+        #ollama-status.not-running {
+            color: $text-muted;
+        }
+
+        /* Ollama enable section */
+        #ollama-enable-container {
+            padding: 0;
+        }
+
+        #ollama-enable-checkbox {
+            margin-right: 1;
+        }
+
+        #ollama-experimental-label {
+            color: $warning;
+            padding: 0 1;
+        }
+
+        #done-container {
+            dock: bottom;
+            height: auto;
+            padding: 1 0;
+            background: $surface;
         }
 
         /* Compact styles for short terminals */
@@ -119,43 +182,76 @@ class ProviderConfigScreen(Screen[None]):
     ]
 
     selected_provider: reactive[str] = reactive("openai")
+    ollama_status: reactive[OllamaStatus | None] = reactive(None)
+
+    def __init__(self, initial_tab: str = "api-providers-tab") -> None:
+        """Initialize the provider config screen.
+
+        Args:
+            initial_tab: ID of the tab to show initially ("api-providers-tab" or "ollama-tab")
+        """
+        super().__init__()
+        self._initial_tab = initial_tab
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
             yield Static("Provider setup", id="provider-config-title")
             yield Static(
-                "Select a provider and enter the API key needed to activate it.",
+                "Configure API keys or use local Ollama models.",
                 id="provider-config-summary",
             )
-            yield Markdown(
-                "Don't have an API Key? Use these links to get one: [OpenAI](https://platform.openai.com/api-keys) | [Anthropic](https://console.anthropic.com) | [Google Gemini](https://aistudio.google.com)",
-                id="provider-links",
-            )
-        yield ListView(*self._build_provider_items_sync(), id="provider-list")
-        yield Input(
-            placeholder=self._input_placeholder(self.selected_provider),
-            password=True,
-            id="api-key",
-        )
-        yield Label("", id="provider-status")
-        with Horizontal(id="provider-actions"):
-            yield Button("Save key \\[ENTER]", variant="primary", id="save")
-            yield Button("Authenticate", variant="success", id="authenticate")
-            yield Button("Clear key", id="clear", variant="warning")
-            yield Button("Done \\[ESC]", id="done")
+
+        with TabbedContent(id="provider-tabs"):
+            with TabPane("API Providers", id="api-providers-tab"):
+                yield Markdown(
+                    "Don't have an API Key? Use these links to get one: [OpenAI](https://platform.openai.com/api-keys) | [Anthropic](https://console.anthropic.com) | [Google Gemini](https://aistudio.google.com)",
+                    id="provider-links",
+                )
+                yield ListView(*self._build_provider_items_sync(), id="provider-list")
+                yield Input(
+                    placeholder=self._input_placeholder(self.selected_provider),
+                    password=True,
+                    id="api-key",
+                )
+                yield Label("", id="provider-status")
+                with Horizontal(id="provider-actions"):
+                    yield Button("Save key \\[ENTER]", variant="primary", id="save")
+                    yield Button("Authenticate", variant="success", id="authenticate")
+                    yield Button("Clear key", id="clear", variant="warning")
+
+            with TabPane("Ollama (Local)", id="ollama-tab"):
+                yield Static("Status: Checking...", id="ollama-status")
+                with Horizontal(id="ollama-enable-container"):
+                    yield Checkbox(
+                        "Enable Ollama",
+                        id="ollama-enable-checkbox",
+                    )
+                    yield Static("Experimental", id="ollama-experimental-label")
+
+        with Horizontal(id="done-container"):
+            yield Button("Back \\[ESC]", id="done", variant="primary")
 
     def on_mount(self) -> None:
-        list_view = self.query_one(ListView)
+        list_view = self.query_one("#provider-list", ListView)
         if list_view.children:
             list_view.index = 0
         self.selected_provider = "openai"
 
         # Hide authenticate button by default (shown only for shotgun)
         self.query_one("#authenticate", Button).display = False
-        self.set_focus(self.query_one("#api-key", Input))
+
+        # Switch to initial tab if specified
+        if self._initial_tab != "api-providers-tab":
+            tabs = self.query_one("#provider-tabs", TabbedContent)
+            tabs.active = self._initial_tab
+        else:
+            self.set_focus(self.query_one("#api-key", Input))
 
         # Refresh UI asynchronously
         self.run_worker(self._refresh_ui(), exclusive=False)
+
+        # Load Ollama status (exclusive to prevent duplicate widget IDs on concurrent refresh)
+        self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
         # Apply layout based on terminal height
         self._apply_layout_for_height(self.app.size.height)
@@ -178,22 +274,53 @@ class ProviderConfigScreen(Screen[None]):
         This ensures the UI reflects any provider changes made elsewhere.
         """
         self.run_worker(self._refresh_ui(), exclusive=False)
+        self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
     async def _refresh_ui(self) -> None:
         """Refresh provider status and button visibility."""
         await self.refresh_provider_status()
         await self._update_done_button_visibility()
 
+    async def _refresh_ollama_status(self) -> None:
+        """Refresh Ollama status, model list, and enable checkbox state."""
+        status = await get_ollama_status()
+        self.ollama_status = status
+        self._update_ollama_ui(status)
+
+        # Load the enable checkbox state from config
+        is_enabled = await self.config_manager.is_ollama_enabled()
+        checkbox = self.query_one("#ollama-enable-checkbox", Checkbox)
+        checkbox.value = is_enabled
+
+    def _update_ollama_ui(self, status: OllamaStatus) -> None:
+        """Update the Ollama tab UI based on status."""
+        status_label = self.query_one("#ollama-status", Static)
+
+        if status.running:
+            model_count = len(status.models)
+            if model_count > 0:
+                status_label.update(
+                    f"● Connected ({model_count} model{'s' if model_count != 1 else ''} available)"
+                )
+            else:
+                status_label.update("● Connected (no models installed)")
+            status_label.remove_class("not-running")
+            status_label.add_class("running")
+        else:
+            status_label.update("○ Not connected")
+            status_label.remove_class("running")
+            status_label.add_class("not-running")
+
     def action_done(self) -> None:
         self.dismiss()
 
-    @on(ListView.Highlighted)
+    @on(ListView.Highlighted, "#provider-list")
     def _on_provider_highlighted(self, event: ListView.Highlighted) -> None:
         provider = self._provider_from_item(event.item)
         if provider:
             self.selected_provider = provider
 
-    @on(ListView.Selected)
+    @on(ListView.Selected, "#provider-list")
     def _on_provider_selected(self, event: ListView.Selected) -> None:
         provider = self._provider_from_item(event.item)
         if provider:
@@ -215,6 +342,26 @@ class ProviderConfigScreen(Screen[None]):
     @on(Button.Pressed, "#done")
     def _on_done_pressed(self) -> None:
         self.action_done()
+
+    @on(Checkbox.Changed, "#ollama-enable-checkbox")
+    def _on_ollama_enable_changed(self, event: Checkbox.Changed) -> None:
+        self.run_worker(self._do_update_ollama_enabled(event.value), exclusive=True)
+
+    async def _do_update_ollama_enabled(self, enabled: bool) -> None:
+        """Update Ollama enabled state in config."""
+        await self.config_manager.update_ollama_enabled(enabled)
+
+        # When enabling Ollama, auto-select the first available model if no model is selected
+        if enabled and self.ollama_status and self.ollama_status.models:
+            config = await self.config_manager.load()
+            # Only auto-select if no model is currently selected
+            if not config.selected_model:
+                first_model = self.ollama_status.models[0]
+                ollama_model_name = f"ollama/{first_model.name}"
+                await self.config_manager.update_selected_model(ollama_model_name)
+
+        # Update done button visibility since Ollama can now provide models
+        await self._update_done_button_visibility()
 
     @on(Input.Submitted, "#api-key")
     def _on_input_submitted(self, event: Input.Submitted) -> None:
@@ -266,10 +413,9 @@ class ProviderConfigScreen(Screen[None]):
             label.update(await self._provider_label(provider_id))
 
     async def _update_done_button_visibility(self) -> None:
-        """Show/hide Done button based on whether any provider keys are configured."""
+        """Ensure Done button is always visible so users can exit the screen."""
         done_button = self.query_one("#done", Button)
-        has_keys = await self.config_manager.has_any_provider_key()
-        done_button.display = has_keys
+        done_button.display = True
 
     def _build_provider_items_sync(self) -> list[ListItem]:
         """Build provider items synchronously for compose().

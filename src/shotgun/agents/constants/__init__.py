@@ -2,6 +2,7 @@
 
 from .file_types import (
     BINARY_EXTENSIONS,
+    IMAGE_EXTENSIONS,
     MAX_BINARY_FILE_SIZE_BYTES,
     MAX_TEXT_FILE_SIZE_BYTES,
     MIME_TYPES,
@@ -16,6 +17,7 @@ from .file_types import (
 __all__ = [
     "BINARY_EXTENSIONS",
     "FileContent",
+    "IMAGE_EXTENSIONS",
     "MAX_BINARY_FILE_SIZE_BYTES",
     "MAX_TEXT_FILE_SIZE_BYTES",
     "MIME_TYPES",

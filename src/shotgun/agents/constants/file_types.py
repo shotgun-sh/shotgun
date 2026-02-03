@@ -11,7 +11,19 @@ from pydantic_ai import BinaryContent
 # Type alias for file content - either binary (PDF, image) or text
 FileContent: TypeAlias = str | BinaryContent
 
+# Image file extensions (for model capability filtering)
+IMAGE_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+    }
+)
+
 # Binary file extensions that require BinaryContent loading
+# Includes both images and PDFs
 BINARY_EXTENSIONS: frozenset[str] = frozenset(
     {
         ".pdf",

@@ -12,7 +12,7 @@ Web search uses the provider matching the user's selected model for consistency.
 from collections.abc import Awaitable, Callable
 
 from shotgun.agents.config.manager import get_config_manager
-from shotgun.agents.config.models import MODEL_SPECS, ProviderType
+from shotgun.agents.config.models import MODEL_SPECS, ModelName, ProviderType
 from shotgun.logging_config import get_logger
 from shotgun.settings import settings
 
@@ -57,7 +57,12 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
     config = await config_manager.load(force_reload=False)
 
     preferred_provider: ProviderType | None = None
-    if config.selected_model and config.selected_model in MODEL_SPECS:
+    # Only check MODEL_SPECS for ModelName enums (not Ollama string models)
+    if (
+        config.selected_model
+        and isinstance(config.selected_model, ModelName)
+        and config.selected_model in MODEL_SPECS
+    ):
         preferred_provider = MODEL_SPECS[config.selected_model].provider
         logger.debug(
             "User selected model %s, preferring %s web search",

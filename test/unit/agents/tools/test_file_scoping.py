@@ -215,13 +215,13 @@ async def test_read_file_not_restricted_by_agent_mode(
 
     # Research agent should be able to read all files
     mock_context.deps.agent_mode = AgentType.RESEARCH
-    content = await read_file(mock_context, "research.md")
+    content = await read_file(mock_context, "research.md", "test read")
     assert content == "Research content"
 
-    content = await read_file(mock_context, "plan.md")
+    content = await read_file(mock_context, "plan.md", "test read")
     assert content == "Plan content"
 
-    content = await read_file(mock_context, "tasks.md")
+    content = await read_file(mock_context, "tasks.md", "test read")
     assert content == "Tasks content"
 
 
@@ -279,7 +279,7 @@ async def test_read_file_normalizes_shotgun_prefix(mock_context, tmp_path, monke
 
     # Should be able to read with .shotgun/ prefix
     mock_context.deps.agent_mode = AgentType.RESEARCH
-    content = await read_file(mock_context, ".shotgun/research.md")
+    content = await read_file(mock_context, ".shotgun/research.md", "test read")
     assert content == "Research content"
 
 

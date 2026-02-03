@@ -408,8 +408,11 @@ async def test_get_provider_model_openai_compatible_with_custom_model():
     },
     clear=False,
 )
+@patch("shotgun.agents.config.provider.get_config_manager")
 @pytest.mark.asyncio
-async def test_get_provider_model_openai_compatible_missing_api_key():
+async def test_get_provider_model_openai_compatible_missing_api_key(
+    mock_get_config_manager,
+):
     """Test get_provider_model falls back to normal provider when only base_url is set.
 
     OpenAI-compatible mode requires BOTH base_url AND api_key to be set.
@@ -419,13 +422,23 @@ async def test_get_provider_model_openai_compatible_missing_api_key():
 
     settings_module.settings = settings_module.Settings()
 
-    try:
-        # Without api_key, OpenAI-compatible mode should NOT be activated
-        # This will fail if no other provider is configured, which is expected
-        with pytest.raises(ValueError, match="No provider keys configured"):
-            await get_provider_model()
-    finally:
-        settings_module.settings = settings_module.Settings()
+    # Create a config with no provider keys
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "config.json"
+        manager = ConfigManager(config_path=config_path)
+        import uuid
+
+        config = ShotgunConfig(shotgun_instance_id=str(uuid.uuid4()))
+        manager._config = config
+        mock_get_config_manager.return_value = manager
+
+        try:
+            # Without api_key, OpenAI-compatible mode should NOT be activated
+            # This will fail if no other provider is configured, which is expected
+            with pytest.raises(ValueError, match="No provider keys configured"):
+                await get_provider_model()
+        finally:
+            settings_module.settings = settings_module.Settings()
 
 
 @patch.dict(

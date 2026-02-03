@@ -21,6 +21,7 @@ from .constants import (
     ConfigSection,
 )
 from .models import (
+    MODEL_SPECS,
     AnthropicConfig,
     GoogleConfig,
     ModelName,
@@ -28,6 +29,7 @@ from .models import (
     ProviderType,
     ShotgunAccountConfig,
     ShotgunConfig,
+    is_ollama_model,
 )
 
 logger = get_logger(__name__)
@@ -51,7 +53,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 6
+CURRENT_CONFIG_VERSION = 7
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -203,6 +205,29 @@ def _migrate_v5_to_v6(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 6 to version 7.
+
+    Changes:
+    - Add 'ollama' section with enabled=False and default base_url
+
+    Args:
+        data: Config data dict at version 6
+
+    Returns:
+        Modified config data dict at version 7
+    """
+    if "ollama" not in data:
+        data["ollama"] = {
+            "enabled": False,
+            "base_url": "http://localhost:11434",
+        }
+        logger.info("Migrated config v6->v7: added ollama configuration")
+
+    data["config_version"] = 7
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -224,6 +249,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         3: _migrate_v3_to_v4,
         4: _migrate_v4_to_v5,
         5: _migrate_v5_to_v6,
+        6: _migrate_v6_to_v7,
     }
 
     # Apply migrations sequentially
@@ -330,17 +356,25 @@ class ConfigManager:
 
             # Clean up invalid selected_model before Pydantic validation
             if "selected_model" in data and data["selected_model"] is not None:
-                from .models import MODEL_SPECS, ModelName
+                selected = data["selected_model"]
 
-                try:
-                    # Try to convert to ModelName enum
-                    model_name = ModelName(data["selected_model"])
-                    # Check if it exists in MODEL_SPECS
-                    if model_name not in MODEL_SPECS:
+                # Allow Ollama model strings (format: "ollama/<model_name>")
+                if is_ollama_model(selected):
+                    # Valid Ollama model string - keep it as-is
+                    pass
+                else:
+                    try:
+                        # Try to convert to ModelName enum
+                        model_name = ModelName(selected)
+                        # Check if it exists in MODEL_SPECS
+                        if model_name not in MODEL_SPECS:
+                            data["selected_model"] = None
+                        else:
+                            # Store the enum so Pydantic uses it (not the string)
+                            data["selected_model"] = model_name
+                    except (ValueError, KeyError):
+                        # Invalid model name - reset to None
                         data["selected_model"] = None
-                except (ValueError, KeyError):
-                    # Invalid model name - reset to None
-                    data["selected_model"] = None
 
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
@@ -355,26 +389,26 @@ class ConfigManager:
             # Validate selected_model for BYOK mode - verify provider has a key
             if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
-                if self._config.selected_model:
-                    from .models import MODEL_SPECS
-
-                    spec = MODEL_SPECS[self._config.selected_model]
-                    if not await self.has_provider_key(spec.provider):
-                        # Provider has no key - reset to None
-                        logger.info(
-                            "Selected model %s provider has no API key, finding available model",
-                            self._config.selected_model.value,
-                        )
-                        self._config.selected_model = None
-                        should_save = True
+                # (Skip validation for Ollama models which don't need API keys)
+                if self._config.selected_model and not is_ollama_model(
+                    self._config.selected_model
+                ):
+                    # Only validate cloud models (ModelName enum values)
+                    if isinstance(self._config.selected_model, ModelName):
+                        spec = MODEL_SPECS[self._config.selected_model]
+                        if not await self.has_provider_key(spec.provider):
+                            # Provider has no key - reset to None
+                            logger.info(
+                                "Selected model %s provider has no API key, finding available model",
+                                self._config.selected_model.value,
+                            )
+                            self._config.selected_model = None
+                            should_save = True
 
                 # If no selected_model or it was invalid, find first available model
                 if not self._config.selected_model:
                     for provider in ProviderType:
                         if await self.has_provider_key(provider):
-                            # Set to that provider's default model
-                            from .models import MODEL_SPECS, ModelName
-
                             # Find default model for this provider
                             provider_models = {
                                 ProviderType.OPENAI: ModelName.GPT_5_2,
@@ -572,11 +606,11 @@ class ConfigManager:
 
         await self.save(config)
 
-    async def update_selected_model(self, model_name: "ModelName") -> None:
+    async def update_selected_model(self, model_name: "ModelName | str") -> None:
         """Update the selected model.
 
         Args:
-            model_name: Model to select
+            model_name: Model to select (ModelName enum or 'ollama/<model>' string)
         """
         config = await self.load()
         config.selected_model = model_name
@@ -824,6 +858,26 @@ class ConfigManager:
         config.router_mode = mode
         await self.save(config)
         logger.debug("Router mode saved: %s", mode)
+
+    async def update_ollama_enabled(self, enabled: bool) -> None:
+        """Update whether Ollama is enabled as a provider.
+
+        Args:
+            enabled: Whether Ollama should be enabled
+        """
+        config = await self.load()
+        config.ollama.enabled = enabled
+        await self.save(config)
+        logger.info("Ollama enabled: %s", enabled)
+
+    async def is_ollama_enabled(self) -> bool:
+        """Check if Ollama is enabled in configuration.
+
+        Returns:
+            True if Ollama is enabled, False otherwise
+        """
+        config = await self.load(force_reload=False)
+        return config.ollama.enabled
 
 
 # Global singleton instance

@@ -201,6 +201,10 @@ def test_build_agent_system_prompt_research_agent():
     mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = True
     mock_context.deps.sub_agent_context = None
+    # Mock llm_model for multimodal capability checks
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -216,6 +220,8 @@ def test_build_agent_system_prompt_research_agent():
             mode="research",
             sub_agent_context=None,
             router_mode=None,
+            supports_pdf=True,
+            supports_images=True,
         )
 
 
@@ -226,6 +232,10 @@ def test_build_agent_system_prompt_custom_context():
     mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = False
     mock_context.deps.sub_agent_context = None
+    # Mock llm_model for multimodal capability checks
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -241,6 +251,8 @@ def test_build_agent_system_prompt_custom_context():
             mode="plan",
             sub_agent_context=None,
             router_mode=None,
+            supports_pdf=True,
+            supports_images=True,
         )
 
 
@@ -251,6 +263,10 @@ def test_build_agent_system_prompt_unknown_agent_type():
     mock_context.deps = MagicMock(spec=AgentDeps)
     mock_context.deps.interactive_mode = True
     mock_context.deps.sub_agent_context = None
+    # Mock llm_model for multimodal capability checks
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -266,6 +282,8 @@ def test_build_agent_system_prompt_unknown_agent_type():
             mode="unknown",
             sub_agent_context=None,
             router_mode=None,
+            supports_pdf=True,
+            supports_images=True,
         )
 
 

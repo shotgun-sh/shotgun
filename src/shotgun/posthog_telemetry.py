@@ -124,9 +124,13 @@ def setup_posthog_observability() -> bool:
             # Cache user context for exception tracking
             is_shotgun_account = config.shotgun.has_valid_account
             _user_context["account_type"] = "shotgun" if is_shotgun_account else "byok"
-            _user_context["selected_model"] = (
-                config.selected_model.value if config.selected_model else None
-            )
+            # Handle both ModelName enum and string (for Ollama models)
+            if config.selected_model is None:
+                _user_context["selected_model"] = None
+            elif isinstance(config.selected_model, str):
+                _user_context["selected_model"] = config.selected_model
+            else:
+                _user_context["selected_model"] = config.selected_model.value
 
             # Set user properties for tracking
             _posthog_client.capture(
@@ -330,9 +334,12 @@ def submit_feedback_survey(feedback: Feedback) -> None:
             ],
             f"$survey_response_{Q_KIND_ID}": feedback.kind,
             f"$survey_response_{Q_DESCRIPTION_ID}": feedback.description,
-            "selected_model": config.selected_model.value
-            if config.selected_model
-            else None,
+            # Handle both ModelName enum and string (for Ollama models)
+            "selected_model": (
+                config.selected_model
+                if isinstance(config.selected_model, str)
+                else (config.selected_model.value if config.selected_model else None)
+            ),
             "config_version": config.config_version,
             "last_10_messages": last_10_messages,  # last 10 messages
         },

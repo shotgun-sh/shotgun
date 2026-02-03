@@ -13,6 +13,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Markdown, Static
 
 from shotgun.tui.layout import TINY_HEIGHT_THRESHOLD
+from shotgun.tui.services.ollama import has_ollama_models_available
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -63,10 +64,10 @@ class WelcomeScreen(Screen[None]):
         }
 
         .option-box {
-            width: 45;
+            width: 38;
             height: auto;
             border: solid $primary;
-            padding: 2;
+            padding: 1 2;
             margin: 0 1;
             background: $surface;
         }
@@ -175,6 +176,7 @@ class WelcomeScreen(Screen[None]):
                     "Shotgun Account", id="tiny-shotgun-button", variant="primary"
                 )
                 yield Button("BYOK", id="tiny-byok-button", variant="success")
+                yield Button("Local", id="tiny-local-button", variant="warning")
 
         # Full welcome screen
         with Vertical(id="titlebox"):
@@ -220,12 +222,12 @@ class WelcomeScreen(Screen[None]):
                         classes="option-button",
                     )
 
-                # Right box - BYOK
+                # Middle box - BYOK
                 with Vertical(classes="option-box", id="byok-box"):
                     yield Static("Bring Your Own Key (BYOK)", classes="option-title")
                     yield Markdown(
                         "**Benefits:**\n"
-                        "• 100% Supported by the application\n"
+                        "• 100% Supported\n"
                         "• Use your existing API keys from OpenAI, Anthropic, or Google",
                         classes="option-benefits",
                     )
@@ -233,6 +235,23 @@ class WelcomeScreen(Screen[None]):
                         "Configure API Keys",
                         variant="success",
                         id="byok-button",
+                        classes="option-button",
+                    )
+
+                # Right box - Local Models
+                with Vertical(classes="option-box", id="local-box"):
+                    yield Static("Local Models (Experimental)", classes="option-title")
+                    yield Markdown(
+                        "**Benefits:**\n"
+                        "• Completely free, runs on your machine\n"
+                        "• Private - data stays on your computer\n"
+                        "• Drafting mode only",
+                        classes="option-benefits",
+                    )
+                    yield Button(
+                        "Set Up Ollama",
+                        variant="warning",
+                        id="local-button",
                         classes="option-button",
                     )
 
@@ -280,14 +299,18 @@ class WelcomeScreen(Screen[None]):
         """Handle BYOK button press."""
         self.run_worker(self._start_byok_config(), exclusive=True)
 
+    @on(Button.Pressed, "#local-button")
+    @on(Button.Pressed, "#tiny-local-button")
+    def _on_local_pressed(self) -> None:
+        """Handle Local Models button press."""
+        self.run_worker(self._start_local_config(), exclusive=True)
+
     async def _start_byok_config(self) -> None:
         """Launch BYOK provider configuration flow."""
         await self._mark_welcome_shown()
 
-        app = cast("ShotgunApp", self.app)
-
-        # If user already has providers, just dismiss and continue to chat
-        if await app.config_manager.has_any_provider_key():
+        # If user already has providers or Ollama, just dismiss and continue to chat
+        if await self._has_any_model_available():
             self.dismiss()
             return
 
@@ -296,9 +319,42 @@ class WelcomeScreen(Screen[None]):
 
         await self.app.push_screen_wait(ProviderConfigScreen())
 
-        # Dismiss welcome screen after config if providers are now configured
-        if await app.config_manager.has_any_provider_key():
+        # Dismiss welcome screen after config if providers or Ollama are now available
+        if await self._has_any_model_available():
             self.dismiss()
+
+    async def _start_local_config(self) -> None:
+        """Launch local model (Ollama) configuration flow."""
+        await self._mark_welcome_shown()
+
+        # Push provider config screen directly to Ollama tab
+        from .provider_config import ProviderConfigScreen
+
+        await self.app.push_screen_wait(ProviderConfigScreen(initial_tab="ollama-tab"))
+
+        # Dismiss welcome screen after config if Ollama is now available
+        if await self._has_any_model_available():
+            self.dismiss()
+
+    async def _has_any_model_available(self) -> bool:
+        """Check if any model is available (API keys or Ollama).
+
+        Returns:
+            True if user has API keys configured OR Ollama is enabled and running.
+        """
+        app = cast("ShotgunApp", self.app)
+
+        # Check for API keys
+        if await app.config_manager.has_any_provider_key():
+            return True
+
+        # Check for Ollama availability
+        if await app.config_manager.is_ollama_enabled():
+            config = await app.config_manager.load()
+            if await has_ollama_models_available(base_url=config.ollama.base_url):
+                return True
+
+        return False
 
     async def _start_shotgun_auth(self) -> None:
         """Launch Shotgun Account authentication flow."""

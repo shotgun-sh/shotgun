@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import TypeGuard
 
 from pydantic import BaseModel, Field, PrivateAttr, SecretStr
 from pydantic_ai.models import Model
@@ -62,6 +63,18 @@ class ModelConfig(BaseModel):
         default=True,
         description="Whether this model configuration supports streaming. False only for BYOK GPT-5 models without streaming enabled.",
     )
+    supports_pdf: bool = Field(
+        default=True,
+        description="Whether this model supports PDF file input. False for Ollama models.",
+    )
+    supports_images: bool = Field(
+        default=True,
+        description="Whether this model supports image file input. Depends on model capabilities for Ollama.",
+    )
+    base_url: str | None = Field(
+        default=None,
+        description="Base URL for OpenAI-compatible endpoints (e.g., Ollama). If not set, uses settings.",
+    )
     _model_instance: Model | None = PrivateAttr(default=None)
 
     class Config:
@@ -74,7 +87,7 @@ class ModelConfig(BaseModel):
             from .provider import get_or_create_model
 
             self._model_instance = get_or_create_model(
-                self.provider, self.key_provider, self.name, self.api_key
+                self.provider, self.key_provider, self.name, self.api_key, self.base_url
             )
         return self._model_instance
 
@@ -243,6 +256,71 @@ class ShotgunAccountConfig(BaseModel):
         return bool(value and value.strip())
 
 
+# Ollama model name prefix - used to identify Ollama models in config
+# Format: "ollama/<model_name>" (e.g., "ollama/llama3:8b")
+OLLAMA_MODEL_PREFIX = "ollama/"
+
+# Placeholder API key for Ollama (which doesn't require authentication)
+OLLAMA_PLACEHOLDER_API_KEY = "ollama"
+
+
+def is_ollama_model(model_name: ModelName | str | None) -> TypeGuard[str]:
+    """Check if a model name represents an Ollama model.
+
+    This is a TypeGuard that narrows the type to str when True.
+
+    Args:
+        model_name: Model name (ModelName enum, string, or None).
+
+    Returns:
+        True if model name is a string starting with the Ollama prefix.
+    """
+    return isinstance(model_name, str) and model_name.startswith(OLLAMA_MODEL_PREFIX)
+
+
+def get_ollama_model_name(prefixed_name: str) -> str:
+    """Extract the actual Ollama model name from a prefixed name.
+
+    Args:
+        prefixed_name: Model name with "ollama/" prefix.
+
+    Returns:
+        Model name without the prefix.
+    """
+    return prefixed_name.removeprefix(OLLAMA_MODEL_PREFIX)
+
+
+def get_ollama_api_base_url(base_url: str) -> str:
+    """Get the OpenAI-compatible API base URL for Ollama.
+
+    Ollama's OpenAI-compatible API is at /v1/chat/completions, so we need
+    to append /v1 to the base URL if not already present.
+
+    Args:
+        base_url: Ollama base URL (e.g., "http://localhost:11434").
+
+    Returns:
+        API base URL with /v1 suffix (e.g., "http://localhost:11434/v1").
+    """
+    base_url = base_url.rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url = f"{base_url}/v1"
+    return base_url
+
+
+class OllamaConfig(BaseModel):
+    """Configuration for local Ollama provider."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Whether Ollama is enabled as a provider",
+    )
+    base_url: str = Field(
+        default="http://localhost:11434",
+        description="Ollama API base URL",
+    )
+
+
 class MarketingMessageRecord(BaseModel):
     """Record of when a marketing message was shown to the user."""
 
@@ -265,9 +343,10 @@ class ShotgunConfig(BaseModel):
     anthropic: AnthropicConfig = Field(default_factory=AnthropicConfig)
     google: GoogleConfig = Field(default_factory=GoogleConfig)
     shotgun: ShotgunAccountConfig = Field(default_factory=ShotgunAccountConfig)
-    selected_model: ModelName | None = Field(
+    ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+    selected_model: ModelName | str | None = Field(
         default=None,
-        description="User-selected model",
+        description="User-selected model (ModelName enum or 'ollama/<model>' string)",
     )
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",

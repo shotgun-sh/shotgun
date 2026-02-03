@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from shotgun.agents.models import FileOperationTracker, FileOperationType
+from shotgun.agents.models import (
+    AgentSystemPromptContext,
+    FileOperationTracker,
+    FileOperationType,
+)
 
 
 @pytest.mark.smoke
@@ -151,3 +155,55 @@ def test_file_operation_tracker_format_summary_empty():
     tracker = FileOperationTracker()
     summary = tracker.format_summary()
     assert summary == "No files were modified during this run."
+
+
+# Tests for AgentSystemPromptContext multimodal capabilities
+
+
+def test_agent_system_prompt_context_default_capabilities():
+    """Test that AgentSystemPromptContext defaults to supporting multimodal."""
+    context = AgentSystemPromptContext(
+        interactive_mode=True,
+        mode="router",
+    )
+    assert context.supports_pdf is True
+    assert context.supports_images is True
+
+
+def test_agent_system_prompt_context_custom_capabilities():
+    """Test that AgentSystemPromptContext can have custom capabilities."""
+    context = AgentSystemPromptContext(
+        interactive_mode=True,
+        mode="router",
+        supports_pdf=False,
+        supports_images=True,
+    )
+    assert context.supports_pdf is False
+    assert context.supports_images is True
+
+
+def test_agent_system_prompt_context_no_multimodal():
+    """Test AgentSystemPromptContext with no multimodal support."""
+    context = AgentSystemPromptContext(
+        interactive_mode=True,
+        mode="router",
+        supports_pdf=False,
+        supports_images=False,
+    )
+    assert context.supports_pdf is False
+    assert context.supports_images is False
+
+
+def test_agent_system_prompt_context_model_dump_includes_capabilities():
+    """Test that model_dump includes the capability fields."""
+    context = AgentSystemPromptContext(
+        interactive_mode=True,
+        mode="router",
+        supports_pdf=False,
+        supports_images=True,
+    )
+    dumped = context.model_dump()
+    assert "supports_pdf" in dumped
+    assert "supports_images" in dumped
+    assert dumped["supports_pdf"] is False
+    assert dumped["supports_images"] is True

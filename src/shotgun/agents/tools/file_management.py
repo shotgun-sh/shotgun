@@ -194,7 +194,7 @@ def _validate_shotgun_path(filename: str) -> Path:
     display_text="Reading file",
     key_arg="filename",
 )
-async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
+async def read_file(ctx: RunContext[AgentDeps], filename: str, reason: str) -> str:
     """Read a TEXT file from the .shotgun directory.
 
     IMPORTANT: This tool is for TEXT files only (.md, .txt, .json, etc.).
@@ -206,8 +206,16 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
     Binary file extensions that require file_requests instead:
     - .pdf, .png, .jpg, .jpeg, .gif, .webp
 
+    IMPORTANT: Do NOT re-read a file you have already read in this conversation.
+    If you previously read a file and got "SUCCESS - File was read successfully",
+    you already have the content. Do not call this tool again for the same file.
+
     Args:
         filename: Relative path to file within .shotgun directory
+        reason: Brief explanation of WHY you need to read this file.
+                Examples: "Need to review the specification for user request",
+                "Checking current content before making edits",
+                "First time reading this file to understand context"
 
     Returns:
         File contents as string. For binary files, returns instructions
@@ -217,7 +225,7 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str) -> str:
         ValueError: If path is outside .shotgun directory
         FileNotFoundError: If file does not exist
     """
-    logger.debug("🔧 Reading file: %s", filename)
+    logger.info("🔧 Reading file: %s | Reason: %s", filename, reason)
 
     try:
         file_path = _validate_shotgun_path(filename)

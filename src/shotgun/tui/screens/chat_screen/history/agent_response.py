@@ -1,5 +1,7 @@
 """Agent response widget for chat history."""
 
+import re
+
 from pydantic_ai.messages import (
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
@@ -13,6 +15,25 @@ from textual.widget import Widget
 from textual.widgets import Markdown
 
 from .formatters import ToolFormatter
+
+# Regex to match <think>...</think> blocks (including partial/unclosed tags during streaming)
+# Matches: <think>content</think> or <think>content (unclosed during streaming)
+THINK_TAG_PATTERN = re.compile(r"<think>.*?</think>|<think>.*", re.DOTALL)
+
+
+def strip_thinking_tags(content: str) -> str:
+    """Remove <think>...</think> blocks from content.
+
+    Some local models (DeepSeek-R1, Qwen-QwQ, etc.) output their reasoning
+    process in <think> tags. This function strips them for cleaner display.
+
+    Args:
+        content: Text content that may contain <think> tags.
+
+    Returns:
+        Content with <think> blocks removed.
+    """
+    return THINK_TAG_PATTERN.sub("", content).strip()
 
 
 class AgentResponseWidget(Widget):
@@ -41,9 +62,11 @@ class AgentResponseWidget(Widget):
 
         for idx, part in enumerate(self.item.parts):
             if isinstance(part, TextPart):
-                # Only show the prefix if there's actual content
-                if part.content and part.content.strip():
-                    acc += f"{prefix}{part.content}\n\n"
+                # Strip <think>...</think> blocks from local model output
+                content = strip_thinking_tags(part.content) if part.content else ""
+                # Only show the prefix if there's actual content after stripping
+                if content:
+                    acc += f"{prefix}{content}\n\n"
             elif isinstance(part, ToolCallPart):
                 parts_str = ToolFormatter.format_tool_call_part(part)
                 if parts_str:  # Only add if there's actual content

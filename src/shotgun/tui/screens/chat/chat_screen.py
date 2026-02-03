@@ -41,7 +41,7 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
-from shotgun.agents.config.models import MODEL_SPECS
+from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
 from shotgun.agents.conversation.history.token_estimation import (
@@ -292,6 +292,9 @@ class ChatScreen(Screen[None]):
 
         # Bind spinner to processing state manager
         self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
+
+        # Force Drafting mode for Ollama models (experimental - Planning not supported)
+        self._ensure_ollama_drafting_mode()
 
         # Load conversation history if --continue flag was provided
         # Use call_later to handle async exists() check
@@ -614,8 +617,20 @@ class ChatScreen(Screen[None]):
             )
             return
 
-        # Toggle mode
-        if self.deps.router_mode == RouterMode.PLANNING:
+        # Check if using Ollama model - lock to Drafting mode only
+        if is_ollama_model(self.deps.llm_model.name):
+            if self.deps.router_mode == RouterMode.DRAFTING:
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message="⚠️ Local models are locked to Drafting mode (experimental)"
+                    )
+                )
+                return
+            # Allow switching TO Drafting mode, just not away from it
+            self.deps.router_mode = RouterMode.DRAFTING
+            mode_name = "Drafting"
+        elif self.deps.router_mode == RouterMode.PLANNING:
+            # Toggle mode for cloud models
             self.deps.router_mode = RouterMode.DRAFTING
             mode_name = "Drafting"
         else:
@@ -635,6 +650,25 @@ class ChatScreen(Screen[None]):
         # Update UI
         self.widget_coordinator.update_for_mode_change(self.mode)
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
+
+    def _ensure_ollama_drafting_mode(self) -> None:
+        """Ensure Ollama models are in Drafting mode on startup.
+
+        Local models don't reliably support Planning mode, so we force
+        Drafting mode when using Ollama.
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        if is_ollama_model(self.deps.llm_model.name):
+            if self.deps.router_mode != RouterMode.DRAFTING:
+                self.deps.router_mode = RouterMode.DRAFTING
+                # Show notification that mode was changed
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message="Local model detected - switched to Drafting mode (experimental)"
+                    )
+                )
 
     async def action_show_usage(self) -> None:
         usage_hint = self.agent_manager.get_usage_hint()
@@ -1433,7 +1467,12 @@ class ChatScreen(Screen[None]):
             self.widget_coordinator.update_context_indicator(analysis, result.new_model)
 
             # Get model display name for user feedback
-            model_spec = MODEL_SPECS.get(result.new_model)
+            # For Ollama models, new_model can be a string, so check if it's a ModelName first
+            model_spec = (
+                MODEL_SPECS.get(result.new_model)
+                if isinstance(result.new_model, ModelName)
+                else None
+            )
             model_display = (
                 model_spec.short_name if model_spec else str(result.new_model)
             )
@@ -1641,6 +1680,9 @@ class ChatScreen(Screen[None]):
         Returns:
             Dynamic placeholder hint based on mode and progress.
         """
+        # Check if using Ollama - show special placeholder
+        if is_ollama_model(self.deps.llm_model.name):
+            return "What would you like to work on? (local model, experimental)"
         return self.placeholder_hints.get_placeholder_for_mode(mode)
 
     def index_codebase_command(self) -> None:

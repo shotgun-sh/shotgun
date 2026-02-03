@@ -30,15 +30,23 @@ class FileReadTool(StrEnum):
 MIN_CONTENT_LENGTH = 500
 
 # Placeholder templates for each type
+# NOTE: These placeholders must clearly indicate SUCCESS to prevent models from retrying.
+# Ollama models in particular may retry file reads if the response looks like an error.
 CODEBASE_PLACEHOLDER = (
     "**File**: `{file_path}`\n"
     "**Size**: {size_bytes} bytes | **Language**: {language}\n"
-    "**Content**: [Removed for compaction - use `retrieve_code` or `file_read` to access]"
+    "**Status**: SUCCESS - File was read successfully.\n"
+    "**Content**: [Content removed for context efficiency. "
+    "The file exists and was read. Do NOT retry this read. "
+    "If you need the content again, use `retrieve_code` or `file_read`.]"
 )
 
 SHOTGUN_PLACEHOLDER = (
     "**File**: `.shotgun/{filename}`\n"
-    "**Content**: [Removed for compaction - file persisted in .shotgun/ folder]"
+    "**Status**: SUCCESS - File was read successfully.\n"
+    "**Content**: [Content removed for context efficiency. "
+    "The file exists and is persisted in the .shotgun/ folder. "
+    "Do NOT retry this read. If you need the content again, use `read_file`.]"
 )
 
 # Simple prefix for detecting file_read output format

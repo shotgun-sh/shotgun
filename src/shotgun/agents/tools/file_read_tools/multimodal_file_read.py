@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import RunContext, ToolReturn
 
 from shotgun.agents.constants import (
+    IMAGE_EXTENSIONS,
     MAX_BINARY_FILE_SIZE_BYTES,
     MAX_TEXT_FILE_SIZE_BYTES,
     MIME_TYPES,
@@ -21,6 +22,7 @@ from shotgun.agents.constants import (
 from shotgun.agents.models import AgentDeps
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
+from shotgun.utils import format_file_size
 
 logger = get_logger(__name__)
 
@@ -43,16 +45,6 @@ class MultimodalFileReadResult(BaseModel):
             return f"Error: {self.error}"
         type_info = self.mime_type if self.mime_type else self.file_type
         return f"Found: {self.file_name} ({self.file_size_bytes} bytes, {type_info})"
-
-
-def _format_file_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
 @register_tool(
@@ -84,6 +76,25 @@ async def multimodal_file_read(
         ToolReturn with file info and absolute path
     """
     logger.debug("Checking multimodal file: %s", file_path)
+
+    # Check model capabilities before proceeding
+    model_config = ctx.deps.llm_model
+    path = Path(file_path)
+    suffix = path.suffix.lower()
+
+    # Check PDF support
+    if suffix == ".pdf" and not model_config.supports_pdf:
+        return ToolReturn(
+            return_value=f"PDF files are not supported by this model ({model_config.name_str}). "
+            "Please ask the user to copy/paste relevant text content instead."
+        )
+
+    # Check image support
+    if suffix in IMAGE_EXTENSIONS and not model_config.supports_images:
+        return ToolReturn(
+            return_value=f"Image files are not supported by this model ({model_config.name_str}). "
+            "Please ask the user to describe the image content instead."
+        )
 
     try:
         # Resolve the path
@@ -131,19 +142,19 @@ async def multimodal_file_read(
                     success=False,
                     file_path=str(path),
                     file_size_bytes=file_size,
-                    error=f"File too large: {_format_file_size(file_size)} (max: {_format_file_size(max_size)})",
+                    error=f"File too large: {format_file_size(file_size)} (max: {format_file_size(max_size)})",
                 )
                 return ToolReturn(return_value=str(error_result))
 
             logger.debug(
                 "Found binary file: %s (%s, %s)",
                 path.name,
-                _format_file_size(file_size),
+                format_file_size(file_size),
                 mime_type,
             )
 
             summary = f"""{file_type} found: {path.name}
-Size: {_format_file_size(file_size)}
+Size: {format_file_size(file_size)}
 Type: {mime_type}
 Absolute path: {path}
 
@@ -160,18 +171,18 @@ The Router will then be able to load and analyze this file's content."""
                     success=False,
                     file_path=str(path),
                     file_size_bytes=file_size,
-                    error=f"File too large: {_format_file_size(file_size)} (max: {_format_file_size(max_size)})",
+                    error=f"File too large: {format_file_size(file_size)} (max: {format_file_size(max_size)})",
                 )
                 return ToolReturn(return_value=str(error_result))
 
             logger.debug(
                 "Found text file: %s (%s)",
                 path.name,
-                _format_file_size(file_size),
+                format_file_size(file_size),
             )
 
             summary = f"""Text file found: {path.name}
-Size: {_format_file_size(file_size)}
+Size: {format_file_size(file_size)}
 Extension: {suffix}
 Absolute path: {path}
 

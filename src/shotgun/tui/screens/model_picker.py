@@ -9,16 +9,42 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import Button, Label, ListItem, ListView, Static
+from textual.widgets import (
+    Button,
+    Label,
+    ListItem,
+    ListView,
+    Static,
+    TabbedContent,
+    TabPane,
+)
 
 from shotgun.agents.agent_manager import ModelConfigUpdated
 from shotgun.agents.config import ConfigManager
-from shotgun.agents.config.models import MODEL_SPECS, ModelName, ShotgunConfig
+from shotgun.agents.config.models import (
+    MODEL_SPECS,
+    OLLAMA_MODEL_PREFIX,
+    OLLAMA_PLACEHOLDER_API_KEY,
+    KeyProvider,
+    ModelConfig,
+    ModelName,
+    ProviderType,
+    ShotgunConfig,
+    get_ollama_api_base_url,
+    get_ollama_model_name,
+    is_ollama_model,
+)
 from shotgun.agents.config.provider import (
     get_default_model_for_provider,
     get_provider_model,
 )
 from shotgun.logging_config import get_logger
+from shotgun.tui.services.ollama import (
+    OllamaStatus,
+    get_ollama_status,
+    sanitize_ollama_model_name_for_id,
+)
+from shotgun.utils import format_file_size
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -64,10 +90,21 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             color: $text-accent;
         }
 
-        #model-list {
-            margin: 2 0;
+        /* Tabbed content styling */
+        #model-tabs {
+            height: auto;
+            margin: 1 0;
+        }
+
+        TabPane {
+            padding: 1;
+        }
+
+        #cloud-model-list, #local-model-list {
+            margin: 1 0;
             height: auto;
             padding: 1;
+            max-height: 15;
             & > * {
             padding: 1 0;
             }
@@ -83,6 +120,31 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         #model-actions > * {
         margin-right: 2;
         }
+
+        /* Local models tab styling */
+        #local-models-status {
+            padding: 1 0;
+            color: $text-muted;
+        }
+
+        #local-models-status.success {
+            color: $success;
+        }
+
+        #local-models-help {
+            padding: 1 0;
+            color: $text-muted;
+        }
+
+        #cloud-models-disabled-msg {
+            display: none;
+            padding: 1;
+            color: $text-muted;
+        }
+
+        #cloud-models-disabled-msg.visible {
+            display: block;
+        }
     """
 
     BINDINGS = [
@@ -90,6 +152,8 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     ]
 
     selected_model: reactive[ModelName] = reactive(ModelName.GPT_5_1)
+    selected_ollama_model: reactive[str | None] = reactive(None)
+    ollama_status: reactive[OllamaStatus | None] = reactive(None)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
@@ -98,14 +162,27 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 "Select the AI model you want to use for your tasks.",
                 id="model-picker-summary",
             )
-        yield ListView(id="model-list")
+
+        with TabbedContent(id="model-tabs"):
+            with TabPane("Cloud Models", id="cloud-models-tab"):
+                yield Static(
+                    "No API keys configured. Add keys in Provider Setup to use cloud models.",
+                    id="cloud-models-disabled-msg",
+                )
+                yield ListView(id="cloud-model-list")
+
+            with TabPane("Local Models", id="local-models-tab"):
+                yield Static("Checking Ollama status...", id="local-models-status")
+                yield ListView(id="local-model-list")
+                yield Static("", id="local-models-help")
+
         yield Label("", id="model-picker-status")
         with Horizontal(id="model-actions"):
             yield Button("Select \\[ENTER]", variant="primary", id="select")
             yield Button("Done \\[ESC]", id="done")
 
     async def _rebuild_model_list(self) -> None:
-        """Rebuild the model list from current config.
+        """Rebuild the cloud model list from current config.
 
         This method is called both on first show and when screen is resumed
         to ensure the list always reflects the current configuration.
@@ -116,21 +193,55 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         config_manager = self.config_manager
         config = await config_manager.load(force_reload=True)
 
+        # Check if any cloud provider keys are configured
+        has_cloud_keys = (
+            config_manager._provider_has_api_key(config.openai)
+            or config_manager._provider_has_api_key(config.anthropic)
+            or config_manager._provider_has_api_key(config.google)
+            or config_manager._provider_has_api_key(config.shotgun)
+        )
+
         # Log provider key status
         logger.debug(
-            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s",
+            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s, has_any=%s",
             config_manager._provider_has_api_key(config.openai),
             config_manager._provider_has_api_key(config.anthropic),
             config_manager._provider_has_api_key(config.google),
             config_manager._provider_has_api_key(config.shotgun),
+            has_cloud_keys,
         )
 
+        # Update cloud models tab state
+        cloud_tab = self.query_one("#cloud-models-tab", TabPane)
+        cloud_list = self.query_one("#cloud-model-list", ListView)
+        disabled_msg = self.query_one("#cloud-models-disabled-msg", Static)
+
+        if has_cloud_keys:
+            cloud_tab.disabled = False
+            cloud_list.display = True
+            disabled_msg.remove_class("visible")
+        else:
+            cloud_tab.disabled = True
+            cloud_list.display = False
+            disabled_msg.add_class("visible")
+            # Switch to local models tab if cloud is disabled
+            tabs = self.query_one("#model-tabs", TabbedContent)
+            tabs.active = "local-models-tab"
+
         current_model = config.selected_model or get_default_model_for_provider(config)
-        self.selected_model = current_model
+        # Handle both cloud models (ModelName enum) and Ollama models (strings)
+        if is_ollama_model(current_model):
+            # Ollama model - extract model name without prefix for display
+            self.selected_ollama_model = get_ollama_model_name(current_model)
+        elif isinstance(current_model, ModelName):
+            self.selected_model = current_model
+        else:
+            # Default fallback for unknown string models
+            self.selected_model = get_default_model_for_provider(config)
         logger.debug("Current selected model: %s", current_model)
 
-        # Rebuild the model list with current available models
-        list_view = self.query_one(ListView)
+        # Rebuild the cloud model list with current available models
+        list_view = self.query_one("#cloud-model-list", ListView)
 
         # Remove all existing items
         old_count = len(list(list_view.children))
@@ -156,10 +267,69 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                                 list_view.index = i
                                 break
 
+        # Also refresh local models
+        await self._refresh_local_models(config)
+
+    async def _refresh_local_models(self, config: ShotgunConfig | None = None) -> None:
+        """Refresh the local models tab with Ollama models."""
+        if config is None:
+            config = await self.config_manager.load(force_reload=False)
+
+        status_label = self.query_one("#local-models-status", Static)
+        list_view = self.query_one("#local-model-list", ListView)
+        help_text = self.query_one("#local-models-help", Static)
+
+        # Clear existing items
+        list_view.clear()
+
+        # Check if Ollama is enabled
+        if not config.ollama.enabled:
+            status_label.update("Ollama is not enabled")
+            status_label.remove_class("success")
+            list_view.display = False
+            help_text.update("Enable Ollama in Provider Setup to use local models")
+            return
+
+        # Check Ollama status
+        status = await get_ollama_status(base_url=config.ollama.base_url)
+        self.ollama_status = status
+
+        if not status.running:
+            status_label.update("Ollama is not running")
+            status_label.remove_class("success")
+            list_view.display = False
+            help_text.update("Start Ollama with: ollama serve")
+            return
+
+        if not status.models:
+            status_label.update("No Ollama models installed")
+            status_label.remove_class("success")
+            list_view.display = False
+            help_text.update("Install a model with: ollama pull <model-name>")
+            return
+
+        # Ollama is running and has models
+        status_label.update(f"● {len(status.models)} model(s) available")
+        status_label.add_class("success")
+        list_view.display = True
+        help_text.update("")
+
+        # Add model items, deduplicating by sanitized ID to avoid duplicate DOM IDs
+        seen_ids: set[str] = set()
+        for model in status.models:
+            safe_id = sanitize_ollama_model_name_for_id(model.name)
+            if safe_id in seen_ids:
+                logger.debug("Skipping duplicate Ollama model ID: %s", safe_id)
+                continue
+            seen_ids.add(safe_id)
+            size_str = format_file_size(model.size)
+            label = Label(f"{model.name} · {size_str}")
+            list_view.append(ListItem(label, id=f"ollama-model-{safe_id}"))
+
     def on_show(self) -> None:
         """Rebuild model list when screen is first shown."""
         logger.debug("ModelPickerScreen.on_show() called")
-        self.run_worker(self._rebuild_model_list(), exclusive=False)
+        self.run_worker(self._rebuild_model_list(), exclusive=True)
 
     def on_screenresume(self) -> None:
         """Rebuild model list when screen is resumed (subsequent visits).
@@ -168,31 +338,65 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         ensuring the model list reflects any config changes made while away.
         """
         logger.debug("ModelPickerScreen.on_screenresume() called")
-        self.run_worker(self._rebuild_model_list(), exclusive=False)
+        self.run_worker(self._rebuild_model_list(), exclusive=True)
 
     def action_done(self) -> None:
         self.dismiss()
 
-    @on(ListView.Highlighted)
-    def _on_model_highlighted(self, event: ListView.Highlighted) -> None:
+    @on(ListView.Highlighted, "#cloud-model-list")
+    def _on_cloud_model_highlighted(self, event: ListView.Highlighted) -> None:
         model_name = self._model_from_item(event.item)
         if model_name:
             self.selected_model = model_name
+            self.selected_ollama_model = None  # Clear ollama selection
 
-    @on(ListView.Selected)
-    def _on_model_selected(self, event: ListView.Selected) -> None:
+    @on(ListView.Selected, "#cloud-model-list")
+    def _on_cloud_model_selected(self, event: ListView.Selected) -> None:
         model_name = self._model_from_item(event.item)
         if model_name:
             self.selected_model = model_name
-            self._select_model()
+            self.selected_ollama_model = None
+            self._select_cloud_model()
+
+    @on(ListView.Highlighted, "#local-model-list")
+    def _on_local_model_highlighted(self, event: ListView.Highlighted) -> None:
+        ollama_model = self._ollama_model_from_item(event.item)
+        if ollama_model:
+            self.selected_ollama_model = ollama_model
+
+    @on(ListView.Selected, "#local-model-list")
+    def _on_local_model_selected(self, event: ListView.Selected) -> None:
+        ollama_model = self._ollama_model_from_item(event.item)
+        if ollama_model:
+            self.selected_ollama_model = ollama_model
+            self._select_ollama_model()
 
     @on(Button.Pressed, "#select")
     def _on_select_pressed(self) -> None:
-        self._select_model()
+        # Check which tab is active and select accordingly
+        tabs = self.query_one("#model-tabs", TabbedContent)
+        if tabs.active == "local-models-tab" and self.selected_ollama_model:
+            self._select_ollama_model()
+        else:
+            self._select_cloud_model()
 
     @on(Button.Pressed, "#done")
     def _on_done_pressed(self) -> None:
         self.action_done()
+
+    def _ollama_model_from_item(self, item: ListItem | None) -> str | None:
+        """Get Ollama model name from a ListItem."""
+        if item is None or item.id is None:
+            return None
+        if not item.id.startswith("ollama-model-"):
+            return None
+        # The ID is sanitized, need to find original model name from status
+        sanitized_id = item.id.removeprefix("ollama-model-")
+        if self.ollama_status and self.ollama_status.models:
+            for model in self.ollama_status.models:
+                if sanitize_ollama_model_name_for_id(model.name) == sanitized_id:
+                    return model.name
+        return None
 
     @property
     def config_manager(self) -> ConfigManager:
@@ -209,17 +413,23 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         config = await self.config_manager.load(force_reload=True)
         current_model = config.selected_model or get_default_model_for_provider(config)
 
-        # Update labels for available models only
+        # Update labels for available cloud models only
         for model_name in AVAILABLE_MODELS:
             # Pass config to avoid multiple force reloads
             if not self._is_model_available(model_name, config):
                 continue
-            label = self.query_one(
-                f"#label-{_sanitize_model_name_for_id(model_name)}", Label
-            )
-            label.update(
-                self._model_label(model_name, is_current=model_name == current_model)
-            )
+            try:
+                label = self.query_one(
+                    f"#label-{_sanitize_model_name_for_id(model_name)}", Label
+                )
+                label.update(
+                    self._model_label(
+                        model_name, is_current=model_name == current_model
+                    )
+                )
+            except Exception:  # noqa: S110
+                # Label might not exist if model was filtered out
+                pass
 
     async def _build_model_items(
         self, config: ShotgunConfig | None = None
@@ -336,12 +546,12 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         }
         return names.get(model_name, model_name.value)
 
-    def _select_model(self) -> None:
-        """Save the selected model."""
-        self.run_worker(self._do_select_model(), exclusive=True)
+    def _select_cloud_model(self) -> None:
+        """Save the selected cloud model."""
+        self.run_worker(self._do_select_cloud_model(), exclusive=True)
 
-    async def _do_select_model(self) -> None:
-        """Async implementation of model selection."""
+    async def _do_select_cloud_model(self) -> None:
+        """Async implementation of cloud model selection."""
         try:
             # Get old model before updating
             config = await self.config_manager.load()
@@ -367,3 +577,62 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         except Exception as exc:  # pragma: no cover - defensive; textual path
             status_label = self.query_one("#model-picker-status", Label)
             status_label.update(f"❌ Failed to select model: {exc}")
+
+    def _select_ollama_model(self) -> None:
+        """Select an Ollama model."""
+        self.run_worker(self._do_select_ollama_model(), exclusive=True)
+
+    async def _do_select_ollama_model(self) -> None:
+        """Async implementation of Ollama model selection."""
+        if not self.selected_ollama_model:
+            return
+
+        try:
+            config = await self.config_manager.load()
+
+            # Find the OllamaModel to get its capabilities
+            supports_vision = False
+            if self.ollama_status and self.ollama_status.models:
+                for model in self.ollama_status.models:
+                    if model.name == self.selected_ollama_model:
+                        supports_vision = model.supports_vision
+                        break
+
+            # Create a ModelConfig for the Ollama model using OpenAI-compatible settings
+            # Ollama provides an OpenAI-compatible API at /v1
+            ollama_base_url = get_ollama_api_base_url(config.ollama.base_url)
+
+            # Store the model name in "ollama/<model>" format for config persistence
+            ollama_model_name = f"{OLLAMA_MODEL_PREFIX}{self.selected_ollama_model}"
+
+            model_config = ModelConfig(
+                name=ollama_model_name,
+                provider=ProviderType.OPENAI_COMPATIBLE,
+                key_provider=KeyProvider.BYOK,
+                max_input_tokens=128_000,  # Conservative default
+                max_output_tokens=16_000,  # Conservative default
+                api_key=OLLAMA_PLACEHOLDER_API_KEY,
+                supports_streaming=True,
+                supports_pdf=False,  # Ollama never supports PDFs
+                supports_images=supports_vision,  # From model capabilities
+                base_url=ollama_base_url,
+            )
+
+            # Save the selected Ollama model to config for persistence across restarts
+            await self.config_manager.update_selected_model(ollama_model_name)
+
+            # Dismiss the screen and return the model config
+            # Note: For Ollama, we return new_model as a string (not ModelName enum)
+            # The caller handles this via model_config.name
+            self.dismiss(
+                ModelConfigUpdated(
+                    old_model=config.selected_model,
+                    new_model=ollama_model_name,  # Pass the Ollama model name with prefix
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    model_config=model_config,
+                )
+            )
+        except Exception as exc:  # pragma: no cover - defensive; textual path
+            status_label = self.query_one("#model-picker-status", Label)
+            status_label.update(f"❌ Failed to select Ollama model: {exc}")

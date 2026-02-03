@@ -53,6 +53,7 @@ from shotgun.agents.config.models import (
     ProviderType,
 )
 from shotgun.agents.constants import (
+    IMAGE_EXTENSIONS,
     MAX_BINARY_FILE_SIZE_BYTES,
     MAX_TEXT_FILE_SIZE_BYTES,
     FileContent,
@@ -292,14 +293,14 @@ class ModelConfigUpdated:
 
     Attributes:
         old_model: Previous model name (None if first selection)
-        new_model: New model name
-        provider: LLM provider (OpenAI, Anthropic, Google)
+        new_model: New model name (ModelName enum or string for OpenAI-compatible)
+        provider: LLM provider (OpenAI, Anthropic, Google, OpenAI-compatible)
         key_provider: Authentication method (BYOK or Shotgun)
         model_config: Complete model configuration
     """
 
-    old_model: ModelName | None
-    new_model: ModelName
+    old_model: ModelName | str | None  # String for Ollama/OpenAI-compatible models
+    new_model: ModelName | str  # String for Ollama/OpenAI-compatible models
     provider: ProviderType
     key_provider: KeyProvider
     model_config: ModelConfig
@@ -541,6 +542,7 @@ class AgentManager(Widget):
         This method is called by the TUI after FileRequestPendingMessage is received.
         It loads the requested files as BinaryContent (for PDFs/images) or strings
         (for text files) and clears the pending state.
+        Files that are unsupported by the current model are filtered out.
 
         Returns:
             List of (file_path, FileContent) tuples for files that were successfully loaded.
@@ -549,17 +551,31 @@ class AgentManager(Widget):
         if not self._file_request_pending:
             return []
 
+        # Get model capabilities
+        model_config = self.deps.llm_model if self.deps else None
+        supports_pdf = model_config.supports_pdf if model_config else True
+        supports_images = model_config.supports_images if model_config else True
+
         loaded_files: list[tuple[str, FileContent]] = []
         total_requested = len(self._pending_file_requests)
 
         for file_path_str in self._pending_file_requests:
             try:
                 path = Path(file_path_str).expanduser().resolve()
+                suffix = path.suffix.lower()
+
+                # Filter out unsupported file types based on model capabilities
+                if suffix == ".pdf" and not supports_pdf:
+                    logger.warning(f"Skipping PDF {path} - not supported by model")
+                    continue
+                if suffix in IMAGE_EXTENSIONS and not supports_images:
+                    logger.warning(f"Skipping image {path} - not supported by model")
+                    continue
+
                 if not path.exists():
                     logger.warning(f"Requested file not found: {path}")
                     continue
 
-                suffix = path.suffix.lower()
                 file_size = path.stat().st_size
 
                 # Handle binary files (PDF, images)

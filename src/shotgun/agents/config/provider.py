@@ -1,10 +1,14 @@
 """Provider management for LLM configuration."""
 
+from copy import deepcopy
+
 from pydantic import SecretStr
+from pydantic_ai._json_schema import JsonSchema, JsonSchemaTransformer
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
+from pydantic_ai.profiles import ModelProfile
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -19,19 +23,92 @@ from shotgun.logging_config import get_logger
 from .manager import get_config_manager
 from .models import (
     MODEL_SPECS,
+    OLLAMA_PLACEHOLDER_API_KEY,
     KeyProvider,
     ModelConfig,
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_ollama_api_base_url,
+    get_ollama_model_name,
     get_sub_agent_model,
+    is_ollama_model,
 )
 from .streaming_test import check_streaming_capability
 
 logger = get_logger(__name__)
 
+
+class OllamaCompatibleJsonSchemaTransformer(JsonSchemaTransformer):
+    """JSON schema transformer optimized for Ollama/OpenAI-compatible endpoints.
+
+    This transformer:
+    1. Inlines $defs references (required for Ollama which doesn't support $ref)
+    2. Simplifies nullable unions (anyOf with null) to just the non-null type
+
+    Ollama's model templates don't support `anyOf` in tool parameter schemas,
+    which causes template errors like:
+    "template: :108:130: error calling index: reflect: slice index out of range"
+
+    This transformer converts schemas like:
+        {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}]}
+    to:
+        {"type": "array", "items": {"type": "string"}}
+    """
+
+    def __init__(self, schema: JsonSchema, *, strict: bool | None = None):
+        super().__init__(schema, strict=strict, prefer_inlined_defs=True)
+
+    def transform(self, schema: JsonSchema) -> JsonSchema:
+        """Transform the schema to be compatible with Ollama."""
+        # Remove anyOf nullable unions - Ollama doesn't support them
+        if "anyOf" in schema:
+            schema = self._simplify_anyof_nullable(schema)
+        if "oneOf" in schema:
+            schema = self._simplify_oneof_nullable(schema)
+        return schema
+
+    def _simplify_anyof_nullable(self, schema: JsonSchema) -> JsonSchema:
+        """Simplify anyOf nullable unions to just the non-null type."""
+        any_of = schema.get("anyOf", [])
+        if len(any_of) == 2:
+            # Check if one is null type
+            non_null_schemas = [s for s in any_of if s.get("type") != "null"]
+            null_schemas = [s for s in any_of if s.get("type") == "null"]
+
+            if len(null_schemas) == 1 and len(non_null_schemas) == 1:
+                # This is a nullable union - use just the non-null schema
+                result: JsonSchema = deepcopy(non_null_schemas[0])
+                # Preserve other fields from the original schema (like default, description)
+                for key, value in schema.items():
+                    if key != "anyOf" and key not in result:
+                        result[key] = value
+                return result
+
+        # Not a simple nullable union, keep as-is (may cause issues with Ollama)
+        return schema
+
+    def _simplify_oneof_nullable(self, schema: JsonSchema) -> JsonSchema:
+        """Simplify oneOf nullable unions to just the non-null type."""
+        one_of = schema.get("oneOf", [])
+        if len(one_of) == 2:
+            non_null_schemas = [s for s in one_of if s.get("type") != "null"]
+            null_schemas = [s for s in one_of if s.get("type") == "null"]
+
+            if len(null_schemas) == 1 and len(non_null_schemas) == 1:
+                result: JsonSchema = deepcopy(non_null_schemas[0])
+                for key, value in schema.items():
+                    if key != "oneOf" and key not in result:
+                        result[key] = value
+                return result
+
+        return schema
+
+
 # Global cache for Model instances (singleton pattern)
-_model_cache: dict[tuple[ProviderType, KeyProvider, ModelName | str, str], Model] = {}
+_model_cache: dict[
+    tuple[ProviderType, KeyProvider, ModelName | str, str, str | None], Model
+] = {}
 
 # Module-level model override for OpenAI-compatible mode (set via --model CLI flag)
 _openai_compat_model_override: str | None = None
@@ -66,36 +143,57 @@ def set_openai_compat_sub_agent_model(model: str | None) -> None:
 
 
 def _create_openai_compat_model(
-    api_key: str, model_name: str, max_tokens: int
+    api_key: str, model_name: str, max_tokens: int, base_url: str | None = None
 ) -> Model:
     """Create a model for OpenAI-compatible endpoints.
 
-    Uses the SHOTGUN_OPENAI_COMPAT_BASE_URL from settings to configure
-    the LiteLLM provider with a custom base URL.
+    Uses the provided base_url or falls back to SHOTGUN_OPENAI_COMPAT_BASE_URL
+    from settings to configure the provider with a custom base URL.
 
     Args:
         api_key: API key for the endpoint
-        model_name: Name of the model to use
+        model_name: Name of the model to use (may include "ollama/" prefix)
         max_tokens: Maximum output tokens
+        base_url: Base URL for the endpoint (optional, falls back to settings)
 
     Returns:
         Configured OpenAI-compatible Model instance
     """
     from shotgun.settings import settings
 
-    base_url = settings.openai_compat.base_url
     if not base_url:
-        raise ValueError(
-            "SHOTGUN_OPENAI_COMPAT_BASE_URL is required for OpenAI-compatible mode"
-        )
+        base_url = settings.openai_compat.base_url
+    if not base_url:
+        raise ValueError("base_url is required for OpenAI-compatible mode")
+
+    # Strip "ollama/" prefix if present - Ollama expects just the model name
+    # The prefix is used internally to identify Ollama models in the config
+    is_ollama = is_ollama_model(model_name)
+    if is_ollama:
+        model_name = get_ollama_model_name(model_name)
+        # Ensure the base URL includes /v1 for OpenAI compatibility
+        base_url = get_ollama_api_base_url(base_url)
 
     # Use OpenAI provider with custom base_url
     openai_provider = OpenAIProvider(api_key=api_key, base_url=base_url)
+
+    # Create a profile that handles Ollama/OpenAI-compatible schema limitations:
+    # - Inlines $defs references (Ollama doesn't support $ref)
+    # - Simplifies nullable anyOf unions (Ollama templates don't support anyOf)
+    compat_profile = ModelProfile(
+        json_schema_transformer=OllamaCompatibleJsonSchemaTransformer,
+    )
+
+    logger.info(
+        "Creating OpenAI-compatible model with OllamaCompatibleJsonSchemaTransformer: %s",
+        model_name,
+    )
 
     # Use OpenAIChatModel for broad compatibility with OpenAI-compatible APIs
     return OpenAIChatModel(
         model_name,
         provider=openai_provider,
+        profile=compat_profile,
         settings=ModelSettings(max_tokens=max_tokens),
     )
 
@@ -133,6 +231,7 @@ def get_or_create_model(
     key_provider: "KeyProvider",
     model_name: ModelName | str,
     api_key: str,
+    base_url: str | None = None,
 ) -> Model:
     """Get or create a singleton Model instance.
 
@@ -141,6 +240,7 @@ def get_or_create_model(
         key_provider: Authentication method (byok or shotgun)
         model_name: Name of the model
         api_key: API key for the provider
+        base_url: Base URL for OpenAI-compatible endpoints (optional)
 
     Returns:
         Cached or newly created Model instance
@@ -148,7 +248,7 @@ def get_or_create_model(
     Raises:
         ValueError: If provider is not supported
     """
-    cache_key = (provider, key_provider, model_name, api_key)
+    cache_key = (provider, key_provider, model_name, api_key, base_url)
 
     if cache_key not in _model_cache:
         logger.debug(
@@ -170,10 +270,10 @@ def get_or_create_model(
                 ProviderType.OPENAI_COMPATIBLE: 16_000,
             }.get(provider, 16_000)
 
-        # Handle OpenAI-compatible endpoints (uses settings for base_url)
+        # Handle OpenAI-compatible endpoints (uses provided base_url or settings)
         if provider == ProviderType.OPENAI_COMPATIBLE:
             _model_cache[cache_key] = _create_openai_compat_model(
-                api_key, str(model_name), max_tokens
+                api_key, str(model_name), max_tokens, base_url
             )
             return _model_cache[cache_key]
 
@@ -334,13 +434,20 @@ async def get_provider_model(
                 ProviderType.ANTHROPIC: ModelName.CLAUDE_SONNET_4_5,
                 ProviderType.GOOGLE: ModelName.GEMINI_3_FLASH_PREVIEW,
             }
-            model_name = provider_defaults.get(
-                provider_or_model,
-                config.selected_model or get_default_model_for_provider(config),
+            # For provider-based requests, use selected ModelName or default
+            selected = (
+                config.selected_model
+                if isinstance(config.selected_model, ModelName)
+                else get_default_model_for_provider(config)
             )
+            model_name = provider_defaults.get(provider_or_model, selected)
         else:
             # No specific model requested - use selected or default
-            model_name = config.selected_model or get_default_model_for_provider(config)
+            # Only use selected_model if it's a ModelName enum (not Ollama string)
+            if isinstance(config.selected_model, ModelName):
+                model_name = config.selected_model
+            else:
+                model_name = get_default_model_for_provider(config)
 
         # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
         if model_name not in MODEL_SPECS:
@@ -371,6 +478,27 @@ async def get_provider_model(
             supports_streaming=True,  # Shotgun accounts always support streaming
         )
 
+    # Priority 1.5: Check for Ollama model (selected via TUI)
+    # Handle when user has selected an Ollama model without any cloud API keys
+    if is_ollama_model(config.selected_model) and config.ollama.enabled:
+        # is_ollama_model TypeGuard narrows type to str
+        ollama_model = config.selected_model
+        logger.info(
+            "Using Ollama model from config: %s (base_url: %s)",
+            ollama_model,
+            config.ollama.base_url,
+        )
+        return ModelConfig(
+            name=ollama_model,
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            key_provider=KeyProvider.BYOK,
+            max_input_tokens=128_000,  # Reasonable default for Ollama
+            max_output_tokens=16_000,
+            api_key=OLLAMA_PLACEHOLDER_API_KEY,
+            supports_streaming=True,
+            base_url=config.ollama.base_url,
+        )
+
     # Priority 2: Fall back to individual provider keys
 
     # Check if a specific model was requested
@@ -394,7 +522,11 @@ async def get_provider_model(
             requested_model = None  # Will use provider's default model
         else:
             # No provider specified - check if user has a selected model
-            if config.selected_model and config.selected_model in MODEL_SPECS:
+            # Only use selected_model if it's a ModelName enum (not Ollama string)
+            if (
+                isinstance(config.selected_model, ModelName)
+                and config.selected_model in MODEL_SPECS
+            ):
                 selected_spec = MODEL_SPECS[config.selected_model]
                 # Only use selected model if its provider has a configured key
                 if _has_provider_key(config, selected_spec.provider):
@@ -414,6 +546,28 @@ async def get_provider_model(
                     if _has_provider_key(config, provider):
                         provider_enum = provider
                         break
+
+            # If still no provider, check if Ollama is enabled as a fallback
+            if provider_enum is None and config.ollama.enabled:
+                # User has Ollama enabled but no cloud API keys
+                # Return a placeholder config - the model will need to be selected
+                logger.info(
+                    "No cloud API keys configured, using Ollama fallback (base_url: %s)",
+                    config.ollama.base_url,
+                )
+                # Use a generic Ollama model name - user should select one from the model picker
+                return ModelConfig(
+                    name="ollama/llama3.2:latest",  # Default suggestion
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    max_input_tokens=128_000,
+                    max_output_tokens=16_000,
+                    api_key=OLLAMA_PLACEHOLDER_API_KEY,
+                    supports_streaming=True,
+                    supports_pdf=False,
+                    supports_images=False,
+                    base_url=config.ollama.base_url,
+                )
 
             if provider_enum is None:
                 raise ValueError(
