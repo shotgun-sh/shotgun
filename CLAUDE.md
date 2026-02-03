@@ -24,6 +24,12 @@ When adding new eval test cases with judge rubrics:
 
 4. **Use deterministic evaluators for structural checks** - Things like `disallowed_tools`, `disallowed_delegations`, and `response_not_contains` are better as deterministic checks since they have clear pass/fail criteria.
 
+## Architecture Documentation
+
+For detailed architecture documentation, see:
+
+- [Ollama/Local Model Support](docs/architecture/ollama-local-models.md) - How Shotgun integrates with local LLMs via Ollama
+
 ## Commit Message Convention
 
 This project enforces **Conventional Commits** specification. All commit messages MUST follow this format:
