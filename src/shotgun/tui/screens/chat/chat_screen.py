@@ -1684,7 +1684,7 @@ class ChatScreen(Screen[None]):
         """
         # Check if using Ollama - show special placeholder
         if is_ollama_model(self.deps.llm_model.name):
-            return "Local model - Drafting mode only (experimental)"
+            return "What would you like to work on? (local model, experimental)"
         return self.placeholder_hints.get_placeholder_for_mode(mode)
 
     def index_codebase_command(self) -> None:
