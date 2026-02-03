@@ -447,7 +447,7 @@ class ProviderConfigScreen(Screen[None]):
             status_label.add_class("not-running")
             # Show helpful instructions
             help_label.update(
-                "1. Load a model with 64k+ context: lms load <model> -c 65536\n"
+                "1. Load model with 128k context: lms load <model> -c 131072\n"
                 "2. Start the server: lms server start"
             )
             # Show install button when LM Studio is not running
