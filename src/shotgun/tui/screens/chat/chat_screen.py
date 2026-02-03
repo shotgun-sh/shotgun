@@ -42,6 +42,7 @@ from shotgun.agents.agent_manager import (
     ToolStreamingProgressMessage,
 )
 from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
+from shotgun.agents.config.provider import get_provider_model
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
 from shotgun.agents.conversation.history.token_estimation import (
@@ -310,6 +311,86 @@ class ChatScreen(Screen[None]):
         self.update_context_indicator()
         # Check for updates in background (after other startup tasks)
         self.call_later(self.check_for_updates)
+
+    def on_screenresume(self) -> None:
+        """Handle screen resume after returning from other screens.
+
+        This validates that the current model is still available (e.g., API keys
+        may have been removed in Provider Setup) and falls back if necessary.
+        """
+        self.run_worker(self._validate_current_model(), exclusive=True)
+
+    async def _validate_current_model(self) -> None:
+        """Validate current model is still available, fall back if not.
+
+        This handles the case where a user:
+        1. Has a cloud model selected (e.g., Sonnet 4.5)
+        2. Goes to Provider Setup and removes their API keys
+        3. Returns to chat - we need to detect the model is no longer valid
+           and fall back to Ollama if available
+        """
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        try:
+            # Get what the current valid model should be based on config
+            valid_model = await get_provider_model()
+
+            # Check if current model matches the valid model
+            current_model_name = self.deps.llm_model.name
+            valid_model_name = valid_model.name
+
+            if current_model_name != valid_model_name:
+                # Model has changed - update deps
+                old_model_display = current_model_name
+                if isinstance(current_model_name, ModelName):
+                    spec = MODEL_SPECS.get(current_model_name)
+                    if spec:
+                        old_model_display = spec.short_name
+
+                self.deps.llm_model = valid_model
+                self.agent_manager.deps.llm_model = valid_model
+
+                # Reset agents so they get recreated with new model
+                self.agent_manager._agents_initialized = False
+                self.agent_manager._research_agent = None
+                self.agent_manager._plan_agent = None
+                self.agent_manager._tasks_agent = None
+                self.agent_manager._specify_agent = None
+                self.agent_manager._export_agent = None
+                self.agent_manager._research_deps = None
+                self.agent_manager._plan_deps = None
+                self.agent_manager._tasks_deps = None
+                self.agent_manager._specify_deps = None
+                self.agent_manager._export_deps = None
+
+                # Get display name for new model
+                new_model_display = valid_model_name
+                if isinstance(valid_model_name, ModelName):
+                    spec = MODEL_SPECS.get(valid_model_name)
+                    if spec:
+                        new_model_display = spec.short_name
+
+                # Show notification about fallback
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message=f"⚠️ {old_model_display} no longer available, switched to {new_model_display}"
+                    )
+                )
+
+                # Update context indicator with new model
+                self.update_context_indicator()
+
+                # Ensure Ollama models are in Drafting mode
+                self._ensure_ollama_drafting_mode()
+
+        except ValueError:
+            # No valid model available at all - show error
+            self.agent_manager.add_hint_message(
+                HintMessage(
+                    message="⚠️ No AI models available. Configure API keys or enable Ollama in settings."
+                )
+            )
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key presses for cancellation."""
