@@ -161,6 +161,16 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         #ollama-setup-container Button {
             margin-right: 1;
         }
+
+        /* Disabled Ollama models (no tool support) */
+        #local-model-list ListItem.-disabled {
+            color: $text-muted;
+            text-style: italic;
+        }
+
+        #local-model-list ListItem.-disabled:hover {
+            background: transparent;
+        }
     """
 
     BINDINGS = [
@@ -358,6 +368,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         # Add model items, deduplicating by sanitized ID to avoid duplicate DOM IDs
         seen_ids: set[str] = set()
+        tool_capable_count = 0
         for model in status.models:
             safe_id = sanitize_ollama_model_name_for_id(model.name)
             if safe_id in seen_ids:
@@ -365,8 +376,28 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 continue
             seen_ids.add(safe_id)
             size_str = format_file_size(model.size)
-            label = Label(f"{model.name} · {size_str}")
-            list_view.append(ListItem(label, id=f"ollama-model-{safe_id}"))
+
+            # Check if model supports tool calling
+            if model.supports_tools:
+                label_text = f"{model.name} · {size_str}"
+                tool_capable_count += 1
+            else:
+                label_text = f"{model.name} · {size_str} · No tool support"
+
+            label = Label(label_text)
+            item = ListItem(label, id=f"ollama-model-{safe_id}")
+
+            # Disable models that don't support tools
+            if not model.supports_tools:
+                item.disabled = True
+
+            list_view.append(item)
+
+        # Update status to show how many models support tools
+        if tool_capable_count < len(status.models):
+            status_label.update(
+                f"● {tool_capable_count}/{len(status.models)} model(s) support tools (Experimental)"
+            )
 
     def on_show(self) -> None:
         """Rebuild model list when screen is first shown."""
