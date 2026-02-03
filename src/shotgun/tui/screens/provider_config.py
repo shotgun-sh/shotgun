@@ -348,6 +348,16 @@ class ProviderConfigScreen(Screen[None]):
     async def _do_update_ollama_enabled(self, enabled: bool) -> None:
         """Update Ollama enabled state in config."""
         await self.config_manager.update_ollama_enabled(enabled)
+
+        # When enabling Ollama, auto-select the first available model if no model is selected
+        if enabled and self.ollama_status and self.ollama_status.models:
+            config = await self.config_manager.load()
+            # Only auto-select if no model is currently selected
+            if not config.selected_model:
+                first_model = self.ollama_status.models[0]
+                ollama_model_name = f"ollama/{first_model.name}"
+                await self.config_manager.update_selected_model(ollama_model_name)
+
         # Update done button visibility since Ollama can now provide models
         await self._update_done_button_visibility()
 

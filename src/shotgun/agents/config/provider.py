@@ -547,6 +547,28 @@ async def get_provider_model(
                         provider_enum = provider
                         break
 
+            # If still no provider, check if Ollama is enabled as a fallback
+            if provider_enum is None and config.ollama.enabled:
+                # User has Ollama enabled but no cloud API keys
+                # Return a placeholder config - the model will need to be selected
+                logger.info(
+                    "No cloud API keys configured, using Ollama fallback (base_url: %s)",
+                    config.ollama.base_url,
+                )
+                # Use a generic Ollama model name - user should select one from the model picker
+                return ModelConfig(
+                    name="ollama/llama3.2:latest",  # Default suggestion
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    max_input_tokens=128_000,
+                    max_output_tokens=16_000,
+                    api_key=OLLAMA_PLACEHOLDER_API_KEY,
+                    supports_streaming=True,
+                    supports_pdf=False,
+                    supports_images=False,
+                    base_url=config.ollama.base_url,
+                )
+
             if provider_enum is None:
                 raise ValueError(
                     "No provider keys configured. Set via environment variables or config."
