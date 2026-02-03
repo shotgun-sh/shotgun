@@ -293,6 +293,9 @@ class ChatScreen(Screen[None]):
         # Bind spinner to processing state manager
         self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
 
+        # Force Drafting mode for Ollama models (experimental - Planning not supported)
+        self._ensure_ollama_drafting_mode()
+
         # Load conversation history if --continue flag was provided
         # Use call_later to handle async exists() check
         if self.continue_session:
@@ -647,6 +650,27 @@ class ChatScreen(Screen[None]):
         # Update UI
         self.widget_coordinator.update_for_mode_change(self.mode)
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
+
+    def _ensure_ollama_drafting_mode(self) -> None:
+        """Ensure Ollama models are in Drafting mode on startup.
+
+        Local models don't reliably support Planning mode, so we force
+        Drafting mode when using Ollama.
+        """
+        from shotgun.agents.router.models import RouterDeps, RouterMode
+
+        if not isinstance(self.deps, RouterDeps):
+            return
+
+        if is_ollama_model(self.deps.llm_model.name):
+            if self.deps.router_mode != RouterMode.DRAFTING:
+                self.deps.router_mode = RouterMode.DRAFTING
+                # Show notification that mode was changed
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message="Local model detected - switched to Drafting mode (experimental)"
+                    )
+                )
 
     async def action_show_usage(self) -> None:
         usage_hint = self.agent_manager.get_usage_hint()
