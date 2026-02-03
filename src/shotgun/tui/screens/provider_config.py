@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import webbrowser
 from typing import TYPE_CHECKING, cast
 
 from textual import on
@@ -144,6 +145,14 @@ class ProviderConfigScreen(Screen[None]):
             padding: 0 1;
         }
 
+        #ollama-install-container {
+            padding: 1 0;
+        }
+
+        #ollama-install-button {
+            margin-right: 1;
+        }
+
         #done-container {
             dock: bottom;
             height: auto;
@@ -221,6 +230,16 @@ class ProviderConfigScreen(Screen[None]):
 
             with TabPane("Ollama (Local)", id="ollama-tab"):
                 yield Static("Status: Checking...", id="ollama-status")
+                with Horizontal(id="ollama-install-container"):
+                    yield Button(
+                        "Install Ollama",
+                        id="ollama-install-button",
+                        variant="primary",
+                    )
+                    yield Static(
+                        "Free, runs locally on your machine",
+                        id="ollama-install-hint",
+                    )
                 with Horizontal(id="ollama-enable-container"):
                     yield Checkbox(
                         "Enable Ollama",
@@ -295,6 +314,7 @@ class ProviderConfigScreen(Screen[None]):
     def _update_ollama_ui(self, status: OllamaStatus) -> None:
         """Update the Ollama tab UI based on status."""
         status_label = self.query_one("#ollama-status", Static)
+        install_container = self.query_one("#ollama-install-container", Horizontal)
 
         if status.running:
             model_count = len(status.models)
@@ -306,10 +326,14 @@ class ProviderConfigScreen(Screen[None]):
                 status_label.update("● Connected (no models installed)")
             status_label.remove_class("not-running")
             status_label.add_class("running")
+            # Hide install button when Ollama is running
+            install_container.display = False
         else:
-            status_label.update("○ Not connected")
+            status_label.update("○ Not connected - Install Ollama to use local models")
             status_label.remove_class("running")
             status_label.add_class("not-running")
+            # Show install button when Ollama is not running
+            install_container.display = True
 
     def action_done(self) -> None:
         self.dismiss()
@@ -342,6 +366,11 @@ class ProviderConfigScreen(Screen[None]):
     @on(Button.Pressed, "#done")
     def _on_done_pressed(self) -> None:
         self.action_done()
+
+    @on(Button.Pressed, "#ollama-install-button")
+    def _on_ollama_install_pressed(self) -> None:
+        """Open Ollama installation page in browser."""
+        webbrowser.open("https://ollama.com/download")
 
     @on(Checkbox.Changed, "#ollama-enable-checkbox")
     def _on_ollama_enable_changed(self, event: Checkbox.Changed) -> None:
