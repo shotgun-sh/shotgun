@@ -135,6 +135,16 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             padding: 1 0;
             color: $text-muted;
         }
+
+        #cloud-models-disabled-msg {
+            display: none;
+            padding: 1;
+            color: $text-muted;
+        }
+
+        #cloud-models-disabled-msg.visible {
+            display: block;
+        }
     """
 
     BINDINGS = [
@@ -155,6 +165,10 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         with TabbedContent(id="model-tabs"):
             with TabPane("Cloud Models", id="cloud-models-tab"):
+                yield Static(
+                    "No API keys configured. Add keys in Provider Setup to use cloud models.",
+                    id="cloud-models-disabled-msg",
+                )
                 yield ListView(id="cloud-model-list")
 
             with TabPane("Local Models", id="local-models-tab"):
@@ -179,14 +193,40 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         config_manager = self.config_manager
         config = await config_manager.load(force_reload=True)
 
+        # Check if any cloud provider keys are configured
+        has_cloud_keys = (
+            config_manager._provider_has_api_key(config.openai)
+            or config_manager._provider_has_api_key(config.anthropic)
+            or config_manager._provider_has_api_key(config.google)
+            or config_manager._provider_has_api_key(config.shotgun)
+        )
+
         # Log provider key status
         logger.debug(
-            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s",
+            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s, has_any=%s",
             config_manager._provider_has_api_key(config.openai),
             config_manager._provider_has_api_key(config.anthropic),
             config_manager._provider_has_api_key(config.google),
             config_manager._provider_has_api_key(config.shotgun),
+            has_cloud_keys,
         )
+
+        # Update cloud models tab state
+        cloud_tab = self.query_one("#cloud-models-tab", TabPane)
+        cloud_list = self.query_one("#cloud-model-list", ListView)
+        disabled_msg = self.query_one("#cloud-models-disabled-msg", Static)
+
+        if has_cloud_keys:
+            cloud_tab.disabled = False
+            cloud_list.display = True
+            disabled_msg.remove_class("visible")
+        else:
+            cloud_tab.disabled = True
+            cloud_list.display = False
+            disabled_msg.add_class("visible")
+            # Switch to local models tab if cloud is disabled
+            tabs = self.query_one("#model-tabs", TabbedContent)
+            tabs.active = "local-models-tab"
 
         current_model = config.selected_model or get_default_model_for_provider(config)
         # Handle both cloud models (ModelName enum) and Ollama models (strings)
