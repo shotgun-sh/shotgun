@@ -501,7 +501,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             status_label.remove_class("success")
             list_view.display = False
             help_text.update(
-                "To start: run 'lms server start' or open LM Studio → Local Server → Start"
+                "Load model with 64k+ context: lms load <model> -c 65536 && lms server start"
             )
             # Show setup buttons - both visible
             setup_container.add_class("visible")
@@ -943,8 +943,8 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 name=lm_studio_model_name,
                 provider=ProviderType.OPENAI_COMPATIBLE,
                 key_provider=KeyProvider.BYOK,
-                max_input_tokens=8_000,  # Conservative default for local models (most are 4k-8k)
-                max_output_tokens=2_000,
+                max_input_tokens=56_000,  # Assumes 64k context (lms load -c 65536)
+                max_output_tokens=8_000,
                 api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
                 supports_streaming=True,
                 supports_pdf=False,  # LM Studio doesn't support PDFs

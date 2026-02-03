@@ -523,8 +523,8 @@ async def get_provider_model(
             name=lm_studio_model,
             provider=ProviderType.OPENAI_COMPATIBLE,
             key_provider=KeyProvider.BYOK,
-            max_input_tokens=8_000,  # Conservative default for local models (most are 4k-8k)
-            max_output_tokens=2_000,
+            max_input_tokens=56_000,  # Assumes 64k context (lms load -c 65536)
+            max_output_tokens=8_000,
             api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
             supports_streaming=True,
             base_url=config.lm_studio.base_url,
@@ -613,8 +613,8 @@ async def get_provider_model(
                     name="lmstudio/default",  # Default suggestion
                     provider=ProviderType.OPENAI_COMPATIBLE,
                     key_provider=KeyProvider.BYOK,
-                    max_input_tokens=8_000,  # Conservative default for local models
-                    max_output_tokens=2_000,
+                    max_input_tokens=56_000,  # Assumes 64k context (lms load -c 65536)
+                    max_output_tokens=8_000,
                     api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
                     supports_streaming=True,
                     supports_pdf=False,
