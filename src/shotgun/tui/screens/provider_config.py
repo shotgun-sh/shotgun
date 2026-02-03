@@ -184,6 +184,15 @@ class ProviderConfigScreen(Screen[None]):
     selected_provider: reactive[str] = reactive("openai")
     ollama_status: reactive[OllamaStatus | None] = reactive(None)
 
+    def __init__(self, initial_tab: str = "api-providers-tab") -> None:
+        """Initialize the provider config screen.
+
+        Args:
+            initial_tab: ID of the tab to show initially ("api-providers-tab" or "ollama-tab")
+        """
+        super().__init__()
+        self._initial_tab = initial_tab
+
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
             yield Static("Provider setup", id="provider-config-title")
@@ -230,7 +239,13 @@ class ProviderConfigScreen(Screen[None]):
 
         # Hide authenticate button by default (shown only for shotgun)
         self.query_one("#authenticate", Button).display = False
-        self.set_focus(self.query_one("#api-key", Input))
+
+        # Switch to initial tab if specified
+        if self._initial_tab != "api-providers-tab":
+            tabs = self.query_one("#provider-tabs", TabbedContent)
+            tabs.active = self._initial_tab
+        else:
+            self.set_focus(self.query_one("#api-key", Input))
 
         # Refresh UI asynchronously
         self.run_worker(self._refresh_ui(), exclusive=False)
