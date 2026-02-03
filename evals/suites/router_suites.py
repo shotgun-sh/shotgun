@@ -132,6 +132,26 @@ router_document_files = EvaluationSuite(
 )
 
 # ============================================================================
+# Local Models Suite
+# Tests designed for evaluation with local LLMs (Ollama, LM Studio)
+# ============================================================================
+
+router_local_models = EvaluationSuite(
+    name="router_local_models",
+    description="Tests designed for local LLMs - simpler prompts and expectations",
+    test_case_names=[
+        "simple_greeting",
+        "local_models_clarifying_questions",
+        "bug_fix_clarifying_questions",
+        "explain_what_you_do",
+        "simple_codebase_question",
+        "simple_file_request_drafting",
+    ],
+    evaluator_names=["router_delegation", "router_correctness_judge"],
+    tags=["local_models", "router", "ollama"],
+)
+
+# ============================================================================
 # All Router Tests Suite
 # Runs all Router agent test cases
 # ============================================================================
@@ -189,6 +209,7 @@ ROUTER_SUITES: dict[str, EvaluationSuite] = {
     "router_file_write": router_file_write,
     "router_file_request": router_file_request,
     "router_document_files": router_document_files,
+    "router_local_models": router_local_models,
     "router_all": router_all,
 }
 
@@ -200,6 +221,7 @@ __all__ = [
     "router_file_write",
     "router_file_request",
     "router_document_files",
+    "router_local_models",
     "router_all",
     "ROUTER_SUITES",
 ]

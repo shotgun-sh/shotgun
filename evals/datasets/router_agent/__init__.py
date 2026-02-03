@@ -55,6 +55,15 @@ from evals.datasets.router_agent.file_write_cases import (
     FILE_WRITE_CASES,
     SPEC_REQUEST_CREATES_PLAN,
 )
+from evals.datasets.router_agent.local_model_cases import (
+    BUG_FIX_CLARIFYING_QUESTIONS,
+    EXPLAIN_WHAT_YOU_DO,
+    LOCAL_MODEL_CASES,
+    LOCAL_MODELS_CLARIFYING_QUESTIONS,
+    SIMPLE_CODEBASE_QUESTION,
+    SIMPLE_FILE_REQUEST_DRAFTING,
+    SIMPLE_GREETING,
+)
 from evals.datasets.router_agent.planning_cases import (
     COMPLEX_FEATURE_ASKS_QUESTIONS,
     FEATURE_REQUEST_ASKS_QUESTIONS,
@@ -79,6 +88,7 @@ ALL_ROUTER_CASES = {
         + FILE_WRITE_CASES
         + FILE_REQUEST_CASES
         + DOCUMENT_FILE_CASES
+        + LOCAL_MODEL_CASES
     )
 }
 
@@ -91,6 +101,7 @@ __all__ = [
     "FILE_WRITE_CASES",
     "FILE_REQUEST_CASES",
     "DOCUMENT_FILE_CASES",
+    "LOCAL_MODEL_CASES",
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
@@ -122,4 +133,11 @@ __all__ = [
     "USER_STORIES_FILE_DRAFTING_MODE",
     "WIREFRAME_IMAGE_DRAFTING_MODE",
     "SCREENSHOT_FOR_BUG_REPORT",
+    # Local model test cases
+    "SIMPLE_GREETING",
+    "LOCAL_MODELS_CLARIFYING_QUESTIONS",
+    "BUG_FIX_CLARIFYING_QUESTIONS",
+    "EXPLAIN_WHAT_YOU_DO",
+    "SIMPLE_CODEBASE_QUESTION",
+    "SIMPLE_FILE_REQUEST_DRAFTING",
 ]

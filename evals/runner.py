@@ -41,6 +41,8 @@ from evals.models import (  # noqa: E402
     AggregatedResult,
     EvaluationReport,
     EvaluationSuite,
+    JudgeModelConfig,
+    JudgeProviderType,
     JudgeType,
     ShotgunTestCase,
     TestCaseResult,
@@ -99,6 +101,9 @@ class RunnerConfig:
         enable_judge: bool = True,
         judge_concurrency: int = 1,
         timeout_seconds: float = 300.0,
+        judge_model: str | None = None,
+        ollama_model: str | None = None,
+        lmstudio_model: str | None = None,
     ) -> None:
         """Initialize runner configuration.
 
@@ -107,11 +112,17 @@ class RunnerConfig:
             enable_judge: Whether to run LLM judge evaluation
             judge_concurrency: Concurrency for judge calls (conservative default)
             timeout_seconds: Timeout per test case
+            judge_model: Model to use for judge evaluation (e.g., "claude-haiku-4-5")
+            ollama_model: Ollama model to use as test subject (e.g., "gpt-oss:20b")
+            lmstudio_model: LM Studio model to use as test subject (e.g., "gpt-oss:20b")
         """
         self.max_concurrency = max_concurrency
         self.enable_judge = enable_judge
         self.judge_concurrency = judge_concurrency
         self.timeout_seconds = timeout_seconds
+        self.judge_model = judge_model
+        self.ollama_model = ollama_model
+        self.lmstudio_model = lmstudio_model
 
 
 class EvaluationRunner:
@@ -144,16 +155,86 @@ class EvaluationRunner:
         self._file_requests_judge: FileRequestsJudge | None = None
         self.aggregator = RouterAggregator()
 
+    def _get_judge_model_config(self) -> JudgeModelConfig | None:
+        """Get JudgeModelConfig based on runner config's judge_model setting."""
+        if not self.config.judge_model:
+            return None
+
+        # Map common model names to provider and model
+        # Note: Uses real Anthropic API model names (not the fictional ModelName enum values)
+        judge_model_mappings: dict[str, tuple[JudgeProviderType, str]] = {
+            # Anthropic models - use real API model names
+            "claude-haiku-4-5": (
+                JudgeProviderType.ANTHROPIC,
+                "claude-3-5-haiku-latest",
+            ),
+            "claude-sonnet-4-5": (
+                JudgeProviderType.ANTHROPIC,
+                "claude-sonnet-4-20250514",
+            ),
+            "claude-opus-4-5": (JudgeProviderType.ANTHROPIC, "claude-opus-4-20250514"),
+            # Also support the real API names directly
+            "claude-3-5-haiku-latest": (
+                JudgeProviderType.ANTHROPIC,
+                "claude-3-5-haiku-latest",
+            ),
+            "claude-sonnet-4-20250514": (
+                JudgeProviderType.ANTHROPIC,
+                "claude-sonnet-4-20250514",
+            ),
+            # Google models
+            "gemini-2.5-flash-lite": (
+                JudgeProviderType.GEMINI,
+                "gemini-2.5-flash-lite",
+            ),
+            "gemini-3-flash-preview": (
+                JudgeProviderType.GEMINI,
+                "gemini-3-flash-preview",
+            ),
+            "gemini-3-pro-preview": (JudgeProviderType.GEMINI, "gemini-3-pro-preview"),
+            # OpenAI models
+            "gpt-5.1": (JudgeProviderType.OPENAI, "gpt-5.1"),
+            "gpt-5.2": (JudgeProviderType.OPENAI, "gpt-5.2"),
+        }
+
+        if self.config.judge_model in judge_model_mappings:
+            provider, model_name = judge_model_mappings[self.config.judge_model]
+            return JudgeModelConfig(
+                provider=provider,
+                model_name=model_name,
+                temperature=0.2,
+                max_tokens=2000,
+            )
+
+        # If not a known model, try to parse as provider:model format
+        if ":" in self.config.judge_model:
+            provider_str, model_name = self.config.judge_model.split(":", 1)
+            try:
+                provider = JudgeProviderType(provider_str)
+                return JudgeModelConfig(
+                    provider=provider,
+                    model_name=model_name,
+                    temperature=0.2,
+                    max_tokens=2000,
+                )
+            except ValueError:
+                pass
+
+        logger.warning(f"Unknown judge model: {self.config.judge_model}, using default")
+        return None
+
     def _get_router_judge(self) -> RouterQualityJudge:
         """Get or create the RouterQualityJudge instance."""
         if self._router_judge is None:
-            self._router_judge = RouterQualityJudge()
+            model_config = self._get_judge_model_config()
+            self._router_judge = RouterQualityJudge(model_config=model_config)
         return self._router_judge
 
     def _get_file_requests_judge(self) -> FileRequestsJudge:
         """Get or create the FileRequestsJudge instance."""
         if self._file_requests_judge is None:
-            self._file_requests_judge = FileRequestsJudge()
+            model_config = self._get_judge_model_config()
+            self._file_requests_judge = FileRequestsJudge(model_config=model_config)
         return self._file_requests_judge
 
     async def run_suite(
@@ -310,6 +391,10 @@ class EvaluationRunner:
         semaphore = asyncio.Semaphore(self.config.max_concurrency)
         judge_semaphore = asyncio.Semaphore(self.config.judge_concurrency)
 
+        # Get local model from config (set via CLI)
+        ollama_model = self.config.ollama_model
+        lmstudio_model = self.config.lmstudio_model
+
         async def run_single(
             test_case: ShotgunTestCase,
         ) -> tuple[AggregatedResult, AgentExecutionOutput]:
@@ -320,6 +405,8 @@ class EvaluationRunner:
                     evaluator_names,
                     judge_semaphore,
                     model_override,
+                    ollama_model,
+                    lmstudio_model,
                 )
 
         tasks = [run_single(tc) for tc in test_cases]
@@ -332,6 +419,8 @@ class EvaluationRunner:
         evaluator_names: list[str],
         judge_semaphore: asyncio.Semaphore,
         model_override: ModelName | None = None,
+        ollama_model: str | None = None,
+        lmstudio_model: str | None = None,
     ) -> tuple[AggregatedResult, AgentExecutionOutput]:
         """Execute and evaluate a single test case.
 
@@ -341,6 +430,8 @@ class EvaluationRunner:
             evaluator_names: Names of evaluators to apply (determines which judge to use)
             judge_semaphore: Semaphore for judge concurrency
             model_override: Optional model to use instead of the default
+            ollama_model: Optional Ollama model string (e.g., "gpt-oss:20b")
+            lmstudio_model: Optional LM Studio model string (e.g., "gpt-oss:20b")
 
         Returns:
             Tuple of (AggregatedResult, AgentExecutionOutput)
@@ -350,10 +441,12 @@ class EvaluationRunner:
             test_case_name=test_case.name,
             suite_name=suite_name,
             model_override=model_override.value if model_override else None,
+            ollama_model=ollama_model,
+            lmstudio_model=lmstudio_model,
         ):
             # Execute the test case
             execution_result: ExecutionResult = await self.executor.execute_case(
-                test_case, suite_name, model_override
+                test_case, suite_name, model_override, ollama_model, lmstudio_model
             )
 
             # Handle execution errors
@@ -517,6 +610,14 @@ def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     # Build available model choices from MODEL_SPECS
     available_models = [m.value for m in ModelName]
+    available_judge_models = [
+        "claude-haiku-4-5",
+        "claude-sonnet-4-5",
+        "claude-opus-4-5",
+        "gemini-2.5-flash-lite",
+        "gemini-3-flash-preview",
+        "gpt-5.1",
+    ]
 
     parser = argparse.ArgumentParser(
         description="Run Router agent evaluation suites",
@@ -534,8 +635,13 @@ Model comparison examples:
     python -m evals.runner --suite router_smoke --models anthropic
     python -m evals.runner --suite router_smoke --models fast
 
+Ollama model evaluation:
+    python -m evals.runner --case simple_greeting --ollama-model gpt-oss:20b --judge-model claude-haiku-4-5
+    python -m evals.runner --suite router_local_models --ollama-model llama3:8b --judge-model gemini-2.5-flash-lite
+
 Available models: {", ".join(available_models)}
 Available presets: {", ".join(MODEL_PRESETS.keys())}
+Available judge models: {", ".join(available_judge_models)}
         """,
     )
 
@@ -545,7 +651,7 @@ Available presets: {", ".join(MODEL_PRESETS.keys())}
     selection.add_argument("--tag", help="Run all suites matching a tag")
     selection.add_argument("--case", help="Run a single test case")
 
-    # Model selection options
+    # Model selection options (cloud models)
     model_group = parser.add_mutually_exclusive_group()
     model_group.add_argument(
         "--model",
@@ -558,6 +664,26 @@ Available presets: {", ".join(MODEL_PRESETS.keys())}
         "--models",
         choices=list(MODEL_PRESETS.keys()),
         help="Model preset to evaluate (e.g., 'anthropic', 'fast', 'all')",
+    )
+    model_group.add_argument(
+        "--ollama-model",
+        type=str,
+        dest="ollama_model",
+        help="Ollama model to evaluate (e.g., 'gpt-oss:20b', 'llama3:8b')",
+    )
+    model_group.add_argument(
+        "--lmstudio-model",
+        type=str,
+        dest="lmstudio_model",
+        help="LM Studio model to evaluate (e.g., 'gpt-oss:20b')",
+    )
+
+    # Judge model selection
+    parser.add_argument(
+        "--judge-model",
+        type=str,
+        dest="judge_model",
+        help=f"Model to use for LLM judge evaluation (e.g., {', '.join(available_judge_models[:3])})",
     )
 
     # Output options
@@ -603,7 +729,14 @@ def get_models_to_run(args: argparse.Namespace) -> list[ModelName]:
 
     Returns:
         List of ModelName enums to evaluate. Empty list means use default model.
+        Note: Returns empty list when using --ollama-model (handled separately).
     """
+    # If using local model (Ollama or LM Studio), return empty list (handled separately)
+    if hasattr(args, "ollama_model") and args.ollama_model:
+        return []
+    if hasattr(args, "lmstudio_model") and args.lmstudio_model:
+        return []
+
     if args.model_list:
         # Individual models specified
         return [ModelName(m) for m in args.model_list]
@@ -625,11 +758,18 @@ async def main() -> int:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    # Get local model if specified
+    ollama_model = getattr(args, "ollama_model", None)
+    lmstudio_model = getattr(args, "lmstudio_model", None)
+
     # Create runner config
     config = RunnerConfig(
         max_concurrency=args.concurrency,
         enable_judge=not args.no_judge,
         judge_concurrency=args.judge_concurrency,
+        judge_model=getattr(args, "judge_model", None),
+        ollama_model=ollama_model,
+        lmstudio_model=lmstudio_model,
     )
 
     # Create runner
@@ -641,36 +781,66 @@ async def main() -> int:
     try:
         reports: list[EvaluationReport] = []
 
-        # If no models specified, run with default
-        if not models_to_run:
-            models_to_run_iter: list[ModelName | None] = [None]
-        else:
-            models_to_run_iter = models_to_run  # type: ignore[assignment]
+        # Special handling for local models (single run, no model_override loop)
+        if ollama_model or lmstudio_model:
+            local_model = ollama_model or lmstudio_model
+            model_type = "Ollama" if ollama_model else "LM Studio"
+            print(f"\n{'=' * 60}")
+            print(f"Running evaluation with {model_type} model: {local_model}")
+            if config.judge_model:
+                print(f"Using judge model: {config.judge_model}")
+            print(f"{'=' * 60}\n")
 
-        # Run evaluation for each model
-        for model_override in models_to_run_iter:
-            if model_override:
-                print(f"\n{'=' * 60}")
-                print(f"Running evaluation with model: {model_override.value}")
-                print(f"{'=' * 60}\n")
-
-            # Run based on selection
+            # Run based on selection (model_override=None since local model is in config)
             if args.suite:
-                report = await runner.run_suite(args.suite, model_override)
+                report = await runner.run_suite(args.suite, None)
             elif args.tag:
-                report = await runner.run_by_tag(args.tag, model_override)
+                report = await runner.run_by_tag(args.tag, None)
             elif args.case:
-                report = await runner.run_single_case(args.case, model_override)
+                report = await runner.run_single_case(args.case, None)
             else:
                 print("Error: Must specify --suite, --tag, or --case", file=sys.stderr)
                 return 1
 
             reports.append(report)
 
-            # Output individual report
+            # Output report for local model evaluation
             if args.report in ("console", "both"):
                 console_reporter = ConsoleReporter()
                 console_reporter.print_report(report)
+        else:
+            # If no models specified, run with default
+            if not models_to_run:
+                models_to_run_iter: list[ModelName | None] = [None]
+            else:
+                models_to_run_iter = models_to_run  # type: ignore[assignment]
+
+            # Run evaluation for each model
+            for model_override in models_to_run_iter:
+                if model_override:
+                    print(f"\n{'=' * 60}")
+                    print(f"Running evaluation with model: {model_override.value}")
+                    print(f"{'=' * 60}\n")
+
+                # Run based on selection
+                if args.suite:
+                    report = await runner.run_suite(args.suite, model_override)
+                elif args.tag:
+                    report = await runner.run_by_tag(args.tag, model_override)
+                elif args.case:
+                    report = await runner.run_single_case(args.case, model_override)
+                else:
+                    print(
+                        "Error: Must specify --suite, --tag, or --case", file=sys.stderr
+                    )
+                    return 1
+
+                reports.append(report)
+
+                # Output individual report
+                if args.report in ("console", "both"):
+                    console_reporter = ConsoleReporter()
+                    console_reporter.print_report(report)
 
         # If multiple models were run, print comparison report
         if len(reports) > 1:

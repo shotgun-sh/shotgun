@@ -120,6 +120,8 @@ class RouterExecutor:
         test_case: ShotgunTestCase,
         suite_name: str = "default",
         model_override: ModelName | None = None,
+        ollama_model: str | None = None,
+        lmstudio_model: str | None = None,
     ) -> ExecutionResult:
         """
         Execute a single test case and capture outputs.
@@ -130,6 +132,8 @@ class RouterExecutor:
             test_case: The test case to execute
             suite_name: Name of the evaluation suite for trace metadata
             model_override: Optional model to use instead of the default
+            ollama_model: Optional Ollama model string (e.g., "gpt-oss:20b")
+            lmstudio_model: Optional LM Studio model string (e.g., "gpt-oss:20b")
 
         Returns:
             ExecutionResult with captured output and trace reference
@@ -142,11 +146,15 @@ class RouterExecutor:
             suite_name=suite_name,
             agent_type=test_case.inputs.agent_type.value,
             model_override=model_override.value if model_override else None,
+            ollama_model=ollama_model,
+            lmstudio_model=lmstudio_model,
         ):
             trace_ref = get_current_trace_ref()
 
             try:
-                output = await self._execute_agent(test_case, model_override)
+                output = await self._execute_agent(
+                    test_case, model_override, ollama_model, lmstudio_model
+                )
                 return ExecutionResult(
                     test_case_name=test_case.name,
                     output=output,
@@ -169,12 +177,16 @@ class RouterExecutor:
         self,
         test_case: ShotgunTestCase,
         model_override: ModelName | None = None,
+        ollama_model: str | None = None,
+        lmstudio_model: str | None = None,
     ) -> AgentExecutionOutput:
         """Execute the agent and extract outputs.
 
         Args:
             test_case: The test case containing inputs for agent execution
             model_override: Optional model to use instead of the default
+            ollama_model: Optional Ollama model string (e.g., "gpt-oss:20b")
+            lmstudio_model: Optional LM Studio model string (e.g., "gpt-oss:20b")
 
         Returns:
             AgentExecutionOutput with all captured observations
@@ -184,13 +196,87 @@ class RouterExecutor:
 
         from shotgun.agents.agent_manager import AgentManager
         from shotgun.agents.config import get_provider_model
+        from shotgun.agents.config.models import (
+            LM_STUDIO_PLACEHOLDER_API_KEY,
+            OLLAMA_PLACEHOLDER_API_KEY,
+            KeyProvider,
+            ModelConfig,
+            ProviderType,
+        )
         from shotgun.agents.models import AgentDeps, AgentResponse, FileOperationTracker
         from shotgun.codebase.service import CodebaseService
         from shotgun.utils import get_shotgun_home
 
         with logfire.span("eval.execute_agent"):
-            # Get model configuration (use override if provided)
-            model_config = await get_provider_model(model_override)
+            # Get model configuration
+            # For local models (Ollama/LM Studio), we need to set up the OpenAI-compatible
+            # settings so that get_provider_model() returns the correct model in agent creation
+            from shotgun.settings import settings
+
+            if ollama_model:
+                # Configure OpenAI-compatible mode for Ollama
+                # Prepend "ollama/" prefix if not already present
+                model_name = (
+                    f"ollama/{ollama_model}"
+                    if not ollama_model.startswith("ollama/")
+                    else ollama_model
+                )
+                # Set up settings for OpenAI-compatible mode
+                # This ensures get_provider_model() uses these settings
+                settings.openai_compat.base_url = "http://localhost:11434"
+                settings.openai_compat.api_key = OLLAMA_PLACEHOLDER_API_KEY
+
+                # Set the model override so get_provider_model returns this model
+                from shotgun.agents.config.provider import set_openai_compat_model
+
+                set_openai_compat_model(model_name)
+
+                model_config = ModelConfig(
+                    name=model_name,
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    max_input_tokens=128_000,  # Reasonable default for Ollama
+                    max_output_tokens=16_000,
+                    api_key=OLLAMA_PLACEHOLDER_API_KEY,
+                    supports_streaming=True,
+                    supports_pdf=False,  # Local models typically don't support PDFs
+                    supports_images=False,  # Conservative default
+                    base_url="http://localhost:11434",  # Default Ollama URL
+                )
+                logger.info(f"Using Ollama model for eval: {model_name}")
+            elif lmstudio_model:
+                # Configure OpenAI-compatible mode for LM Studio
+                # Prepend "lmstudio/" prefix if not already present
+                model_name = (
+                    f"lmstudio/{lmstudio_model}"
+                    if not lmstudio_model.startswith("lmstudio/")
+                    else lmstudio_model
+                )
+                # Set up settings for OpenAI-compatible mode
+                settings.openai_compat.base_url = "http://localhost:1234"
+                settings.openai_compat.api_key = LM_STUDIO_PLACEHOLDER_API_KEY
+
+                # Set the model override so get_provider_model returns this model
+                from shotgun.agents.config.provider import set_openai_compat_model
+
+                set_openai_compat_model(model_name)
+
+                model_config = ModelConfig(
+                    name=model_name,
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    max_input_tokens=128_000,  # Reasonable default for LM Studio
+                    max_output_tokens=16_000,
+                    api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
+                    supports_streaming=True,
+                    supports_pdf=False,  # Local models typically don't support PDFs
+                    supports_images=False,  # Conservative default
+                    base_url="http://localhost:1234",  # Default LM Studio URL
+                )
+                logger.info(f"Using LM Studio model for eval: {model_name}")
+            else:
+                # Use standard model override
+                model_config = await get_provider_model(model_override)
 
             # Create codebase service
             storage_dir = get_shotgun_home() / "codebases"
