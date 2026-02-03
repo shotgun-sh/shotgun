@@ -24,6 +24,7 @@ class OllamaCapability(StrEnum):
 
     COMPLETION = "completion"
     VISION = "vision"
+    TOOLS = "tools"
 
 
 class OllamaModel(BaseModel):
@@ -38,6 +39,11 @@ class OllamaModel(BaseModel):
     def supports_vision(self) -> bool:
         """Check if this model supports vision/image input."""
         return OllamaCapability.VISION in self.capabilities
+
+    @property
+    def supports_tools(self) -> bool:
+        """Check if this model supports tool/function calling."""
+        return OllamaCapability.TOOLS in self.capabilities
 
 
 class OllamaStatus(BaseModel):
@@ -72,10 +78,13 @@ async def get_model_capabilities(
             data = response.json()
             # Ollama returns capabilities in model_info or details
             # The format varies, so we check multiple locations
-            capabilities: list[str] = data.get("capabilities", [])
+            capabilities: list[str] = list(data.get("capabilities", []))
+
             if not capabilities:
-                # Some versions put it in model_info
+                # Build capabilities from model_info
                 model_info = data.get("model_info", {})
+                capabilities = [OllamaCapability.COMPLETION]
+
                 if model_info:
                     # Check for vision capability markers
                     # Vision models typically have projector architecture
@@ -84,12 +93,20 @@ async def get_model_capabilities(
                         "clip" in arch.lower()
                         or OllamaCapability.VISION in str(model_info).lower()
                     ):
-                        capabilities = [
-                            OllamaCapability.COMPLETION,
-                            OllamaCapability.VISION,
-                        ]
-                    else:
-                        capabilities = [OllamaCapability.COMPLETION]
+                        capabilities.append(OllamaCapability.VISION)
+
+            # Check for tool/function calling support
+            # Ollama indicates this in the template or capabilities
+            template = data.get("template", "")
+            if OllamaCapability.TOOLS not in capabilities:
+                # Check if template has tool-related markers
+                # Models that support tools typically have {{.Tools}} in template
+                if "{{.Tools}}" in template or ".Tools" in template:
+                    capabilities.append(OllamaCapability.TOOLS)
+                # Also check if "tools" is explicitly in capabilities (newer Ollama)
+                elif "tools" in [c.lower() for c in data.get("capabilities", [])]:
+                    capabilities.append(OllamaCapability.TOOLS)
+
             return capabilities
     except Exception as e:
         logger.debug(f"Failed to fetch capabilities for {model_name}: {e}")
