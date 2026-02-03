@@ -1501,6 +1501,9 @@ class ChatScreen(Screen[None]):
                 )
             )
 
+            # Ensure Ollama models are forced to Drafting mode
+            self._ensure_ollama_drafting_mode()
+
         except Exception as e:
             logger.error(f"Failed to handle model selection: {e}")
             self.agent_manager.add_hint_message(
