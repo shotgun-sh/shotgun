@@ -27,6 +27,7 @@ from textual.widgets import (
 from shotgun.agents.config import ConfigManager, ProviderType
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.services.ollama import (
+    OLLAMA_DOWNLOAD_URL,
     OllamaStatus,
     get_ollama_status,
 )
@@ -370,7 +371,7 @@ class ProviderConfigScreen(Screen[None]):
     @on(Button.Pressed, "#ollama-install-button")
     def _on_ollama_install_pressed(self) -> None:
         """Open Ollama installation page in browser."""
-        webbrowser.open("https://ollama.com/download")
+        webbrowser.open(OLLAMA_DOWNLOAD_URL)
 
     @on(Checkbox.Changed, "#ollama-enable-checkbox")
     def _on_ollama_enable_changed(self, event: Checkbox.Changed) -> None:

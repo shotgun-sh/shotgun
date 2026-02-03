@@ -41,6 +41,7 @@ from shotgun.agents.config.provider import (
 )
 from shotgun.logging_config import get_logger
 from shotgun.tui.services.ollama import (
+    OLLAMA_DOWNLOAD_URL,
     OllamaStatus,
     get_ollama_status,
     sanitize_ollama_model_name_for_id,
@@ -433,7 +434,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     @on(Button.Pressed, "#install-ollama-button")
     def _on_install_ollama_pressed(self) -> None:
         """Open Ollama download page in browser."""
-        webbrowser.open("https://ollama.com/download")
+        webbrowser.open(OLLAMA_DOWNLOAD_URL)
 
     async def _open_provider_setup(self) -> None:
         """Open provider setup screen to Ollama tab and refresh on return."""
