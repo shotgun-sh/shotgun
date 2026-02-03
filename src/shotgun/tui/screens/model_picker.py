@@ -500,7 +500,9 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             status_label.update("LM Studio is not running")
             status_label.remove_class("success")
             list_view.display = False
-            help_text.update("Install and start LM Studio to use local models")
+            help_text.update(
+                "To start: run 'lms server start' or open LM Studio → Local Server → Start"
+            )
             # Show setup buttons - both visible
             setup_container.add_class("visible")
             enable_button.display = False

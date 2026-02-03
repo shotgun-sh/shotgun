@@ -194,6 +194,11 @@ class ProviderConfigScreen(Screen[None]):
             margin-right: 1;
         }
 
+        #lm-studio-help {
+            padding: 1 0;
+            color: $text-muted;
+        }
+
         #done-container {
             dock: bottom;
             height: auto;
@@ -291,6 +296,7 @@ class ProviderConfigScreen(Screen[None]):
 
             with TabPane("LM Studio (Local)", id="lm-studio-tab"):
                 yield Static("Status: Checking...", id="lm-studio-status")
+                yield Static("", id="lm-studio-help")
                 with Horizontal(id="lm-studio-install-container"):
                     yield Button(
                         "Install LM Studio",
@@ -418,6 +424,7 @@ class ProviderConfigScreen(Screen[None]):
     def _update_lm_studio_ui(self, status: LMStudioStatus) -> None:
         """Update the LM Studio tab UI based on status."""
         status_label = self.query_one("#lm-studio-status", Static)
+        help_label = self.query_one("#lm-studio-help", Static)
         install_container = self.query_one("#lm-studio-install-container", Horizontal)
 
         if status.running:
@@ -426,18 +433,23 @@ class ProviderConfigScreen(Screen[None]):
                 status_label.update(
                     f"● Connected ({model_count} model{'s' if model_count != 1 else ''} available)"
                 )
+                help_label.update("")
             else:
                 status_label.update("● Connected (no models loaded)")
+                help_label.update("Load a model in LM Studio to use it here")
             status_label.remove_class("not-running")
             status_label.add_class("running")
             # Hide install button when LM Studio is running
             install_container.display = False
         else:
-            status_label.update(
-                "○ Not connected - Install LM Studio to use local models"
-            )
+            status_label.update("○ Not connected")
             status_label.remove_class("running")
             status_label.add_class("not-running")
+            # Show helpful instructions
+            help_label.update(
+                "To start the server, run: lms server start\n"
+                "Or open LM Studio → Local Server tab → Start Server"
+            )
             # Show install button when LM Studio is not running
             install_container.display = True
 
