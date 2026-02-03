@@ -299,7 +299,9 @@ class ProviderConfigScreen(Screen[None]):
         if status.running:
             model_count = len(status.models)
             if model_count > 0:
-                status_label.update(f"● Connected ({model_count} model{'s' if model_count != 1 else ''} available)")
+                status_label.update(
+                    f"● Connected ({model_count} model{'s' if model_count != 1 else ''} available)"
+                )
             else:
                 status_label.update("● Connected (no models installed)")
             status_label.remove_class("not-running")
