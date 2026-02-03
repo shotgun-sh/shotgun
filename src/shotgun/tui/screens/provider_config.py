@@ -26,6 +26,11 @@ from textual.widgets import (
 
 from shotgun.agents.config import ConfigManager, ProviderType
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.services.lm_studio import (
+    LM_STUDIO_DOWNLOAD_URL,
+    LMStudioStatus,
+    get_lm_studio_status,
+)
 from shotgun.tui.services.ollama import (
     OLLAMA_DOWNLOAD_URL,
     OllamaStatus,
@@ -154,6 +159,41 @@ class ProviderConfigScreen(Screen[None]):
             margin-right: 1;
         }
 
+        /* LM Studio tab styling */
+        #lm-studio-status {
+            padding: 0;
+        }
+
+        #lm-studio-status.running {
+            color: $success;
+        }
+
+        #lm-studio-status.not-running {
+            color: $text-muted;
+        }
+
+        /* LM Studio enable section */
+        #lm-studio-enable-container {
+            padding: 0;
+        }
+
+        #lm-studio-enable-checkbox {
+            margin-right: 1;
+        }
+
+        #lm-studio-experimental-label {
+            color: $warning;
+            padding: 0 1;
+        }
+
+        #lm-studio-install-container {
+            padding: 1 0;
+        }
+
+        #lm-studio-install-button {
+            margin-right: 1;
+        }
+
         #done-container {
             dock: bottom;
             height: auto;
@@ -193,6 +233,7 @@ class ProviderConfigScreen(Screen[None]):
 
     selected_provider: reactive[str] = reactive("openai")
     ollama_status: reactive[OllamaStatus | None] = reactive(None)
+    lm_studio_status: reactive[LMStudioStatus | None] = reactive(None)
 
     def __init__(self, initial_tab: str = "api-providers-tab") -> None:
         """Initialize the provider config screen.
@@ -248,6 +289,25 @@ class ProviderConfigScreen(Screen[None]):
                     )
                     yield Static("Experimental", id="ollama-experimental-label")
 
+            with TabPane("LM Studio (Local)", id="lm-studio-tab"):
+                yield Static("Status: Checking...", id="lm-studio-status")
+                with Horizontal(id="lm-studio-install-container"):
+                    yield Button(
+                        "Install LM Studio",
+                        id="lm-studio-install-button",
+                        variant="primary",
+                    )
+                    yield Static(
+                        "Free, runs locally on your machine",
+                        id="lm-studio-install-hint",
+                    )
+                with Horizontal(id="lm-studio-enable-container"):
+                    yield Checkbox(
+                        "Enable LM Studio",
+                        id="lm-studio-enable-checkbox",
+                    )
+                    yield Static("Experimental", id="lm-studio-experimental-label")
+
         with Horizontal(id="done-container"):
             yield Button("Back \\[ESC]", id="done", variant="primary")
 
@@ -273,6 +333,11 @@ class ProviderConfigScreen(Screen[None]):
         # Load Ollama status (exclusive to prevent duplicate widget IDs on concurrent refresh)
         self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
 
+        # Load LM Studio status
+        self.run_worker(
+            self._refresh_lm_studio_status(), exclusive=True, group="lm_studio"
+        )
+
         # Apply layout based on terminal height
         self._apply_layout_for_height(self.app.size.height)
 
@@ -295,6 +360,9 @@ class ProviderConfigScreen(Screen[None]):
         """
         self.run_worker(self._refresh_ui(), exclusive=False)
         self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
+        self.run_worker(
+            self._refresh_lm_studio_status(), exclusive=True, group="lm_studio"
+        )
 
     async def _refresh_ui(self) -> None:
         """Refresh provider status and button visibility."""
@@ -334,6 +402,43 @@ class ProviderConfigScreen(Screen[None]):
             status_label.remove_class("running")
             status_label.add_class("not-running")
             # Show install button when Ollama is not running
+            install_container.display = True
+
+    async def _refresh_lm_studio_status(self) -> None:
+        """Refresh LM Studio status, model list, and enable checkbox state."""
+        status = await get_lm_studio_status()
+        self.lm_studio_status = status
+        self._update_lm_studio_ui(status)
+
+        # Load the enable checkbox state from config
+        is_enabled = await self.config_manager.is_lm_studio_enabled()
+        checkbox = self.query_one("#lm-studio-enable-checkbox", Checkbox)
+        checkbox.value = is_enabled
+
+    def _update_lm_studio_ui(self, status: LMStudioStatus) -> None:
+        """Update the LM Studio tab UI based on status."""
+        status_label = self.query_one("#lm-studio-status", Static)
+        install_container = self.query_one("#lm-studio-install-container", Horizontal)
+
+        if status.running:
+            model_count = len(status.models)
+            if model_count > 0:
+                status_label.update(
+                    f"● Connected ({model_count} model{'s' if model_count != 1 else ''} available)"
+                )
+            else:
+                status_label.update("● Connected (no models loaded)")
+            status_label.remove_class("not-running")
+            status_label.add_class("running")
+            # Hide install button when LM Studio is running
+            install_container.display = False
+        else:
+            status_label.update(
+                "○ Not connected - Install LM Studio to use local models"
+            )
+            status_label.remove_class("running")
+            status_label.add_class("not-running")
+            # Show install button when LM Studio is not running
             install_container.display = True
 
     def action_done(self) -> None:
@@ -391,6 +496,31 @@ class ProviderConfigScreen(Screen[None]):
                 await self.config_manager.update_selected_model(ollama_model_name)
 
         # Update done button visibility since Ollama can now provide models
+        await self._update_done_button_visibility()
+
+    @on(Button.Pressed, "#lm-studio-install-button")
+    def _on_lm_studio_install_pressed(self) -> None:
+        """Open LM Studio installation page in browser."""
+        webbrowser.open(LM_STUDIO_DOWNLOAD_URL)
+
+    @on(Checkbox.Changed, "#lm-studio-enable-checkbox")
+    def _on_lm_studio_enable_changed(self, event: Checkbox.Changed) -> None:
+        self.run_worker(self._do_update_lm_studio_enabled(event.value), exclusive=True)
+
+    async def _do_update_lm_studio_enabled(self, enabled: bool) -> None:
+        """Update LM Studio enabled state in config."""
+        await self.config_manager.update_lm_studio_enabled(enabled)
+
+        # When enabling LM Studio, auto-select the first available model if no model is selected
+        if enabled and self.lm_studio_status and self.lm_studio_status.models:
+            config = await self.config_manager.load()
+            # Only auto-select if no model is currently selected
+            if not config.selected_model:
+                first_model = self.lm_studio_status.models[0]
+                lm_studio_model_name = f"lmstudio/{first_model.id}"
+                await self.config_manager.update_selected_model(lm_studio_model_name)
+
+        # Update done button visibility since LM Studio can now provide models
         await self._update_done_button_visibility()
 
     @on(Input.Submitted, "#api-key")

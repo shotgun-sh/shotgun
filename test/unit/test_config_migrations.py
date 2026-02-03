@@ -18,6 +18,7 @@ from shotgun.agents.config.manager import (
     _migrate_v3_to_v4,
     _migrate_v4_to_v5,
     _migrate_v6_to_v7,
+    _migrate_v7_to_v8,
     get_backup_dir,
 )
 from shotgun.agents.config.models import ProviderType, ShotgunConfig
@@ -89,6 +90,21 @@ V7_CONFIG = {
     "selected_model": "gpt-5",
     "shotgun_instance_id": "test-user-id-12345",
     "config_version": 7,
+    "shown_welcome_screen": False,
+    "marketing": {"messages": {}},
+    "router_mode": "planning",
+}
+
+V8_CONFIG = {
+    "openai": {"api_key": "sk-test123", "supports_streaming": None},
+    "anthropic": {"api_key": None},
+    "google": {"api_key": None},
+    "shotgun": {"api_key": None, "supabase_jwt": None},
+    "ollama": {"enabled": False, "base_url": "http://localhost:11434"},
+    "lm_studio": {"enabled": False, "base_url": "http://localhost:1234"},
+    "selected_model": "gpt-5",
+    "shotgun_instance_id": "test-user-id-12345",
+    "config_version": 8,
     "shown_welcome_screen": False,
     "marketing": {"messages": {}},
     "router_mode": "planning",
@@ -192,6 +208,39 @@ def test_migrate_v6_to_v7_preserves_existing_fields():
     assert result["router_mode"] == "drafting"
 
 
+def test_migrate_v7_to_v8():
+    """Test migration from version 7 to version 8."""
+    config = V7_CONFIG.copy()
+
+    result = _migrate_v7_to_v8(config)
+
+    assert result["config_version"] == 8
+    assert "lm_studio" in result
+    assert result["lm_studio"]["enabled"] is False
+    assert result["lm_studio"]["base_url"] == "http://localhost:1234"
+    assert result["shotgun_instance_id"] == "test-user-id-12345"
+
+
+def test_migrate_v7_to_v8_preserves_existing_fields():
+    """Test v7->v8 migration preserves all existing fields."""
+    config = V7_CONFIG.copy()
+    config["openai"]["api_key"] = "sk-proj-test"
+    config["anthropic"]["api_key"] = "sk-ant-test"
+    config["ollama"]["enabled"] = True
+    config["ollama"]["base_url"] = "http://192.168.1.100:11434"
+    config["router_mode"] = "drafting"
+
+    result = _migrate_v7_to_v8(config)
+
+    assert result["config_version"] == 8
+    assert result["lm_studio"]["enabled"] is False
+    assert result["openai"]["api_key"] == "sk-proj-test"
+    assert result["anthropic"]["api_key"] == "sk-ant-test"
+    assert result["ollama"]["enabled"] is True
+    assert result["ollama"]["base_url"] == "http://192.168.1.100:11434"
+    assert result["router_mode"] == "drafting"
+
+
 def test_apply_migrations_from_v2_to_current():
     """Test applying all migrations from v2 to current version."""
     config = V2_CONFIG.copy()
@@ -232,16 +281,16 @@ def test_apply_migrations_from_v4_to_current():
 
 def test_apply_migrations_already_current():
     """Test applying migrations when already at current version."""
-    config = V7_CONFIG.copy()
+    config = V8_CONFIG.copy()
 
     result = _apply_migrations(config)
 
     assert result["config_version"] == CURRENT_CONFIG_VERSION
-    assert result == V7_CONFIG  # Should be unchanged
+    assert result == V8_CONFIG  # Should be unchanged
 
 
 def test_apply_migrations_sequential():
-    """Test that migrations are applied sequentially v2->v3->v4->v5->v6->v7."""
+    """Test that migrations are applied sequentially v2->v3->v4->v5->v6->v7->v8."""
     config = V2_CONFIG.copy()
 
     result = _apply_migrations(config)
@@ -255,6 +304,8 @@ def test_apply_migrations_sequential():
     assert result["router_mode"] == "planning"  # v5->v6 change
     assert result["ollama"]["enabled"] is False  # v6->v7 change
     assert result["ollama"]["base_url"] == "http://localhost:11434"  # v6->v7 change
+    assert result["lm_studio"]["enabled"] is False  # v7->v8 change
+    assert result["lm_studio"]["base_url"] == "http://localhost:1234"  # v7->v8 change
     assert result["config_version"] == CURRENT_CONFIG_VERSION
 
 
@@ -722,7 +773,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config (no migration needed)
-        current_config = V7_CONFIG.copy()
+        current_config = V8_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
@@ -807,7 +858,7 @@ async def test_update_ollama_enabled():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config
-        current_config = V7_CONFIG.copy()
+        current_config = V8_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
@@ -838,7 +889,7 @@ async def test_is_ollama_enabled():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a config with Ollama enabled
-        current_config = V7_CONFIG.copy()
+        current_config = V8_CONFIG.copy()
         current_config["ollama"]["enabled"] = True
         config_path.write_text(json.dumps(current_config))
 
@@ -874,3 +925,79 @@ async def test_ollama_config_preserved_in_migrations():
         # Verify Ollama config is preserved
         assert config.ollama.enabled is True
         assert config.ollama.base_url == "http://192.168.1.100:11434"
+
+
+@pytest.mark.asyncio
+async def test_update_lm_studio_enabled():
+    """Test enabling and disabling LM Studio via config manager."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.json"
+
+        # Create a current version config
+        current_config = V8_CONFIG.copy()
+        config_path.write_text(json.dumps(current_config))
+
+        manager = ConfigManager(config_path=config_path)
+
+        # Initially disabled
+        config = await manager.load()
+        assert config.lm_studio.enabled is False
+
+        # Enable LM Studio
+        await manager.update_lm_studio_enabled(True)
+
+        # Verify it's enabled
+        config = await manager.load(force_reload=True)
+        assert config.lm_studio.enabled is True
+
+        # Disable LM Studio
+        await manager.update_lm_studio_enabled(False)
+
+        # Verify it's disabled
+        config = await manager.load(force_reload=True)
+        assert config.lm_studio.enabled is False
+
+
+@pytest.mark.asyncio
+async def test_is_lm_studio_enabled():
+    """Test checking if LM Studio is enabled."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.json"
+
+        # Create a config with LM Studio enabled
+        current_config = V8_CONFIG.copy()
+        current_config["lm_studio"]["enabled"] = True
+        config_path.write_text(json.dumps(current_config))
+
+        manager = ConfigManager(config_path=config_path)
+
+        # Should return True
+        assert await manager.is_lm_studio_enabled() is True
+
+        # Disable it
+        await manager.update_lm_studio_enabled(False)
+
+        # Should return False
+        assert await manager.is_lm_studio_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_lm_studio_config_preserved_in_migrations():
+    """Test that LM Studio config from v8 is preserved when loading."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.json"
+
+        # Create v8 config with custom LM Studio settings
+        config_with_lm_studio = V8_CONFIG.copy()
+        config_with_lm_studio["lm_studio"] = {
+            "enabled": True,
+            "base_url": "http://192.168.1.100:1234",
+        }
+        config_path.write_text(json.dumps(config_with_lm_studio))
+
+        manager = ConfigManager(config_path=config_path)
+        config = await manager.load()
+
+        # Verify LM Studio config is preserved
+        assert config.lm_studio.enabled is True
+        assert config.lm_studio.base_url == "http://192.168.1.100:1234"

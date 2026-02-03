@@ -19,6 +19,7 @@ import tiktoken
 
 class FileTokenCount(NamedTuple):
     """Token count for a single file."""
+
     path: Path
     tokens: int
     chars: int
@@ -26,6 +27,7 @@ class FileTokenCount(NamedTuple):
 
 class FolderSummary(NamedTuple):
     """Token count summary for a folder."""
+
     path: Path
     files: list[FileTokenCount]
     total_tokens: int
@@ -44,7 +46,9 @@ def count_tokens(text: str, encoder: tiktoken.Encoding | None = None) -> int:
     return len(encoder.encode(text))
 
 
-def count_file_tokens(file_path: Path, encoder: tiktoken.Encoding) -> FileTokenCount | None:
+def count_file_tokens(
+    file_path: Path, encoder: tiktoken.Encoding
+) -> FileTokenCount | None:
     """Count tokens in a single file. Returns None for binary/unreadable files."""
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -106,12 +110,14 @@ def count_tokens_in_directory(
         total_tokens = sum(f.tokens for f in files)
         total_chars = sum(f.chars for f in files)
         grand_total += total_tokens
-        summaries.append(FolderSummary(
-            path=folder_path,
-            files=sorted(files, key=lambda f: f.tokens, reverse=True),
-            total_tokens=total_tokens,
-            total_chars=total_chars,
-        ))
+        summaries.append(
+            FolderSummary(
+                path=folder_path,
+                files=sorted(files, key=lambda f: f.tokens, reverse=True),
+                total_tokens=total_tokens,
+                total_chars=total_chars,
+            )
+        )
 
     # Sort by total tokens descending
     summaries.sort(key=lambda s: s.total_tokens, reverse=True)
@@ -122,31 +128,37 @@ def count_tokens_in_directory(
 def format_tokens(tokens: int) -> str:
     """Format token count with K suffix for readability."""
     if tokens >= 1000:
-        return f"{tokens:,} ({tokens/1000:.1f}K)"
+        return f"{tokens:,} ({tokens / 1000:.1f}K)"
     return f"{tokens:,}"
 
 
-def print_report(directory: Path, summaries: list[FolderSummary], grand_total: int) -> None:
+def print_report(
+    directory: Path, summaries: list[FolderSummary], grand_total: int
+) -> None:
     """Print a formatted token count report."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Token Count Report: {directory}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for summary in summaries:
         folder_name = summary.path.name if summary.path != directory else "(root)"
         print(f"## {folder_name}/")
-        print(f"   Total: {format_tokens(summary.total_tokens)} tokens | {summary.total_chars:,} chars")
+        print(
+            f"   Total: {format_tokens(summary.total_tokens)} tokens | {summary.total_chars:,} chars"
+        )
         print()
 
         for file_count in summary.files:
             rel_path = file_count.path.relative_to(directory)
             print(f"   {rel_path}")
-            print(f"      {format_tokens(file_count.tokens)} tokens | {file_count.chars:,} chars")
+            print(
+                f"      {format_tokens(file_count.tokens)} tokens | {file_count.chars:,} chars"
+            )
         print()
 
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"GRAND TOTAL: {format_tokens(grand_total)} tokens")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 def main() -> int:

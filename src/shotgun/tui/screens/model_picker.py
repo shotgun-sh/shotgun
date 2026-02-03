@@ -23,6 +23,8 @@ from textual.widgets import (
 from shotgun.agents.agent_manager import ModelConfigUpdated
 from shotgun.agents.config import ConfigManager
 from shotgun.agents.config.models import (
+    LM_STUDIO_MODEL_PREFIX,
+    LM_STUDIO_PLACEHOLDER_API_KEY,
     MODEL_SPECS,
     OLLAMA_MODEL_PREFIX,
     OLLAMA_PLACEHOLDER_API_KEY,
@@ -31,8 +33,11 @@ from shotgun.agents.config.models import (
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_lm_studio_api_base_url,
+    get_lm_studio_model_name,
     get_ollama_api_base_url,
     get_ollama_model_name,
+    is_lm_studio_model,
     is_ollama_model,
 )
 from shotgun.agents.config.provider import (
@@ -40,6 +45,12 @@ from shotgun.agents.config.provider import (
     get_provider_model,
 )
 from shotgun.logging_config import get_logger
+from shotgun.tui.services.lm_studio import (
+    LM_STUDIO_DOWNLOAD_URL,
+    LMStudioStatus,
+    get_lm_studio_status,
+    sanitize_lm_studio_model_name_for_id,
+)
 from shotgun.tui.services.ollama import (
     OLLAMA_DOWNLOAD_URL,
     OllamaStatus,
@@ -102,7 +113,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             padding: 1;
         }
 
-        #cloud-model-list, #local-model-list {
+        #cloud-model-list, #ollama-model-list, #lm-studio-model-list {
             margin: 1 0;
             height: auto;
             padding: 1;
@@ -123,17 +134,32 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         margin-right: 2;
         }
 
-        /* Local models tab styling */
-        #local-models-status {
+        /* Ollama tab styling */
+        #ollama-status {
             padding: 1 0;
             color: $text-muted;
         }
 
-        #local-models-status.success {
+        #ollama-status.success {
             color: $success;
         }
 
-        #local-models-help {
+        #ollama-help {
+            padding: 1 0;
+            color: $text-muted;
+        }
+
+        /* LM Studio tab styling */
+        #lm-studio-status {
+            padding: 1 0;
+            color: $text-muted;
+        }
+
+        #lm-studio-status.success {
+            color: $success;
+        }
+
+        #lm-studio-help {
             padding: 1 0;
             color: $text-muted;
         }
@@ -162,13 +188,29 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             margin-right: 1;
         }
 
-        /* Disabled Ollama models (no tool support) */
-        #local-model-list ListItem.-disabled {
+        /* LM Studio setup buttons */
+        #lm-studio-setup-container {
+            display: none;
+            padding: 1 0;
+        }
+
+        #lm-studio-setup-container.visible {
+            display: block;
+        }
+
+        #lm-studio-setup-container Button {
+            margin-right: 1;
+        }
+
+        /* Disabled models (no tool support) */
+        #ollama-model-list ListItem.-disabled,
+        #lm-studio-model-list ListItem.-disabled {
             color: $text-muted;
             text-style: italic;
         }
 
-        #local-model-list ListItem.-disabled:hover {
+        #ollama-model-list ListItem.-disabled:hover,
+        #lm-studio-model-list ListItem.-disabled:hover {
             background: transparent;
         }
     """
@@ -179,7 +221,9 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
     selected_model: reactive[ModelName] = reactive(ModelName.GPT_5_1)
     selected_ollama_model: reactive[str | None] = reactive(None)
+    selected_lm_studio_model: reactive[str | None] = reactive(None)
     ollama_status: reactive[OllamaStatus | None] = reactive(None)
+    lm_studio_status: reactive[LMStudioStatus | None] = reactive(None)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
@@ -197,8 +241,8 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 )
                 yield ListView(id="cloud-model-list")
 
-            with TabPane("Local Models", id="local-models-tab"):
-                yield Static("Checking Ollama status...", id="local-models-status")
+            with TabPane("Ollama", id="ollama-tab"):
+                yield Static("Checking Ollama status...", id="ollama-status")
                 with Horizontal(id="ollama-setup-container"):
                     yield Button(
                         "Enable Ollama",
@@ -210,8 +254,24 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                         id="install-ollama-button",
                         variant="success",
                     )
-                yield ListView(id="local-model-list")
-                yield Static("", id="local-models-help")
+                yield ListView(id="ollama-model-list")
+                yield Static("", id="ollama-help")
+
+            with TabPane("LM Studio", id="lm-studio-tab"):
+                yield Static("Checking LM Studio status...", id="lm-studio-status")
+                with Horizontal(id="lm-studio-setup-container"):
+                    yield Button(
+                        "Enable LM Studio",
+                        id="enable-lm-studio-button",
+                        variant="primary",
+                    )
+                    yield Button(
+                        "Install LM Studio",
+                        id="install-lm-studio-button",
+                        variant="success",
+                    )
+                yield ListView(id="lm-studio-model-list")
+                yield Static("", id="lm-studio-help")
 
         yield Label("", id="model-picker-status")
         with Horizontal(id="model-actions"):
@@ -261,15 +321,18 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             cloud_tab.disabled = True
             cloud_list.display = False
             disabled_msg.add_class("visible")
-            # Switch to local models tab if cloud is disabled
+            # Switch to Ollama tab if cloud is disabled
             tabs = self.query_one("#model-tabs", TabbedContent)
-            tabs.active = "local-models-tab"
+            tabs.active = "ollama-tab"
 
         current_model = config.selected_model or get_default_model_for_provider(config)
-        # Handle both cloud models (ModelName enum) and Ollama models (strings)
+        # Handle cloud models (ModelName enum), Ollama models, and LM Studio models (strings)
         if is_ollama_model(current_model):
             # Ollama model - extract model name without prefix for display
             self.selected_ollama_model = get_ollama_model_name(current_model)
+        elif is_lm_studio_model(current_model):
+            # LM Studio model - extract model name without prefix for display
+            self.selected_lm_studio_model = get_lm_studio_model_name(current_model)
         elif isinstance(current_model, ModelName):
             self.selected_model = current_model
         else:
@@ -304,17 +367,18 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                                 list_view.index = i
                                 break
 
-        # Also refresh local models
-        await self._refresh_local_models(config)
+        # Also refresh local provider models
+        await self._refresh_ollama_models(config)
+        await self._refresh_lm_studio_models(config)
 
-    async def _refresh_local_models(self, config: ShotgunConfig | None = None) -> None:
-        """Refresh the local models tab with Ollama models."""
+    async def _refresh_ollama_models(self, config: ShotgunConfig | None = None) -> None:
+        """Refresh the Ollama tab with Ollama models."""
         if config is None:
             config = await self.config_manager.load(force_reload=False)
 
-        status_label = self.query_one("#local-models-status", Static)
-        list_view = self.query_one("#local-model-list", ListView)
-        help_text = self.query_one("#local-models-help", Static)
+        status_label = self.query_one("#ollama-status", Static)
+        list_view = self.query_one("#ollama-model-list", ListView)
+        help_text = self.query_one("#ollama-help", Static)
         setup_container = self.query_one("#ollama-setup-container", Horizontal)
         enable_button = self.query_one("#enable-ollama-button", Button)
         install_button = self.query_one("#install-ollama-button", Button)
@@ -399,6 +463,81 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
                 f"● {tool_capable_count}/{len(status.models)} model(s) support tools (Experimental)"
             )
 
+    async def _refresh_lm_studio_models(
+        self, config: ShotgunConfig | None = None
+    ) -> None:
+        """Refresh the LM Studio tab with LM Studio models."""
+        if config is None:
+            config = await self.config_manager.load(force_reload=False)
+
+        status_label = self.query_one("#lm-studio-status", Static)
+        list_view = self.query_one("#lm-studio-model-list", ListView)
+        help_text = self.query_one("#lm-studio-help", Static)
+        setup_container = self.query_one("#lm-studio-setup-container", Horizontal)
+        enable_button = self.query_one("#enable-lm-studio-button", Button)
+        install_button = self.query_one("#install-lm-studio-button", Button)
+
+        # Clear existing items
+        list_view.clear()
+
+        # Check if LM Studio is enabled
+        if not config.lm_studio.enabled:
+            status_label.update("LM Studio is not enabled")
+            status_label.remove_class("success")
+            list_view.display = False
+            help_text.update("Enable LM Studio to use free, local AI models")
+            # Show setup buttons - enable button visible, install hidden
+            setup_container.add_class("visible")
+            enable_button.display = True
+            install_button.display = False
+            return
+
+        # Check LM Studio status
+        status = await get_lm_studio_status(base_url=config.lm_studio.base_url)
+        self.lm_studio_status = status
+
+        if not status.running:
+            status_label.update("LM Studio is not running")
+            status_label.remove_class("success")
+            list_view.display = False
+            help_text.update("Install and start LM Studio to use local models")
+            # Show setup buttons - both visible
+            setup_container.add_class("visible")
+            enable_button.display = False
+            install_button.display = True
+            return
+
+        if not status.models:
+            status_label.update("No models loaded in LM Studio")
+            status_label.remove_class("success")
+            list_view.display = False
+            help_text.update("Load a model in LM Studio to use it here")
+            # Hide setup buttons when LM Studio is running
+            setup_container.remove_class("visible")
+            return
+
+        # LM Studio is running and has models
+        status_label.update(f"● {len(status.models)} model(s) available (Experimental)")
+        status_label.add_class("success")
+        list_view.display = True
+        help_text.update("")
+        # Hide setup buttons
+        setup_container.remove_class("visible")
+
+        # Add model items
+        seen_ids: set[str] = set()
+        for model in status.models:
+            safe_id = sanitize_lm_studio_model_name_for_id(model.id)
+            if safe_id in seen_ids:
+                logger.debug("Skipping duplicate LM Studio model ID: %s", safe_id)
+                continue
+            seen_ids.add(safe_id)
+
+            label_text = model.id
+            label = Label(label_text)
+            item = ListItem(label, id=f"lm-studio-model-{safe_id}")
+            list_view.append(item)
+
     def on_show(self) -> None:
         """Rebuild model list when screen is first shown."""
         logger.debug("ModelPickerScreen.on_show() called")
@@ -431,25 +570,40 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             self.selected_ollama_model = None
             self._select_cloud_model()
 
-    @on(ListView.Highlighted, "#local-model-list")
-    def _on_local_model_highlighted(self, event: ListView.Highlighted) -> None:
+    @on(ListView.Highlighted, "#ollama-model-list")
+    def _on_ollama_model_highlighted(self, event: ListView.Highlighted) -> None:
         ollama_model = self._ollama_model_from_item(event.item)
         if ollama_model:
             self.selected_ollama_model = ollama_model
 
-    @on(ListView.Selected, "#local-model-list")
-    def _on_local_model_selected(self, event: ListView.Selected) -> None:
+    @on(ListView.Selected, "#ollama-model-list")
+    def _on_ollama_model_selected(self, event: ListView.Selected) -> None:
         ollama_model = self._ollama_model_from_item(event.item)
         if ollama_model:
             self.selected_ollama_model = ollama_model
             self._select_ollama_model()
+
+    @on(ListView.Highlighted, "#lm-studio-model-list")
+    def _on_lm_studio_model_highlighted(self, event: ListView.Highlighted) -> None:
+        lm_studio_model = self._lm_studio_model_from_item(event.item)
+        if lm_studio_model:
+            self.selected_lm_studio_model = lm_studio_model
+
+    @on(ListView.Selected, "#lm-studio-model-list")
+    def _on_lm_studio_model_selected(self, event: ListView.Selected) -> None:
+        lm_studio_model = self._lm_studio_model_from_item(event.item)
+        if lm_studio_model:
+            self.selected_lm_studio_model = lm_studio_model
+            self._select_lm_studio_model()
 
     @on(Button.Pressed, "#select")
     def _on_select_pressed(self) -> None:
         # Check which tab is active and select accordingly
         tabs = self.query_one("#model-tabs", TabbedContent)
-        if tabs.active == "local-models-tab" and self.selected_ollama_model:
+        if tabs.active == "ollama-tab" and self.selected_ollama_model:
             self._select_ollama_model()
+        elif tabs.active == "lm-studio-tab" and self.selected_lm_studio_model:
+            self._select_lm_studio_model()
         else:
             self._select_cloud_model()
 
@@ -460,20 +614,40 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
     @on(Button.Pressed, "#enable-ollama-button")
     def _on_enable_ollama_pressed(self) -> None:
         """Open provider setup screen to Ollama tab."""
-        self.run_worker(self._open_provider_setup(), exclusive=True)
+        self.run_worker(self._open_ollama_provider_setup(), exclusive=True)
 
     @on(Button.Pressed, "#install-ollama-button")
     def _on_install_ollama_pressed(self) -> None:
         """Open Ollama download page in browser."""
         webbrowser.open(OLLAMA_DOWNLOAD_URL)
 
-    async def _open_provider_setup(self) -> None:
+    @on(Button.Pressed, "#enable-lm-studio-button")
+    def _on_enable_lm_studio_pressed(self) -> None:
+        """Open provider setup screen to LM Studio tab."""
+        self.run_worker(self._open_lm_studio_provider_setup(), exclusive=True)
+
+    @on(Button.Pressed, "#install-lm-studio-button")
+    def _on_install_lm_studio_pressed(self) -> None:
+        """Open LM Studio download page in browser."""
+        webbrowser.open(LM_STUDIO_DOWNLOAD_URL)
+
+    async def _open_ollama_provider_setup(self) -> None:
         """Open provider setup screen to Ollama tab and refresh on return."""
         from .provider_config import ProviderConfigScreen
 
         await self.app.push_screen_wait(ProviderConfigScreen(initial_tab="ollama-tab"))
-        # Refresh local models after returning from provider setup
-        await self._refresh_local_models()
+        # Refresh Ollama models after returning from provider setup
+        await self._refresh_ollama_models()
+
+    async def _open_lm_studio_provider_setup(self) -> None:
+        """Open provider setup screen to LM Studio tab and refresh on return."""
+        from .provider_config import ProviderConfigScreen
+
+        await self.app.push_screen_wait(
+            ProviderConfigScreen(initial_tab="lm-studio-tab")
+        )
+        # Refresh LM Studio models after returning from provider setup
+        await self._refresh_lm_studio_models()
 
     def _ollama_model_from_item(self, item: ListItem | None) -> str | None:
         """Get Ollama model name from a ListItem."""
@@ -487,6 +661,20 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             for model in self.ollama_status.models:
                 if sanitize_ollama_model_name_for_id(model.name) == sanitized_id:
                     return model.name
+        return None
+
+    def _lm_studio_model_from_item(self, item: ListItem | None) -> str | None:
+        """Get LM Studio model name from a ListItem."""
+        if item is None or item.id is None:
+            return None
+        if not item.id.startswith("lm-studio-model-"):
+            return None
+        # The ID is sanitized, need to find original model name from status
+        sanitized_id = item.id.removeprefix("lm-studio-model-")
+        if self.lm_studio_status and self.lm_studio_status.models:
+            for model in self.lm_studio_status.models:
+                if sanitize_lm_studio_model_name_for_id(model.id) == sanitized_id:
+                    return model.id
         return None
 
     @property
@@ -727,3 +915,56 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         except Exception as exc:  # pragma: no cover - defensive; textual path
             status_label = self.query_one("#model-picker-status", Label)
             status_label.update(f"❌ Failed to select Ollama model: {exc}")
+
+    def _select_lm_studio_model(self) -> None:
+        """Select an LM Studio model."""
+        self.run_worker(self._do_select_lm_studio_model(), exclusive=True)
+
+    async def _do_select_lm_studio_model(self) -> None:
+        """Async implementation of LM Studio model selection."""
+        if not self.selected_lm_studio_model:
+            return
+
+        try:
+            config = await self.config_manager.load()
+
+            # Create a ModelConfig for the LM Studio model using OpenAI-compatible settings
+            # LM Studio provides an OpenAI-compatible API at /v1
+            lm_studio_base_url = get_lm_studio_api_base_url(config.lm_studio.base_url)
+
+            # Store the model name in "lmstudio/<model>" format for config persistence
+            lm_studio_model_name = (
+                f"{LM_STUDIO_MODEL_PREFIX}{self.selected_lm_studio_model}"
+            )
+
+            model_config = ModelConfig(
+                name=lm_studio_model_name,
+                provider=ProviderType.OPENAI_COMPATIBLE,
+                key_provider=KeyProvider.BYOK,
+                max_input_tokens=128_000,  # Conservative default
+                max_output_tokens=16_000,  # Conservative default
+                api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
+                supports_streaming=True,
+                supports_pdf=False,  # LM Studio doesn't support PDFs
+                supports_images=False,  # Conservative default
+                base_url=lm_studio_base_url,
+            )
+
+            # Save the selected LM Studio model to config for persistence across restarts
+            await self.config_manager.update_selected_model(lm_studio_model_name)
+
+            # Dismiss the screen and return the model config
+            # Note: For LM Studio, we return new_model as a string (not ModelName enum)
+            # The caller handles this via model_config.name
+            self.dismiss(
+                ModelConfigUpdated(
+                    old_model=config.selected_model,
+                    new_model=lm_studio_model_name,  # Pass the LM Studio model name with prefix
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    model_config=model_config,
+                )
+            )
+        except Exception as exc:  # pragma: no cover - defensive; textual path
+            status_label = self.query_one("#model-picker-status", Label)
+            status_label.update(f"❌ Failed to select LM Studio model: {exc}")

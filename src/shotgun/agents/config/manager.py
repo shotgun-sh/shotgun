@@ -29,6 +29,7 @@ from .models import (
     ProviderType,
     ShotgunAccountConfig,
     ShotgunConfig,
+    is_lm_studio_model,
     is_ollama_model,
 )
 
@@ -53,7 +54,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 7
+CURRENT_CONFIG_VERSION = 8
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -228,6 +229,29 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v7_to_v8(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 7 to version 8.
+
+    Changes:
+    - Add 'lm_studio' section with enabled=False and default base_url
+
+    Args:
+        data: Config data dict at version 7
+
+    Returns:
+        Modified config data dict at version 8
+    """
+    if "lm_studio" not in data:
+        data["lm_studio"] = {
+            "enabled": False,
+            "base_url": "http://localhost:1234",
+        }
+        logger.info("Migrated config v7->v8: added lm_studio configuration")
+
+    data["config_version"] = 8
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -250,6 +274,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         4: _migrate_v4_to_v5,
         5: _migrate_v5_to_v6,
         6: _migrate_v6_to_v7,
+        7: _migrate_v7_to_v8,
     }
 
     # Apply migrations sequentially
@@ -362,6 +387,10 @@ class ConfigManager:
                 if is_ollama_model(selected):
                     # Valid Ollama model string - keep it as-is
                     pass
+                # Allow LM Studio model strings (format: "lmstudio/<model_name>")
+                elif is_lm_studio_model(selected):
+                    # Valid LM Studio model string - keep it as-is
+                    pass
                 else:
                     try:
                         # Try to convert to ModelName enum
@@ -389,9 +418,11 @@ class ConfigManager:
             # Validate selected_model for BYOK mode - verify provider has a key
             if not self._provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
-                # (Skip validation for Ollama models which don't need API keys)
-                if self._config.selected_model and not is_ollama_model(
+                # (Skip validation for Ollama/LM Studio models which don't need API keys)
+                if (
                     self._config.selected_model
+                    and not is_ollama_model(self._config.selected_model)
+                    and not is_lm_studio_model(self._config.selected_model)
                 ):
                     # Only validate cloud models (ModelName enum values)
                     if isinstance(self._config.selected_model, ModelName):
@@ -878,6 +909,26 @@ class ConfigManager:
         """
         config = await self.load(force_reload=False)
         return config.ollama.enabled
+
+    async def update_lm_studio_enabled(self, enabled: bool) -> None:
+        """Update whether LM Studio is enabled as a provider.
+
+        Args:
+            enabled: Whether LM Studio should be enabled
+        """
+        config = await self.load()
+        config.lm_studio.enabled = enabled
+        await self.save(config)
+        logger.info("LM Studio enabled: %s", enabled)
+
+    async def is_lm_studio_enabled(self) -> bool:
+        """Check if LM Studio is enabled in configuration.
+
+        Returns:
+            True if LM Studio is enabled, False otherwise
+        """
+        config = await self.load(force_reload=False)
+        return config.lm_studio.enabled
 
 
 # Global singleton instance

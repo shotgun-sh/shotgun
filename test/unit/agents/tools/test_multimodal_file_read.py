@@ -13,7 +13,9 @@ from shotgun.agents.tools.file_read_tools.multimodal_file_read import (
 )
 
 
-def create_mock_deps(supports_pdf: bool = True, supports_images: bool = True) -> AgentDeps:
+def create_mock_deps(
+    supports_pdf: bool = True, supports_images: bool = True
+) -> AgentDeps:
     """Create mock AgentDeps with specified capabilities."""
     model_config = ModelConfig(
         name="test-model",

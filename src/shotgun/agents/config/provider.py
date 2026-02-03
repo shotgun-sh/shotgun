@@ -22,6 +22,7 @@ from shotgun.logging_config import get_logger
 
 from .manager import get_config_manager
 from .models import (
+    LM_STUDIO_PLACEHOLDER_API_KEY,
     MODEL_SPECS,
     OLLAMA_PLACEHOLDER_API_KEY,
     KeyProvider,
@@ -29,9 +30,12 @@ from .models import (
     ModelName,
     ProviderType,
     ShotgunConfig,
+    get_lm_studio_api_base_url,
+    get_lm_studio_model_name,
     get_ollama_api_base_url,
     get_ollama_model_name,
     get_sub_agent_model,
+    is_lm_studio_model,
     is_ollama_model,
 )
 from .streaming_test import check_streaming_capability
@@ -166,13 +170,19 @@ def _create_openai_compat_model(
     if not base_url:
         raise ValueError("base_url is required for OpenAI-compatible mode")
 
-    # Strip "ollama/" prefix if present - Ollama expects just the model name
-    # The prefix is used internally to identify Ollama models in the config
+    # Strip "ollama/" or "lmstudio/" prefix if present - local servers expect just the model name
+    # The prefix is used internally to identify local models in the config
     is_ollama = is_ollama_model(model_name)
+    is_lm_studio = is_lm_studio_model(model_name)
+
     if is_ollama:
         model_name = get_ollama_model_name(model_name)
         # Ensure the base URL includes /v1 for OpenAI compatibility
         base_url = get_ollama_api_base_url(base_url)
+    elif is_lm_studio:
+        model_name = get_lm_studio_model_name(model_name)
+        # Ensure the base URL includes /v1 for OpenAI compatibility
+        base_url = get_lm_studio_api_base_url(base_url)
 
     # Use OpenAI provider with custom base_url
     openai_provider = OpenAIProvider(api_key=api_key, base_url=base_url)
@@ -499,6 +509,27 @@ async def get_provider_model(
             base_url=config.ollama.base_url,
         )
 
+    # Priority 1.6: Check for LM Studio model (selected via TUI)
+    # Handle when user has selected an LM Studio model without any cloud API keys
+    if is_lm_studio_model(config.selected_model) and config.lm_studio.enabled:
+        # is_lm_studio_model TypeGuard narrows type to str
+        lm_studio_model = config.selected_model
+        logger.info(
+            "Using LM Studio model from config: %s (base_url: %s)",
+            lm_studio_model,
+            config.lm_studio.base_url,
+        )
+        return ModelConfig(
+            name=lm_studio_model,
+            provider=ProviderType.OPENAI_COMPATIBLE,
+            key_provider=KeyProvider.BYOK,
+            max_input_tokens=128_000,  # Reasonable default for LM Studio
+            max_output_tokens=16_000,
+            api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
+            supports_streaming=True,
+            base_url=config.lm_studio.base_url,
+        )
+
     # Priority 2: Fall back to individual provider keys
 
     # Check if a specific model was requested
@@ -567,6 +598,28 @@ async def get_provider_model(
                     supports_pdf=False,
                     supports_images=False,
                     base_url=config.ollama.base_url,
+                )
+
+            # If still no provider, check if LM Studio is enabled as a fallback
+            if provider_enum is None and config.lm_studio.enabled:
+                # User has LM Studio enabled but no cloud API keys
+                # Return a placeholder config - the model will need to be selected
+                logger.info(
+                    "No cloud API keys configured, using LM Studio fallback (base_url: %s)",
+                    config.lm_studio.base_url,
+                )
+                # Use a placeholder - user should select one from the model picker
+                return ModelConfig(
+                    name="lmstudio/default",  # Default suggestion
+                    provider=ProviderType.OPENAI_COMPATIBLE,
+                    key_provider=KeyProvider.BYOK,
+                    max_input_tokens=128_000,
+                    max_output_tokens=16_000,
+                    api_key=LM_STUDIO_PLACEHOLDER_API_KEY,
+                    supports_streaming=True,
+                    supports_pdf=False,
+                    supports_images=False,
+                    base_url=config.lm_studio.base_url,
                 )
 
             if provider_enum is None:

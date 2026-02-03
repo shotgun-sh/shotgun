@@ -171,7 +171,12 @@ class ExecutionFailureEvaluator(BaseEvaluator):
         )
 
         # Agent succeeded if it produced ANY meaningful output
-        if not (has_response or has_clarifying_questions or has_file_requests or has_delegation):
+        if not (
+            has_response
+            or has_clarifying_questions
+            or has_file_requests
+            or has_delegation
+        ):
             logger.warning(f"ExecutionFailureEvaluator: no output for {test_case.name}")
             return EvaluatorResult(
                 evaluator_name=self.name,

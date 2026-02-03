@@ -28,7 +28,7 @@ When adding new eval test cases with judge rubrics:
 
 For detailed architecture documentation, see:
 
-- [Ollama/Local Model Support](docs/architecture/ollama-local-models.md) - How Shotgun integrates with local LLMs via Ollama
+- [Local Model Support](docs/architecture/local-model-support.md) - How Shotgun integrates with local LLMs via Ollama and LM Studio
 
 ## Commit Message Convention
 
