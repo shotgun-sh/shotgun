@@ -329,6 +329,21 @@ def is_lm_studio_model(model_name: ModelName | str | None) -> TypeGuard[str]:
     return isinstance(model_name, str) and model_name.startswith(LM_STUDIO_MODEL_PREFIX)
 
 
+def is_local_model(model_name: ModelName | str | None) -> bool:
+    """Check if a model name represents a local model (Ollama or LM Studio).
+
+    Use this to check if a model requires special handling for local providers,
+    such as forcing Drafting mode instead of Planning mode.
+
+    Args:
+        model_name: Model name (ModelName enum, string, or None).
+
+    Returns:
+        True if model is a local model (Ollama or LM Studio).
+    """
+    return is_ollama_model(model_name) or is_lm_studio_model(model_name)
+
+
 def get_lm_studio_model_name(prefixed_name: str) -> str:
     """Extract the actual LM Studio model name from a prefixed name.
 

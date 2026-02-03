@@ -41,7 +41,7 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
-from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
+from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_local_model
 from shotgun.agents.config.provider import get_provider_model
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
@@ -294,8 +294,8 @@ class ChatScreen(Screen[None]):
         # Bind spinner to processing state manager
         self.processing_state.bind_spinner(self.query_one("#spinner", Spinner))
 
-        # Force Drafting mode for Ollama models (experimental - Planning not supported)
-        self._ensure_ollama_drafting_mode()
+        # Force Drafting mode for local models (experimental - Planning not supported)
+        self._ensure_local_model_drafting_mode()
 
         # Load conversation history if --continue flag was provided
         # Use call_later to handle async exists() check
@@ -389,8 +389,8 @@ class ChatScreen(Screen[None]):
                 # Update context indicator with new model
                 self.update_context_indicator()
 
-                # Ensure Ollama models are in Drafting mode
-                self._ensure_ollama_drafting_mode()
+                # Ensure local models are in Drafting mode
+                self._ensure_local_model_drafting_mode()
 
         except ValueError:
             # No valid model available at all - show error
@@ -706,8 +706,8 @@ class ChatScreen(Screen[None]):
             )
             return
 
-        # Check if using Ollama model - lock to Drafting mode only
-        if is_ollama_model(self.deps.llm_model.name):
+        # Check if using local model - lock to Drafting mode only
+        if is_local_model(self.deps.llm_model.name):
             if self.deps.router_mode == RouterMode.DRAFTING:
                 self.agent_manager.add_hint_message(
                     HintMessage(
@@ -740,16 +740,16 @@ class ChatScreen(Screen[None]):
         self.widget_coordinator.update_for_mode_change(self.mode)
         self.call_later(lambda: self.widget_coordinator.update_prompt_input(focus=True))
 
-    def _ensure_ollama_drafting_mode(self) -> None:
-        """Ensure Ollama models are in Drafting mode on startup.
+    def _ensure_local_model_drafting_mode(self) -> None:
+        """Ensure local models (Ollama, LM Studio) are in Drafting mode on startup.
 
         Local models don't reliably support Planning mode, so we force
-        Drafting mode when using Ollama.
+        Drafting mode when using any local provider.
         """
         if not isinstance(self.deps, RouterDeps):
             return
 
-        if is_ollama_model(self.deps.llm_model.name):
+        if is_local_model(self.deps.llm_model.name):
             if self.deps.router_mode != RouterMode.DRAFTING:
                 self.deps.router_mode = RouterMode.DRAFTING
                 # Show notification that mode was changed
@@ -1580,8 +1580,8 @@ class ChatScreen(Screen[None]):
                 )
             )
 
-            # Ensure Ollama models are forced to Drafting mode
-            self._ensure_ollama_drafting_mode()
+            # Ensure local models are forced to Drafting mode
+            self._ensure_local_model_drafting_mode()
 
         except Exception as e:
             logger.error(f"Failed to handle model selection: {e}")
@@ -1762,8 +1762,8 @@ class ChatScreen(Screen[None]):
         Returns:
             Dynamic placeholder hint based on mode and progress.
         """
-        # Check if using Ollama - show special placeholder
-        if is_ollama_model(self.deps.llm_model.name):
+        # Check if using local model - show special placeholder
+        if is_local_model(self.deps.llm_model.name):
             return "What would you like to work on? (local model, experimental)"
         return self.placeholder_hints.get_placeholder_for_mode(mode)
 
