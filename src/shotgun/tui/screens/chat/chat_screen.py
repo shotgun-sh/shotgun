@@ -657,8 +657,6 @@ class ChatScreen(Screen[None]):
         Local models don't reliably support Planning mode, so we force
         Drafting mode when using Ollama.
         """
-        from shotgun.agents.router.models import RouterDeps, RouterMode
-
         if not isinstance(self.deps, RouterDeps):
             return
 
