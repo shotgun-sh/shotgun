@@ -13,7 +13,6 @@ from pydantic_ai import Agent
 from shotgun.agents.autopilot.models import Stage, StageStatus, Task
 from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile
 from shotgun.agents.config import get_provider_model
-from shotgun.agents.config.models import MODEL_SPECS, ModelName, get_sub_agent_model
 
 logger = logging.getLogger(__name__)
 
@@ -84,30 +83,18 @@ class LLMTasksParser:
         if self._agent is not None:
             return self._agent
 
-        # Get the user's current model and find the sub-agent model
-        model_name: str = "anthropic/claude-haiku-4-5"  # Default fallback
-
+        # Get a sub-agent model (cheaper/faster) with API key already configured
         try:
-            model_config = await get_provider_model()
-            main_model = model_config.name
-
-            # Get the cheaper sub-agent model
-            if isinstance(main_model, ModelName) and main_model in MODEL_SPECS:
-                sub_model_name = get_sub_agent_model(main_model)
-                sub_model_spec = MODEL_SPECS[sub_model_name]
-                model_name = sub_model_spec.litellm_proxy_model_name
-                logger.debug("Using sub-agent model for parsing: %s", model_name)
-            else:
-                # Fallback to user's pydantic model name
-                model_name = model_config.pydantic_model_name
-                logger.debug("Using main model for parsing: %s", model_name)
+            model_config = await get_provider_model(for_sub_agent=True)
+            model_instance = model_config.model_instance
+            logger.debug("Using model for LLM parsing: %s", model_config.name)
 
         except Exception as e:
-            # Fallback to Haiku if we can't determine the model
-            logger.warning("Could not determine model, falling back to Haiku: %s", e)
+            logger.exception("Could not get model config for LLM parser")
+            raise RuntimeError(f"Failed to initialize LLM parser: {e}") from e
 
         self._agent = Agent(
-            model_name,
+            model_instance,
             output_type=ParsedTasksOutput,
             system_prompt=PARSER_SYSTEM_PROMPT,
             retries=2,
