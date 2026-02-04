@@ -1,7 +1,6 @@
 """Tests for the autopilot orchestrator."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -115,8 +114,8 @@ def test_is_complete():
     assert orchestrator.is_complete is True
 
 
-def test_requires_approval_pause_mode():
-    """Test requires_approval in pause mode."""
+def test_awaiting_approval_set_by_workflow():
+    """Test awaiting_approval is set after workflow completes."""
     stages = [
         Stage(number=1, name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
         Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
@@ -125,12 +124,16 @@ def test_requires_approval_pause_mode():
     orchestrator.state.stages = stages
     orchestrator.state.mode = AutopilotMode.PAUSE_BETWEEN
 
-    # Stage 1 is complete, should require approval
-    assert orchestrator.requires_approval is True
+    # Initially not awaiting approval
+    assert orchestrator.awaiting_approval is False
+
+    # Manually set awaiting_approval (simulating workflow completion)
+    orchestrator.state.awaiting_approval = True
+    assert orchestrator.awaiting_approval is True
 
 
-def test_requires_approval_auto_mode():
-    """Test requires_approval in auto-continue mode."""
+def test_awaiting_approval_default_false():
+    """Test awaiting_approval defaults to false."""
     stages = [
         Stage(number=1, name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
         Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
@@ -139,11 +142,11 @@ def test_requires_approval_auto_mode():
     orchestrator.state.stages = stages
     orchestrator.state.mode = AutopilotMode.AUTO_CONTINUE
 
-    # Auto mode never requires approval
-    assert orchestrator.requires_approval is False
+    # Default is False
+    assert orchestrator.awaiting_approval is False
 
 
-def test_build_stage_prompt():
+def test_build_execution_prompt():
     """Test building prompt for Claude."""
     tasks = [
         Task(text="Create login form", completed=False, line_number=10),
@@ -154,12 +157,13 @@ def test_build_stage_prompt():
     orchestrator = AutopilotOrchestrator()
     orchestrator.state.stages = [stage]
 
-    prompt = orchestrator._build_stage_prompt(stage)
+    prompt = orchestrator._build_execution_prompt(stage)
 
     assert "Stage 1" in prompt
     assert "Authentication" in prompt
     assert "Create login form" in prompt
-    assert "Add validation" in prompt
+    # Completed tasks should not be in the prompt (only pending)
+    assert "Add validation" not in prompt
     assert ".shotgun/tasks.md" in prompt
 
 

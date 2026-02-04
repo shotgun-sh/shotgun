@@ -1,11 +1,17 @@
 """Autopilot orchestrator for stage-based execution.
 
 This module provides the main orchestration logic for the Autopilot agent,
-managing the execution of stages, Claude Code subprocess runs, and PR creation.
+managing the execution of stages with a complete workflow:
+1. Execute tasks until stage is complete
+2. Create PR
+3. Review and fix code
+4. Run QA testing
+5. Present for user approval
 """
 
 import asyncio
 import logging
+import re
 from collections.abc import AsyncGenerator, Callable
 from pathlib import Path
 
@@ -20,11 +26,15 @@ from shotgun.agents.autopilot.models import (
     AutopilotState,
     ClaudeOutput,
     ClaudeOutputType,
+    Stage,
+    StagePhase,
     StageStatus,
 )
 from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
 
 logger = logging.getLogger(__name__)
+
+MAX_STAGE_ITERATIONS = 5  # Max attempts to complete a stage
 
 
 class AutopilotConfig(BaseModel):
@@ -46,17 +56,21 @@ class AutopilotConfig(BaseModel):
         default="autopilot/stage-",
         description="Prefix for stage branch names",
     )
+    max_iterations: int = Field(
+        default=MAX_STAGE_ITERATIONS,
+        description="Maximum iterations per stage before giving up",
+    )
 
 
 class AutopilotOrchestrator:
     """Orchestrator for Autopilot stage-based execution.
 
-    Manages the execution lifecycle:
-    1. Parse tasks.md to extract stages
-    2. Create git branches for each stage
-    3. Run Claude Code to complete stage tasks
-    4. Create PRs for completed stages
-    5. Handle user approval (in pause mode)
+    Manages the complete execution lifecycle for each stage:
+    1. Execute tasks until all are marked complete in tasks.md
+    2. Create a PR for the completed work
+    3. Review the PR and make any necessary fixes
+    4. Run manual QA testing
+    5. Present to user for approval (Accept/Reject)
     """
 
     def __init__(
@@ -111,17 +125,18 @@ class AutopilotOrchestrator:
         self.state.mode = mode
         logger.info("Autopilot mode set to: %s", mode.value)
 
-    async def run_next_stage(self) -> AsyncGenerator[ClaudeOutput, None]:
-        """Run the next pending stage.
+    async def run_stage_workflow(self) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run the complete workflow for the current stage.
+
+        This is the main entry point that runs through:
+        1. Task execution (looping until complete)
+        2. PR creation
+        3. Code review and fixes
+        4. QA testing
+        5. Sets awaiting_approval for user decision
 
         Yields:
-            ClaudeOutput objects as Claude Code executes.
-
-        This method:
-        1. Creates a git branch for the stage (in auto-continue mode)
-        2. Runs Claude Code with a prompt to complete the stage tasks
-        3. Refreshes task completion status from tasks.md
-        4. Updates stage status
+            ClaudeOutput objects as work progresses.
         """
         stage = self.state.current_stage
         if stage is None:
@@ -131,88 +146,270 @@ class AutopilotOrchestrator:
             )
             return
 
-        logger.info("Starting execution of Stage %d: %s", stage.number, stage.name)
+        logger.info("Starting workflow for Stage %d: %s", stage.number, stage.name)
         stage.status = StageStatus.IN_PROGRESS
 
-        # In auto-continue mode, create a branch for this stage
-        if self.state.mode == AutopilotMode.AUTO_CONTINUE:
-            async for output in self._create_stage_branch(stage.number):
-                yield output
-                if output.type == ClaudeOutputType.ERROR:
-                    stage.status = StageStatus.FAILED
-                    return
+        # Create branch for this stage
+        async for output in self._create_stage_branch(stage.number):
+            yield output
+            if output.type == ClaudeOutputType.ERROR:
+                stage.status = StageStatus.FAILED
+                return
 
-        # Build the prompt for Claude Code
-        prompt = self._build_stage_prompt(stage)
-
-        # Run Claude Code
-        config = ClaudeSubprocessConfig(
-            working_directory=self.config.working_directory,
+        # Phase 1: Execute tasks until complete
+        stage.phase = StagePhase.EXECUTING
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"📋 Phase 1: Executing tasks for Stage {stage.number}",
         )
-        self._claude = ClaudeSubprocess(config)
 
-        try:
-            async for output in self._claude.run(prompt):
-                yield output
+        async for output in self._execute_until_complete(stage):
+            yield output
+            if self._cancelled:
+                return
 
-                # Check if execution failed
-                if output.type == ClaudeOutputType.EXIT and output.exit_code != 0:
-                    logger.warning(
-                        "Claude exited with non-zero code: %d", output.exit_code
-                    )
-
-        except Exception as e:
-            logger.error("Error running Claude: %s", e)
+        # Check if stage completed successfully
+        self._refresh_stages()
+        stage = self.state.current_stage
+        if not stage or not stage.is_complete:
             yield ClaudeOutput(
                 type=ClaudeOutputType.ERROR,
-                content=f"Error running Claude: {e}",
+                content=f"Stage {stage.number if stage else '?'} failed to complete after {self.config.max_iterations} iterations",
             )
-            stage.status = StageStatus.FAILED
+            if stage:
+                stage.status = StageStatus.FAILED
             return
-        finally:
-            self._claude = None
 
-        # Refresh stages from tasks.md to check completion
-        self.state.stages = self._parser.refresh_stages(
-            self.state.stages,
-            self.config.tasks_file_path,
+        # Phase 2: Create PR
+        stage.phase = StagePhase.CREATING_PR
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"📝 Phase 2: Creating PR for Stage {stage.number}",
         )
 
-        # Get the updated stage
-        updated_stage = self.state.current_stage
-        if updated_stage and updated_stage.is_complete:
-            updated_stage.status = StageStatus.COMPLETED
-            logger.info("Stage %d completed successfully", stage.number)
-        else:
-            # Stage not fully complete - may need another iteration
-            remaining = len(updated_stage.pending_tasks) if updated_stage else 0
-            logger.info("Stage %d has %d remaining tasks", stage.number, remaining)
+        async for output in self._create_pr(stage):
+            yield output
+            if self._cancelled:
+                return
 
-    def _build_stage_prompt(self, stage: "Stage") -> str:
-        """Build the prompt for Claude Code to work on a stage.
+        # Phase 3: Review and fix
+        stage.phase = StagePhase.REVIEWING
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"🔍 Phase 3: Reviewing code for Stage {stage.number}",
+        )
+
+        async for output in self._review_and_fix(stage):
+            yield output
+            if self._cancelled:
+                return
+
+        # Phase 4: QA Testing
+        stage.phase = StagePhase.QA_TESTING
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"🧪 Phase 4: Running QA tests for Stage {stage.number}",
+        )
+
+        async for output in self._run_qa_tests(stage):
+            yield output
+            if self._cancelled:
+                return
+
+        # Phase 5: Ready for user approval
+        stage.phase = StagePhase.AWAITING_APPROVAL
+        stage.status = StageStatus.COMPLETED
+        self.state.awaiting_approval = True
+
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"✅ Stage {stage.number} ready for review. PR: {stage.pr_url or 'N/A'}",
+        )
+
+    async def _execute_until_complete(
+        self, stage: Stage
+    ) -> AsyncGenerator[ClaudeOutput, None]:
+        """Execute stage tasks until all are marked complete.
 
         Args:
-            stage: The stage to build a prompt for.
+            stage: The stage to execute.
+
+        Yields:
+            ClaudeOutput as execution progresses.
+        """
+        while stage.iteration_count < self.config.max_iterations:
+            if self._cancelled:
+                return
+
+            stage.iteration_count += 1
+            remaining = len(stage.pending_tasks)
+
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"  Iteration {stage.iteration_count}: {remaining} tasks remaining",
+            )
+
+            # Build and run the prompt
+            prompt = self._build_execution_prompt(stage)
+            async for output in self._run_claude(prompt):
+                yield output
+
+            # Refresh and check completion
+            self._refresh_stages()
+            updated_stage = self.state.current_stage
+            if updated_stage is None:
+                return
+
+            # Update the loop variable
+            stage = updated_stage
+
+            if stage.is_complete:
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDOUT,
+                    content=f"  All tasks complete after {stage.iteration_count} iteration(s)",
+                )
+                return
+
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDERR,
+            content=f"  Max iterations ({self.config.max_iterations}) reached",
+        )
+
+    async def _create_pr(self, stage: Stage) -> AsyncGenerator[ClaudeOutput, None]:
+        """Create a PR for the completed stage.
+
+        Args:
+            stage: The stage to create a PR for.
+
+        Yields:
+            ClaudeOutput with progress.
+        """
+        preamble = self._build_context_preamble()
+        prompt = f"""{preamble}Create a pull request for the work completed in Stage {stage.number}: {stage.name}
+
+Instructions:
+1. First, commit any uncommitted changes with a clear commit message
+2. Push the branch to origin
+3. Use `gh pr create` to create the PR with:
+   - Title: "Stage {stage.number}: {stage.name}"
+   - A description summarizing what was implemented
+   - Base branch: {self.state.base_branch}
+
+Report the PR URL when done.
+"""
+        async for output in self._run_claude(prompt):
+            yield output
+            # Extract PR URL
+            if output.type == ClaudeOutputType.STDOUT:
+                self._extract_pr_url(output.content, stage)
+
+    async def _review_and_fix(self, stage: Stage) -> AsyncGenerator[ClaudeOutput, None]:
+        """Review the PR code and make any necessary fixes.
+
+        Args:
+            stage: The stage to review.
+
+        Yields:
+            ClaudeOutput with review progress.
+        """
+        preamble = self._build_context_preamble()
+        prompt = f"""{preamble}Review the code changes for Stage {stage.number}: {stage.name}
+
+Look at the git diff of all changes made and check for:
+1. Code quality issues (unused variables, poor naming, etc.)
+2. Potential bugs or edge cases not handled
+3. Missing error handling
+4. Security issues
+5. Performance concerns
+
+If you find any issues:
+1. Fix them directly
+2. Commit the fixes with message "fix: address review feedback for Stage {stage.number}"
+3. Push the changes
+
+Be thorough but practical - focus on real issues, not style nitpicks.
+"""
+        async for output in self._run_claude(prompt):
+            yield output
+
+    async def _run_qa_tests(self, stage: Stage) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run manual QA testing for the stage.
+
+        Args:
+            stage: The stage to test.
+
+        Yields:
+            ClaudeOutput with test progress.
+        """
+        preamble = self._build_context_preamble()
+        prompt = f"""{preamble}Perform manual QA testing for Stage {stage.number}: {stage.name}
+
+DO NOT run unit tests (pytest, jest, etc.) - those are separate.
+
+Instead, do manual verification:
+1. If there's a CLI tool, run it with various inputs
+2. If there's an API, test endpoints with curl or similar
+3. If there's a script, execute it and verify output
+4. Check that files were created/modified as expected
+5. Verify any configuration is correct
+
+If you find bugs:
+1. Fix them
+2. Commit with message "fix: QA fixes for Stage {stage.number}"
+3. Push the changes
+4. Re-test to confirm the fix
+
+Report what you tested and the results.
+"""
+        async for output in self._run_claude(prompt):
+            yield output
+
+    def _build_context_preamble(self) -> str:
+        """Build a preamble that loads project context.
 
         Returns:
-            The formatted prompt string.
+            Preamble text instructing Claude to load .shotgun/ context.
         """
-        task_list = stage.format_task_list()
+        return f"""First, read these files to understand the project context:
+1. Read {self.state.tasks_file_path} to see all stages and tasks
+2. Read .shotgun/spec.md if it exists to understand the specification
+3. Read .shotgun/plan.md if it exists to understand the implementation plan
 
-        prompt = f"""Work on Stage {stage.number}: {stage.name}
+This gives you fresh context about the project state.
 
-Complete the following tasks. As you complete each task, mark it as done in {self.state.tasks_file_path} by changing `- [ ]` to `- [x]`.
+---
 
-Tasks:
+"""
+
+    def _build_execution_prompt(self, stage: Stage) -> str:
+        """Build the prompt for executing stage tasks.
+
+        Args:
+            stage: The stage to build prompt for.
+
+        Returns:
+            The formatted prompt.
+        """
+        pending = stage.pending_tasks
+        task_list = "\n".join(f"- [ ] {task.text}" for task in pending)
+
+        preamble = self._build_context_preamble()
+
+        return f"""{preamble}Complete the remaining tasks for Stage {stage.number}: {stage.name}
+
+IMPORTANT: Only work on THIS stage's tasks. Do not work ahead.
+
+Remaining tasks:
 {task_list}
 
-Important:
-- Focus only on tasks for this stage
-- Mark each task complete in {self.state.tasks_file_path} as you finish it
-- Commit your changes when you complete tasks
-- Be thorough but efficient
+Instructions:
+1. Complete each task thoroughly
+2. After completing a task, mark it done in {self.state.tasks_file_path} by changing `- [ ]` to `- [x]`
+3. Commit your changes after completing tasks
+4. Focus on quality - make sure the implementation is correct
+
+You MUST mark tasks as complete in {self.state.tasks_file_path} when done.
 """
-        return prompt
 
     async def _create_stage_branch(
         self, stage_number: int
@@ -220,25 +417,24 @@ Important:
         """Create a git branch for a stage.
 
         Args:
-            stage_number: The stage number to create a branch for.
+            stage_number: The stage number.
 
         Yields:
-            ClaudeOutput with the result.
+            ClaudeOutput with result.
         """
         branch_name = f"{self.config.branch_prefix}{stage_number}"
         stage = self.state.stages[stage_number - 1]
 
-        # Determine the base branch
+        # Determine base branch
         if stage_number == 1:
             base = self.state.base_branch
         else:
-            # Stack on previous stage's branch
             base = f"{self.config.branch_prefix}{stage_number - 1}"
 
         logger.info("Creating branch %s from %s", branch_name, base)
 
-        # Use git to create and checkout the branch
         try:
+            # Try to create new branch
             process = await asyncio.create_subprocess_exec(
                 "git",
                 "checkout",
@@ -249,10 +445,10 @@ Important:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await process.communicate()
+            await process.communicate()
 
             if process.returncode != 0:
-                # Branch might already exist, try just checking it out
+                # Branch might exist, try checking it out
                 process = await asyncio.create_subprocess_exec(
                     "git",
                     "checkout",
@@ -261,13 +457,12 @@ Important:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await process.communicate()
+                _, stderr = await process.communicate()
 
                 if process.returncode != 0:
-                    error_msg = stderr.decode("utf-8", errors="replace")
                     yield ClaudeOutput(
                         type=ClaudeOutputType.ERROR,
-                        content=f"Failed to create/checkout branch: {error_msg}",
+                        content=f"Failed to checkout branch: {stderr.decode()}",
                     )
                     return
 
@@ -276,7 +471,7 @@ Important:
 
             yield ClaudeOutput(
                 type=ClaudeOutputType.STDOUT,
-                content=f"Created and checked out branch: {branch_name}",
+                content=f"On branch: {branch_name}",
             )
 
         except Exception as e:
@@ -285,33 +480,15 @@ Important:
                 content=f"Git error: {e}",
             )
 
-    async def create_pr(self) -> AsyncGenerator[ClaudeOutput, None]:
-        """Create a PR for the current stage.
+    async def _run_claude(self, prompt: str) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run Claude Code with a prompt.
+
+        Args:
+            prompt: The prompt to send.
 
         Yields:
-            ClaudeOutput with progress and result.
+            ClaudeOutput as execution progresses.
         """
-        stage = self.state.current_stage
-        if stage is None:
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content="No current stage for PR creation",
-            )
-            return
-
-        logger.info("Creating PR for Stage %d", stage.number)
-
-        # Build the prompt for Claude to create a PR
-        prompt = f"""Create a pull request for Stage {stage.number}: {stage.name}
-
-Use `gh pr create` to create the PR with:
-- A clear title mentioning Stage {stage.number}
-- A description summarizing the work completed
-- Target the appropriate base branch
-
-Just create the PR and report the URL.
-"""
-
         config = ClaudeSubprocessConfig(
             working_directory=self.config.working_directory,
         )
@@ -320,93 +497,77 @@ Just create the PR and report the URL.
         try:
             async for output in self._claude.run(prompt):
                 yield output
-
-                # Try to extract PR URL from output
-                if output.type == ClaudeOutputType.STDOUT:
-                    if "github.com" in output.content and "/pull/" in output.content:
-                        # Extract URL
-                        import re
-
-                        url_match = re.search(
-                            r"https://github\.com/[^\s]+/pull/\d+",
-                            output.content,
-                        )
-                        if url_match:
-                            pr_url = url_match.group(0)
-                            stage.pr_url = pr_url
-                            self.state.pr_urls.append(pr_url)
-                            logger.info("PR created: %s", pr_url)
-
         except Exception as e:
+            logger.exception("Error running Claude")
             yield ClaudeOutput(
                 type=ClaudeOutputType.ERROR,
-                content=f"Error creating PR: {e}",
+                content=f"Claude error: {e}",
             )
         finally:
             self._claude = None
 
-    async def review_pr(self) -> AsyncGenerator[ClaudeOutput, None]:
-        """Have Claude review the current stage's PR.
-
-        Yields:
-            ClaudeOutput with the review results.
-        """
-        stage = self.state.current_stage
-        if stage is None or stage.pr_url is None:
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content="No PR to review",
-            )
-            return
-
-        logger.info("Reviewing PR for Stage %d", stage.number)
-
-        prompt = f"""Review the changes in the current PR.
-
-PR URL: {stage.pr_url}
-
-Provide a brief review of:
-1. Code quality and correctness
-2. Any potential issues or improvements
-3. Whether the stage tasks appear complete
-"""
-
-        config = ClaudeSubprocessConfig(
-            working_directory=self.config.working_directory,
+    def _refresh_stages(self) -> None:
+        """Refresh stage task completion status from tasks.md."""
+        self.state.stages = self._parser.refresh_stages(
+            self.state.stages,
+            self.config.tasks_file_path,
         )
-        self._claude = ClaudeSubprocess(config)
 
-        try:
-            async for output in self._claude.run(prompt):
-                yield output
+    def _extract_pr_url(self, content: str, stage: Stage) -> None:
+        """Extract PR URL from output content.
 
-        except Exception as e:
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content=f"Error reviewing PR: {e}",
-            )
-        finally:
-            self._claude = None
+        Args:
+            content: The output content to search.
+            stage: The stage to update with PR URL.
+        """
+        if "github.com" in content and "/pull/" in content:
+            match = re.search(r"https://github\.com/[^\s]+/pull/\d+", content)
+            if match:
+                pr_url = match.group(0)
+                stage.pr_url = pr_url
+                self.state.pr_urls.append(pr_url)
+                logger.info("PR created: %s", pr_url)
+
+    def handle_user_approval(self, approved: bool, feedback: str | None = None) -> None:
+        """Handle user's Accept/Reject decision.
+
+        Args:
+            approved: True if user accepted, False if rejected.
+            feedback: Optional feedback if rejected.
+        """
+        self.state.awaiting_approval = False
+        stage = self.state.current_stage
+
+        if stage:
+            if approved:
+                logger.info("User approved Stage %d", stage.number)
+                stage.phase = None  # Clear phase
+            else:
+                logger.info("User rejected Stage %d: %s", stage.number, feedback)
+                # Reset to allow re-work
+                stage.phase = StagePhase.EXECUTING
+                stage.status = StageStatus.IN_PROGRESS
 
     def advance_to_next_stage(self) -> bool:
         """Advance to the next stage.
 
         Returns:
-            True if advanced successfully, False if no more stages.
+            True if advanced, False if no more stages.
         """
         result = self.state.advance_to_next_stage()
         if result:
+            stage = self.state.current_stage
             logger.info(
                 "Advanced to Stage %d: %s",
-                self.state.current_stage.number if self.state.current_stage else 0,
-                self.state.current_stage.name if self.state.current_stage else "",
+                stage.number if stage else 0,
+                stage.name if stage else "",
             )
         else:
             logger.info("All stages complete")
         return result
 
     async def cancel(self) -> None:
-        """Cancel the current execution."""
+        """Cancel current execution."""
         self._cancelled = True
         if self._claude:
             await self._claude.cancel()
@@ -418,20 +579,12 @@ Provide a brief review of:
         return self.state.is_complete
 
     @property
-    def requires_approval(self) -> bool:
-        """Check if we need user approval to continue.
+    def awaiting_approval(self) -> bool:
+        """Check if waiting for user approval."""
+        return self.state.awaiting_approval
 
-        Returns True in pause mode after stage completion.
-        """
-        if self.state.mode != AutopilotMode.PAUSE_BETWEEN:
-            return False
-
-        current = self.state.current_stage
-        if current is None:
-            return False
-
-        return current.status == StageStatus.COMPLETED
-
-
-# Import Stage here to avoid circular imports
-from shotgun.agents.autopilot.models import Stage  # noqa: E402
+    # Legacy method for compatibility
+    async def run_next_stage(self) -> AsyncGenerator[ClaudeOutput, None]:
+        """Legacy method - use run_stage_workflow instead."""
+        async for output in self.run_stage_workflow():
+            yield output

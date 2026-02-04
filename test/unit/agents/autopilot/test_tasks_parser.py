@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from shotgun.agents.autopilot.models import Stage, StageStatus, Task
 from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
 
@@ -13,7 +11,7 @@ def test_parser_initialization():
     parser = TasksParser()
     assert parser.working_directory == Path.cwd()
 
-    custom_dir = Path("/tmp/test")
+    custom_dir = Path("/var/tmp/test")  # noqa: S108
     parser_with_dir = TasksParser(custom_dir)
     assert parser_with_dir.working_directory == custom_dir
 
@@ -217,8 +215,8 @@ def test_refresh_stages_updates_completion():
 """
     parser = TasksParser()
 
-    # Create a mock parsed result
-    parsed = parser.parse_content(new_content)
+    # Verify parsing works (result not used, just exercising the parser)
+    _ = parser.parse_content(new_content)
 
     # Manually test the refresh logic by simulating the file parse
     updated_stages = parser.refresh_stages(

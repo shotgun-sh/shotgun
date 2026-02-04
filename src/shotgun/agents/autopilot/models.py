@@ -27,6 +27,16 @@ class StageStatus(StrEnum):
     SKIPPED = "skipped"  # Skipped by user
 
 
+class StagePhase(StrEnum):
+    """Current phase within a stage's execution workflow."""
+
+    EXECUTING = "executing"  # Running tasks
+    CREATING_PR = "creating_pr"  # Creating the PR
+    REVIEWING = "reviewing"  # Reviewing code and making fixes
+    QA_TESTING = "qa_testing"  # Running manual QA tests
+    AWAITING_APPROVAL = "awaiting_approval"  # Waiting for user Accept/Reject
+
+
 class Task(BaseModel):
     """A single task within a stage.
 
@@ -56,11 +66,17 @@ class Stage(BaseModel):
     status: StageStatus = Field(
         default=StageStatus.PENDING, description="Current status of this stage"
     )
+    phase: StagePhase | None = Field(
+        default=None, description="Current phase in the stage workflow"
+    )
     branch_name: str | None = Field(
         default=None, description="Git branch created for this stage"
     )
     pr_url: str | None = Field(
         default=None, description="URL of the PR created for this stage"
+    )
+    iteration_count: int = Field(
+        default=0, description="Number of execution iterations for this stage"
     )
 
     @property

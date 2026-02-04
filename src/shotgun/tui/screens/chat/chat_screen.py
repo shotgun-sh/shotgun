@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from shotgun.agents.autopilot import AutopilotOrchestrator
     from shotgun.agents.autopilot.models import AutopilotMode, Stage
     from shotgun.agents.constants import FileContent
     from shotgun.agents.router.models import ExecutionStep
@@ -115,10 +116,12 @@ from shotgun.tui.screens.chat_screen.command_providers import (
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.chat_screen.messages import (
+    AutopilotAccept,
     AutopilotApprovalRequired,
     AutopilotCancel,
     AutopilotContinue,
     AutopilotOutputReceived,
+    AutopilotReject,
     AutopilotStart,
     AutopilotStop,
     CascadeConfirmationRequired,
@@ -235,9 +238,11 @@ class ChatScreen(Screen[None]):
     # Plan panel widget (Stage 11)
     _plan_panel: PlanPanelWidget | None = None
 
-    # Autopilot widgets
+    # Autopilot widgets and state
     _autopilot_startup_widget: AutopilotStartupWidget | None = None
     _autopilot_approval_widget: StageApprovalWidget | None = None
+    _autopilot_orchestrator: "AutopilotOrchestrator | None" = None
+    _autopilot_rejection_mode: bool = False  # True when waiting for rejection feedback
 
     def __init__(
         self,
@@ -1648,6 +1653,29 @@ class ChatScreen(Screen[None]):
             self.value = ""
             return
 
+        # Handle autopilot rejection feedback mode
+        if self._autopilot_rejection_mode and self._autopilot_orchestrator:
+            self._autopilot_rejection_mode = False
+            feedback = text
+
+            # Clear input
+            self.widget_coordinator.update_prompt_input(
+                clear=True,
+                placeholder="Enter your message...",
+            )
+            self.value = ""
+
+            # Continue autopilot with feedback
+            orchestrator = self._autopilot_orchestrator
+            orchestrator.handle_user_approval(approved=False, feedback=feedback)
+
+            self._run_autopilot_stage(
+                orchestrator.state.mode,
+                orchestrator.state.stages,
+                feedback=feedback,
+            )
+            return
+
         # Handle Q&A mode (from structured output clarifying questions)
         if self.qa_mode and self.qa_questions:
             # Collect answer
@@ -2895,9 +2923,18 @@ class ChatScreen(Screen[None]):
         """
         from shotgun.agents.autopilot import TasksParser
 
+        logger.info("Autopilot: show_autopilot_startup called")
+
         # Parse tasks.md
         parser = TasksParser(self.deps.working_directory)
         parsed = parser.parse()
+
+        logger.info(
+            "Autopilot: Parsed tasks.md - valid=%s, stages=%d, errors=%s",
+            parsed.is_valid,
+            len(parsed.stages),
+            parsed.parse_errors,
+        )
 
         # Show startup widget
         if parsed.is_valid:
@@ -2916,24 +2953,37 @@ class ChatScreen(Screen[None]):
             stages: List of stages parsed from tasks.md.
             error_message: Optional error message to display.
         """
+        logger.info(
+            "Autopilot: _show_autopilot_startup_widget called with %d stages",
+            len(stages),
+        )
+
         # Remove existing widget if any
         if self._autopilot_startup_widget:
             self._autopilot_startup_widget.remove()
             self._autopilot_startup_widget = None
 
-        # Create and mount new widget
-        self._autopilot_startup_widget = AutopilotStartupWidget(
-            stages, error_message
-        )
-        window = self.query_one("#window")
+        # Create the widget
+        self._autopilot_startup_widget = AutopilotStartupWidget(stages, error_message)
+
+        # Hide PromptInput and mount widget in footer (like PlanApprovalWidget)
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = False
+
         footer = self.query_one("#footer")
-        window.mount(self._autopilot_startup_widget, before=footer)
+        footer.mount(self._autopilot_startup_widget, after=prompt_input)
+
+        logger.info("Autopilot: Widget mounted in footer")
 
     def _hide_autopilot_startup_widget(self) -> None:
-        """Hide the autopilot startup widget."""
+        """Hide the autopilot startup widget and restore PromptInput."""
         if self._autopilot_startup_widget:
             self._autopilot_startup_widget.remove()
             self._autopilot_startup_widget = None
+
+        # Restore PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = True
 
     @on(AutopilotStart)
     def handle_autopilot_start(self, event: AutopilotStart) -> None:
@@ -2947,7 +2997,7 @@ class ChatScreen(Screen[None]):
         )
 
         # Start the autopilot loop
-        self._run_autopilot_loop(event.mode, event.stages)
+        self._run_autopilot_stage(event.mode, event.stages)
 
     @on(AutopilotCancel)
     def handle_autopilot_cancel(self) -> None:
@@ -2957,14 +3007,25 @@ class ChatScreen(Screen[None]):
         self.widget_coordinator.update_prompt_input(focus=True)
 
     @work(exclusive=True)
-    async def _run_autopilot_loop(
-        self, mode: "AutopilotMode", stages: "list[Stage]"
+    async def _run_autopilot_stage(
+        self,
+        mode: "AutopilotMode",
+        stages: "list[Stage]",
+        feedback: str | None = None,
     ) -> None:
-        """Run the autopilot execution loop.
+        """Run the autopilot workflow for the current stage.
+
+        This runs the complete workflow for one stage:
+        1. Execute tasks until complete
+        2. Create PR
+        3. Review and fix code
+        4. Run QA tests
+        5. Show approval widget
 
         Args:
             mode: The execution mode.
-            stages: List of stages to execute.
+            stages: List of stages (with current state).
+            feedback: Optional feedback from user rejection.
         """
         from shotgun.agents.autopilot import (
             AutopilotConfig,
@@ -2973,67 +3034,74 @@ class ChatScreen(Screen[None]):
             ClaudeOutputType,
         )
 
-        # Create orchestrator
-        config = AutopilotConfig(
-            working_directory=self.deps.working_directory,
-        )
-        orchestrator = AutopilotOrchestrator(config)
+        # Create or reuse orchestrator
+        if self._autopilot_orchestrator is None:
+            config = AutopilotConfig(
+                working_directory=self.deps.working_directory,
+            )
+            self._autopilot_orchestrator = AutopilotOrchestrator(config)
+            self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))
+            self._autopilot_orchestrator.state.stages = stages
 
-        # Set mode and initialize with pre-parsed stages
-        # Need to convert type hint to runtime type
-        orchestrator.set_mode(AutopilotMode(mode.value))
-        orchestrator.state.stages = stages
+        orchestrator = self._autopilot_orchestrator
+
+        # If we have feedback, run a fix iteration first
+        if feedback:
+            self.mount_hint(f"Addressing feedback: {feedback}")
+            self.processing_state.start_processing("Addressing feedback...")
+
+            prompt = f"""The user reviewed the PR and requested changes:
+
+{feedback}
+
+Please address this feedback:
+1. Make the necessary changes
+2. Commit with message "fix: address user feedback"
+3. Push the changes
+
+Then confirm what you changed.
+"""
+            try:
+                async for output in orchestrator._run_claude(prompt):
+                    self.post_message(AutopilotOutputReceived(output))
+            except Exception as e:
+                logger.exception("Error addressing feedback")
+                self.mount_hint(f"[red]Error:[/] {e}")
+
+            self.processing_state.stop_processing()
+
+        # Check if orchestrator is complete
+        if orchestrator.is_complete:
+            self.mount_hint("[green]Autopilot completed all stages![/]")
+            self._autopilot_orchestrator = None
+            self.widget_coordinator.update_prompt_input(focus=True)
+            return
+
+        current_stage = orchestrator.state.current_stage
+        if current_stage is None:
+            self.mount_hint("[yellow]No current stage[/]")
+            return
 
         # Show we're starting
-        self.processing_state.start_processing("Running Autopilot...")
+        self.processing_state.start_processing(
+            f"Stage {current_stage.number}: {current_stage.name}"
+        )
+        self.mount_hint(f"**Stage {current_stage.number}:** {current_stage.name}")
 
         try:
-            while not orchestrator.is_complete:
-                current_stage = orchestrator.state.current_stage
-                if current_stage is None:
-                    break
+            # Run the complete stage workflow
+            async for output in orchestrator.run_stage_workflow():
+                self.post_message(AutopilotOutputReceived(output))
 
-                # Log stage start
-                logger.info(
-                    "Autopilot: Starting Stage %d: %s",
-                    current_stage.number,
-                    current_stage.name,
-                )
-                self.mount_hint(
-                    f"**Stage {current_stage.number}:** {current_stage.name}"
-                )
+                if output.type == ClaudeOutputType.ERROR:
+                    self.mount_hint(f"[red]Error:[/] {output.content}")
 
-                # Run the stage
-                async for output in orchestrator.run_next_stage():
-                    # Post output message for display
-                    self.post_message(AutopilotOutputReceived(output))
-
-                    # Check for errors
-                    if output.type == ClaudeOutputType.ERROR:
-                        self.mount_hint(f"[red]Error:[/] {output.content}")
-                        return
-
-                # Check if we need to create PR
-                if orchestrator.state.mode == AutopilotMode.AUTO_CONTINUE:
-                    self.mount_hint("Creating PR for stage...")
-                    async for output in orchestrator.create_pr():
-                        self.post_message(AutopilotOutputReceived(output))
-
-                # Check if we need approval (pause mode)
-                if orchestrator.requires_approval:
-                    next_stage = orchestrator.state.next_stage
-                    self.post_message(
-                        AutopilotApprovalRequired(current_stage, next_stage)
-                    )
-                    # Wait for user response - the handler will resume us
-                    return
-
-                # Advance to next stage
-                if not orchestrator.advance_to_next_stage():
-                    break
-
-            # All done
-            self.mount_hint("[green]Autopilot completed all stages![/]")
+            # Check if awaiting approval
+            if orchestrator.awaiting_approval:
+                next_stage = orchestrator.state.next_stage
+                self.post_message(AutopilotApprovalRequired(current_stage, next_stage))
+                # Workflow paused - user will Accept or Reject
+                return
 
         except asyncio.CancelledError:
             self.mount_hint("Autopilot was cancelled")
@@ -3042,7 +3110,6 @@ class ChatScreen(Screen[None]):
             self.mount_hint(f"[red]Autopilot error:[/] {e}")
         finally:
             self.processing_state.stop_processing()
-            self.widget_coordinator.update_prompt_input(focus=True)
 
     @on(AutopilotOutputReceived)
     def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
@@ -3050,30 +3117,34 @@ class ChatScreen(Screen[None]):
         from shotgun.agents.autopilot.models import ClaudeOutputType
 
         output = event.output
+        content = output.content.strip()
+
+        if not content:
+            return
 
         # Format based on output type
         if output.type == ClaudeOutputType.STDOUT:
-            # Regular output - show as hint
-            if output.content.strip():
-                self.agent_manager.add_hint_message(
-                    HintMessage(message=output.content)
-                )
+            # Tool calls (start with emoji) are compact
+            is_tool_call = any(
+                content.startswith(c) for c in ["📖", "✏️", "📝", "💻", "🔍", "🔎", "🔧"]
+            )
+            self.agent_manager.add_hint_message(
+                HintMessage(message=content, compact=is_tool_call)
+            )
         elif output.type == ClaudeOutputType.STDERR:
-            # Error output - show with warning style
-            if output.content.strip():
-                self.agent_manager.add_hint_message(
-                    HintMessage(message=f"[yellow]{output.content}[/]")
-                )
+            self.agent_manager.add_hint_message(
+                HintMessage(message=f"[yellow]{content}[/]", compact=True)
+            )
         elif output.type == ClaudeOutputType.EXIT:
-            # Exit - show completion
             if output.exit_code == 0:
                 self.agent_manager.add_hint_message(
-                    HintMessage(message="[dim]Claude completed[/]")
+                    HintMessage(message="[dim]✓ Claude completed[/]", compact=True)
                 )
             else:
                 self.agent_manager.add_hint_message(
                     HintMessage(
-                        message=f"[yellow]Claude exited with code {output.exit_code}[/]"
+                        message=f"[yellow]⚠ Claude exited: {output.exit_code}[/]",
+                        compact=True,
                     )
                 )
 
@@ -3081,40 +3152,87 @@ class ChatScreen(Screen[None]):
     def handle_autopilot_approval_required(
         self, event: AutopilotApprovalRequired
     ) -> None:
-        """Show approval widget between stages."""
+        """Show approval widget when stage workflow completes."""
         # Remove existing widget if any
         if self._autopilot_approval_widget:
             self._autopilot_approval_widget.remove()
             self._autopilot_approval_widget = None
 
-        # Create and mount approval widget
+        # Hide prompt input and mount approval widget in footer
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = False
+
         self._autopilot_approval_widget = StageApprovalWidget(
             event.completed_stage, event.next_stage
         )
-        window = self.query_one("#window")
         footer = self.query_one("#footer")
-        window.mount(self._autopilot_approval_widget, before=footer)
+        footer.mount(self._autopilot_approval_widget, after=prompt_input)
 
-    @on(AutopilotContinue)
-    def handle_autopilot_continue(self) -> None:
-        """Handle user continuing autopilot execution."""
-        # Remove approval widget
+    def _hide_autopilot_approval_widget(self) -> None:
+        """Hide the approval widget and restore prompt input."""
         if self._autopilot_approval_widget:
             self._autopilot_approval_widget.remove()
             self._autopilot_approval_widget = None
 
-        self.mount_hint("Continuing to next stage...")
-        # Note: The worker needs to be resumed - this is a simplified implementation
-        # In production, we'd need to track orchestrator state and resume properly
-        self.widget_coordinator.update_prompt_input(focus=True)
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = True
+
+    @on(AutopilotAccept)
+    def handle_autopilot_accept(self) -> None:
+        """Handle user accepting the completed stage."""
+
+        self._hide_autopilot_approval_widget()
+
+        if self._autopilot_orchestrator:
+            orchestrator = self._autopilot_orchestrator
+
+            # Mark as approved
+            orchestrator.handle_user_approval(approved=True)
+
+            # Check if there are more stages
+            if orchestrator.advance_to_next_stage():
+                self.mount_hint("Moving to next stage...")
+                # Continue with next stage
+                self._run_autopilot_stage(
+                    orchestrator.state.mode,
+                    orchestrator.state.stages,
+                )
+            else:
+                # All done!
+                self.mount_hint("[green]Autopilot completed all stages![/]")
+                self._autopilot_orchestrator = None
+                self.widget_coordinator.update_prompt_input(focus=True)
+        else:
+            self.widget_coordinator.update_prompt_input(focus=True)
+
+    @on(AutopilotReject)
+    def handle_autopilot_reject(self, event: "AutopilotReject") -> None:
+        """Handle user rejecting the stage - show prompt for feedback."""
+        self._hide_autopilot_approval_widget()
+
+        # Enable rejection mode - next prompt submission is feedback
+        self._autopilot_rejection_mode = True
+
+        self.mount_hint(
+            "[yellow]What changes would you like?[/] "
+            "Enter your feedback and press Enter."
+        )
+        self.widget_coordinator.update_prompt_input(
+            focus=True,
+            placeholder="Describe the changes you want...",
+        )
+
+    @on(AutopilotContinue)
+    def handle_autopilot_continue(self) -> None:
+        """Handle legacy continue message - same as accept."""
+        self.handle_autopilot_accept()
 
     @on(AutopilotStop)
     def handle_autopilot_stop(self) -> None:
         """Handle user stopping autopilot execution."""
-        # Remove approval widget
-        if self._autopilot_approval_widget:
-            self._autopilot_approval_widget.remove()
-            self._autopilot_approval_widget = None
+        self._hide_autopilot_approval_widget()
+        self._autopilot_orchestrator = None
+        self._autopilot_rejection_mode = False
 
         self.mount_hint("Autopilot stopped by user")
         self.widget_coordinator.update_prompt_input(focus=True)

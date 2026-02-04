@@ -1,7 +1,5 @@
 """Tests for autopilot models."""
 
-import pytest
-
 from shotgun.agents.autopilot.models import (
     AutopilotMode,
     AutopilotState,

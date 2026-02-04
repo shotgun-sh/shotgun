@@ -1,82 +1,92 @@
-"""Stage approval widget for Autopilot pause mode.
+"""Stage approval widget for Autopilot workflow.
 
-This widget displays between stages in pause mode, allowing the user
-to review the completed stage and choose whether to continue.
+This widget displays after a stage completes its workflow, showing the PR
+and allowing the user to Accept (continue) or Reject (request changes).
 """
 
 from textual import events, on
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.widget import Widget
 from textual.widgets import Button, Static
 
 from shotgun.agents.autopilot.models import Stage
 from shotgun.tui.screens.chat_screen.messages import (
-    AutopilotContinue,
+    AutopilotAccept,
+    AutopilotReject,
     AutopilotStop,
 )
 
 
 class StageApprovalWidget(Widget):
-    """Widget for stage completion approval in Autopilot pause mode.
+    """Widget for stage approval in Autopilot workflow.
 
-    Displays information about the completed stage and provides
-    action buttons for the user to continue or stop.
+    Shows the completed stage with PR link and Accept/Reject buttons.
+    The input box is disabled while this widget is shown.
 
     Attributes:
-        completed_stage: The stage that was just completed.
+        completed_stage: The stage that completed the workflow.
         next_stage: The next stage to execute, or None if all complete.
     """
 
     DEFAULT_CSS = """
         StageApprovalWidget {
-            background: $secondary-background-darken-1;
+            background: $surface;
             height: auto;
-            margin: 1;
-            padding: 1;
+            margin: 0 1;
+            padding: 1 2;
             border: solid $success;
         }
 
-        StageApprovalWidget .stage-header {
+        StageApprovalWidget .approval-header {
+            text-align: center;
             margin-bottom: 1;
         }
 
-        StageApprovalWidget .completed-info {
-            color: $success;
+        StageApprovalWidget .stage-info {
             margin-bottom: 1;
         }
 
-        StageApprovalWidget .next-stage-preview {
-            color: $text-muted;
-        }
-
-        StageApprovalWidget .pr-info {
+        StageApprovalWidget .pr-link {
             color: $primary;
+            text-style: bold;
             margin: 1 0;
         }
 
-        StageApprovalWidget .stage-buttons {
+        StageApprovalWidget .next-preview {
+            color: $text-muted;
+            margin-top: 1;
+        }
+
+        StageApprovalWidget .button-row {
             height: auto;
             width: 100%;
+            align: center middle;
             margin-top: 1;
         }
 
         StageApprovalWidget Button {
-            margin-right: 1;
-            min-width: 14;
+            margin: 0 2;
+            min-width: 16;
         }
 
-        StageApprovalWidget #btn-continue {
+        StageApprovalWidget #btn-accept {
             background: $success;
+        }
+
+        StageApprovalWidget #btn-reject {
+            background: $warning;
         }
 
         StageApprovalWidget #btn-stop {
             background: $error;
         }
 
-        StageApprovalWidget #btn-done {
-            background: $success;
+        StageApprovalWidget .all-done {
+            color: $success;
+            text-style: bold;
+            text-align: center;
         }
     """
 
@@ -84,8 +94,8 @@ class StageApprovalWidget(Widget):
         """Initialize the approval widget.
 
         Args:
-            completed_stage: The stage that was just completed.
-            next_stage: The next stage to execute, or None if last stage.
+            completed_stage: The stage that completed.
+            next_stage: The next stage, or None if all done.
         """
         super().__init__()
         self.completed_stage = completed_stage
@@ -93,96 +103,92 @@ class StageApprovalWidget(Widget):
 
     def compose(self) -> ComposeResult:
         """Compose the approval widget layout."""
-        if self.next_stage:
-            # Mid-execution: show completed stage with next stage preview
+        with Vertical():
+            # Header
             yield Static(
-                f"[bold green]Stage {self.completed_stage.number} completed[/]",
-                classes="stage-header",
-            )
-            yield Static(
-                f"[green]{self.completed_stage.name}[/] - "
-                f"{self.completed_stage.completed_count}/{self.completed_stage.task_count} tasks",
-                classes="completed-info",
+                f"[bold]Stage {self.completed_stage.number} Complete[/bold]",
+                classes="approval-header",
             )
 
-            # Show PR URL if available
+            # Stage info
+            yield Static(
+                f"{self.completed_stage.name} - "
+                f"{self.completed_stage.completed_count}/{self.completed_stage.task_count} tasks done",
+                classes="stage-info",
+            )
+
+            # PR Link (prominent)
             if self.completed_stage.pr_url:
                 yield Static(
-                    f"[dim]PR:[/] {self.completed_stage.pr_url}",
-                    classes="pr-info",
+                    f"PR: {self.completed_stage.pr_url}",
+                    classes="pr-link",
                 )
-
-            yield Static(
-                f"[dim]Next:[/] Stage {self.next_stage.number}: {self.next_stage.name} "
-                f"({self.next_stage.task_count} tasks)",
-                classes="next-stage-preview",
-            )
-
-            with Horizontal(classes="stage-buttons"):
-                yield Button("Continue", id="btn-continue")
-                yield Button("Stop here", id="btn-stop")
-        else:
-            # All stages complete
-            yield Static(
-                "[bold green]All stages completed![/]",
-                classes="stage-header",
-            )
-            yield Static(
-                f"[green]Final stage:[/] {self.completed_stage.name}",
-                classes="completed-info",
-            )
-
-            # Show PR URL if available
-            if self.completed_stage.pr_url:
+            else:
                 yield Static(
-                    f"[dim]PR:[/] {self.completed_stage.pr_url}",
-                    classes="pr-info",
+                    "[dim]No PR created[/dim]",
+                    classes="pr-link",
                 )
 
-            with Horizontal(classes="stage-buttons"):
-                yield Button("Done", id="btn-done")
+            # Next stage preview
+            if self.next_stage:
+                yield Static(
+                    f"[dim]Next: Stage {self.next_stage.number}: {self.next_stage.name}[/dim]",
+                    classes="next-preview",
+                )
+            else:
+                yield Static(
+                    "[green]This is the final stage![/green]",
+                    classes="all-done",
+                )
+
+            # Buttons
+            with Horizontal(classes="button-row"):
+                if self.next_stage:
+                    yield Button("Accept", id="btn-accept", variant="success")
+                    yield Button("Reject", id="btn-reject", variant="warning")
+                else:
+                    # Final stage - just Done button
+                    yield Button("Done", id="btn-accept", variant="success")
 
     def on_mount(self) -> None:
-        """Auto-focus the appropriate button on mount."""
+        """Focus the Accept button on mount."""
         try:
-            continue_btn = self.query_one("#btn-continue", Button)
-            continue_btn.focus()
+            btn = self.query_one("#btn-accept", Button)
+            btn.focus()
         except NoMatches:
-            try:
-                done_btn = self.query_one("#btn-done", Button)
-                done_btn.focus()
-            except NoMatches:
-                pass
+            pass
 
-    @on(Button.Pressed, "#btn-continue")
-    def handle_continue(self) -> None:
-        """Handle Continue button press."""
-        self.post_message(AutopilotContinue())
+    @on(Button.Pressed, "#btn-accept")
+    def handle_accept(self) -> None:
+        """Handle Accept button - approve and continue."""
+        self.post_message(AutopilotAccept())
+
+    @on(Button.Pressed, "#btn-reject")
+    def handle_reject(self) -> None:
+        """Handle Reject button - request changes."""
+        # Post reject message - the TUI will show prompt input for feedback
+        self.post_message(AutopilotReject())
 
     @on(Button.Pressed, "#btn-stop")
     def handle_stop(self) -> None:
-        """Handle Stop button press."""
-        self.post_message(AutopilotStop())
-
-    @on(Button.Pressed, "#btn-done")
-    def handle_done(self) -> None:
-        """Handle Done button press (all stages complete)."""
+        """Handle Stop button."""
         self.post_message(AutopilotStop())
 
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard shortcuts.
 
         Shortcuts:
-            Enter/C: Continue to next stage (or dismiss if complete)
-            Escape/S: Stop execution
+            A/Enter: Accept
+            R: Reject
+            Escape: Stop
         """
-        if event.key in ("enter", "c", "C"):
-            if self.next_stage:
-                self.post_message(AutopilotContinue())
-            else:
-                # All complete - dismiss
-                self.post_message(AutopilotStop())
+        if event.key in ("a", "A", "enter"):
+            self.post_message(AutopilotAccept())
             event.stop()
-        elif event.key in ("escape", "s", "S"):
+        elif event.key in ("r", "R"):
+            if self.next_stage:  # Only allow reject if not final stage
+                self.post_message(AutopilotReject())
+            event.stop()
+        elif event.key == "escape":
             self.post_message(AutopilotStop())
             event.stop()

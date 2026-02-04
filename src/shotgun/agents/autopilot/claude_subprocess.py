@@ -1,14 +1,13 @@
-"""Claude Code CLI subprocess manager.
+"""Claude Code SDK integration for Autopilot.
 
-This module provides async subprocess management for running Claude Code
-commands and streaming their output line-by-line to the TUI.
+This module provides async integration with the Claude Agent SDK
+for running Claude Code and streaming output to the TUI.
 """
 
-import asyncio
 import logging
-import shutil
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClaudeSubprocessConfig(BaseModel):
-    """Configuration for Claude subprocess execution."""
+    """Configuration for Claude SDK execution."""
 
     working_directory: Path = Field(
         default_factory=Path.cwd,
@@ -28,65 +27,40 @@ class ClaudeSubprocessConfig(BaseModel):
         default=None,
         description="Maximum execution time in seconds (None for no timeout)",
     )
-    claude_command: str = Field(
-        default="claude",
-        description="Claude CLI command/path to use",
+    model: str | None = Field(
+        default=None,
+        description="Model to use (defaults to Claude's default)",
+    )
+    system_prompt: str | None = Field(
+        default=None,
+        description="Optional system prompt to prepend",
     )
 
 
 class ClaudeSubprocessError(Exception):
-    """Error during Claude subprocess execution."""
+    """Error during Claude SDK execution."""
 
 
 class ClaudeSubprocess:
-    """Async subprocess manager for Claude Code CLI.
+    """Claude Agent SDK wrapper for Autopilot.
 
-    Handles spawning the Claude Code CLI as a subprocess, streaming its
-    output line-by-line, and supporting cancellation.
+    Uses the official claude-agent-sdk to run Claude Code and stream
+    output back to the TUI.
     """
 
     def __init__(self, config: ClaudeSubprocessConfig | None = None):
-        """Initialize the subprocess manager.
+        """Initialize the SDK wrapper.
 
         Args:
-            config: Configuration for subprocess execution.
+            config: Configuration for SDK execution.
         """
         self.config = config or ClaudeSubprocessConfig()
-        self._process: asyncio.subprocess.Process | None = None
         self._cancelled = False
 
     @property
     def is_running(self) -> bool:
-        """Check if a subprocess is currently running."""
-        return self._process is not None and self._process.returncode is None
-
-    def _find_claude_command(self) -> str:
-        """Find the Claude CLI command.
-
-        Returns:
-            Path to the claude command.
-
-        Raises:
-            ClaudeSubprocessError: If claude is not found.
-        """
-        # Check if configured command exists
-        command = self.config.claude_command
-
-        # If it's a path, check if it exists
-        if "/" in command or "\\" in command:
-            if Path(command).exists():
-                return command
-            raise ClaudeSubprocessError(f"Claude command not found at: {command}")
-
-        # Otherwise, look in PATH
-        claude_path = shutil.which(command)
-        if claude_path:
-            return claude_path
-
-        raise ClaudeSubprocessError(
-            f"Claude CLI not found. Please install it or set the path in config. "
-            f"Tried: {command}"
-        )
+        """Check if execution is in progress."""
+        return not self._cancelled
 
     async def run(
         self,
@@ -100,193 +74,169 @@ class ClaudeSubprocess:
         Args:
             prompt: The prompt to send to Claude Code.
             allow_permissions: Whether to auto-accept permission prompts.
-            additional_args: Additional CLI arguments to pass.
+            additional_args: Additional CLI arguments (ignored, kept for compatibility).
 
         Yields:
             ClaudeOutput objects as output is received.
-
-        Raises:
-            ClaudeSubprocessError: If the subprocess fails to start.
         """
         self._cancelled = False
 
-        # Find the claude command
         try:
-            claude_cmd = self._find_claude_command()
-        except ClaudeSubprocessError as e:
+            from claude_agent_sdk import (
+                AssistantMessage,
+                ClaudeAgentOptions,
+                PermissionMode,
+                ResultMessage,
+                TextBlock,
+                ToolResultBlock,
+                ToolUseBlock,
+                query,
+            )
+        except ImportError as e:
             yield ClaudeOutput(
                 type=ClaudeOutputType.ERROR,
-                content=str(e),
+                content=f"claude-agent-sdk not installed: {e}. Run: uv add claude-agent-sdk",
             )
             return
 
-        # Build command arguments
-        args = ["--print"]  # Use print mode for non-interactive output
-
-        if allow_permissions:
-            args.append("--dangerously-skip-permissions")
-
-        if additional_args:
-            args.extend(additional_args)
-
-        # Add the prompt
-        args.extend(["--prompt", prompt])
-
-        logger.info(
-            "Starting Claude subprocess: %s %s",
-            claude_cmd,
-            " ".join(args[:5]) + "...",
+        # Build options
+        permission_mode: PermissionMode = (
+            "bypassPermissions" if allow_permissions else "default"
         )
 
-        # Start the subprocess
+        options = ClaudeAgentOptions(
+            allowed_tools=["Read", "Edit", "Write", "Glob", "Grep", "Bash"],
+            permission_mode=permission_mode,
+            cwd=str(self.config.working_directory),
+            # Ensure fresh session - no conversation continuation
+            continue_conversation=False,
+        )
+
+        if self.config.model:
+            options.model = self.config.model
+
+        if self.config.system_prompt:
+            options.system_prompt = self.config.system_prompt
+
+        logger.info(
+            "Starting Claude SDK execution in %s",
+            self.config.working_directory,
+        )
+
+        got_result = False
         try:
-            self._process = await asyncio.create_subprocess_exec(
-                claude_cmd,
-                *args,
-                cwd=self.config.working_directory,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-        except Exception as e:
-            logger.error("Failed to start Claude subprocess: %s", e)
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content=f"Failed to start Claude: {e}",
-            )
-            return
-
-        # Stream output from both stdout and stderr
-        async for output in self._stream_output():
-            yield output
-
-    async def _stream_output(self) -> AsyncGenerator[ClaudeOutput, None]:
-        """Stream output from the running subprocess.
-
-        Yields:
-            ClaudeOutput objects for each line of output.
-        """
-        if self._process is None:
-            return
-
-        stdout = self._process.stdout
-        stderr = self._process.stderr
-
-        if stdout is None or stderr is None:
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content="Failed to capture subprocess output",
-            )
-            return
-
-        # Create tasks to read from both streams
-        async def read_stream(
-            stream: asyncio.StreamReader, output_type: ClaudeOutputType
-        ) -> AsyncGenerator[ClaudeOutput, None]:
-            """Read lines from a stream and yield output objects."""
-            while True:
+            async for message in query(prompt=prompt, options=options):
                 if self._cancelled:
                     break
 
-                try:
-                    line = await asyncio.wait_for(
-                        stream.readline(),
-                        timeout=1.0,  # Check for cancellation periodically
-                    )
-                except asyncio.TimeoutError:
-                    # Check if process is still running
-                    if self._process and self._process.returncode is not None:
-                        break
-                    continue
+                # Handle different message types
+                if isinstance(message, AssistantMessage):
+                    # Claude's response - content is directly on the message
+                    content = getattr(message, "content", []) or []
+                    for block in content:
+                        if isinstance(block, TextBlock):
+                            if block.text:
+                                yield ClaudeOutput(
+                                    type=ClaudeOutputType.STDOUT,
+                                    content=block.text,
+                                )
+                        elif isinstance(block, ToolUseBlock):
+                            tool_name = getattr(block, "name", "unknown")
+                            tool_input = getattr(block, "input", {}) or {}
 
-                if not line:
-                    break
+                            # Format tool call with relevant details
+                            detail = self._format_tool_detail(tool_name, tool_input)
+                            yield ClaudeOutput(
+                                type=ClaudeOutputType.STDOUT,
+                                content=detail,
+                            )
+                        elif isinstance(block, ToolResultBlock):
+                            # Tool results can be verbose, just log
+                            logger.debug("Tool result block received")
 
-                content = line.decode("utf-8", errors="replace").rstrip("\n\r")
-                if content:  # Only yield non-empty lines
+                elif isinstance(message, ResultMessage):
+                    # Final result
+                    got_result = True
+                    subtype = getattr(message, "subtype", "completed")
                     yield ClaudeOutput(
-                        type=output_type,
-                        content=content,
+                        type=ClaudeOutputType.EXIT,
+                        content=f"Claude finished: {subtype}",
+                        exit_code=0,
                     )
 
-        # Interleave stdout and stderr using asyncio.Queue
-        output_queue: asyncio.Queue[ClaudeOutput | None] = asyncio.Queue()
+        except Exception as e:
+            logger.exception("Claude SDK error")
+            yield ClaudeOutput(
+                type=ClaudeOutputType.ERROR,
+                content=f"Claude SDK error: {e}",
+            )
+            yield ClaudeOutput(
+                type=ClaudeOutputType.EXIT,
+                content="Claude exited with error",
+                exit_code=1,
+            )
+            return
 
-        async def reader_task(
-            stream: asyncio.StreamReader, output_type: ClaudeOutputType
-        ) -> None:
-            """Task to read from a stream and put items in queue."""
-            async for output in read_stream(stream, output_type):
-                await output_queue.put(output)
-            await output_queue.put(None)  # Signal done
+        # If we completed normally without a ResultMessage
+        if not self._cancelled and not got_result:
+            yield ClaudeOutput(
+                type=ClaudeOutputType.EXIT,
+                content="Claude completed",
+                exit_code=0,
+            )
 
-        # Start reader tasks
-        stdout_task = asyncio.create_task(reader_task(stdout, ClaudeOutputType.STDOUT))
-        stderr_task = asyncio.create_task(reader_task(stderr, ClaudeOutputType.STDERR))
+    def _format_tool_detail(self, tool_name: str, tool_input: dict[str, Any]) -> str:
+        """Format tool call with relevant details.
 
-        # Yield outputs as they arrive
-        done_count = 0
-        while done_count < 2:
-            if self._cancelled:
-                stdout_task.cancel()
-                stderr_task.cancel()
-                break
+        Args:
+            tool_name: Name of the tool (Read, Edit, Bash, etc.)
+            tool_input: Input arguments for the tool.
 
-            try:
-                output = await asyncio.wait_for(
-                    output_queue.get(),
-                    timeout=self.config.timeout_seconds,
-                )
-            except asyncio.TimeoutError:
-                logger.warning("Claude subprocess timed out")
-                yield ClaudeOutput(
-                    type=ClaudeOutputType.ERROR,
-                    content=f"Claude timed out after {self.config.timeout_seconds} seconds",
-                )
-                await self.cancel()
-                break
+        Returns:
+            Formatted string with tool details.
+        """
+        if tool_name == "Read":
+            path = tool_input.get("file_path", "")
+            # Shorten long paths
+            if len(path) > 50:
+                path = "..." + path[-47:]
+            return f"📖 Read: {path}"
 
-            if output is None:
-                done_count += 1
-            else:
-                yield output
+        elif tool_name == "Edit":
+            path = tool_input.get("file_path", "")
+            if len(path) > 50:
+                path = "..." + path[-47:]
+            return f"✏️ Edit: {path}"
 
-        # Wait for process to complete
-        if self._process and self._process.returncode is None:
-            try:
-                await asyncio.wait_for(self._process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                self._process.kill()
-                await self._process.wait()
+        elif tool_name == "Write":
+            path = tool_input.get("file_path", "")
+            if len(path) > 50:
+                path = "..." + path[-47:]
+            return f"📝 Write: {path}"
 
-        # Yield exit status
-        exit_code = self._process.returncode if self._process else -1
-        yield ClaudeOutput(
-            type=ClaudeOutputType.EXIT,
-            content=f"Claude exited with code {exit_code}",
-            exit_code=exit_code,
-        )
+        elif tool_name == "Bash":
+            cmd = tool_input.get("command", "")
+            # Truncate long commands
+            if len(cmd) > 60:
+                cmd = cmd[:57] + "..."
+            return f"💻 Bash: {cmd}"
 
-        # Cleanup
-        self._process = None
+        elif tool_name == "Glob":
+            pattern = tool_input.get("pattern", "")
+            return f"🔍 Glob: {pattern}"
+
+        elif tool_name == "Grep":
+            pattern = tool_input.get("pattern", "")
+            path = tool_input.get("path", ".")
+            return f"🔎 Grep: '{pattern}' in {path}"
+
+        else:
+            return f"🔧 {tool_name}"
 
     async def cancel(self) -> None:
-        """Cancel the running subprocess."""
+        """Cancel the running execution."""
         self._cancelled = True
-
-        if self._process and self._process.returncode is None:
-            logger.info("Cancelling Claude subprocess")
-            try:
-                self._process.terminate()
-                try:
-                    await asyncio.wait_for(self._process.wait(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    logger.warning("Process did not terminate, killing")
-                    self._process.kill()
-                    await self._process.wait()
-            except ProcessLookupError:
-                pass  # Process already terminated
-
-        self._process = None
+        logger.info("Claude SDK execution cancelled")
 
 
 async def run_claude_command(
@@ -299,7 +249,7 @@ async def run_claude_command(
     Args:
         prompt: The prompt to send to Claude.
         working_directory: Working directory for execution.
-        timeout_seconds: Optional timeout.
+        timeout_seconds: Optional timeout (not currently implemented with SDK).
 
     Yields:
         ClaudeOutput objects as output is received.
@@ -308,7 +258,7 @@ async def run_claude_command(
         working_directory=working_directory or Path.cwd(),
         timeout_seconds=timeout_seconds,
     )
-    subprocess = ClaudeSubprocess(config)
+    sdk = ClaudeSubprocess(config)
 
-    async for output in subprocess.run(prompt):
+    async for output in sdk.run(prompt):
         yield output

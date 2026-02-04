@@ -22,6 +22,8 @@ class HintMessage(BaseModel):
     # Optional link functionality
     link: str | None = None
     link_text: str | None = None  # Button label, defaults to "Open link"
+    # Compact mode for autopilot output
+    compact: bool = False
 
 
 class HintMessageWidget(Widget):
@@ -41,6 +43,18 @@ class HintMessageWidget(Widget):
               padding: 0;
               margin: 0;
           }
+        }
+
+        HintMessageWidget.compact {
+          margin: 0 1;
+          padding: 0 1;
+          background: transparent;
+        }
+
+        HintMessageWidget.compact Static {
+          height: auto;
+          padding: 0;
+          margin: 0;
         }
 
         HintMessageWidget .email-copy-row {
@@ -97,6 +111,8 @@ class HintMessageWidget(Widget):
     def __init__(self, message: HintMessage) -> None:
         super().__init__()
         self.message = message
+        if message.compact:
+            self.add_class("compact")
 
     def compose(self) -> ComposeResult:
         # Main message markdown

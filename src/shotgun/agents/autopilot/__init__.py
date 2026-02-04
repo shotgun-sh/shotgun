@@ -18,6 +18,7 @@ from shotgun.agents.autopilot.models import (
     ClaudeOutput,
     ClaudeOutputType,
     Stage,
+    StagePhase,
     StageStatus,
     Task,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "ClaudeSubprocessConfig",
     "ParsedTasksFile",
     "Stage",
+    "StagePhase",
     "StageStatus",
     "Task",
     "TasksParser",

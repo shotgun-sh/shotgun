@@ -41,6 +41,8 @@ __all__ = [
     "AutopilotStageStarted",
     "AutopilotStageCompleted",
     "AutopilotApprovalRequired",
+    "AutopilotAccept",
+    "AutopilotReject",
     "AutopilotContinue",
     "AutopilotStop",
     "AutopilotOutputReceived",
@@ -305,6 +307,27 @@ class AutopilotApprovalRequired(Message):
         super().__init__()
         self.completed_stage = completed_stage
         self.next_stage = next_stage
+
+
+class AutopilotAccept(Message):
+    """Posted when user accepts the completed stage.
+
+    This message approves the PR and moves to the next stage.
+    """
+
+
+class AutopilotReject(Message):
+    """Posted when user rejects the stage and wants changes.
+
+    This message will show the prompt input for feedback.
+
+    Attributes:
+        feedback: The user's feedback about what to change.
+    """
+
+    def __init__(self, feedback: str = "") -> None:
+        super().__init__()
+        self.feedback = feedback
 
 
 class AutopilotContinue(Message):
