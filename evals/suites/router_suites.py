@@ -132,6 +132,28 @@ router_document_files = EvaluationSuite(
 )
 
 # ============================================================================
+# Web Search Efficiency Suite
+# Tests Router doesn't perform excessive web searches in drafting mode
+# ============================================================================
+
+router_web_search = EvaluationSuite(
+    name="router_web_search",
+    description="Tests web search efficiency in drafting mode",
+    test_case_names=[
+        # Router-level tests (may be affected by existing files)
+        "spec_request_reasonable_web_searches",
+        "complex_spec_request_bounded_searches",
+        "plan_request_minimal_searches",
+        "spec_request_natural",
+        # Research agent direct tests (bypass Router, use isolated directory)
+        "research_agent_pydantic_ai",
+        "research_agent_simple_topic",
+    ],
+    evaluator_names=["router_delegation", "web_search_efficiency_judge"],
+    tags=["web_search", "drafting", "multi-turn"],
+)
+
+# ============================================================================
 # All Router Tests Suite
 # Runs all Router agent test cases
 # ============================================================================
@@ -172,6 +194,14 @@ router_all = EvaluationSuite(
         "user_stories_file_drafting_mode",
         "wireframe_image_drafting_mode",
         "screenshot_for_bug_report",
+        # Web search behavior cases
+        "spec_request_reasonable_web_searches",
+        "complex_spec_request_bounded_searches",
+        "plan_request_minimal_searches",
+        "spec_request_natural",
+        # Research agent direct tests
+        "research_agent_pydantic_ai",
+        "research_agent_simple_topic",
     ],
     evaluator_names=["router_delegation", "router_correctness_judge"],
     tags=["all", "router"],
@@ -189,6 +219,7 @@ ROUTER_SUITES: dict[str, EvaluationSuite] = {
     "router_file_write": router_file_write,
     "router_file_request": router_file_request,
     "router_document_files": router_document_files,
+    "router_web_search": router_web_search,
     "router_all": router_all,
 }
 
@@ -200,6 +231,7 @@ __all__ = [
     "router_file_write",
     "router_file_request",
     "router_document_files",
+    "router_web_search",
     "router_all",
     "ROUTER_SUITES",
 ]

@@ -11,13 +11,22 @@ from pydantic_ai import (
     UsageLimits,
 )
 from pydantic_ai.agent import AgentRunResult
+
+# Import for type checking of message parts
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
+    ModelResponse,
+    SystemPromptPart,
+    ToolCallPart,
 )
 from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import ProviderType, get_provider_model
+from shotgun.agents.config.constants import (
+    WEB_SEARCH_STOP_THRESHOLD,
+    WEB_SEARCH_WARNING_THRESHOLD,
+)
 from shotgun.agents.models import (
     AgentResponse,
     AgentSystemPromptContext,
@@ -55,16 +64,54 @@ logger = get_logger(__name__)
 # Global prompt loader instance
 prompt_loader = PromptLoader()
 
+# Web search tool names across all providers
+WEB_SEARCH_TOOL_NAMES: set[str] = {
+    "web_search",
+    "anthropic_web_search_tool",
+    "openai_web_search_tool",
+    "gemini_web_search_tool",
+    "openai_compatible_web_search_tool",
+    "search_web",
+    "bing_search",
+    "google_search",
+    "tavily_search",
+}
+
+
+def count_web_searches(message_history: list[ModelMessage] | None) -> int:
+    """Count the number of web search tool calls in message history.
+
+    Args:
+        message_history: List of model messages to scan
+
+    Returns:
+        Number of web search tool calls found
+    """
+    if not message_history:
+        return 0
+
+    count = 0
+    for msg in message_history:
+        if isinstance(msg, ModelResponse):
+            for part in msg.parts:
+                if isinstance(part, ToolCallPart):
+                    if part.tool_name in WEB_SEARCH_TOOL_NAMES:
+                        count += 1
+    return count
+
 
 async def add_system_status_message(
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
+    web_search_count: int | None = None,
 ) -> list[ModelMessage]:
     """Add a system status message to the message history.
 
     Args:
         deps: Agent dependencies containing runtime options
         message_history: Existing message history
+        web_search_count: Optional pre-computed web search count.
+            If None, will be counted from message_history.
 
     Returns:
         Updated message history with system status message prepended
@@ -102,6 +149,11 @@ async def add_system_status_message(
             # Check if plan is pending approval (multi-step plan in Planning mode)
             pending_approval = deps.pending_approval is not None
 
+    # Count web searches in this session to warn about excessive searching
+    # Use provided count if available (from history_processor), otherwise count from history
+    if web_search_count is None:
+        web_search_count = count_web_searches(message_history)
+
     system_state = prompt_loader.render(
         "agents/state/system_state.j2",
         codebase_understanding_graphs=codebase_understanding_graphs,
@@ -114,6 +166,9 @@ async def add_system_status_message(
         utc_offset=dt_context.utc_offset,
         execution_plan=execution_plan,
         pending_approval=pending_approval,
+        web_search_count=web_search_count,
+        web_search_warning_threshold=WEB_SEARCH_WARNING_THRESHOLD,
+        web_search_stop_threshold=WEB_SEARCH_STOP_THRESHOLD,
     )
 
     message_history.append(
@@ -196,7 +251,48 @@ async def create_base_agent(
 
     # Create a history processor that has access to deps via closure
     async def history_processor(messages: list[ModelMessage]) -> list[ModelMessage]:
-        """History processor with access to deps via closure."""
+        """History processor with access to deps via closure.
+
+        This processor runs before each turn and:
+        1. Updates web search count in the system status message
+        2. Applies token limit compaction
+        """
+        # Count current web searches to update the status message
+        web_search_count = count_web_searches(messages)
+        if web_search_count > 0:
+            logger.debug(
+                "🔍 History processor: %d web searches detected, updating status",
+                web_search_count,
+            )
+
+        # Remove existing SystemStatusPrompt messages and re-add with updated count
+        # This ensures the agent sees accurate web search warnings on each turn
+        filtered_messages: list[ModelMessage] = []
+        for msg in messages:
+            if isinstance(msg, ModelRequest):
+                # Filter out SystemStatusPrompt parts
+                new_parts = [
+                    part
+                    for part in msg.parts
+                    if not (
+                        isinstance(part, SystemPromptPart)
+                        and hasattr(part, "prompt_type")
+                        and part.prompt_type == "status"
+                    )
+                ]
+                if new_parts:
+                    filtered_messages.append(
+                        ModelRequest(parts=new_parts, instructions=msg.instructions)
+                    )
+            else:
+                filtered_messages.append(msg)
+
+        # Re-add system status with updated web search count
+        # Note: add_system_status_message will count from filtered_messages,
+        # but we already counted from original messages, so pass the count
+        filtered_messages = await add_system_status_message(
+            deps, filtered_messages, web_search_count=web_search_count
+        )
 
         # Create a minimal context for compaction
         class ProcessorContext:
@@ -205,7 +301,7 @@ async def create_base_agent(
                 self.usage = None  # Will be estimated from messages
 
         ctx = ProcessorContext(deps)
-        return await token_limit_compactor(ctx, messages)
+        return await token_limit_compactor(ctx, filtered_messages)
 
     agent = Agent(
         model,

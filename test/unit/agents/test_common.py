@@ -102,6 +102,9 @@ async def test_add_system_status_message_empty_history(mock_deps):
                         utc_offset="UTC+00:00",
                         execution_plan=None,
                         pending_approval=False,
+                        web_search_count=0,
+                        web_search_warning_threshold=3,
+                        web_search_stop_threshold=5,
                     )
 
 

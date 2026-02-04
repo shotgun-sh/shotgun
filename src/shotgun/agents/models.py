@@ -412,6 +412,11 @@ class AgentDeps(AgentRuntimeOptions):
         description="Event set when the operation should be cancelled",
     )
 
+    web_search_count: int = Field(
+        default=0,
+        description="Count of web searches performed in this agent session",
+    )
+
 
 # Rebuild model to resolve forward references after imports are available
 try:

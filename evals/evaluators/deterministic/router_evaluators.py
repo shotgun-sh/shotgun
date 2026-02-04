@@ -22,6 +22,7 @@ from evals.models import (
     ExpectedAgentOutput,
     ShotgunTestCase,
 )
+from shotgun.agents.common import WEB_SEARCH_TOOL_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,12 @@ class ExecutionFailureEvaluator(BaseEvaluator):
         )
 
         # Agent succeeded if it produced ANY meaningful output
-        if not (has_response or has_clarifying_questions or has_file_requests or has_delegation):
+        if not (
+            has_response
+            or has_clarifying_questions
+            or has_file_requests
+            or has_delegation
+        ):
             logger.warning(f"ExecutionFailureEvaluator: no output for {test_case.name}")
             return EvaluatorResult(
                 evaluator_name=self.name,
@@ -618,6 +624,82 @@ class MultiDelegationCorrectnessEvaluator(BaseEvaluator):
         )
 
 
+class WebSearchCountEvaluator(BaseEvaluator):
+    """
+    [HARD] Checks that web search tool usage doesn't exceed limits.
+
+    This evaluator counts total web search invocations across all providers
+    and fails if the count exceeds the max_web_searches limit in the test case.
+
+    This is a HARD failure because excessive web searches indicate a potential
+    infinite loop or pathological behavior that should be investigated.
+    """
+
+    name = "web_search_count"
+    severity = EvaluatorSeverity.HARD
+
+    def evaluate(
+        self,
+        actual_output: AgentExecutionOutput,
+        expected_output: ExpectedAgentOutput | None,
+        test_case: ShotgunTestCase,
+    ) -> EvaluatorResult:
+        """Check that web search usage doesn't exceed limits."""
+        # Get max_web_searches limit from expected output
+        max_web_searches = expected_output.max_web_searches if expected_output else None
+
+        # If no limit specified, skip this evaluator
+        if max_web_searches is None:
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=True,
+                severity=self.severity,
+                reasoning="No web search limit specified",
+                details={},
+            )
+
+        # Count total web search invocations from tool_call_counts
+        tool_counts = actual_output.tool_call_counts
+        total_web_searches = sum(
+            count
+            for tool_name, count in tool_counts.items()
+            if tool_name in WEB_SEARCH_TOOL_NAMES
+        )
+
+        if total_web_searches > max_web_searches:
+            # Find which search tools were used
+            used_search_tools = {
+                tool_name: count
+                for tool_name, count in tool_counts.items()
+                if tool_name in WEB_SEARCH_TOOL_NAMES
+            }
+            return EvaluatorResult(
+                evaluator_name=self.name,
+                passed=False,
+                severity=self.severity,
+                reasoning=f"Exceeded web search limit: {total_web_searches} searches "
+                f"(max allowed: {max_web_searches})",
+                details={
+                    "total_web_searches": [str(total_web_searches)],
+                    "max_allowed": [str(max_web_searches)],
+                    "web_search_breakdown": [
+                        f"{tool}: {count}" for tool, count in used_search_tools.items()
+                    ],
+                },
+            )
+
+        return EvaluatorResult(
+            evaluator_name=self.name,
+            passed=True,
+            severity=self.severity,
+            reasoning=f"Web search count within limits: {total_web_searches}/{max_web_searches}",
+            details={
+                "total_web_searches": [str(total_web_searches)],
+                "max_allowed": [str(max_web_searches)],
+            },
+        )
+
+
 # Registry of all deterministic evaluators
 DETERMINISTIC_EVALUATORS: list[type[BaseEvaluator]] = [
     DisallowedToolUsageEvaluator,
@@ -627,6 +709,7 @@ DETERMINISTIC_EVALUATORS: list[type[BaseEvaluator]] = [
     DelegationCorrectnessEvaluator,
     MultiDelegationCorrectnessEvaluator,
     ClarifyingQuestionsEvaluator,
+    WebSearchCountEvaluator,
 ]
 
 

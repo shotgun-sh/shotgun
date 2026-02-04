@@ -26,3 +26,8 @@ SHOTGUN_PROVIDER = ConfigSection.SHOTGUN.value
 
 # Token limits
 MEDIUM_TEXT_8K_TOKENS = 8192  # Default max_tokens for web search requests
+
+# Web search behavior thresholds
+# These control when warnings are shown to agents about excessive web searching
+WEB_SEARCH_WARNING_THRESHOLD = 3  # Show caution message at this count
+WEB_SEARCH_STOP_THRESHOLD = 5  # Show stop message at this count

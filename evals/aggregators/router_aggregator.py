@@ -13,6 +13,7 @@ Into a final score with:
 """
 
 from evals.judges.file_requests_judge import FileRequestsJudgeResult
+from evals.judges.web_search_efficiency_judge import WebSearchEfficiencyJudgeResult
 from evals.models import (
     AgentExecutionOutput,
     AggregatedResult,
@@ -27,7 +28,9 @@ from evals.models import (
 )
 
 # Union type for all judge results
-JudgeResult = RouterJudgeResult | FileRequestsJudgeResult
+JudgeResult = (
+    RouterJudgeResult | FileRequestsJudgeResult | WebSearchEfficiencyJudgeResult
+)
 
 # Rebuild the model to resolve forward reference to FileRequestsJudgeResult
 AggregatedResult.model_rebuild()

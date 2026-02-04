@@ -67,6 +67,16 @@ from evals.datasets.router_agent.research_planning_cases import (
     OLLAMA_FEATURE_PLANS_RESEARCH_FIRST,
     RESEARCH_PLANNING_CASES,
 )
+from evals.datasets.router_agent.web_search_behavior_cases import (
+    COMPLEX_SPEC_REQUEST_BOUNDED_SEARCHES,
+    PLAN_REQUEST_MINIMAL_SEARCHES,
+    RESEARCH_AGENT_PYDANTIC_AI,
+    RESEARCH_AGENT_SIMPLE_TOPIC,
+    SPEC_REQUEST_NATURAL,
+    SPEC_REQUEST_REASONABLE_WEB_SEARCHES,
+    SPEC_RESEARCH_FIRST,
+    WEB_SEARCH_BEHAVIOR_CASES,
+)
 
 # Index of all Router test cases by name for discovery
 ALL_ROUTER_CASES = {
@@ -79,6 +89,7 @@ ALL_ROUTER_CASES = {
         + FILE_WRITE_CASES
         + FILE_REQUEST_CASES
         + DOCUMENT_FILE_CASES
+        + WEB_SEARCH_BEHAVIOR_CASES
     )
 }
 
@@ -91,6 +102,7 @@ __all__ = [
     "FILE_WRITE_CASES",
     "FILE_REQUEST_CASES",
     "DOCUMENT_FILE_CASES",
+    "WEB_SEARCH_BEHAVIOR_CASES",
     "ALL_ROUTER_CASES",
     # Clarifying questions test cases
     "VAGUE_PROMPT_CLARIFYING_QUESTIONS",
@@ -122,4 +134,13 @@ __all__ = [
     "USER_STORIES_FILE_DRAFTING_MODE",
     "WIREFRAME_IMAGE_DRAFTING_MODE",
     "SCREENSHOT_FOR_BUG_REPORT",
+    # Web search behavior test cases
+    "SPEC_REQUEST_REASONABLE_WEB_SEARCHES",
+    "COMPLEX_SPEC_REQUEST_BOUNDED_SEARCHES",
+    "PLAN_REQUEST_MINIMAL_SEARCHES",
+    "SPEC_REQUEST_NATURAL",
+    "SPEC_RESEARCH_FIRST",
+    # Research agent direct test cases
+    "RESEARCH_AGENT_PYDANTIC_AI",
+    "RESEARCH_AGENT_SIMPLE_TOPIC",
 ]

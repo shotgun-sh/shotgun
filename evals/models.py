@@ -16,8 +16,11 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
 
+from shotgun.agents.router.models import RouterMode
+
 if TYPE_CHECKING:
     from evals.judges.file_requests_judge import FileRequestsJudgeResult
+    from evals.judges.web_search_efficiency_judge import WebSearchEfficiencyJudgeResult
 
 # ============================================================================
 # Constants
@@ -110,10 +113,12 @@ class JudgeType(str, Enum):
     Each test case specifies which judge to use based on what behavior it tests:
     - ROUTER_CORRECTNESS: For clarifying questions, planning, and general routing scenarios
     - FILE_REQUESTS: For file handling scenarios (PDFs, images, binary files)
+    - WEB_SEARCH_EFFICIENCY: For evaluating web search behavior in drafting mode
     """
 
     ROUTER_CORRECTNESS = "router_correctness"
     FILE_REQUESTS = "file_requests"
+    WEB_SEARCH_EFFICIENCY = "web_search_efficiency"
 
 
 class EvaluatorName(str, Enum):
@@ -163,9 +168,13 @@ class TestCaseContext(BaseModel):
     codebase_name: str | None = Field(
         default=None, description="Name of the indexed codebase"
     )
-    router_mode: str = Field(
-        default="planning",
-        description="Router mode: 'planning' (no delegation) or 'drafting' (delegation enabled)",
+    router_mode: RouterMode = Field(
+        default=RouterMode.PLANNING,
+        description="Router mode: PLANNING (no delegation) or DRAFTING (delegation enabled)",
+    )
+    use_isolated_directory: bool = Field(
+        default=False,
+        description="If True, run eval in an isolated temp directory to avoid existing files",
     )
 
 
@@ -186,6 +195,14 @@ class TestCaseInput(BaseModel):
     message_history: list[ModelMessage] | None = Field(
         default=None,
         description="Optional message history for multi-turn conversations",
+    )
+    request_limit: int = Field(
+        default=10,
+        description="Max API requests for this test (overrides default 10)",
+    )
+    tool_calls_limit: int = Field(
+        default=10,
+        description="Max tool calls for this test (overrides default 10)",
     )
 
 
@@ -210,7 +227,11 @@ class AgentExecutionOutput(BaseModel):
         default_factory=list, description="Files created/modified/deleted"
     )
     tools_used: list[str] = Field(
-        default_factory=list, description="Names of tools invoked"
+        default_factory=list, description="Names of tools invoked (unique, in order)"
+    )
+    tool_call_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of each tool call (tool_name -> count)",
     )
     duration_seconds: float = Field(..., description="Execution time")
     token_usage: dict[str, int] = Field(
@@ -291,6 +312,12 @@ class ExpectedAgentOutput(BaseModel):
     )
     response_not_contains: list[str] = Field(
         default_factory=list, description="Keywords/phrases that must NOT appear"
+    )
+
+    # Web search limits
+    max_web_searches: int | None = Field(
+        default=None,
+        description="Maximum allowed web search tool calls. None means no limit.",
     )
 
 
@@ -571,10 +598,13 @@ class AggregatedResult(BaseModel):
     deterministic_results: list[EvaluatorResult] = Field(
         ..., description="Results from deterministic evaluators"
     )
-    # Note: FileRequestsJudgeResult imported via model_rebuild() in aggregator
-    judge_result: RouterJudgeResult | FileRequestsJudgeResult | None = Field(
-        default=None, description="Result from LLM judge (if run)"
-    )
+    # Note: Judge result types imported via model_rebuild() in aggregator
+    judge_result: (
+        RouterJudgeResult
+        | FileRequestsJudgeResult
+        | WebSearchEfficiencyJudgeResult
+        | None
+    ) = Field(default=None, description="Result from LLM judge (if run)")
 
     # Per-dimension aggregates
     dimension_scores: list[DimensionAggregate] = Field(
