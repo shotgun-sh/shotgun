@@ -2919,30 +2919,41 @@ class ChatScreen(Screen[None]):
     def show_autopilot_startup(self) -> None:
         """Show the autopilot startup widget.
 
-        This parses tasks.md and displays the startup widget for mode selection.
+        This starts async parsing of tasks.md and displays a loading hint,
+        then shows the startup widget when parsing completes.
         """
-        from shotgun.agents.autopilot import TasksParser
-
         logger.info("Autopilot: show_autopilot_startup called")
+        self.mount_hint("[dim]Parsing tasks.md...[/]")
+        self._async_parse_and_show_autopilot()
 
-        # Parse tasks.md
-        parser = TasksParser(self.deps.working_directory)
-        parsed = parser.parse()
+    @work(exclusive=True)
+    async def _async_parse_and_show_autopilot(self) -> None:
+        """Async worker to parse tasks.md using LLM parser and show startup widget."""
+        from shotgun.agents.autopilot import LLMTasksParser
 
-        logger.info(
-            "Autopilot: Parsed tasks.md - valid=%s, stages=%d, errors=%s",
-            parsed.is_valid,
-            len(parsed.stages),
-            parsed.parse_errors,
-        )
+        try:
+            # Use LLM parser for flexible parsing of various markdown formats
+            parser = LLMTasksParser(self.deps.working_directory)
+            parsed = await parser.parse()
 
-        # Show startup widget
-        if parsed.is_valid:
-            self._show_autopilot_startup_widget(parsed.stages)
-        else:
-            # Show widget with error
-            error_msg = "\n".join(parsed.parse_errors)
-            self._show_autopilot_startup_widget([], error_msg)
+            logger.info(
+                "Autopilot: LLM parsed tasks.md - valid=%s, stages=%d, errors=%s",
+                parsed.is_valid,
+                len(parsed.stages),
+                parsed.parse_errors,
+            )
+
+            # Show startup widget
+            if parsed.is_valid:
+                self._show_autopilot_startup_widget(parsed.stages)
+            else:
+                # Show widget with error
+                error_msg = "\n".join(parsed.parse_errors)
+                self._show_autopilot_startup_widget([], error_msg)
+
+        except Exception as e:
+            logger.exception("Autopilot: Error parsing tasks.md")
+            self._show_autopilot_startup_widget([], f"Error parsing tasks.md: {e}")
 
     def _show_autopilot_startup_widget(
         self, stages: "list[Stage]", error_message: str | None = None
