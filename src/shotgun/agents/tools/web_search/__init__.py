@@ -39,7 +39,8 @@ _PROVIDER_WEB_SEARCH_TOOLS: dict[ProviderType, WebSearchTool] = {
 async def get_available_web_search_tools() -> list[WebSearchTool]:
     """Get web search tool matching the user's selected provider.
 
-    Prefers the web search tool from the same provider as the user's selected model.
+    For Shotgun Account users, always uses Gemini web search (more reliable).
+    For BYOK users, prefers the web search tool from their selected model's provider.
     Falls back to other available providers if the preferred one isn't available.
 
     Returns:
@@ -56,6 +57,12 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
     config_manager = get_config_manager()
     config = await config_manager.load(force_reload=False)
 
+    # Priority 1: Shotgun Account always uses Gemini web search
+    if config.shotgun.api_key:
+        logger.info("Using Gemini web search (Shotgun Account)")
+        return [gemini_web_search_tool]
+
+    # For BYOK users, match their selected model's provider
     preferred_provider: ProviderType | None = None
     # Only check MODEL_SPECS for ModelName enums (not Ollama string models)
     if (
