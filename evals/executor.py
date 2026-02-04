@@ -7,6 +7,7 @@ Wraps AgentManager.run() to capture evaluable outputs with Logfire tracing.
 import logging
 import os
 import platform
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -188,129 +189,165 @@ class RouterExecutor:
         from shotgun.codebase.service import CodebaseService
         from shotgun.utils import get_shotgun_home
 
-        with logfire.span("eval.execute_agent"):
-            # Get model configuration (use override if provided)
-            model_config = await get_provider_model(model_override)
+        # Check if we should use an isolated temp directory
+        context = test_case.inputs.context
+        use_isolated = context.use_isolated_directory if context else False
 
-            # Create codebase service
-            storage_dir = get_shotgun_home() / "codebases"
-            codebase_service = CodebaseService(storage_dir)
+        # Create temp directory if needed (persists for the duration of this method)
+        temp_dir = tempfile.mkdtemp(prefix="shotgun_eval_") if use_isolated else None
+        original_cwd = os.getcwd()
 
-            # Create file tracker for this run
-            file_tracker = FileOperationTracker()
+        try:
+            # Change to isolated directory if requested
+            if temp_dir:
+                os.chdir(temp_dir)
+                logger.debug("Running eval in isolated directory: %s", temp_dir)
 
-            # Placeholder system prompt function (agents provide their own)
-            def _eval_system_prompt_fn(ctx: RunContext[Any]) -> str:
-                raise RuntimeError(
-                    "This should not be called - agents provide their own system_prompt_fn"
+            with logfire.span("eval.execute_agent"):
+                # Get model configuration (use override if provided)
+                model_config = await get_provider_model(model_override)
+
+                # Create codebase service
+                storage_dir = get_shotgun_home() / "codebases"
+                codebase_service = CodebaseService(storage_dir)
+
+                # Create file tracker for this run
+                file_tracker = FileOperationTracker()
+
+                # Placeholder system prompt function (agents provide their own)
+                def _eval_system_prompt_fn(ctx: RunContext[Any]) -> str:
+                    raise RuntimeError(
+                        "This should not be called - agents provide their own system_prompt_fn"
+                    )
+
+                # Map eval AgentType to shotgun AgentType
+                from shotgun.agents.models import AgentType as ShotgunAgentType
+                from shotgun.agents.router.models import RouterDeps, RouterMode
+
+                shotgun_agent_type = ShotgunAgentType(test_case.inputs.agent_type.value)
+
+                # Create appropriate deps based on agent type
+                # Router needs RouterDeps with router_mode, other agents use AgentDeps
+                # Simulate TUI context for realistic system prompts
+                if shotgun_agent_type == ShotgunAgentType.ROUTER:
+                    # Get router mode from test case context (default: planning)
+                    context = test_case.inputs.context
+                    router_mode_str = context.router_mode if context else "planning"
+                    router_mode = (
+                        RouterMode.DRAFTING
+                        if router_mode_str == "drafting"
+                        else RouterMode.PLANNING
+                    )
+
+                    deps: AgentDeps = RouterDeps(
+                        interactive_mode=True,
+                        is_tui_context=True,
+                        llm_model=model_config,
+                        codebase_service=codebase_service,
+                        system_prompt_fn=_eval_system_prompt_fn,
+                        file_tracker=file_tracker,
+                        router_mode=router_mode,
+                    )
+                else:
+                    deps = AgentDeps(
+                        interactive_mode=True,
+                        is_tui_context=True,
+                        llm_model=model_config,
+                        codebase_service=codebase_service,
+                        system_prompt_fn=_eval_system_prompt_fn,
+                        file_tracker=file_tracker,
+                    )
+
+                # Create agent manager with the correct agent type
+                manager = AgentManager(deps=deps, initial_type=shotgun_agent_type)
+
+                # Set message history if provided (for multi-turn conversation tests)
+                if test_case.inputs.message_history:
+                    manager.message_history = list(test_case.inputs.message_history)
+
+                # Time the execution
+                start_time = time.time()
+
+                # Run the agent with the test case prompt
+                # Use test case limits if provided, otherwise use defaults
+                request_limit = test_case.inputs.request_limit
+                tool_calls_limit = test_case.inputs.tool_calls_limit
+                eval_limits = UsageLimits(
+                    request_limit=request_limit, tool_calls_limit=tool_calls_limit
+                )
+                result: AgentRunResult[AgentResponse] = await manager.run(
+                    prompt=test_case.inputs.prompt,
+                    usage_limits=eval_limits,
                 )
 
-            # Map eval AgentType to shotgun AgentType
-            from shotgun.agents.models import AgentType as ShotgunAgentType
-            from shotgun.agents.router.models import RouterDeps, RouterMode
+                duration = time.time() - start_time
 
-            shotgun_agent_type = ShotgunAgentType(test_case.inputs.agent_type.value)
+            with logfire.span("eval.extract_observations"):
+                # Extract response
+                response = result.output.response
+                clarifying_questions = result.output.clarifying_questions or []
+                file_requests = result.output.file_requests or []
 
-            # Create appropriate deps based on agent type
-            # Router needs RouterDeps with router_mode, other agents use AgentDeps
-            # Simulate TUI context for realistic system prompts
-            if shotgun_agent_type == ShotgunAgentType.ROUTER:
-                # Get router mode from test case context (default: planning)
-                context = test_case.inputs.context
-                router_mode_str = context.router_mode if context else "planning"
-                router_mode = (
-                    RouterMode.DRAFTING
-                    if router_mode_str == "drafting"
-                    else RouterMode.PLANNING
+                # Debug logging for empty responses
+                if not response or response.strip() == "":
+                    logger.warning(
+                        f"Empty response from agent for {test_case.name}. "
+                        f"clarifying_questions={len(clarifying_questions)}, "
+                        f"file_requests={len(file_requests)}, "
+                        f"output={result.output}"
+                    )
+
+                # Extract tool usage (unique tools in order)
+                tools_used = self._extract_tool_names(result.all_messages())
+
+                # Extract tool call counts (total invocations per tool)
+                tool_call_counts = self._extract_tool_call_counts(result.all_messages())
+
+                # Merge sub-agent tool calls from RouterDeps (if available)
+                # This captures tool calls from delegated sub-agents (Research, Specify, etc.)
+                if hasattr(deps, "sub_agent_tool_calls"):
+                    for tool_name, count in deps.sub_agent_tool_calls.items():
+                        tool_call_counts[tool_name] = (
+                            tool_call_counts.get(tool_name, 0) + count
+                        )
+                        # Also add to tools_used if not already present
+                        if tool_name not in tools_used:
+                            tools_used.append(tool_name)
+
+                # Extract file operations
+                file_operations = self._extract_file_operations(file_tracker.operations)
+
+                # Extract token usage
+                usage = result.usage()
+                token_usage = {
+                    "prompt_tokens": usage.input_tokens or 0,
+                    "completion_tokens": usage.output_tokens or 0,
+                    "total_tokens": (usage.input_tokens or 0) + (usage.output_tokens or 0),
+                }
+
+                # Extract router-specific fields
+                all_messages = result.all_messages()
+                delegated_sub_agents = self._extract_all_delegated_agents(all_messages)
+                delegated_sub_agent = (
+                    delegated_sub_agents[0] if delegated_sub_agents else None
                 )
 
-                deps: AgentDeps = RouterDeps(
-                    interactive_mode=True,
-                    is_tui_context=True,
-                    llm_model=model_config,
-                    codebase_service=codebase_service,
-                    system_prompt_fn=_eval_system_prompt_fn,
-                    file_tracker=file_tracker,
-                    router_mode=router_mode,
-                )
-            else:
-                deps = AgentDeps(
-                    interactive_mode=True,
-                    is_tui_context=True,
-                    llm_model=model_config,
-                    codebase_service=codebase_service,
-                    system_prompt_fn=_eval_system_prompt_fn,
-                    file_tracker=file_tracker,
-                )
-
-            # Create agent manager with the correct agent type
-            manager = AgentManager(deps=deps, initial_type=shotgun_agent_type)
-
-            # Set message history if provided (for multi-turn conversation tests)
-            if test_case.inputs.message_history:
-                manager.message_history = list(test_case.inputs.message_history)
-
-            # Time the execution
-            start_time = time.time()
-
-            # Run the agent with the test case prompt
-            # Use tight limits for evals to keep test runs fast
-            eval_limits = UsageLimits(request_limit=10, tool_calls_limit=10)
-            result: AgentRunResult[AgentResponse] = await manager.run(
-                prompt=test_case.inputs.prompt,
-                usage_limits=eval_limits,
+            return AgentExecutionOutput(
+                response=response,
+                clarifying_questions=clarifying_questions if clarifying_questions else None,
+                file_operations=file_operations,
+                tools_used=tools_used,
+                tool_call_counts=tool_call_counts,
+                duration_seconds=duration,
+                token_usage=token_usage,
+                delegated_sub_agent=delegated_sub_agent,
+                delegated_sub_agents=delegated_sub_agents,
+                delegation_reasoning=None,  # Could extract from response if needed
+                file_requests=file_requests,
             )
-
-            duration = time.time() - start_time
-
-        with logfire.span("eval.extract_observations"):
-            # Extract response
-            response = result.output.response
-            clarifying_questions = result.output.clarifying_questions or []
-            file_requests = result.output.file_requests or []
-
-            # Debug logging for empty responses
-            if not response or response.strip() == "":
-                logger.warning(
-                    f"Empty response from agent for {test_case.name}. "
-                    f"clarifying_questions={len(clarifying_questions)}, "
-                    f"file_requests={len(file_requests)}, "
-                    f"output={result.output}"
-                )
-
-            # Extract tool usage
-            tools_used = self._extract_tool_names(result.all_messages())
-
-            # Extract file operations
-            file_operations = self._extract_file_operations(file_tracker.operations)
-
-            # Extract token usage
-            usage = result.usage()
-            token_usage = {
-                "prompt_tokens": usage.input_tokens or 0,
-                "completion_tokens": usage.output_tokens or 0,
-                "total_tokens": (usage.input_tokens or 0) + (usage.output_tokens or 0),
-            }
-
-            # Extract router-specific fields
-            all_messages = result.all_messages()
-            delegated_sub_agents = self._extract_all_delegated_agents(all_messages)
-            delegated_sub_agent = (
-                delegated_sub_agents[0] if delegated_sub_agents else None
-            )
-
-        return AgentExecutionOutput(
-            response=response,
-            clarifying_questions=clarifying_questions if clarifying_questions else None,
-            file_operations=file_operations,
-            tools_used=tools_used,
-            duration_seconds=duration,
-            token_usage=token_usage,
-            delegated_sub_agent=delegated_sub_agent,
-            delegated_sub_agents=delegated_sub_agents,
-            delegation_reasoning=None,  # Could extract from response if needed
-            file_requests=file_requests,
-        )
+        finally:
+            # Always restore original working directory
+            os.chdir(original_cwd)
 
     def _extract_tool_names(self, messages: list[ModelMessage]) -> list[str]:
         """Extract unique tool names from message history in order of first use.
@@ -333,6 +370,31 @@ class RouterExecutor:
                             seen.add(part.tool_name)
 
         return tool_names
+
+    def _extract_tool_call_counts(self, messages: list[ModelMessage]) -> dict[str, int]:
+        """Extract count of each tool call from message history.
+
+        Unlike _extract_tool_names which returns unique tools, this counts
+        every invocation of each tool. Useful for detecting excessive tool usage
+        like repeated web searches.
+
+        Args:
+            messages: List of model messages from the agent run
+
+        Returns:
+            Dictionary mapping tool names to invocation counts
+        """
+        tool_counts: dict[str, int] = {}
+
+        for msg in messages:
+            if isinstance(msg, ModelResponse):
+                for part in msg.parts:
+                    if isinstance(part, ToolCallPart):
+                        tool_counts[part.tool_name] = (
+                            tool_counts.get(part.tool_name, 0) + 1
+                        )
+
+        return tool_counts
 
     def _extract_file_operations(
         self,
@@ -418,6 +480,7 @@ class RouterExecutor:
             clarifying_questions=None,
             file_operations=[],
             tools_used=[],
+            tool_call_counts={},
             duration_seconds=0.0,
             token_usage={},
             delegated_sub_agent=None,

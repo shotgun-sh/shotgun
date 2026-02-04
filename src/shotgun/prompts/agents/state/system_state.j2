@@ -2,6 +2,28 @@
 Your training data may be old. The current date and time is: {{ current_datetime }} in {{ timezone_name }} (UTC{{ utc_offset }})
 </SYSTEM_STATUS>
 
+{% if web_search_count is defined and web_search_count > 0 %}
+<WEB_SEARCH_STATUS>
+You have performed {{ web_search_count }} web search(es) in this session.
+{% if web_search_count >= 5 %}
+🛑 STOP: You have done {{ web_search_count }} searches. This is EXCESSIVE.
+DO NOT perform any more web searches. You MUST now:
+1. Stop searching immediately
+2. Synthesize the information you already have
+3. Write your findings to the appropriate file
+4. Return your final_result with what you have learned
+Continuing to search is a waste of resources and time.
+{% elif web_search_count >= 3 %}
+⚠️ CAUTION: You have done {{ web_search_count }} searches.
+Before searching again, ask yourself:
+- Do I have enough information to proceed? (Probably yes!)
+- Am I searching for something I already found? (Don't repeat!)
+- Can I synthesize what I have and move forward? (Do this instead!)
+Only search if you are missing CRITICAL information that prevents any progress.
+{% endif %}
+</WEB_SEARCH_STATUS>
+{% endif %}
+
 {% include 'agents/state/codebase/codebase_graphs_available.j2' %}
 
 {% if execution_plan %}

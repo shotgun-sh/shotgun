@@ -227,6 +227,10 @@ class DelegationResult(BaseModel):
         default_factory=list, description="Clarifying questions from sub-agent"
     )
     error: str | None = Field(default=None, description="Error message if failed")
+    tool_call_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of each tool call made by sub-agent (tool_name -> count)",
+    )
 
 
 class SubAgentResult(BaseModel):
@@ -381,4 +385,10 @@ class RouterDeps(AgentDeps):
         default=None,
         exclude=True,
         description="Callback to notify TUI when plan changes",
+    )
+    # Accumulated tool call counts from all sub-agents
+    # Used by evals to track total tool usage across delegation chain
+    sub_agent_tool_calls: dict[str, int] = Field(
+        default_factory=dict,
+        description="Accumulated tool call counts from all sub-agent delegations",
     )

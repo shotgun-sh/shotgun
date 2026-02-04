@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pydantic_ai import RunContext
+from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.tools import ToolDefinition
 
 from shotgun.agents.export import create_export_agent, run_export_agent
@@ -317,11 +318,30 @@ async def _run_sub_agent(
                 has_questions = True
                 questions = result.output.clarifying_questions
 
+            # Extract tool call counts from sub-agent's message history
+            tool_call_counts: dict[str, int] = {}
+            if result:
+                for msg in result.all_messages():
+                    if isinstance(msg, ModelResponse):
+                        for part in msg.parts:
+                            if isinstance(part, ToolCallPart):
+                                tool_name = part.tool_name
+                                tool_call_counts[tool_name] = (
+                                    tool_call_counts.get(tool_name, 0) + 1
+                                )
+
+            # Accumulate tool calls in RouterDeps for eval tracking
+            for tool_name, count in tool_call_counts.items():
+                deps.sub_agent_tool_calls[tool_name] = (
+                    deps.sub_agent_tool_calls.get(tool_name, 0) + count
+                )
+
             logger.info(
-                "Sub-agent %s completed. Files modified: %s, files found: %s",
+                "Sub-agent %s completed. Files modified: %s, files found: %s, tool calls: %s",
                 agent_type.value,
                 files_modified,
                 files_found,
+                tool_call_counts,
             )
 
             # Track delegation completion metric
@@ -332,6 +352,7 @@ async def _run_sub_agent(
                     "files_modified_count": len(files_modified),
                     "has_questions": has_questions,
                     "duration_seconds": round(time.time() - start_time, 2),
+                    "tool_call_count": sum(tool_call_counts.values()),
                 },
             )
 
@@ -345,6 +366,7 @@ async def _run_sub_agent(
                 files_found=files_found,
                 has_questions=has_questions,
                 questions=questions,
+                tool_call_counts=tool_call_counts,
             )
 
         except Exception as e:

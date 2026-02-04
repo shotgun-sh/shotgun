@@ -36,6 +36,9 @@ from evals.evaluators.deterministic.router_evaluators import (  # noqa: E402
 from evals.executor import ExecutionResult, RouterExecutor  # noqa: E402
 from evals.judges.file_requests_judge import FileRequestsJudge  # noqa: E402
 from evals.judges.router_quality_judge import RouterQualityJudge  # noqa: E402
+from evals.judges.web_search_efficiency_judge import (  # noqa: E402
+    WebSearchEfficiencyJudge,
+)  # noqa: E402
 from evals.models import (  # noqa: E402
     AgentExecutionOutput,
     AggregatedResult,
@@ -142,6 +145,7 @@ class EvaluationRunner:
         # Initialize judges lazily based on evaluator_names
         self._router_judge: RouterQualityJudge | None = None
         self._file_requests_judge: FileRequestsJudge | None = None
+        self._web_search_efficiency_judge: WebSearchEfficiencyJudge | None = None
         self.aggregator = RouterAggregator()
 
     def _get_router_judge(self) -> RouterQualityJudge:
@@ -155,6 +159,12 @@ class EvaluationRunner:
         if self._file_requests_judge is None:
             self._file_requests_judge = FileRequestsJudge()
         return self._file_requests_judge
+
+    def _get_web_search_efficiency_judge(self) -> WebSearchEfficiencyJudge:
+        """Get or create the WebSearchEfficiencyJudge instance."""
+        if self._web_search_efficiency_judge is None:
+            self._web_search_efficiency_judge = WebSearchEfficiencyJudge()
+        return self._web_search_efficiency_judge
 
     async def run_suite(
         self,
@@ -378,9 +388,17 @@ class EvaluationRunner:
             # Run LLM judge (with concurrency control)
             # Select judge based on test_case.expected.judge_type (per-test-case selection)
             from evals.judges.file_requests_judge import FileRequestsJudgeResult
+            from evals.judges.web_search_efficiency_judge import (
+                WebSearchEfficiencyJudgeResult,
+            )
             from evals.models import RouterJudgeResult
 
-            judge_result: RouterJudgeResult | FileRequestsJudgeResult | None = None
+            judge_result: (
+                RouterJudgeResult
+                | FileRequestsJudgeResult
+                | WebSearchEfficiencyJudgeResult
+                | None
+            ) = None
             if self.config.enable_judge:
                 async with judge_semaphore:
                     try:
@@ -389,6 +407,12 @@ class EvaluationRunner:
                             # Use FileRequestsJudge for file handling scenarios
                             file_judge = self._get_file_requests_judge()
                             judge_result = await file_judge.evaluate(
+                                test_case, execution_result.output
+                            )
+                        elif judge_type == JudgeType.WEB_SEARCH_EFFICIENCY:
+                            # Use WebSearchEfficiencyJudge for web search behavior
+                            ws_judge = self._get_web_search_efficiency_judge()
+                            judge_result = await ws_judge.evaluate(
                                 test_case, execution_result.output
                             )
                         else:
