@@ -19,6 +19,7 @@ from evals.models import (
     TestCaseContext,
     TestCaseInput,
 )
+from shotgun.agents.router.models import RouterMode
 
 # =============================================================================
 # Test Case: Feature request should create plan with file write steps
@@ -31,7 +32,7 @@ FEATURE_REQUEST_CREATES_PLAN_WITH_FILES = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="planning",  # Planning mode - no delegation, just create plan
+            router_mode=RouterMode.PLANNING,  # Planning mode - no delegation, just create plan
         ),
     ),
     expected=ExpectedAgentOutput(
@@ -60,7 +61,7 @@ SPEC_REQUEST_CREATES_PLAN = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="planning",  # Planning mode
+            router_mode=RouterMode.PLANNING,  # Planning mode
         ),
     ),
     expected=ExpectedAgentOutput(

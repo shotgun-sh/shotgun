@@ -18,6 +18,7 @@ from evals.models import (
     TestCaseContext,
     TestCaseInput,
 )
+from shotgun.agents.router.models import RouterMode
 
 # Test: Router should use file_requests for PDFs, not ask clarifying questions
 PDF_FILE_REQUEST_NO_QUESTIONS = ShotgunTestCase(
@@ -27,7 +28,7 @@ PDF_FILE_REQUEST_NO_QUESTIONS = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",  # Drafting mode - delegation tools available
+            router_mode=RouterMode.DRAFTING,  # Drafting mode - delegation tools available
         ),
     ),
     expected=ExpectedAgentOutput(
@@ -59,7 +60,7 @@ IMAGE_FILE_REQUEST_NO_QUESTIONS = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
     ),
     expected=ExpectedAgentOutput(
@@ -87,7 +88,7 @@ PDF_DIRECT_ACCESS_NO_EXCUSES = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
     ),
     expected=ExpectedAgentOutput(
@@ -124,7 +125,7 @@ PDF_NO_RESEARCH_FILE_READ = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
     ),
     expected=ExpectedAgentOutput(
@@ -155,7 +156,7 @@ SHOTGUN_MULTIPLE_PDFS_FILE_REQUEST = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
     ),
     expected=ExpectedAgentOutput(

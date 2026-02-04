@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 from pydantic_ai.messages import ModelMessage
 
+from shotgun.agents.router.models import RouterMode
+
 if TYPE_CHECKING:
     from evals.judges.file_requests_judge import FileRequestsJudgeResult
     from evals.judges.web_search_efficiency_judge import WebSearchEfficiencyJudgeResult
@@ -166,9 +168,9 @@ class TestCaseContext(BaseModel):
     codebase_name: str | None = Field(
         default=None, description="Name of the indexed codebase"
     )
-    router_mode: str = Field(
-        default="planning",
-        description="Router mode: 'planning' (no delegation) or 'drafting' (delegation enabled)",
+    router_mode: RouterMode = Field(
+        default=RouterMode.PLANNING,
+        description="Router mode: PLANNING (no delegation) or DRAFTING (delegation enabled)",
     )
     use_isolated_directory: bool = Field(
         default=False,

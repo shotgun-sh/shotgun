@@ -232,12 +232,7 @@ class RouterExecutor:
                 if shotgun_agent_type == ShotgunAgentType.ROUTER:
                     # Get router mode from test case context (default: planning)
                     context = test_case.inputs.context
-                    router_mode_str = context.router_mode if context else "planning"
-                    router_mode = (
-                        RouterMode.DRAFTING
-                        if router_mode_str == "drafting"
-                        else RouterMode.PLANNING
-                    )
+                    router_mode = context.router_mode if context else RouterMode.PLANNING
 
                     deps: AgentDeps = RouterDeps(
                         interactive_mode=True,

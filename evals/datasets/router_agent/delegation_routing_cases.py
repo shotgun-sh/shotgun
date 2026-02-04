@@ -15,6 +15,7 @@ from evals.models import (
     TestCaseContext,
     TestCaseInput,
 )
+from shotgun.agents.router.models import RouterMode
 
 # =============================================================================
 # Test Case: Request affecting multiple areas should create a plan first
@@ -28,7 +29,7 @@ MULTI_AREA_REQUEST_CREATES_PLAN = ShotgunTestCase(
         context=TestCaseContext(
             has_codebase_indexed=True,
             codebase_name="shotgun",
-            router_mode="planning",  # Planning mode - Router should create plan
+            router_mode=RouterMode.PLANNING,  # Planning mode - Router should create plan
         ),
     ),
     expected=ExpectedAgentOutput(

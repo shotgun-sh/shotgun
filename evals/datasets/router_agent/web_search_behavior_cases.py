@@ -19,6 +19,7 @@ from evals.models import (
     TestCaseContext,
     TestCaseInput,
 )
+from shotgun.agents.router.models import RouterMode
 
 # Test: Simple spec request should not trigger excessive web searches
 # This is the case that triggered the investigation - asking for a spec
@@ -31,7 +32,7 @@ SPEC_REQUEST_REASONABLE_WEB_SEARCHES = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",  # Drafting mode - delegation tools available
+            router_mode=RouterMode.DRAFTING,  # Drafting mode - delegation tools available
         ),
         # Allow more turns for multi-turn behavior - need enough for delegation chain
         request_limit=25,
@@ -81,7 +82,7 @@ COMPLEX_SPEC_REQUEST_BOUNDED_SEARCHES = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
         # More generous limits for complex topic and delegation chain
         request_limit=30,
@@ -122,7 +123,7 @@ PLAN_REQUEST_MINIMAL_SEARCHES = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
         request_limit=20,
         tool_calls_limit=75,
@@ -163,7 +164,7 @@ SPEC_REQUEST_NATURAL = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
         ),
         # Allow enough turns for full delegation chain
         request_limit=30,
@@ -204,7 +205,7 @@ SPEC_RESEARCH_FIRST = ShotgunTestCase(
         agent_type=AgentType.ROUTER,
         context=TestCaseContext(
             has_codebase_indexed=False,
-            router_mode="drafting",
+            router_mode=RouterMode.DRAFTING,
             use_isolated_directory=True,
         ),
         request_limit=30,
