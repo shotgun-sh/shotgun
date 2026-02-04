@@ -21,6 +21,7 @@ from shotgun.agents.autopilot.claude_subprocess import (
     ClaudeSubprocess,
     ClaudeSubprocessConfig,
 )
+from shotgun.agents.autopilot.llm_parser import LLMTasksParser
 from shotgun.agents.autopilot.models import (
     AutopilotMode,
     AutopilotState,
@@ -90,24 +91,31 @@ class AutopilotOrchestrator:
             tasks_file_path=self.config.tasks_file_path,
             base_branch=self.config.base_branch,
         )
-        self._parser = TasksParser(self.config.working_directory)
+        # LLM parser for initial parsing (handles various formats)
+        self._llm_parser = LLMTasksParser(self.config.working_directory)
+        # Regex parser for fast refresh of task completion status
+        self._regex_parser = TasksParser(self.config.working_directory)
         self._claude: ClaudeSubprocess | None = None
         self._cancelled = False
 
     async def initialize(self) -> ParsedTasksFile:
-        """Initialize autopilot by parsing tasks.md.
+        """Initialize autopilot by parsing tasks.md using LLM.
+
+        Uses a fast sub-agent model with structured output to parse
+        tasks.md files flexibly, handling various markdown formats.
 
         Returns:
             ParsedTasksFile with stages and any parse errors.
         """
         logger.info("Initializing autopilot from %s", self.config.tasks_file_path)
 
-        parsed = self._parser.parse(self.config.tasks_file_path)
+        # Use LLM parser for flexible parsing of various formats
+        parsed = await self._llm_parser.parse(self.config.tasks_file_path)
 
         if parsed.is_valid:
             self.state.stages = parsed.stages
             logger.info(
-                "Parsed %d stages with %d total tasks",
+                "LLM parsed %d stages with %d total tasks",
                 len(parsed.stages),
                 parsed.total_tasks,
             )
@@ -507,8 +515,12 @@ You MUST mark tasks as complete in {self.state.tasks_file_path} when done.
             self._claude = None
 
     def _refresh_stages(self) -> None:
-        """Refresh stage task completion status from tasks.md."""
-        self.state.stages = self._parser.refresh_stages(
+        """Refresh stage task completion status from tasks.md.
+
+        Uses the fast regex parser to check checkbox status without
+        needing a full LLM parse.
+        """
+        self.state.stages = self._regex_parser.refresh_stages(
             self.state.stages,
             self.config.tasks_file_path,
         )
