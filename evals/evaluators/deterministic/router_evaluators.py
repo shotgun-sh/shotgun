@@ -22,6 +22,7 @@ from evals.models import (
     ExpectedAgentOutput,
     ShotgunTestCase,
 )
+from shotgun.agents.common import WEB_SEARCH_TOOL_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -637,22 +638,6 @@ class WebSearchCountEvaluator(BaseEvaluator):
     name = "web_search_count"
     severity = EvaluatorSeverity.HARD
 
-    # All known web search tool names across providers
-    # Builtin tools from Pydantic AI / model providers
-    WEB_SEARCH_TOOLS: set[str] = {
-        "web_search",  # Generic/builtin web search
-        # Provider-specific web search tools
-        "anthropic_web_search_tool",
-        "openai_web_search_tool",
-        "gemini_web_search_tool",
-        "openai_compatible_web_search_tool",
-        # Potential aliases
-        "search_web",
-        "bing_search",
-        "google_search",
-        "tavily_search",
-    }
-
     def evaluate(
         self,
         actual_output: AgentExecutionOutput,
@@ -678,7 +663,7 @@ class WebSearchCountEvaluator(BaseEvaluator):
         total_web_searches = sum(
             count
             for tool_name, count in tool_counts.items()
-            if tool_name in self.WEB_SEARCH_TOOLS
+            if tool_name in WEB_SEARCH_TOOL_NAMES
         )
 
         if total_web_searches > max_web_searches:
@@ -686,7 +671,7 @@ class WebSearchCountEvaluator(BaseEvaluator):
             used_search_tools = {
                 tool_name: count
                 for tool_name, count in tool_counts.items()
-                if tool_name in self.WEB_SEARCH_TOOLS
+                if tool_name in WEB_SEARCH_TOOL_NAMES
             }
             return EvaluatorResult(
                 evaluator_name=self.name,
