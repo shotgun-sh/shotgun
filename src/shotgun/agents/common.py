@@ -23,6 +23,10 @@ from pydantic_ai.messages import (
 from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import ProviderType, get_provider_model
+from shotgun.agents.config.constants import (
+    WEB_SEARCH_STOP_THRESHOLD,
+    WEB_SEARCH_WARNING_THRESHOLD,
+)
 from shotgun.agents.models import (
     AgentResponse,
     AgentSystemPromptContext,
@@ -163,6 +167,8 @@ async def add_system_status_message(
         execution_plan=execution_plan,
         pending_approval=pending_approval,
         web_search_count=web_search_count,
+        web_search_warning_threshold=WEB_SEARCH_WARNING_THRESHOLD,
+        web_search_stop_threshold=WEB_SEARCH_STOP_THRESHOLD,
     )
 
     message_history.append(
