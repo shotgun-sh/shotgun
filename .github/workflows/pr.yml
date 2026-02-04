@@ -375,32 +375,12 @@ jobs:
           fetch-depth: 0  # Full history for comprehensive scan
 
       - name: Install trufflehog
-        run: |
-          # Retry with exponential backoff (max 5 attempts, max 60s delay)
-          MAX_ATTEMPTS=5
-          DELAY=2
-          MAX_DELAY=60
-
-          for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            echo "Attempt $attempt of $MAX_ATTEMPTS: Installing trufflehog..."
-            if curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin; then
-              echo "✅ Successfully installed trufflehog"
-              exit 0
-            fi
-
-            if [ $attempt -lt $MAX_ATTEMPTS ]; then
-              echo "⚠️ Attempt $attempt failed. Retrying in ${DELAY}s..."
-              sleep $DELAY
-              # Exponential backoff with max cap
-              DELAY=$((DELAY * 2))
-              if [ $DELAY -gt $MAX_DELAY ]; then
-                DELAY=$MAX_DELAY
-              fi
-            fi
-          done
-
-          echo "❌ Failed to install trufflehog after $MAX_ATTEMPTS attempts"
-          exit 1
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 2
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Run trufflehog scan (pass 1 - all files except uv.lock)
         run: trufflehog git file://. --fail --no-update --exclude-globs=uv.lock
