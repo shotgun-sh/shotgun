@@ -308,7 +308,7 @@ class ChatScreen(Screen[None]):
 
         self.call_later(self.check_if_codebase_is_indexed)
         # Initial update of context indicator
-        self.update_context_indicator()
+        self.call_later(self.update_context_indicator)
         # Check for updates in background (after other startup tasks)
         self.call_later(self.check_for_updates)
 
