@@ -260,6 +260,11 @@ class UnifiedCommandProvider(Provider):
 
         # Alphabetically ordered commands
         yield DiscoveryHit(
+            "Autopilot: Run Stages",
+            self.chat_screen.show_autopilot_startup,
+            help="Run implementation stages from .shotgun/tasks.md with Claude Code",
+        )
+        yield DiscoveryHit(
             "Clear Conversation",
             self.chat_screen.action_clear_conversation,
             help="Clear the entire conversation history",
@@ -314,6 +319,11 @@ class UnifiedCommandProvider(Provider):
 
         # Define all commands in alphabetical order
         commands = [
+            (
+                "Autopilot: Run Stages",
+                self.chat_screen.show_autopilot_startup,
+                "Run implementation stages from .shotgun/tasks.md with Claude Code",
+            ),
             (
                 "Clear Conversation",
                 self.chat_screen.action_clear_conversation,

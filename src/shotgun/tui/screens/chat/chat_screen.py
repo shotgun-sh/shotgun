@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from shotgun.agents.autopilot.models import AutopilotMode, Stage
     from shotgun.agents.constants import FileContent
     from shotgun.agents.router.models import ExecutionStep
 
@@ -114,6 +115,12 @@ from shotgun.tui.screens.chat_screen.command_providers import (
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.chat_screen.messages import (
+    AutopilotApprovalRequired,
+    AutopilotCancel,
+    AutopilotContinue,
+    AutopilotOutputReceived,
+    AutopilotStart,
+    AutopilotStop,
     CascadeConfirmationRequired,
     CascadeConfirmed,
     CascadeDeclined,
@@ -144,8 +151,10 @@ from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.approval_widget import PlanApprovalWidget
+from shotgun.tui.widgets.autopilot_startup_widget import AutopilotStartupWidget
 from shotgun.tui.widgets.cascade_confirmation_widget import CascadeConfirmationWidget
 from shotgun.tui.widgets.plan_panel import PlanPanelWidget
+from shotgun.tui.widgets.stage_approval_widget import StageApprovalWidget
 from shotgun.tui.widgets.step_checkpoint_widget import StepCheckpointWidget
 from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 from shotgun.utils import get_shotgun_home
@@ -225,6 +234,10 @@ class ChatScreen(Screen[None]):
 
     # Plan panel widget (Stage 11)
     _plan_panel: PlanPanelWidget | None = None
+
+    # Autopilot widgets
+    _autopilot_startup_widget: AutopilotStartupWidget | None = None
+    _autopilot_approval_widget: StageApprovalWidget | None = None
 
     def __init__(
         self,
@@ -2870,3 +2883,238 @@ class ChatScreen(Screen[None]):
             f"'{plan.goal}' with {len(plan.steps)} steps" if plan else "None",
         )
         self.post_message(PlanUpdated(plan))
+
+    # =========================================================================
+    # Autopilot Handlers
+    # =========================================================================
+
+    def show_autopilot_startup(self) -> None:
+        """Show the autopilot startup widget.
+
+        This parses tasks.md and displays the startup widget for mode selection.
+        """
+        from shotgun.agents.autopilot import TasksParser
+
+        # Parse tasks.md
+        parser = TasksParser(self.deps.working_directory)
+        parsed = parser.parse()
+
+        # Show startup widget
+        if parsed.is_valid:
+            self._show_autopilot_startup_widget(parsed.stages)
+        else:
+            # Show widget with error
+            error_msg = "\n".join(parsed.parse_errors)
+            self._show_autopilot_startup_widget([], error_msg)
+
+    def _show_autopilot_startup_widget(
+        self, stages: "list[Stage]", error_message: str | None = None
+    ) -> None:
+        """Show the autopilot startup widget.
+
+        Args:
+            stages: List of stages parsed from tasks.md.
+            error_message: Optional error message to display.
+        """
+        # Remove existing widget if any
+        if self._autopilot_startup_widget:
+            self._autopilot_startup_widget.remove()
+            self._autopilot_startup_widget = None
+
+        # Create and mount new widget
+        self._autopilot_startup_widget = AutopilotStartupWidget(
+            stages, error_message
+        )
+        window = self.query_one("#window")
+        footer = self.query_one("#footer")
+        window.mount(self._autopilot_startup_widget, before=footer)
+
+    def _hide_autopilot_startup_widget(self) -> None:
+        """Hide the autopilot startup widget."""
+        if self._autopilot_startup_widget:
+            self._autopilot_startup_widget.remove()
+            self._autopilot_startup_widget = None
+
+    @on(AutopilotStart)
+    def handle_autopilot_start(self, event: AutopilotStart) -> None:
+        """Handle autopilot start from startup widget."""
+        self._hide_autopilot_startup_widget()
+
+        # Show confirmation
+        self.mount_hint(
+            f"Starting Autopilot in **{event.mode.value}** mode with "
+            f"**{len(event.stages)}** stages"
+        )
+
+        # Start the autopilot loop
+        self._run_autopilot_loop(event.mode, event.stages)
+
+    @on(AutopilotCancel)
+    def handle_autopilot_cancel(self) -> None:
+        """Handle autopilot cancellation from startup widget."""
+        self._hide_autopilot_startup_widget()
+        self.mount_hint("Autopilot cancelled")
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    @work(exclusive=True)
+    async def _run_autopilot_loop(
+        self, mode: "AutopilotMode", stages: "list[Stage]"
+    ) -> None:
+        """Run the autopilot execution loop.
+
+        Args:
+            mode: The execution mode.
+            stages: List of stages to execute.
+        """
+        from shotgun.agents.autopilot import (
+            AutopilotConfig,
+            AutopilotMode,
+            AutopilotOrchestrator,
+            ClaudeOutputType,
+        )
+
+        # Create orchestrator
+        config = AutopilotConfig(
+            working_directory=self.deps.working_directory,
+        )
+        orchestrator = AutopilotOrchestrator(config)
+
+        # Set mode and initialize with pre-parsed stages
+        # Need to convert type hint to runtime type
+        orchestrator.set_mode(AutopilotMode(mode.value))
+        orchestrator.state.stages = stages
+
+        # Show we're starting
+        self.processing_state.start_processing("Running Autopilot...")
+
+        try:
+            while not orchestrator.is_complete:
+                current_stage = orchestrator.state.current_stage
+                if current_stage is None:
+                    break
+
+                # Log stage start
+                logger.info(
+                    "Autopilot: Starting Stage %d: %s",
+                    current_stage.number,
+                    current_stage.name,
+                )
+                self.mount_hint(
+                    f"**Stage {current_stage.number}:** {current_stage.name}"
+                )
+
+                # Run the stage
+                async for output in orchestrator.run_next_stage():
+                    # Post output message for display
+                    self.post_message(AutopilotOutputReceived(output))
+
+                    # Check for errors
+                    if output.type == ClaudeOutputType.ERROR:
+                        self.mount_hint(f"[red]Error:[/] {output.content}")
+                        return
+
+                # Check if we need to create PR
+                if orchestrator.state.mode == AutopilotMode.AUTO_CONTINUE:
+                    self.mount_hint("Creating PR for stage...")
+                    async for output in orchestrator.create_pr():
+                        self.post_message(AutopilotOutputReceived(output))
+
+                # Check if we need approval (pause mode)
+                if orchestrator.requires_approval:
+                    next_stage = orchestrator.state.next_stage
+                    self.post_message(
+                        AutopilotApprovalRequired(current_stage, next_stage)
+                    )
+                    # Wait for user response - the handler will resume us
+                    return
+
+                # Advance to next stage
+                if not orchestrator.advance_to_next_stage():
+                    break
+
+            # All done
+            self.mount_hint("[green]Autopilot completed all stages![/]")
+
+        except asyncio.CancelledError:
+            self.mount_hint("Autopilot was cancelled")
+        except Exception as e:
+            logger.exception("Autopilot error")
+            self.mount_hint(f"[red]Autopilot error:[/] {e}")
+        finally:
+            self.processing_state.stop_processing()
+            self.widget_coordinator.update_prompt_input(focus=True)
+
+    @on(AutopilotOutputReceived)
+    def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
+        """Handle output from Claude Code subprocess."""
+        from shotgun.agents.autopilot.models import ClaudeOutputType
+
+        output = event.output
+
+        # Format based on output type
+        if output.type == ClaudeOutputType.STDOUT:
+            # Regular output - show as hint
+            if output.content.strip():
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=output.content)
+                )
+        elif output.type == ClaudeOutputType.STDERR:
+            # Error output - show with warning style
+            if output.content.strip():
+                self.agent_manager.add_hint_message(
+                    HintMessage(message=f"[yellow]{output.content}[/]")
+                )
+        elif output.type == ClaudeOutputType.EXIT:
+            # Exit - show completion
+            if output.exit_code == 0:
+                self.agent_manager.add_hint_message(
+                    HintMessage(message="[dim]Claude completed[/]")
+                )
+            else:
+                self.agent_manager.add_hint_message(
+                    HintMessage(
+                        message=f"[yellow]Claude exited with code {output.exit_code}[/]"
+                    )
+                )
+
+    @on(AutopilotApprovalRequired)
+    def handle_autopilot_approval_required(
+        self, event: AutopilotApprovalRequired
+    ) -> None:
+        """Show approval widget between stages."""
+        # Remove existing widget if any
+        if self._autopilot_approval_widget:
+            self._autopilot_approval_widget.remove()
+            self._autopilot_approval_widget = None
+
+        # Create and mount approval widget
+        self._autopilot_approval_widget = StageApprovalWidget(
+            event.completed_stage, event.next_stage
+        )
+        window = self.query_one("#window")
+        footer = self.query_one("#footer")
+        window.mount(self._autopilot_approval_widget, before=footer)
+
+    @on(AutopilotContinue)
+    def handle_autopilot_continue(self) -> None:
+        """Handle user continuing autopilot execution."""
+        # Remove approval widget
+        if self._autopilot_approval_widget:
+            self._autopilot_approval_widget.remove()
+            self._autopilot_approval_widget = None
+
+        self.mount_hint("Continuing to next stage...")
+        # Note: The worker needs to be resumed - this is a simplified implementation
+        # In production, we'd need to track orchestrator state and resume properly
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+    @on(AutopilotStop)
+    def handle_autopilot_stop(self) -> None:
+        """Handle user stopping autopilot execution."""
+        # Remove approval widget
+        if self._autopilot_approval_widget:
+            self._autopilot_approval_widget.remove()
+            self._autopilot_approval_widget = None
+
+        self.mount_hint("Autopilot stopped by user")
+        self.widget_coordinator.update_prompt_input(focus=True)

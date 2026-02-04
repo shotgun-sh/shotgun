@@ -7,6 +7,11 @@ and cascade confirmation in the Router's Planning mode.
 
 from textual.message import Message
 
+from shotgun.agents.autopilot.models import (
+    AutopilotMode,
+    ClaudeOutput,
+    Stage,
+)
 from shotgun.agents.models import AgentType
 from shotgun.agents.router.models import CascadeScope, ExecutionPlan, ExecutionStep
 
@@ -30,6 +35,15 @@ __all__ = [
     # Plan panel messages (Stage 11)
     "PlanUpdated",
     "PlanPanelClosed",
+    # Autopilot messages
+    "AutopilotStart",
+    "AutopilotCancel",
+    "AutopilotStageStarted",
+    "AutopilotStageCompleted",
+    "AutopilotApprovalRequired",
+    "AutopilotContinue",
+    "AutopilotStop",
+    "AutopilotOutputReceived",
 ]
 
 
@@ -217,3 +231,105 @@ class PlanPanelClosed(Message):
     This message indicates the user wants to dismiss the plan panel
     temporarily. The panel will reopen when the plan changes.
     """
+
+
+# =============================================================================
+# Autopilot Messages
+# =============================================================================
+
+
+class AutopilotStart(Message):
+    """Posted when user clicks Start in the autopilot startup widget.
+
+    This message initiates autopilot execution with the selected mode.
+
+    Attributes:
+        mode: The execution mode selected by the user.
+        stages: The stages parsed from tasks.md.
+    """
+
+    def __init__(self, mode: AutopilotMode, stages: list[Stage]) -> None:
+        super().__init__()
+        self.mode = mode
+        self.stages = stages
+
+
+class AutopilotCancel(Message):
+    """Posted when user clicks Cancel in the autopilot startup widget.
+
+    This message dismisses the autopilot startup widget without
+    starting execution.
+    """
+
+
+class AutopilotStageStarted(Message):
+    """Posted when autopilot begins executing a stage.
+
+    Attributes:
+        stage: The stage that is starting.
+        stage_index: The 0-indexed position of the stage.
+    """
+
+    def __init__(self, stage: Stage, stage_index: int) -> None:
+        super().__init__()
+        self.stage = stage
+        self.stage_index = stage_index
+
+
+class AutopilotStageCompleted(Message):
+    """Posted when autopilot completes a stage.
+
+    Attributes:
+        stage: The stage that was completed.
+        next_stage: The next stage to execute, or None if this was the last.
+    """
+
+    def __init__(self, stage: Stage, next_stage: Stage | None) -> None:
+        super().__init__()
+        self.stage = stage
+        self.next_stage = next_stage
+
+
+class AutopilotApprovalRequired(Message):
+    """Posted when autopilot needs user approval to continue.
+
+    In pause mode, this message is posted after each stage completes
+    to allow the user to review before continuing.
+
+    Attributes:
+        completed_stage: The stage that was just completed.
+        next_stage: The next stage to execute, or None if complete.
+    """
+
+    def __init__(self, completed_stage: Stage, next_stage: Stage | None) -> None:
+        super().__init__()
+        self.completed_stage = completed_stage
+        self.next_stage = next_stage
+
+
+class AutopilotContinue(Message):
+    """Posted when user approves continuing to the next stage.
+
+    This message resumes autopilot execution after an approval pause.
+    """
+
+
+class AutopilotStop(Message):
+    """Posted when user wants to stop autopilot execution.
+
+    This message terminates autopilot, stopping at the current stage.
+    """
+
+
+class AutopilotOutputReceived(Message):
+    """Posted when Claude Code subprocess produces output.
+
+    This message allows streaming output to be displayed in the TUI.
+
+    Attributes:
+        output: The output received from Claude Code.
+    """
+
+    def __init__(self, output: ClaudeOutput) -> None:
+        super().__init__()
+        self.output = output
