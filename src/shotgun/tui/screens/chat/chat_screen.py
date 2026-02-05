@@ -3140,7 +3140,8 @@ Then confirm what you changed.
 
                 # Update spinner when stage changes (e.g., in cowboy mode auto-advance)
                 if output.type == ClaudeOutputType.STAGE_CHANGE:
-                    self.processing_state.start_processing(output.content)
+                    # Use update_spinner_text since processing is already active
+                    self.processing_state.update_spinner_text(output.content)
                     self.mount_hint(f"**{output.content}**")
                 elif output.type == ClaudeOutputType.ERROR:
                     self.mount_hint(f"[red]Error:[/] {output.content}")
