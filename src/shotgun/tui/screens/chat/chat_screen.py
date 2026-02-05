@@ -3033,9 +3033,7 @@ class ChatScreen(Screen[None]):
                     f"Starting Autopilot in **{result.mode.value}** mode with "
                     f"**{len(result.stages)}** stages"
                 )
-                self._run_autopilot_stage(
-                    result.mode, result.stages, model=result.model
-                )
+                self._run_autopilot_stage(result.mode, result.stages)
             else:
                 logger.info("Autopilot: Cancelled by user")
                 self.mount_hint("Autopilot cancelled")
@@ -3052,7 +3050,6 @@ class ChatScreen(Screen[None]):
         mode: "AutopilotMode",
         stages: "list[Stage]",
         feedback: str | None = None,
-        model: str | None = None,
     ) -> None:
         """Run the autopilot workflow for the current stage.
 
@@ -3067,13 +3064,11 @@ class ChatScreen(Screen[None]):
             mode: The execution mode.
             stages: List of stages (with current state).
             feedback: Optional feedback from user rejection.
-            model: Claude model to use (None = Claude Code default).
         """
         # Create or reuse orchestrator
         if self._autopilot_orchestrator is None:
             config = AutopilotConfig(
                 working_directory=self.deps.working_directory,
-                model=model if model else None,  # Empty string means default
             )
             self._autopilot_orchestrator = AutopilotOrchestrator(config)
             self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))

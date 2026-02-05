@@ -4,37 +4,15 @@ This screen displays when the user invokes /autopilot, allowing them
 to select the execution mode and preview stages before starting.
 """
 
-from enum import StrEnum
-
 from pydantic import BaseModel, Field
 from textual import events, on
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
-from textual.widgets import Button, RadioButton, RadioSet, Select, Static
+from textual.widgets import Button, RadioButton, RadioSet, Static
 
 from shotgun.agents.autopilot.models import AutopilotMode, Stage
-
-
-class ClaudeModel(StrEnum):
-    """Available Claude models for autopilot execution."""
-
-    DEFAULT = ""  # Use Claude Code's default
-    OPUS_4_5 = "claude-opus-4-5-20251101"
-    SONNET_4_5 = "claude-sonnet-4-5-20250514"
-    HAIKU_4_5 = "claude-haiku-4-5-20250514"
-
-    @classmethod
-    def display_name(cls, model: "ClaudeModel") -> str:
-        """Get the display name for a model."""
-        names = {
-            cls.DEFAULT: "Default",
-            cls.OPUS_4_5: "Opus 4.5",
-            cls.SONNET_4_5: "Sonnet 4.5",
-            cls.HAIKU_4_5: "Haiku 4.5",
-        }
-        return names.get(model, model.value)
 
 
 class AutopilotStartResult(BaseModel):
@@ -44,7 +22,6 @@ class AutopilotStartResult(BaseModel):
     mode: AutopilotMode | None = Field(
         default=None, description="Selected execution mode"
     )
-    model: str | None = Field(default=None, description="Selected Claude model")
     stages: list[Stage] | None = Field(default=None, description="Stages to execute")
 
 
@@ -93,29 +70,8 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             margin-bottom: 1;
         }
 
-        AutopilotStartupScreen .mode-model-row {
-            height: auto;
-            width: 100%;
-        }
-
-        AutopilotStartupScreen .mode-column {
-            width: 1fr;
-            height: auto;
-        }
-
-        AutopilotStartupScreen .model-column {
-            width: auto;
-            height: auto;
-            padding-left: 2;
-        }
-
         AutopilotStartupScreen .mode-label {
             color: $text;
-        }
-
-        AutopilotStartupScreen .model-label {
-            color: $text;
-            margin-bottom: 0;
         }
 
         AutopilotStartupScreen RadioSet {
@@ -126,11 +82,6 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         AutopilotStartupScreen RadioButton {
             height: auto;
             margin-bottom: 0;
-        }
-
-        AutopilotStartupScreen #model-select {
-            width: 32;
-            margin-left: 1;
         }
 
         AutopilotStartupScreen .stages-label {
@@ -214,7 +165,6 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             is_warning and len(stages) > 0
         )  # Warnings only make sense if we have stages
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
-        self.selected_model = ClaudeModel.DEFAULT
 
     def compose(self) -> ComposeResult:
         """Compose the startup screen layout."""
@@ -246,38 +196,23 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                     classes="warning-message",
                 )
 
-            # Mode and Model selection (side by side)
+            # Mode selection
             with Container(classes="mode-section"):
-                with Horizontal(classes="mode-model-row"):
-                    # Mode selection (left side)
-                    with Vertical(classes="mode-column"):
-                        yield Static("Mode:", classes="mode-label")
-                        with RadioSet(id="mode-select"):
-                            yield RadioButton(
-                                "Pause for human review after each stage",
-                                id="mode-pause",
-                                value=True,
-                            )
-                            yield RadioButton(
-                                "Auto-continue with self-review (stacked PRs)",
-                                id="mode-auto",
-                            )
-                            yield RadioButton(
-                                "Cowboy (self-review, no human review, no PRs)",
-                                id="mode-cowboy",
-                            )
-
-                    # Model selection (right side)
-                    with Vertical(classes="model-column"):
-                        yield Static("Model:", classes="model-label")
-                        yield Select(
-                            [
-                                (ClaudeModel.display_name(m), m.value)
-                                for m in ClaudeModel
-                            ],
-                            id="model-select",
-                            value=ClaudeModel.DEFAULT.value,
-                        )
+                yield Static("Mode:", classes="mode-label")
+                with RadioSet(id="mode-select"):
+                    yield RadioButton(
+                        "Pause for human review after each stage",
+                        id="mode-pause",
+                        value=True,
+                    )
+                    yield RadioButton(
+                        "Auto-continue with self-review (stacked PRs)",
+                        id="mode-auto",
+                    )
+                    yield RadioButton(
+                        "Cowboy (self-review, no human review, no PRs)",
+                        id="mode-cowboy",
+                    )
 
             # Stages preview section
             total_tasks = sum(s.task_count for s in self.stages)
@@ -338,12 +273,6 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         elif event.pressed.id == "mode-cowboy":
             self.selected_mode = AutopilotMode.COWBOY
 
-    @on(Select.Changed, "#model-select")
-    def handle_model_change(self, event: Select.Changed) -> None:
-        """Handle model selection change."""
-        if event.value is not None and isinstance(event.value, str):
-            self.selected_model = ClaudeModel(event.value)
-
     @on(Button.Pressed, "#btn-start")
     def handle_start(self, event: Button.Pressed) -> None:
         """Handle Start button press."""
@@ -352,7 +281,6 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             AutopilotStartResult(
                 started=True,
                 mode=self.selected_mode,
-                model=self.selected_model.value if self.selected_model else None,
                 stages=self.stages,
             )
         )
@@ -379,9 +307,6 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                     AutopilotStartResult(
                         started=True,
                         mode=self.selected_mode,
-                        model=self.selected_model.value
-                        if self.selected_model
-                        else None,
                         stages=self.stages,
                     )
                 )

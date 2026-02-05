@@ -18,6 +18,26 @@ class AutopilotMode(StrEnum):
     COWBOY = "cowboy"  # Just build each stage, no review, no PRs, full send
 
 
+class ClaudeModel(StrEnum):
+    """Available Claude models for autopilot execution."""
+
+    DEFAULT = ""  # Use Claude Code's default
+    OPUS_4_5 = "claude-opus-4-5-20251101"
+    SONNET_4_5 = "claude-sonnet-4-5-20250514"
+    HAIKU_4_5 = "claude-haiku-4-5-20250514"
+
+    @classmethod
+    def display_name(cls, model: "ClaudeModel") -> str:
+        """Get the display name for a model."""
+        names = {
+            cls.DEFAULT: "Default",
+            cls.OPUS_4_5: "Opus 4.5",
+            cls.SONNET_4_5: "Sonnet 4.5",
+            cls.HAIKU_4_5: "Haiku 4.5",
+        }
+        return names.get(model, model.value)
+
+
 class StageStatus(StrEnum):
     """Status of a stage in the execution plan."""
 
