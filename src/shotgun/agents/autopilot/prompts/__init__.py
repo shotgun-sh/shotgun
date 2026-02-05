@@ -53,6 +53,7 @@ def render_create_pr(
     tasks_file_path: str,
     stage_number: int,
     stage_name: str,
+    branch_name: str,
     base_branch: str,
 ) -> str:
     """Render the create PR prompt.
@@ -61,6 +62,7 @@ def render_create_pr(
         tasks_file_path: Path to the tasks.md file.
         stage_number: The stage number.
         stage_name: The stage name.
+        branch_name: The branch name for this stage.
         base_branch: The base branch for the PR.
 
     Returns:
@@ -71,6 +73,7 @@ def render_create_pr(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
         stage_name=stage_name,
+        branch_name=branch_name,
         base_branch=base_branch,
     )
 

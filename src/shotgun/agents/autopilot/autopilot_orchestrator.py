@@ -290,10 +290,12 @@ class AutopilotOrchestrator:
         Yields:
             ClaudeOutput with progress.
         """
+        branch_name = f"{self.config.branch_prefix}{stage.number}"
         prompt = render_create_pr(
             tasks_file_path=self.state.tasks_file_path,
             stage_number=stage.number,
             stage_name=stage.name,
+            branch_name=branch_name,
             base_branch=self.state.base_branch,
         )
         async for output in self._run_claude(prompt):
