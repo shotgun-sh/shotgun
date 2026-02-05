@@ -2926,11 +2926,53 @@ class ChatScreen(Screen[None]):
     @work(exclusive=True)
     async def _async_parse_and_show_autopilot(self) -> None:
         """Async worker to parse tasks.md using LLM parser and show startup screen."""
-        from shotgun.agents.autopilot import LLMTasksParser
+        from shotgun.agents.autopilot import (
+            AutopilotConfig,
+            AutopilotOrchestrator,
+            LLMTasksParser,
+        )
         from shotgun.tui.screens.autopilot_startup import AutopilotStartupScreen
 
         try:
-            # Use LLM parser for flexible parsing of various markdown formats
+            # Step 1: Validate prerequisites before doing any LLM parsing
+            config = AutopilotConfig(working_directory=self.deps.working_directory)
+            orchestrator = AutopilotOrchestrator(config)
+            validation = orchestrator.validate_prerequisites()
+
+            logger.info(
+                "Autopilot: Prerequisite validation - can_proceed=%s",
+                validation.can_proceed,
+            )
+
+            # Check if we can proceed
+            if not validation.can_proceed:
+                self.processing_state.stop_processing()
+
+                # Build helpful error message
+                error_lines = [
+                    "Missing required files:",
+                    validation.format_status(),
+                    "",
+                    "Use Shotgun to create these files first:",
+                    "  1. Chat with Shotgun to develop your specification",
+                    "  2. Use /plan to create an implementation plan",
+                    "  3. Use /tasks to generate the stage-based tasks.md",
+                ]
+                error_msg = "\n".join(error_lines)
+                screen = AutopilotStartupScreen([], error_msg)
+                result = await self.app.push_screen_wait(screen)
+                if not result.started:
+                    self.widget_coordinator.update_prompt_input(focus=True)
+                return
+
+            # Log warnings for missing recommended files
+            if validation.missing_recommended:
+                logger.warning(
+                    "Autopilot: Missing recommended files: %s",
+                    validation.missing_recommended,
+                )
+
+            # Step 2: Use LLM parser for flexible parsing of various markdown formats
             parser = LLMTasksParser(self.deps.working_directory)
             parsed = await parser.parse()
 
@@ -2944,12 +2986,18 @@ class ChatScreen(Screen[None]):
             # Stop spinner before showing modal
             self.processing_state.stop_processing()
 
-            # Show full-screen modal
+            # Show full-screen modal with warning about missing recommended files
             if parsed.is_valid:
-                screen = AutopilotStartupScreen(parsed.stages)
+                warning_msg = None
+                if validation.missing_recommended:
+                    warning_msg = (
+                        f"Missing recommended files: {', '.join(validation.missing_recommended)}. "
+                        "Consider using Shotgun to create a spec and plan first."
+                    )
+                screen = AutopilotStartupScreen(parsed.stages, warning_msg, is_warning=True)
             else:
                 error_msg = "\n".join(parsed.parse_errors)
-                screen = AutopilotStartupScreen([], error_msg)
+                screen = AutopilotStartupScreen([], error_msg, is_warning=False)
 
             result = await self.app.push_screen_wait(screen)
 

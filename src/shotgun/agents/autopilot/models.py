@@ -212,6 +212,84 @@ class AutopilotState(BaseModel):
         return "\n".join(lines)
 
 
+class FileStatus(BaseModel):
+    """Status of a prerequisite file."""
+
+    path: str = Field(description="Path to the file")
+    exists: bool = Field(description="Whether the file exists")
+    is_empty: bool = Field(default=True, description="Whether the file is empty or missing")
+    size_bytes: int = Field(default=0, description="File size in bytes")
+
+
+class PrerequisiteValidation(BaseModel):
+    """Result of validating autopilot prerequisites.
+
+    Checks that required .shotgun/ files exist before starting autopilot.
+    """
+
+    tasks_file: FileStatus = Field(description="Status of tasks.md (REQUIRED)")
+    spec_file: FileStatus = Field(description="Status of spec.md (recommended)")
+    plan_file: FileStatus = Field(description="Status of plan.md (recommended)")
+
+    @property
+    def can_proceed(self) -> bool:
+        """Check if we have the minimum required files to proceed.
+
+        tasks.md is required. spec.md and plan.md are recommended but optional.
+        """
+        return self.tasks_file.exists and not self.tasks_file.is_empty
+
+    @property
+    def missing_required(self) -> list[str]:
+        """Get list of missing required files."""
+        missing = []
+        if not self.tasks_file.exists:
+            missing.append(self.tasks_file.path)
+        elif self.tasks_file.is_empty:
+            missing.append(f"{self.tasks_file.path} (empty)")
+        return missing
+
+    @property
+    def missing_recommended(self) -> list[str]:
+        """Get list of missing recommended files."""
+        missing = []
+        if not self.spec_file.exists or self.spec_file.is_empty:
+            missing.append(self.spec_file.path)
+        if not self.plan_file.exists or self.plan_file.is_empty:
+            missing.append(self.plan_file.path)
+        return missing
+
+    def format_status(self) -> str:
+        """Format the validation status for display."""
+        lines = []
+
+        # Tasks file (required)
+        if self.tasks_file.exists and not self.tasks_file.is_empty:
+            lines.append(f"✅ {self.tasks_file.path}")
+        elif self.tasks_file.exists:
+            lines.append(f"❌ {self.tasks_file.path} (empty)")
+        else:
+            lines.append(f"❌ {self.tasks_file.path} (missing)")
+
+        # Spec file (recommended)
+        if self.spec_file.exists and not self.spec_file.is_empty:
+            lines.append(f"✅ {self.spec_file.path}")
+        elif self.spec_file.exists:
+            lines.append(f"⚠️  {self.spec_file.path} (empty)")
+        else:
+            lines.append(f"⚠️  {self.spec_file.path} (missing)")
+
+        # Plan file (recommended)
+        if self.plan_file.exists and not self.plan_file.is_empty:
+            lines.append(f"✅ {self.plan_file.path}")
+        elif self.plan_file.exists:
+            lines.append(f"⚠️  {self.plan_file.path} (empty)")
+        else:
+            lines.append(f"⚠️  {self.plan_file.path} (missing)")
+
+        return "\n".join(lines)
+
+
 class ClaudeOutputType(StrEnum):
     """Types of output from Claude Code subprocess."""
 

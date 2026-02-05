@@ -26,6 +26,8 @@ from shotgun.agents.autopilot.models import (
     AutopilotState,
     ClaudeOutput,
     ClaudeOutputType,
+    FileStatus,
+    PrerequisiteValidation,
     Stage,
     StagePhase,
     StageStatus,
@@ -102,6 +104,55 @@ class AutopilotOrchestrator:
         self._regex_parser = TasksParser(self.config.working_directory)
         self._claude: ClaudeSubprocess | None = None
         self._cancelled = False
+
+    def validate_prerequisites(self) -> PrerequisiteValidation:
+        """Validate that required .shotgun/ files exist before starting.
+
+        Checks for:
+        - tasks.md (REQUIRED) - cannot proceed without this
+        - spec.md (recommended) - specification document
+        - plan.md (recommended) - implementation plan
+
+        Returns:
+            PrerequisiteValidation with status of each file.
+        """
+        working_dir = self.config.working_directory
+
+        def check_file(path: str) -> FileStatus:
+            """Check if a file exists and is not empty."""
+            full_path = working_dir / path
+            exists = full_path.exists()
+            size = 0
+            is_empty = True
+
+            if exists:
+                size = full_path.stat().st_size
+                # Consider files with only whitespace as empty
+                if size > 0:
+                    content = full_path.read_text().strip()
+                    is_empty = len(content) == 0
+
+            return FileStatus(
+                path=path,
+                exists=exists,
+                is_empty=is_empty,
+                size_bytes=size,
+            )
+
+        validation = PrerequisiteValidation(
+            tasks_file=check_file(self.config.tasks_file_path),
+            spec_file=check_file(".shotgun/spec.md"),
+            plan_file=check_file(".shotgun/plan.md"),
+        )
+
+        logger.info(
+            "Prerequisite validation: can_proceed=%s, missing_required=%s, missing_recommended=%s",
+            validation.can_proceed,
+            validation.missing_required,
+            validation.missing_recommended,
+        )
+
+        return validation
 
     async def initialize(self) -> ParsedTasksFile:
         """Initialize autopilot by parsing tasks.md using LLM.

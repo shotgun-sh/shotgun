@@ -133,6 +133,12 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             text-align: center;
         }
 
+        AutopilotStartupScreen .warning-message {
+            color: $warning;
+            padding: 1 2;
+            margin-bottom: 1;
+        }
+
         AutopilotStartupScreen .shortcut-hint {
             text-align: center;
             color: $text-muted;
@@ -140,16 +146,24 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         }
     """
 
-    def __init__(self, stages: list[Stage], error_message: str | None = None) -> None:
+    def __init__(
+        self,
+        stages: list[Stage],
+        error_message: str | None = None,
+        *,
+        is_warning: bool = False,
+    ) -> None:
         """Initialize the startup screen.
 
         Args:
             stages: List of stages parsed from tasks.md.
-            error_message: Optional error message to display.
+            error_message: Optional error/warning message to display.
+            is_warning: If True, treat as warning (can still start). If False, treat as error (blocks start).
         """
         super().__init__()
         self.stages = stages
         self.error_message = error_message
+        self.is_warning = is_warning and len(stages) > 0  # Warnings only make sense if we have stages
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
 
     def compose(self) -> ComposeResult:
@@ -165,8 +179,8 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 classes="experimental-badge",
             )
 
-            # Error message if any
-            if self.error_message:
+            # Error message if any (blocking error - no stages)
+            if self.error_message and not self.is_warning:
                 yield Static(
                     f"[bold red]Error:[/] {self.error_message}",
                     classes="error-message",
@@ -174,6 +188,13 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 with Horizontal(classes="startup-buttons"):
                     yield Button("Close", id="btn-cancel")
                 return
+
+            # Warning message (non-blocking - can still start)
+            if self.error_message and self.is_warning:
+                yield Static(
+                    f"[bold yellow]⚠️  {self.error_message}[/]",
+                    classes="warning-message",
+                )
 
             # Mode selection section
             yield Static("Execution Mode:", classes="mode-label")
