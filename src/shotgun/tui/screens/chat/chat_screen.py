@@ -3008,6 +3008,24 @@ class ChatScreen(Screen[None]):
                     result.mode.value,
                     len(result.stages),
                 )
+
+                # Track autopilot started (no PII - just counts and mode)
+                from shotgun.posthog_telemetry import track_event
+
+                total_tasks = sum(len(s.tasks) for s in result.stages)
+                completed_tasks = sum(len(s.completed_tasks) for s in result.stages)
+                track_event(
+                    "autopilot_started",
+                    {
+                        "mode": result.mode.value,
+                        "total_stages": len(result.stages),
+                        "total_tasks": total_tasks,
+                        "completed_tasks": completed_tasks,
+                        "has_spec_file": not validation.spec_file.is_empty,
+                        "has_plan_file": not validation.plan_file.is_empty,
+                    },
+                )
+
                 self.mount_hint(
                     f"Starting Autopilot in **{result.mode.value}** mode with "
                     f"**{len(result.stages)}** stages"

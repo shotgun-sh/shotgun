@@ -39,6 +39,7 @@ from shotgun.agents.autopilot.prompts import (
     render_review_code,
 )
 from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
+from shotgun.posthog_telemetry import track_event
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,17 @@ class AutopilotOrchestrator:
             validation.missing_recommended,
         )
 
+        # Track validation result (no PII - just counts)
+        track_event(
+            "autopilot_validation",
+            {
+                "can_proceed": validation.can_proceed,
+                "has_tasks_file": validation.tasks_file.exists and not validation.tasks_file.is_empty,
+                "has_spec_file": validation.spec_file.exists and not validation.spec_file.is_empty,
+                "has_plan_file": validation.plan_file.exists and not validation.plan_file.is_empty,
+            },
+        )
+
         return validation
 
     async def initialize(self) -> ParsedTasksFile:
@@ -217,6 +229,19 @@ class AutopilotOrchestrator:
             len(stage.pending_tasks),
             len(stage.completed_tasks),
         )
+
+        # Track stage start (no PII - just counts and numbers)
+        track_event(
+            "autopilot_stage_started",
+            {
+                "stage_number": stage.number,
+                "total_stages": len(self.state.stages),
+                "pending_tasks": len(stage.pending_tasks),
+                "completed_tasks": len(stage.completed_tasks),
+                "mode": self.state.mode.value,
+            },
+        )
+
         stage.status = StageStatus.IN_PROGRESS
 
         # Phase 1: Execute tasks until complete
@@ -293,6 +318,19 @@ class AutopilotOrchestrator:
             stage.number,
             stage.pr_url or "no PR",
         )
+
+        # Track stage completion (no PII - just counts)
+        track_event(
+            "autopilot_stage_completed",
+            {
+                "stage_number": stage.number,
+                "total_stages": len(self.state.stages),
+                "iterations_used": stage.iteration_count,
+                "has_pr": stage.pr_url is not None,
+                "mode": self.state.mode.value,
+            },
+        )
+
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"✅ Stage {stage.number} ready for review. PR: {stage.pr_url or 'N/A'}",
@@ -380,6 +418,20 @@ class AutopilotOrchestrator:
             stage.number,
             self.config.max_iterations,
         )
+
+        # Track stage failure (no PII - just counts)
+        track_event(
+            "autopilot_stage_failed",
+            {
+                "stage_number": stage.number,
+                "total_stages": len(self.state.stages),
+                "max_iterations": self.config.max_iterations,
+                "pending_tasks": len(stage.pending_tasks),
+                "completed_tasks": len(stage.completed_tasks),
+                "mode": self.state.mode.value,
+            },
+        )
+
         yield ClaudeOutput(
             type=ClaudeOutputType.STDERR,
             content=f"  Max iterations ({self.config.max_iterations}) reached",
@@ -539,6 +591,18 @@ class AutopilotOrchestrator:
         stage = self.state.current_stage
 
         if stage:
+            # Track approval decision (no PII - no feedback content)
+            track_event(
+                "autopilot_stage_approval",
+                {
+                    "stage_number": stage.number,
+                    "total_stages": len(self.state.stages),
+                    "approved": approved,
+                    "has_feedback": feedback is not None and len(feedback) > 0,
+                    "mode": self.state.mode.value,
+                },
+            )
+
             if approved:
                 logger.info("User approved Stage %d", stage.number)
                 stage.phase = None  # Clear phase
@@ -563,6 +627,18 @@ class AutopilotOrchestrator:
                 stage.name if stage else "",
             )
         else:
+            # Track autopilot completion (no PII - just counts)
+            completed_stages = sum(
+                1 for s in self.state.stages if s.status == StageStatus.COMPLETED
+            )
+            track_event(
+                "autopilot_completed",
+                {
+                    "total_stages": len(self.state.stages),
+                    "completed_stages": completed_stages,
+                    "mode": self.state.mode.value,
+                },
+            )
             logger.info("All stages complete")
         return result
 
@@ -571,6 +647,19 @@ class AutopilotOrchestrator:
         self._cancelled = True
         if self._claude:
             await self._claude.cancel()
+
+        # Track cancellation (no PII - just state info)
+        stage = self.state.current_stage
+        track_event(
+            "autopilot_cancelled",
+            {
+                "stage_number": stage.number if stage else 0,
+                "total_stages": len(self.state.stages),
+                "phase": stage.phase.value if stage and stage.phase else None,
+                "mode": self.state.mode.value,
+            },
+        )
+
         logger.info("Autopilot cancelled")
 
     @property
