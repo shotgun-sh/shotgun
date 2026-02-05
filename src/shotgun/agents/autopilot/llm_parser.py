@@ -15,7 +15,10 @@ from shotgun.agents.autopilot.models import (
     StageStatus,
     Task,
 )
-from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile
+from shotgun.agents.autopilot.tasks_parser import (
+    ParsedTasksFile,
+    merge_stages_with_parsed_tasks,
+)
 from shotgun.agents.config import get_provider_model
 
 logger = logging.getLogger(__name__)
@@ -251,56 +254,24 @@ class LLMTasksParser:
             logger.exception("LLM refresh parsing failed")
             return state_stages
 
-        # Create a map of stage number to parsed stage
-        parsed_stage_map = {stage.number: stage for stage in parsed_stages}
-
         logger.info(
             "LLM refresh: parsed %d stages from tasks.md",
             len(parsed_stages),
         )
 
-        # Update each existing stage with new task completion status
-        updated_stages: list[Stage] = []
-        for state_stage in state_stages:
-            if state_stage.number in parsed_stage_map:
-                parsed_stage = parsed_stage_map[state_stage.number]
+        # Convert ParsedStage objects to Stage objects
+        converted_stages = [
+            Stage(
+                number=ps.number,
+                name=ps.name,
+                tasks=[
+                    Task(text=t.text, completed=t.completed, line_number=0)
+                    for t in ps.tasks
+                ],
+                status=StageStatus.PENDING,
+            )
+            for ps in parsed_stages
+        ]
 
-                # Convert parsed tasks to Task objects
-                updated_tasks = [
-                    Task(
-                        text=task.text,
-                        completed=task.completed,
-                        line_number=0,
-                    )
-                    for task in parsed_stage.tasks
-                ]
-
-                # Log completion status
-                completed = sum(1 for t in updated_tasks if t.completed)
-                logger.info(
-                    "Stage %d refresh: %d/%d tasks completed",
-                    state_stage.number,
-                    completed,
-                    len(updated_tasks),
-                )
-
-                # Create updated stage preserving metadata
-                updated_stage = Stage(
-                    number=state_stage.number,
-                    name=state_stage.name,
-                    tasks=updated_tasks,
-                    status=state_stage.status,
-                    phase=state_stage.phase,
-                    branch_name=state_stage.branch_name,
-                    pr_url=state_stage.pr_url,
-                    iteration_count=state_stage.iteration_count,
-                )
-                updated_stages.append(updated_stage)
-            else:
-                logger.warning(
-                    "Stage %d not found in parsed file, keeping original",
-                    state_stage.number,
-                )
-                updated_stages.append(state_stage)
-
-        return updated_stages
+        # Use shared utility to merge with state stages
+        return merge_stages_with_parsed_tasks(state_stages, converted_stages)

@@ -28,7 +28,11 @@ from shotgun.agents.autopilot.models import (
     StageStatus,
     Task,
 )
-from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
+from shotgun.agents.autopilot.tasks_parser import (
+    ParsedTasksFile,
+    TasksParser,
+    merge_stages_with_parsed_tasks,
+)
 
 __all__ = [
     "AutopilotConfig",
@@ -51,4 +55,5 @@ __all__ = [
     "StageStatus",
     "Task",
     "TasksParser",
+    "merge_stages_with_parsed_tasks",
 ]
