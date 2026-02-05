@@ -2919,11 +2919,12 @@ class ChatScreen(Screen[None]):
     def show_autopilot_startup(self) -> None:
         """Show the autopilot startup widget.
 
-        This starts async parsing of tasks.md and displays a loading hint,
+        This starts async parsing of tasks.md with a spinner,
         then shows the startup widget when parsing completes.
         """
         logger.info("Autopilot: show_autopilot_startup called")
-        self.mount_hint("[dim]Parsing tasks.md...[/]")
+        # Show spinner during LLM parsing
+        self.processing_state.start_processing("Parsing tasks.md...")
         self._async_parse_and_show_autopilot()
 
     @work(exclusive=True)
@@ -2954,6 +2955,9 @@ class ChatScreen(Screen[None]):
         except Exception as e:
             logger.exception("Autopilot: Error parsing tasks.md")
             self._show_autopilot_startup_widget([], f"Error parsing tasks.md: {e}")
+        finally:
+            # Stop spinner after parsing completes
+            self.processing_state.stop_processing()
 
     def _show_autopilot_startup_widget(
         self, stages: "list[Stage]", error_message: str | None = None
