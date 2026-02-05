@@ -9,7 +9,6 @@ managing the execution of stages with a complete workflow:
 5. Present for user approval
 """
 
-import asyncio
 import logging
 import re
 from collections.abc import AsyncGenerator, Callable
@@ -162,13 +161,6 @@ class AutopilotOrchestrator:
 
         logger.info("Starting workflow for Stage %d: %s", stage.number, stage.name)
         stage.status = StageStatus.IN_PROGRESS
-
-        # Create branch for this stage
-        async for output in self._create_stage_branch(stage.number):
-            yield output
-            if output.type == ClaudeOutputType.ERROR:
-                stage.status = StageStatus.FAILED
-                return
 
         # Phase 1: Execute tasks until complete
         stage.phase = StagePhase.EXECUTING
@@ -354,81 +346,22 @@ class AutopilotOrchestrator:
             The formatted prompt.
         """
         pending_tasks = [task.text for task in stage.pending_tasks]
+
+        # Determine branch names
+        branch_name = f"{self.config.branch_prefix}{stage.number}"
+        if stage.number == 1:
+            base_branch = self.state.base_branch
+        else:
+            base_branch = f"{self.config.branch_prefix}{stage.number - 1}"
+
         return render_execute_stage(
             tasks_file_path=self.state.tasks_file_path,
             stage_number=stage.number,
             stage_name=stage.name,
             pending_tasks=pending_tasks,
+            branch_name=branch_name,
+            base_branch=base_branch,
         )
-
-    async def _create_stage_branch(
-        self, stage_number: int
-    ) -> AsyncGenerator[ClaudeOutput, None]:
-        """Create a git branch for a stage.
-
-        Args:
-            stage_number: The stage number.
-
-        Yields:
-            ClaudeOutput with result.
-        """
-        branch_name = f"{self.config.branch_prefix}{stage_number}"
-        stage = self.state.stages[stage_number - 1]
-
-        # Determine base branch
-        if stage_number == 1:
-            base = self.state.base_branch
-        else:
-            base = f"{self.config.branch_prefix}{stage_number - 1}"
-
-        logger.info("Creating branch %s from %s", branch_name, base)
-
-        try:
-            # Try to create new branch
-            process = await asyncio.create_subprocess_exec(
-                "git",
-                "checkout",
-                "-b",
-                branch_name,
-                base,
-                cwd=self.config.working_directory,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await process.communicate()
-
-            if process.returncode != 0:
-                # Branch might exist, try checking it out
-                process = await asyncio.create_subprocess_exec(
-                    "git",
-                    "checkout",
-                    branch_name,
-                    cwd=self.config.working_directory,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                _, stderr = await process.communicate()
-
-                if process.returncode != 0:
-                    yield ClaudeOutput(
-                        type=ClaudeOutputType.ERROR,
-                        content=f"Failed to checkout branch: {stderr.decode()}",
-                    )
-                    return
-
-            stage.branch_name = branch_name
-            self.state.current_branch = branch_name
-
-            yield ClaudeOutput(
-                type=ClaudeOutputType.STDOUT,
-                content=f"On branch: {branch_name}",
-            )
-
-        except Exception as e:
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content=f"Git error: {e}",
-            )
 
     async def _run_claude(self, prompt: str) -> AsyncGenerator[ClaudeOutput, None]:
         """Run Claude Code with a prompt.

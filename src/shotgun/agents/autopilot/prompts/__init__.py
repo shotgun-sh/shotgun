@@ -22,6 +22,8 @@ def render_execute_stage(
     stage_number: int,
     stage_name: str,
     pending_tasks: list[str],
+    branch_name: str,
+    base_branch: str,
 ) -> str:
     """Render the execute stage prompt.
 
@@ -30,16 +32,20 @@ def render_execute_stage(
         stage_number: The stage number.
         stage_name: The stage name.
         pending_tasks: List of pending task descriptions.
+        branch_name: The branch name to create/checkout for this stage.
+        base_branch: The base branch to create from.
 
     Returns:
         Rendered prompt string.
     """
-    template = _env.get_template("execute_stage.jinja")
+    template = _env.get_template("execute_stage.j2")
     return template.render(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
         stage_name=stage_name,
         pending_tasks=pending_tasks,
+        branch_name=branch_name,
+        base_branch=base_branch,
     )
 
 
@@ -60,7 +66,7 @@ def render_create_pr(
     Returns:
         Rendered prompt string.
     """
-    template = _env.get_template("create_pr.jinja")
+    template = _env.get_template("create_pr.j2")
     return template.render(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
@@ -84,7 +90,7 @@ def render_review_code(
     Returns:
         Rendered prompt string.
     """
-    template = _env.get_template("review_code.jinja")
+    template = _env.get_template("review_code.j2")
     return template.render(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
@@ -107,7 +113,7 @@ def render_qa_testing(
     Returns:
         Rendered prompt string.
     """
-    template = _env.get_template("qa_testing.jinja")
+    template = _env.get_template("qa_testing.j2")
     return template.render(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
