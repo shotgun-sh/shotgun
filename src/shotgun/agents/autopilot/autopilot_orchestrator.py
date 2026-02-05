@@ -69,6 +69,10 @@ class AutopilotConfig(BaseModel):
         default=MAX_STAGE_ITERATIONS,
         description="Maximum iterations per stage before giving up",
     )
+    model: str | None = Field(
+        default=None,
+        description="Claude model to use (None = Claude Code default)",
+    )
 
 
 class AutopilotOrchestrator:
@@ -603,10 +607,11 @@ class AutopilotOrchestrator:
         Yields:
             ClaudeOutput as execution progresses.
         """
-        config = ClaudeSubprocessConfig(
+        subprocess_config = ClaudeSubprocessConfig(
             working_directory=self.config.working_directory,
+            model=self.config.model,
         )
-        self._claude = ClaudeSubprocess(config)
+        self._claude = ClaudeSubprocess(subprocess_config)
 
         logger.debug("Invoking Claude Code with prompt (%d chars)", len(prompt))
 
