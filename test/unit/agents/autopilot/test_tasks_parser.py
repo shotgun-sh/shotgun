@@ -39,7 +39,7 @@ def test_parse_valid_tasks_content():
 
     # Check first stage
     stage1 = result.stages[0]
-    assert stage1.number == 1
+    assert stage1.number == "1"
     assert stage1.name == "Authentication Setup"
     assert len(stage1.tasks) == 3
     assert stage1.tasks[0].text == "Create login form"
@@ -48,7 +48,7 @@ def test_parse_valid_tasks_content():
 
     # Check second stage
     stage2 = result.stages[1]
-    assert stage2.number == 2
+    assert stage2.number == "2"
     assert stage2.name == "User Management"
     assert len(stage2.tasks) == 2
 

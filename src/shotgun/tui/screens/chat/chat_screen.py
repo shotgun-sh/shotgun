@@ -3041,7 +3041,6 @@ class ChatScreen(Screen[None]):
 
         except Exception as e:
             logger.exception("Autopilot: Error parsing tasks.md")
-            self.processing_state.stop_processing()
             self.mount_hint(f"[red]Autopilot error:[/] {e}")
 
     @work(exclusive=True)

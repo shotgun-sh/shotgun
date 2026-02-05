@@ -230,7 +230,7 @@ class AutopilotOrchestrator:
             return
 
         logger.info(
-            "Starting workflow for Stage %d: %s (tasks: %d pending, %d completed)",
+            "Starting workflow for Stage %s: %s (tasks: %d pending, %d completed)",
             stage.number,
             stage.name,
             len(stage.pending_tasks),
@@ -259,7 +259,7 @@ class AutopilotOrchestrator:
 
         # Phase 1: Execute tasks until complete
         stage.phase = StagePhase.EXECUTING
-        logger.info("Entering Phase 1: EXECUTING for Stage %d", stage.number)
+        logger.info("Entering Phase 1: EXECUTING for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"📋 Phase 1: Executing tasks for Stage {stage.number}",
@@ -286,7 +286,7 @@ class AutopilotOrchestrator:
         if self.state.mode == AutopilotMode.COWBOY:
             # Self-review phase
             stage.phase = StagePhase.REVIEWING
-            logger.info("Cowboy mode: Self-reviewing Stage %d", stage.number)
+            logger.info("Cowboy mode: Self-reviewing Stage %s", stage.number)
             yield ClaudeOutput(
                 type=ClaudeOutputType.STDOUT,
                 content=f"🔍 Self-reviewing Stage {stage.number}...",
@@ -302,7 +302,7 @@ class AutopilotOrchestrator:
             stage.phase = None
 
             logger.info(
-                "Stage %d complete (cowboy mode - no PR, no human review)",
+                "Stage %s complete (cowboy mode - no PR, no human review)",
                 stage.number,
             )
 
@@ -341,7 +341,7 @@ class AutopilotOrchestrator:
 
         # Phase 2: Create PR
         stage.phase = StagePhase.CREATING_PR
-        logger.info("Entering Phase 2: CREATING_PR for Stage %d", stage.number)
+        logger.info("Entering Phase 2: CREATING_PR for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"📝 Phase 2: Creating PR for Stage {stage.number}",
@@ -354,7 +354,7 @@ class AutopilotOrchestrator:
 
         # Phase 3: Review and fix
         stage.phase = StagePhase.REVIEWING
-        logger.info("Entering Phase 3: REVIEWING for Stage %d", stage.number)
+        logger.info("Entering Phase 3: REVIEWING for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"🔍 Phase 3: Reviewing code for Stage {stage.number}",
@@ -367,7 +367,7 @@ class AutopilotOrchestrator:
 
         # Phase 4: QA Testing
         stage.phase = StagePhase.QA_TESTING
-        logger.info("Entering Phase 4: QA_TESTING for Stage %d", stage.number)
+        logger.info("Entering Phase 4: QA_TESTING for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"🧪 Phase 4: Running QA tests for Stage {stage.number}",
@@ -384,7 +384,7 @@ class AutopilotOrchestrator:
         self.state.awaiting_approval = True
 
         logger.info(
-            "Stage %d workflow complete - entering Phase 5: AWAITING_APPROVAL (PR: %s)",
+            "Stage %s workflow complete - entering Phase 5: AWAITING_APPROVAL (PR: %s)",
             stage.number,
             stage.pr_url or "no PR",
         )
@@ -418,21 +418,21 @@ class AutopilotOrchestrator:
             ClaudeOutput as execution progresses.
         """
         logger.info(
-            "Starting execution loop for Stage %d with %d pending tasks",
+            "Starting execution loop for Stage %s with %d pending tasks",
             stage.number,
             len(stage.pending_tasks),
         )
 
         while stage.iteration_count < self.config.max_iterations:
             if self._cancelled:
-                logger.info("Execution cancelled for Stage %d", stage.number)
+                logger.info("Execution cancelled for Stage %s", stage.number)
                 return
 
             stage.iteration_count += 1
             remaining = len(stage.pending_tasks)
 
             logger.info(
-                "Stage %d iteration %d/%d - %d tasks remaining: %s",
+                "Stage %s iteration %d/%d - %d tasks remaining: %s",
                 stage.number,
                 stage.iteration_count,
                 self.config.max_iterations,
@@ -464,7 +464,7 @@ class AutopilotOrchestrator:
             completed_count = len(updated_stage.completed_tasks)
             pending_count = len(updated_stage.pending_tasks)
             logger.info(
-                "Stage %d after iteration %d: %d completed, %d pending",
+                "Stage %s after iteration %d: %d completed, %d pending",
                 updated_stage.number,
                 stage.iteration_count,
                 completed_count,
@@ -476,7 +476,7 @@ class AutopilotOrchestrator:
 
             if stage.is_complete:
                 logger.info(
-                    "Stage %d COMPLETE after %d iteration(s)",
+                    "Stage %s COMPLETE after %d iteration(s)",
                     stage.number,
                     stage.iteration_count,
                 )
@@ -487,7 +487,7 @@ class AutopilotOrchestrator:
                 return
 
         logger.warning(
-            "Stage %d reached max iterations (%d) without completing",
+            "Stage %s reached max iterations (%d) without completing",
             stage.number,
             self.config.max_iterations,
         )
@@ -580,10 +580,12 @@ class AutopilotOrchestrator:
 
         # Determine branch names
         branch_name = f"{self.config.branch_prefix}{stage.number}"
-        if stage.number == 1:
+        # For the first stage, use main base branch; otherwise, stack on previous stage
+        if self.state.current_stage_index == 0:
             base_branch = self.state.base_branch
         else:
-            base_branch = f"{self.config.branch_prefix}{stage.number - 1}"
+            prev_stage = self.state.stages[self.state.current_stage_index - 1]
+            base_branch = f"{self.config.branch_prefix}{prev_stage.number}"
 
         return render_execute_stage(
             tasks_file_path=self.state.tasks_file_path,
@@ -682,10 +684,10 @@ class AutopilotOrchestrator:
             )
 
             if approved:
-                logger.info("User approved Stage %d", stage.number)
+                logger.info("User approved Stage %s", stage.number)
                 stage.phase = None  # Clear phase
             else:
-                logger.info("User rejected Stage %d: %s", stage.number, feedback)
+                logger.info("User rejected Stage %s: %s", stage.number, feedback)
                 # Reset to allow re-work
                 stage.phase = StagePhase.EXECUTING
                 stage.status = StageStatus.IN_PROGRESS
@@ -700,7 +702,7 @@ class AutopilotOrchestrator:
         if result:
             stage = self.state.current_stage
             logger.info(
-                "Advanced to Stage %d: %s",
+                "Advanced to Stage %s: %s",
                 stage.number if stage else 0,
                 stage.name if stage else "",
             )

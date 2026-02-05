@@ -32,11 +32,12 @@ Your job is to:
 3. Return structured data with stages and their tasks
 
 Rules:
-- A stage header contains "Stage" followed by a number and a name
+- A stage header contains "Stage" followed by an identifier (numeric like 1, 2, 3 or alphanumeric like A, 1a, 2b) and a name
+- The stage identifier should be extracted exactly as written (preserve letters, numbers, and case)
 - Tasks are checkbox items: - [ ] means incomplete, - [x] or - [X] means complete
 - Only extract actual tasks (checkboxes), not other bullet points or text
 - Preserve the exact task text after the checkbox
-- Stages should be in order by their number
+- Stages should be in the order they appear in the document
 - Ignore any content that isn't a stage header or task checkbox
 
 Be precise and extract all stages and tasks from the document."""

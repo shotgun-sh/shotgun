@@ -77,9 +77,10 @@ class Stage(BaseModel):
     """A stage containing multiple tasks.
 
     Stages are parsed from ### Stage N: Name headings in tasks.md.
+    Stage identifiers can be numeric (1, 2, 3) or alphanumeric (A, 1a, 2b).
     """
 
-    number: int = Field(description="Stage number (1-indexed)")
+    number: str = Field(description="Stage identifier (numeric or alphanumeric)")
     name: str = Field(description="Stage name/title")
     tasks: list[Task] = Field(
         default_factory=list, description="List of tasks in this stage"
@@ -381,7 +382,9 @@ class ParsedTask(BaseModel):
 class ParsedStage(BaseModel):
     """A parsed stage from the markdown file (LLM parser output)."""
 
-    number: int = Field(description="Stage number (e.g., 1, 2, 3)")
+    number: str = Field(
+        description="Stage identifier - can be numeric (1, 2, 3) or alphanumeric (A, 1a, 2b)"
+    )
     name: str = Field(description="Stage name/title")
     tasks: list[ParsedTask] = Field(description="List of tasks in this stage")
 

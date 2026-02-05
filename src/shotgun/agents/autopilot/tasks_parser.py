@@ -30,7 +30,7 @@ def merge_stages_with_parsed_tasks(
 ) -> list[Stage]:
     """Merge parsed stages with existing state stages, preserving metadata.
 
-    This utility function is used by both regex and LLM parsers to update
+    This utility function is used by the LLM parser to update
     task completion status while preserving stage metadata (status, phase,
     branch_name, pr_url, iteration_count).
 
@@ -56,7 +56,7 @@ def merge_stages_with_parsed_tasks(
             # Log completion status
             completed = sum(1 for t in updated_tasks if t.completed)
             logger.info(
-                "Stage %d refresh: %d/%d tasks completed",
+                "Stage %s refresh: %d/%d tasks completed",
                 state_stage.number,
                 completed,
                 len(updated_tasks),
@@ -76,7 +76,7 @@ def merge_stages_with_parsed_tasks(
             updated_stages.append(updated_stage)
         else:
             logger.warning(
-                "Stage %d not found in parsed file, keeping original",
+                "Stage %s not found in parsed file, keeping original",
                 state_stage.number,
             )
             updated_stages.append(state_stage)
@@ -119,7 +119,7 @@ class TasksParser:
 
     # Regex patterns for parsing
     STAGE_PATTERN = re.compile(
-        r"^###\s+Stage\s+(\d+)\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE
+        r"^###\s+Stage\s+([A-Za-z0-9]+)\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE
     )
     TASK_PATTERN = re.compile(r"^-\s*\[([ xX])\]\s*(.+)$", re.MULTILINE)
 
@@ -203,16 +203,10 @@ class TasksParser:
                     stages.append(current_stage)
 
                 # Start a new stage
-                stage_number = int(stage_match.group(1))
+                stage_number = stage_match.group(
+                    1
+                )  # Keep as string for alphanumeric support
                 stage_name = stage_match.group(2).strip()
-
-                # Validate stage number is sequential
-                expected_number = len(stages) + 1
-                if stage_number != expected_number:
-                    errors.append(
-                        f"Line {line_num}: Stage {stage_number} is out of order "
-                        f"(expected {expected_number})"
-                    )
 
                 current_stage = Stage(number=stage_number, name=stage_name)
                 continue

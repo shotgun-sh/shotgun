@@ -19,7 +19,7 @@ _env = Environment(
 
 def render_execute_stage(
     tasks_file_path: str,
-    stage_number: int,
+    stage_number: str | int,
     stage_name: str,
     pending_tasks: list[str],
     branch_name: str,
@@ -51,7 +51,7 @@ def render_execute_stage(
 
 def render_create_pr(
     tasks_file_path: str,
-    stage_number: int,
+    stage_number: str | int,
     stage_name: str,
     branch_name: str,
     base_branch: str,
@@ -80,7 +80,7 @@ def render_create_pr(
 
 def render_review_code(
     tasks_file_path: str,
-    stage_number: int,
+    stage_number: str | int,
     stage_name: str,
 ) -> str:
     """Render the code review prompt.
@@ -103,7 +103,7 @@ def render_review_code(
 
 def render_qa_testing(
     tasks_file_path: str,
-    stage_number: int,
+    stage_number: str | int,
     stage_name: str,
 ) -> str:
     """Render the QA testing prompt.

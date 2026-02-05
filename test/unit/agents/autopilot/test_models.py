@@ -57,9 +57,9 @@ def test_stage_creation():
         Task(text="Task 2", completed=True, line_number=11),
         Task(text="Task 3", completed=False, line_number=12),
     ]
-    stage = Stage(number=1, name="Authentication Setup", tasks=tasks)
+    stage = Stage(number="1", name="Authentication Setup", tasks=tasks)
 
-    assert stage.number == 1
+    assert stage.number == "1"
     assert stage.name == "Authentication Setup"
     assert len(stage.tasks) == 3
     assert stage.status == StageStatus.PENDING
@@ -72,7 +72,7 @@ def test_stage_pending_tasks():
         Task(text="Task 2", completed=True, line_number=11),
         Task(text="Task 3", completed=False, line_number=12),
     ]
-    stage = Stage(number=1, name="Test Stage", tasks=tasks)
+    stage = Stage(number="1", name="Test Stage", tasks=tasks)
 
     pending = stage.pending_tasks
     assert len(pending) == 2
@@ -87,7 +87,7 @@ def test_stage_completed_tasks():
         Task(text="Task 2", completed=True, line_number=11),
         Task(text="Task 3", completed=True, line_number=12),
     ]
-    stage = Stage(number=1, name="Test Stage", tasks=tasks)
+    stage = Stage(number="1", name="Test Stage", tasks=tasks)
 
     completed = stage.completed_tasks
     assert len(completed) == 2
@@ -102,7 +102,7 @@ def test_stage_is_complete():
         Task(text="Task 1", completed=True, line_number=10),
         Task(text="Task 2", completed=False, line_number=11),
     ]
-    stage = Stage(number=1, name="Test Stage", tasks=tasks)
+    stage = Stage(number="1", name="Test Stage", tasks=tasks)
     assert stage.is_complete is False
 
     # Complete
@@ -110,7 +110,7 @@ def test_stage_is_complete():
         Task(text="Task 1", completed=True, line_number=10),
         Task(text="Task 2", completed=True, line_number=11),
     ]
-    stage_complete = Stage(number=1, name="Test Stage", tasks=tasks_complete)
+    stage_complete = Stage(number="1", name="Test Stage", tasks=tasks_complete)
     assert stage_complete.is_complete is True
 
 
@@ -121,7 +121,7 @@ def test_stage_task_count():
         Task(text="Task 2", completed=True, line_number=11),
         Task(text="Task 3", completed=False, line_number=12),
     ]
-    stage = Stage(number=1, name="Test Stage", tasks=tasks)
+    stage = Stage(number="1", name="Test Stage", tasks=tasks)
 
     assert stage.task_count == 3
     assert stage.completed_count == 1
@@ -133,7 +133,7 @@ def test_stage_format_task_list():
         Task(text="Incomplete task", completed=False, line_number=10),
         Task(text="Complete task", completed=True, line_number=11),
     ]
-    stage = Stage(number=1, name="Test Stage", tasks=tasks)
+    stage = Stage(number="1", name="Test Stage", tasks=tasks)
 
     formatted = stage.format_task_list()
     assert "- [ ] Incomplete task" in formatted
@@ -159,26 +159,26 @@ def test_autopilot_state_creation():
 def test_autopilot_state_current_stage():
     """Test AutopilotState.current_stage property."""
     stages = [
-        Stage(number=1, name="Stage 1", tasks=[]),
-        Stage(number=2, name="Stage 2", tasks=[]),
+        Stage(number="1", name="Stage 1", tasks=[]),
+        Stage(number="2", name="Stage 2", tasks=[]),
     ]
     state = AutopilotState(stages=stages, current_stage_index=0)
 
     assert state.current_stage is not None
-    assert state.current_stage.number == 1
+    assert state.current_stage.number == "1"
     assert state.current_stage.name == "Stage 1"
 
 
 def test_autopilot_state_next_stage():
     """Test AutopilotState.next_stage property."""
     stages = [
-        Stage(number=1, name="Stage 1", tasks=[]),
-        Stage(number=2, name="Stage 2", tasks=[]),
+        Stage(number="1", name="Stage 1", tasks=[]),
+        Stage(number="2", name="Stage 2", tasks=[]),
     ]
     state = AutopilotState(stages=stages, current_stage_index=0)
 
     assert state.next_stage is not None
-    assert state.next_stage.number == 2
+    assert state.next_stage.number == "2"
 
     # At last stage
     state.current_stage_index = 1
@@ -188,8 +188,8 @@ def test_autopilot_state_next_stage():
 def test_autopilot_state_is_complete():
     """Test AutopilotState.is_complete property."""
     stages = [
-        Stage(number=1, name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
-        Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
+        Stage(number="1", name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
+        Stage(number="2", name="Stage 2", status=StageStatus.PENDING, tasks=[]),
     ]
     state = AutopilotState(stages=stages)
 
@@ -203,8 +203,8 @@ def test_autopilot_state_is_complete():
 def test_autopilot_state_advance_to_next_stage():
     """Test AutopilotState.advance_to_next_stage method."""
     stages = [
-        Stage(number=1, name="Stage 1", tasks=[]),
-        Stage(number=2, name="Stage 2", tasks=[]),
+        Stage(number="1", name="Stage 1", tasks=[]),
+        Stage(number="2", name="Stage 2", tasks=[]),
     ]
     state = AutopilotState(stages=stages, current_stage_index=0)
 
@@ -222,16 +222,16 @@ def test_autopilot_state_advance_to_next_stage():
 def test_autopilot_state_pending_stages():
     """Test AutopilotState.pending_stages property."""
     stages = [
-        Stage(number=1, name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
-        Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
-        Stage(number=3, name="Stage 3", status=StageStatus.IN_PROGRESS, tasks=[]),
+        Stage(number="1", name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
+        Stage(number="2", name="Stage 2", status=StageStatus.PENDING, tasks=[]),
+        Stage(number="3", name="Stage 3", status=StageStatus.IN_PROGRESS, tasks=[]),
     ]
     state = AutopilotState(stages=stages)
 
     pending = state.pending_stages
     assert len(pending) == 2  # PENDING and IN_PROGRESS
-    assert pending[0].number == 2
-    assert pending[1].number == 3
+    assert pending[0].number == "2"
+    assert pending[1].number == "3"
 
 
 def test_autopilot_state_format_stages_summary():
