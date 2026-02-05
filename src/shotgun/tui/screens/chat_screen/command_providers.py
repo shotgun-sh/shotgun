@@ -260,7 +260,7 @@ class UnifiedCommandProvider(Provider):
 
         # Alphabetically ordered commands
         yield DiscoveryHit(
-            "Autopilot: Run Stages",
+            "Autopilot: Run Stages (experimental)",
             self.chat_screen.show_autopilot_startup,
             help="Run implementation stages from .shotgun/tasks.md with Claude Code",
         )
@@ -320,7 +320,7 @@ class UnifiedCommandProvider(Provider):
         # Define all commands in alphabetical order
         commands = [
             (
-                "Autopilot: Run Stages",
+                "Autopilot: Run Stages (experimental)",
                 self.chat_screen.show_autopilot_startup,
                 "Run implementation stages from .shotgun/tasks.md with Claude Code",
             ),

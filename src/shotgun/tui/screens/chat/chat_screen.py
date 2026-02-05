@@ -118,11 +118,9 @@ from shotgun.tui.screens.chat_screen.history import ChatHistory
 from shotgun.tui.screens.chat_screen.messages import (
     AutopilotAccept,
     AutopilotApprovalRequired,
-    AutopilotCancel,
     AutopilotContinue,
     AutopilotOutputReceived,
     AutopilotReject,
-    AutopilotStart,
     AutopilotStop,
     CascadeConfirmationRequired,
     CascadeConfirmed,
@@ -154,7 +152,6 @@ from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.approval_widget import PlanApprovalWidget
-from shotgun.tui.widgets.autopilot_startup_widget import AutopilotStartupWidget
 from shotgun.tui.widgets.cascade_confirmation_widget import CascadeConfirmationWidget
 from shotgun.tui.widgets.plan_panel import PlanPanelWidget
 from shotgun.tui.widgets.stage_approval_widget import StageApprovalWidget
@@ -239,7 +236,6 @@ class ChatScreen(Screen[None]):
     _plan_panel: PlanPanelWidget | None = None
 
     # Autopilot widgets and state
-    _autopilot_startup_widget: AutopilotStartupWidget | None = None
     _autopilot_approval_widget: StageApprovalWidget | None = None
     _autopilot_orchestrator: "AutopilotOrchestrator | None" = None
     _autopilot_rejection_mode: bool = False  # True when waiting for rejection feedback
@@ -2917,10 +2913,10 @@ class ChatScreen(Screen[None]):
     # =========================================================================
 
     def show_autopilot_startup(self) -> None:
-        """Show the autopilot startup widget.
+        """Show the autopilot startup screen.
 
         This starts async parsing of tasks.md with a spinner,
-        then shows the startup widget when parsing completes.
+        then shows the full-screen modal when parsing completes.
         """
         logger.info("Autopilot: show_autopilot_startup called")
         # Show spinner during LLM parsing
@@ -2929,8 +2925,9 @@ class ChatScreen(Screen[None]):
 
     @work(exclusive=True)
     async def _async_parse_and_show_autopilot(self) -> None:
-        """Async worker to parse tasks.md using LLM parser and show startup widget."""
+        """Async worker to parse tasks.md using LLM parser and show startup screen."""
         from shotgun.agents.autopilot import LLMTasksParser
+        from shotgun.tui.screens.autopilot_startup import AutopilotStartupScreen
 
         try:
             # Use LLM parser for flexible parsing of various markdown formats
@@ -2944,82 +2941,39 @@ class ChatScreen(Screen[None]):
                 parsed.parse_errors,
             )
 
-            # Show startup widget
+            # Stop spinner before showing modal
+            self.processing_state.stop_processing()
+
+            # Show full-screen modal
             if parsed.is_valid:
-                self._show_autopilot_startup_widget(parsed.stages)
+                screen = AutopilotStartupScreen(parsed.stages)
             else:
-                # Show widget with error
                 error_msg = "\n".join(parsed.parse_errors)
-                self._show_autopilot_startup_widget([], error_msg)
+                screen = AutopilotStartupScreen([], error_msg)
+
+            result = await self.app.push_screen_wait(screen)
+
+            # Handle result
+            if result.started and result.mode and result.stages:
+                logger.info(
+                    "Autopilot: Starting with mode=%s, stages=%d",
+                    result.mode.value,
+                    len(result.stages),
+                )
+                self.mount_hint(
+                    f"Starting Autopilot in **{result.mode.value}** mode with "
+                    f"**{len(result.stages)}** stages"
+                )
+                self._run_autopilot_stage(result.mode, result.stages)
+            else:
+                logger.info("Autopilot: Cancelled by user")
+                self.mount_hint("Autopilot cancelled")
+                self.widget_coordinator.update_prompt_input(focus=True)
 
         except Exception as e:
             logger.exception("Autopilot: Error parsing tasks.md")
-            self._show_autopilot_startup_widget([], f"Error parsing tasks.md: {e}")
-        finally:
-            # Stop spinner after parsing completes
             self.processing_state.stop_processing()
-
-    def _show_autopilot_startup_widget(
-        self, stages: "list[Stage]", error_message: str | None = None
-    ) -> None:
-        """Show the autopilot startup widget.
-
-        Args:
-            stages: List of stages parsed from tasks.md.
-            error_message: Optional error message to display.
-        """
-        logger.info(
-            "Autopilot: _show_autopilot_startup_widget called with %d stages",
-            len(stages),
-        )
-
-        # Remove existing widget if any
-        if self._autopilot_startup_widget:
-            self._autopilot_startup_widget.remove()
-            self._autopilot_startup_widget = None
-
-        # Create the widget
-        self._autopilot_startup_widget = AutopilotStartupWidget(stages, error_message)
-
-        # Hide PromptInput and mount widget in footer (like PlanApprovalWidget)
-        prompt_input = self.query_one(PromptInput)
-        prompt_input.display = False
-
-        footer = self.query_one("#footer")
-        footer.mount(self._autopilot_startup_widget, after=prompt_input)
-
-        logger.info("Autopilot: Widget mounted in footer")
-
-    def _hide_autopilot_startup_widget(self) -> None:
-        """Hide the autopilot startup widget and restore PromptInput."""
-        if self._autopilot_startup_widget:
-            self._autopilot_startup_widget.remove()
-            self._autopilot_startup_widget = None
-
-        # Restore PromptInput
-        prompt_input = self.query_one(PromptInput)
-        prompt_input.display = True
-
-    @on(AutopilotStart)
-    def handle_autopilot_start(self, event: AutopilotStart) -> None:
-        """Handle autopilot start from startup widget."""
-        self._hide_autopilot_startup_widget()
-
-        # Show confirmation
-        self.mount_hint(
-            f"Starting Autopilot in **{event.mode.value}** mode with "
-            f"**{len(event.stages)}** stages"
-        )
-
-        # Start the autopilot loop
-        self._run_autopilot_stage(event.mode, event.stages)
-
-    @on(AutopilotCancel)
-    def handle_autopilot_cancel(self) -> None:
-        """Handle autopilot cancellation from startup widget."""
-        self._hide_autopilot_startup_widget()
-        self.mount_hint("Autopilot cancelled")
-        self.widget_coordinator.update_prompt_input(focus=True)
+            self.mount_hint(f"[red]Autopilot error:[/] {e}")
 
     @work(exclusive=True)
     async def _run_autopilot_stage(
