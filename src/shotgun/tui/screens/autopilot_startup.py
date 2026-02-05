@@ -21,16 +21,20 @@ class ClaudeModel(StrEnum):
     """Available Claude models for autopilot execution."""
 
     DEFAULT = ""  # Use Claude Code's default
-    OPUS = "claude-opus-4-20250514"
-    SONNET = "claude-sonnet-4-20250514"
-    HAIKU = "claude-haiku-3-5-20241022"
+    OPUS_4_5 = "claude-opus-4-5-20251101"
+    SONNET_4_5 = "claude-sonnet-4-5-20250514"
+    HAIKU_4_5 = "claude-haiku-4-5-20250514"
 
     @classmethod
     def display_name(cls, model: "ClaudeModel") -> str:
         """Get the display name for a model."""
-        if model == cls.DEFAULT:
-            return "Default"
-        return model.value
+        names = {
+            cls.DEFAULT: "Default",
+            cls.OPUS_4_5: "Opus 4.5",
+            cls.SONNET_4_5: "Sonnet 4.5",
+            cls.HAIKU_4_5: "Haiku 4.5",
+        }
+        return names.get(model, model.value)
 
 
 class AutopilotStartResult(BaseModel):
