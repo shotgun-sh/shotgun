@@ -1,0 +1,16 @@
+{% include 'context_preamble.j2' %}
+Review the code changes for Stage {{ stage_number }}: {{ stage_name }}
+
+Look at the git diff of all changes made and check for:
+1. Code quality issues (unused variables, poor naming, etc.)
+2. Potential bugs or edge cases not handled
+3. Missing error handling
+4. Security issues
+5. Performance concerns
+
+If you find any issues:
+1. Fix them directly
+2. Commit the fixes with message "fix: address review feedback for Stage {{ stage_number }}"
+3. Push the changes
+
+Be thorough but practical - focus on real issues, not style nitpicks.

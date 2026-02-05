@@ -1,0 +1,23 @@
+{% include 'context_preamble.j2' %}
+Finalize the work completed in Stage {{ stage_number }}: {{ stage_name }}
+
+## Instructions
+
+1. Commit any uncommitted changes with a clear commit message
+
+2. Check if a git remote is configured:
+   ```bash
+   git remote -v
+   ```
+
+3. **If a remote exists (origin):**
+   - Push the branch: `git push -u origin {{ branch_name }}`
+   - Create a PR using `gh pr create` with:
+     - Title: "Stage {{ stage_number }}: {{ stage_name }}"
+     - A description summarizing what was implemented
+     - Base branch: {{ base_branch }}
+   - Report the PR URL when done
+
+4. **If NO remote exists:**
+   - Skip pushing and PR creation
+   - Just report that the stage is complete and committed locally

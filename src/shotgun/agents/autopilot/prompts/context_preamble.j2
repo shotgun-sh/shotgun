@@ -1,0 +1,46 @@
+## Project Context
+
+First, understand the project context by reading the `.shotgun/` folder:
+
+```bash
+ls -la .shotgun/
+```
+
+### Key Files to Read
+
+1. **{{ tasks_file_path }}** - The task list with stages and checkboxes (your source of truth for what to do)
+2. **.shotgun/specification.md** - The specification describing what to build
+3. **.shotgun/plan.md** - The implementation plan with technical decisions
+
+### Additional Context
+
+- **.shotgun/research.md** - Summarized Research findings and analysis (read for background context)
+- **.shotgun/research/** - Research findings and analysis (read for background context)
+- **.shotgun/contracts/** - Interface contracts and API definitions (follow these exactly)
+
+## CRITICAL RULES
+
+### 1. The .shotgun/ folder is TEMPORARY
+
+**ALL files in `.shotgun/` are temporary working documents and MUST NOT be committed to the codebase.**
+
+These files exist only to guide implementation. They are:
+- NOT part of the final deliverable
+- NOT to be referenced by production code
+- NOT to be checked into version control
+
+### 2. Contracts are specifications, not code
+
+Files in `.shotgun/contracts/` define interfaces and APIs but are **NOT to be used directly**.
+
+You MUST:
+- **Read** the contracts to understand the expected interfaces
+- **Write** the actual implementation code to the proper locations in the codebase
+- **Never** import from or reference `.shotgun/contracts/` in production code
+
+Example:
+- Contract at `.shotgun/contracts/user_service.py` defines the interface
+- You write the actual code to `src/services/user_service.py`
+
+---
+

@@ -353,6 +353,22 @@ wheels = [
 ]
 
 [[package]]
+name = "claude-agent-sdk"
+version = "0.1.29"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "mcp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f2/a7/e1449285606b98119729249394ad0e93e75ea6d25fa3006d734b21f73044/claude_agent_sdk-0.1.29.tar.gz", hash = "sha256:ece32436a81fc015ca325d4121edeb5627ae9af15b5079f7b42d5eda9dcdb7a3", size = 59801, upload-time = "2026-02-04T00:53:54.099Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/98/8915e3bb6acccf2b62b101545b286f30fd63e5421e9a3483b88a0c88f49b/claude_agent_sdk-0.1.29-py3-none-macosx_11_0_arm64.whl", hash = "sha256:811de31c92bd90250ebbfd79758c538766c672abde244ae0f7dec2d02ed5a1f7", size = 54225884, upload-time = "2026-02-04T00:53:38.169Z" },
+    { url = "https://files.pythonhosted.org/packages/91/a7/9a8801ae25e453877bc71b5dc4f4818171bc9c04319e0681d3950fbe0232/claude_agent_sdk-0.1.29-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:6279360d251ce8b8e9d922b03e3492c88736648e7f5e7c9f301fde0eef37928f", size = 68426447, upload-time = "2026-02-04T00:53:42.539Z" },
+    { url = "https://files.pythonhosted.org/packages/87/9c/aab63fe82c7cba80ee5234b0a928a032340cdaba0e48d23544e592b6f9ca/claude_agent_sdk-0.1.29-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:4d1f01fe5f7252126f35808e2887a40125b784ac0dbf73b9509a4065a4766149", size = 70124488, upload-time = "2026-02-04T00:53:46.675Z" },
+    { url = "https://files.pythonhosted.org/packages/63/30/135575231e53c10d4a99f1fa7b0b548f2ae89b907e41d0b2d158bde1896e/claude_agent_sdk-0.1.29-py3-none-win_amd64.whl", hash = "sha256:67fb58a72f0dd54d079c538078130cc8c888bc60652d3d396768ffaee6716467", size = 72305314, upload-time = "2026-02-04T00:53:51.045Z" },
+]
+
+[[package]]
 name = "click"
 version = "8.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2706,6 +2722,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "anthropic" },
+    { name = "claude-agent-sdk" },
     { name = "dependency-injector" },
     { name = "genai-prices" },
     { name = "httpx" },
@@ -2758,6 +2775,7 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=24.0.0" },
     { name = "anthropic", specifier = ">=0.39.0" },
+    { name = "claude-agent-sdk", specifier = ">=0.1.0" },
     { name = "dependency-injector", specifier = ">=4.41.0" },
     { name = "genai-prices", specifier = ">=0.0.27" },
     { name = "httpx", specifier = ">=0.27.0" },

@@ -1,0 +1,33 @@
+{% include 'context_preamble.j2' %}
+# Stage {{ stage_number }}: {{ stage_name }}
+
+You are working on **Stage {{ stage_number }} ONLY**. Do not work on any other stages.
+
+## Git Setup
+
+Before starting work, ensure git is set up correctly:
+1. If this directory is not a git repo, initialize one with `git init`
+2. Create or checkout the branch `{{ branch_name }}` based on `{{ base_branch }}`
+   - If the branch doesn't exist: `git checkout -b {{ branch_name }} {{ base_branch }}`
+   - If the branch exists: `git checkout {{ branch_name }}`
+
+## Tasks for This Stage
+
+{% for task in pending_tasks %}
+- [ ] {{ task }}
+{% endfor %}
+
+## Rules
+
+1. **ONLY** complete the tasks listed above for Stage {{ stage_number }}
+2. **STOP** when all tasks above are marked complete - do NOT continue to other stages
+3. After completing each task, mark it done in {{ tasks_file_path }} by changing `- [ ]` to `- [x]`
+4. Commit your changes after completing tasks
+5. Focus on quality - make sure the implementation is correct
+
+## IMPORTANT
+
+When you have completed ALL the tasks listed above and marked them as `[x]` in {{ tasks_file_path }}:
+- **STOP WORKING**
+- Do NOT start on the next stage
+- Report that Stage {{ stage_number }} is complete
