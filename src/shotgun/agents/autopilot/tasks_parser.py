@@ -13,12 +13,15 @@ Expected format:
     - [ ] Task in stage 2
 """
 
+import logging
 import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from shotgun.agents.autopilot.models import Stage, Task
+
+logger = logging.getLogger(__name__)
 
 
 class ParsedTasksFile(BaseModel):
@@ -204,8 +207,18 @@ class TasksParser:
         """
         parsed = self.parse(file_path)
 
+        logger.info(
+            "Refreshing stages from %s - parsed valid=%s, stages=%d",
+            file_path,
+            parsed.is_valid,
+            len(parsed.stages),
+        )
+
         if not parsed.is_valid:
-            # If parsing failed, return original stages unchanged
+            logger.warning(
+                "Refresh parsing failed, keeping original stages: %s",
+                parsed.parse_errors,
+            )
             return state_stages
 
         # Create a map of stage number to parsed stage for lookup
@@ -217,35 +230,26 @@ class TasksParser:
             if state_stage.number in parsed_stage_map:
                 parsed_stage = parsed_stage_map[state_stage.number]
 
-                # Update tasks with new completion status
-                # Match by line number if possible, otherwise by position
-                updated_tasks: list[Task] = []
-                for i, state_task in enumerate(state_stage.tasks):
-                    # Try to find matching task in parsed tasks
-                    matching_task = None
+                logger.debug(
+                    "Stage %d: state has %d tasks, parsed has %d tasks",
+                    state_stage.number,
+                    len(state_stage.tasks),
+                    len(parsed_stage.tasks),
+                )
 
-                    # First try matching by line number
-                    for parsed_task in parsed_stage.tasks:
-                        if parsed_task.line_number == state_task.line_number:
-                            matching_task = parsed_task
-                            break
+                # Simply use the parsed tasks directly - they have the current
+                # completion status from the file. The LLM parser may have
+                # different task counts, so we trust the file as source of truth.
+                updated_tasks = parsed_stage.tasks.copy()
 
-                    # Fall back to position matching
-                    if matching_task is None and i < len(parsed_stage.tasks):
-                        matching_task = parsed_stage.tasks[i]
-
-                    if matching_task:
-                        # Create updated task with new completion status
-                        updated_tasks.append(
-                            Task(
-                                text=matching_task.text,
-                                completed=matching_task.completed,
-                                line_number=matching_task.line_number,
-                            )
-                        )
-                    else:
-                        # Keep original task if no match found
-                        updated_tasks.append(state_task)
+                # Log completion status
+                completed = sum(1 for t in updated_tasks if t.completed)
+                logger.info(
+                    "Stage %d refresh: %d/%d tasks completed",
+                    state_stage.number,
+                    completed,
+                    len(updated_tasks),
+                )
 
                 # Create updated stage preserving metadata
                 updated_stage = Stage(
@@ -253,12 +257,17 @@ class TasksParser:
                     name=state_stage.name,
                     tasks=updated_tasks,
                     status=state_stage.status,
+                    phase=state_stage.phase,
                     branch_name=state_stage.branch_name,
                     pr_url=state_stage.pr_url,
+                    iteration_count=state_stage.iteration_count,
                 )
                 updated_stages.append(updated_stage)
             else:
-                # Stage doesn't exist in parsed file, keep original
+                logger.warning(
+                    "Stage %d not found in parsed file, keeping original",
+                    state_stage.number,
+                )
                 updated_stages.append(state_stage)
 
         return updated_stages
