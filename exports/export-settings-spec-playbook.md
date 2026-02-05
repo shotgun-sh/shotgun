@@ -108,9 +108,13 @@ hr {
 ```bash
 npx md-to-pdf docs/spec-driven-dev-playbook.md \
   --pdf-options '{"format": "Letter", "margin": {"top": "25mm", "bottom": "25mm", "left": "20mm", "right": "20mm"}}' \
-  --stylesheet exports/export-styles.css
+  --stylesheet exports/export-styles.css \
+  --dest exports/
+mv exports/spec-driven-dev-playbook.pdf exports/spec-driven-dev-playbook-base.pdf
 ```
 
 ## Output
 
 The exported PDF is saved to: `exports/spec-driven-dev-playbook-base.pdf`
+
+**Note:** The full CSS is in `exports/export-styles.css` and includes additional rules for print optimization (orphans/widows, page-break controls, image sizing) beyond the core styles shown above.

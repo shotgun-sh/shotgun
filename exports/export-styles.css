@@ -107,17 +107,12 @@ hr {
   border: none;
   border-top: 1px solid #e0e0e0;
   margin: 20pt 0;
-  page-break-after: avoid;
 }
 
 /* Links */
 a {
   color: #0066cc;
   text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
 }
 
 /* Strong/Bold and Emphasis */
