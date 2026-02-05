@@ -295,3 +295,29 @@ class WidgetCoordinator:
             update_indicator.set_update_info(info)
         except Exception as e:
             logger.exception(f"Failed to update version indicator: {e}")
+
+    def set_autopilot_input_locked(self, locked: bool) -> None:
+        """Lock or unlock prompt input during autopilot execution.
+
+        When locked, the input is disabled and shows a message explaining why.
+
+        Args:
+            locked: Whether to lock (disable) the input.
+        """
+        if not self.screen.is_mounted:
+            return
+
+        try:
+            prompt_input = self.screen.query_one(PromptInput)
+            prompt_input.disabled = locked
+            if locked:
+                prompt_input.placeholder = "Input locked while Autopilot is running..."
+            else:
+                # Restore normal placeholder based on current mode
+                placeholder = self.screen._placeholder_for_mode(
+                    self.screen.agent_manager._current_agent_type, force_new=True
+                )
+                prompt_input.placeholder = placeholder
+            prompt_input.refresh()
+        except Exception as e:
+            logger.exception(f"Failed to set autopilot input lock: {e}")

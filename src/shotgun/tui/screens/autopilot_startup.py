@@ -43,16 +43,13 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
     DEFAULT_CSS = """
         AutopilotStartupScreen {
             align: center middle;
-            background: $background 80%;
+            background: $background 90%;
         }
 
         AutopilotStartupScreen > #autopilot-container {
-            width: 80%;
-            max-width: 100;
-            height: auto;
-            max-height: 90%;
-            border: wide $primary;
-            padding: 2 3;
+            width: 100%;
+            height: 100%;
+            padding: 1;
             layout: vertical;
             background: $surface;
         }
@@ -62,24 +59,26 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             text-align: center;
             text-style: bold;
             color: $primary;
-            padding-bottom: 2;
         }
 
         AutopilotStartupScreen .experimental-badge {
             text-align: center;
             color: $warning;
-            padding-bottom: 1;
+            margin-bottom: 1;
+        }
+
+        AutopilotStartupScreen .mode-section {
+            height: auto;
+            margin-bottom: 1;
         }
 
         AutopilotStartupScreen .mode-label {
             color: $text;
-            padding-bottom: 1;
         }
 
         AutopilotStartupScreen RadioSet {
             height: auto;
-            margin-left: 2;
-            margin-bottom: 2;
+            margin-left: 1;
         }
 
         AutopilotStartupScreen RadioButton {
@@ -89,24 +88,24 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
 
         AutopilotStartupScreen .stages-label {
             color: $text;
-            padding-bottom: 1;
+            height: auto;
         }
 
         AutopilotStartupScreen .stages-scroll {
-            height: auto;
-            max-height: 50%;
-            margin-left: 2;
-            margin-bottom: 2;
-            border: solid $surface-lighten-2;
-            padding: 1;
+            height: 1fr;
+            min-height: 5;
+            margin-left: 1;
+            scrollbar-gutter: stable;
         }
 
         AutopilotStartupScreen .stage-item {
             color: $text;
+            height: auto;
         }
 
         AutopilotStartupScreen .stage-item-complete {
             color: $success;
+            height: auto;
         }
 
         AutopilotStartupScreen .startup-buttons {
@@ -117,8 +116,8 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         }
 
         AutopilotStartupScreen Button {
-            margin: 0 2;
-            min-width: 16;
+            margin: 0 1;
+            min-width: 12;
         }
 
         AutopilotStartupScreen #btn-start {
@@ -131,20 +130,19 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
 
         AutopilotStartupScreen .error-message {
             color: $error;
-            padding: 2;
+            padding: 1;
             text-align: center;
         }
 
         AutopilotStartupScreen .warning-message {
             color: $warning;
-            padding: 1 2;
             margin-bottom: 1;
         }
 
         AutopilotStartupScreen .shortcut-hint {
             text-align: center;
             color: $text-muted;
-            padding-top: 1;
+            height: auto;
         }
     """
 
@@ -173,7 +171,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         with Container(id="autopilot-container"):
             # Header
             yield Static(
-                "🚀 Autopilot - Stage Executor",
+                "Autopilot - Stage Executor",
                 classes="startup-header",
             )
             yield Static(
@@ -194,30 +192,34 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             # Warning message (non-blocking - can still start)
             if self.error_message and self.is_warning:
                 yield Static(
-                    f"[bold yellow]⚠️  {self.error_message}[/]",
+                    f"[yellow]{self.error_message}[/]",
                     classes="warning-message",
                 )
 
-            # Mode selection section
-            yield Static("Execution Mode:", classes="mode-label")
-            with RadioSet(id="mode-select"):
-                yield RadioButton(
-                    "Pause after each stage (review PRs)",
-                    id="mode-pause",
-                    value=True,
-                )
-                yield RadioButton(
-                    "Auto-continue (stacked PRs)",
-                    id="mode-auto",
-                )
+            # Mode selection
+            with Container(classes="mode-section"):
+                yield Static("Mode:", classes="mode-label")
+                with RadioSet(id="mode-select"):
+                    yield RadioButton(
+                        "Pause for human review after each stage",
+                        id="mode-pause",
+                        value=True,
+                    )
+                    yield RadioButton(
+                        "Auto-continue with self-review (stacked PRs)",
+                        id="mode-auto",
+                    )
+                    yield RadioButton(
+                        "Cowboy (self-review, no human review, no PRs)",
+                        id="mode-cowboy",
+                    )
 
             # Stages preview section
             total_tasks = sum(s.task_count for s in self.stages)
             completed_tasks = sum(s.completed_count for s in self.stages)
 
             yield Static(
-                f"Stages from .shotgun/tasks.md: [bold]{len(self.stages)}[/] stages, "
-                f"[bold]{completed_tasks}/{total_tasks}[/] tasks done",
+                f"Stages: [bold]{len(self.stages)}[/] ({completed_tasks}/{total_tasks} tasks done)",
                 classes="stages-label",
             )
 
@@ -234,7 +236,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
 
                     yield Static(
                         f"{status_icon}{stage.number}. {stage.name} "
-                        f"[dim]({stage.completed_count}/{stage.task_count} tasks)[/]",
+                        f"[dim]({stage.completed_count}/{stage.task_count})[/]",
                         classes=css_class,
                     )
 
@@ -245,7 +247,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
 
             # Shortcut hints
             yield Static(
-                "[dim]Press [bold]Enter[/] to start, [bold]Escape[/] to cancel[/]",
+                "[dim][bold]Enter[/]=start [bold]Esc[/]=cancel[/]",
                 classes="shortcut-hint",
             )
 
@@ -268,6 +270,8 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             self.selected_mode = AutopilotMode.PAUSE_BETWEEN
         elif event.pressed.id == "mode-auto":
             self.selected_mode = AutopilotMode.AUTO_CONTINUE
+        elif event.pressed.id == "mode-cowboy":
+            self.selected_mode = AutopilotMode.COWBOY
 
     @on(Button.Pressed, "#btn-start")
     def handle_start(self, event: Button.Pressed) -> None:
@@ -295,9 +299,10 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             Escape: Cancel
             P: Select pause mode
             A: Select auto-continue mode
+            C: Select cowboy mode
         """
         if event.key == "enter":
-            if not self.error_message:
+            if not self.error_message or self.is_warning:
                 self.dismiss(
                     AutopilotStartResult(
                         started=True,
@@ -323,6 +328,14 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             self.selected_mode = AutopilotMode.AUTO_CONTINUE
             try:
                 radio = self.query_one("#mode-auto", RadioButton)
+                radio.value = True
+            except NoMatches:
+                pass
+            event.stop()
+        elif event.key in ("c", "C"):
+            self.selected_mode = AutopilotMode.COWBOY
+            try:
+                radio = self.query_one("#mode-cowboy", RadioButton)
                 radio.value = True
             except NoMatches:
                 pass

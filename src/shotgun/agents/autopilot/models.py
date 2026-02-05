@@ -15,6 +15,7 @@ class AutopilotMode(StrEnum):
 
     PAUSE_BETWEEN = "pause_between"  # Stop after each stage for user approval
     AUTO_CONTINUE = "auto_continue"  # Create stacked PRs without pausing
+    COWBOY = "cowboy"  # Just build each stage, no review, no PRs, full send
 
 
 class StageStatus(StrEnum):
@@ -192,6 +193,33 @@ class AutopilotState(BaseModel):
             self.current_stage_index += 1
             return True
         return False
+
+    def find_first_incomplete_stage_index(self) -> int:
+        """Find the index of the first stage that isn't complete.
+
+        A stage is complete if all its tasks are marked as completed.
+
+        Returns:
+            Index of the first incomplete stage, or len(stages) if all complete.
+        """
+        for i, stage in enumerate(self.stages):
+            if not stage.is_complete:
+                return i
+        return len(self.stages)
+
+    def initialize_from_tasks(self) -> None:
+        """Initialize state based on task completion status.
+
+        This should be called after stages are loaded to:
+        1. Mark already-complete stages as COMPLETED
+        2. Set current_stage_index to the first incomplete stage
+        """
+        for stage in self.stages:
+            if stage.is_complete:
+                stage.status = StageStatus.COMPLETED
+
+        # Start at the first incomplete stage
+        self.current_stage_index = self.find_first_incomplete_stage_index()
 
     def format_stages_summary(self) -> str:
         """Format all stages for display."""

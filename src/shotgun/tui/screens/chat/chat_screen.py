@@ -3012,11 +3012,14 @@ class ChatScreen(Screen[None]):
                 # Track autopilot started (no PII - just counts and mode)
                 total_tasks = sum(len(s.tasks) for s in result.stages)
                 completed_tasks = sum(len(s.completed_tasks) for s in result.stages)
+                # Count stages that are fully complete (all tasks done)
+                completed_stages = sum(1 for s in result.stages if s.is_complete)
                 track_event(
                     "autopilot_started",
                     {
                         "mode": result.mode.value,
                         "total_stages": len(result.stages),
+                        "completed_stages": completed_stages,
                         "total_tasks": total_tasks,
                         "completed_tasks": completed_tasks,
                         "has_spec_file": not validation.spec_file.is_empty,
@@ -3068,8 +3071,23 @@ class ChatScreen(Screen[None]):
             self._autopilot_orchestrator = AutopilotOrchestrator(config)
             self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))
             self._autopilot_orchestrator.state.stages = stages
+            # Initialize state based on task completion - skip completed stages
+            self._autopilot_orchestrator.state.initialize_from_tasks()
+
+            # Show hint if skipping completed stages
+            skipped = self._autopilot_orchestrator.state.current_stage_index
+            if skipped > 0:
+                starting_stage = self._autopilot_orchestrator.state.current_stage
+                if starting_stage:
+                    self.mount_hint(
+                        f"Skipping {skipped} completed stage(s), "
+                        f"starting at Stage {starting_stage.number}"
+                    )
 
         orchestrator = self._autopilot_orchestrator
+
+        # Lock input while autopilot is running
+        self.widget_coordinator.set_autopilot_input_locked(True)
 
         # If we have feedback, run a fix iteration first
         if feedback:
@@ -3100,6 +3118,7 @@ Then confirm what you changed.
         if orchestrator.is_complete:
             self.mount_hint("[green]Autopilot completed all stages![/]")
             self._autopilot_orchestrator = None
+            self.widget_coordinator.set_autopilot_input_locked(False)
             self.widget_coordinator.update_prompt_input(focus=True)
             return
 
@@ -3126,14 +3145,17 @@ Then confirm what you changed.
             if orchestrator.awaiting_approval:
                 next_stage = orchestrator.state.next_stage
                 self.post_message(AutopilotApprovalRequired(current_stage, next_stage))
-                # Workflow paused - user will Accept or Reject
+                # Workflow paused - unlock input for user interaction
+                self.widget_coordinator.set_autopilot_input_locked(False)
                 return
 
         except asyncio.CancelledError:
             self.mount_hint("Autopilot was cancelled")
+            self.widget_coordinator.set_autopilot_input_locked(False)
         except Exception as e:
             logger.exception("Autopilot error")
             self.mount_hint(f"[red]Autopilot error:[/] {e}")
+            self.widget_coordinator.set_autopilot_input_locked(False)
         finally:
             self.processing_state.stop_processing()
 
@@ -3225,8 +3247,10 @@ Then confirm what you changed.
                 # All done!
                 self.mount_hint("[green]Autopilot completed all stages![/]")
                 self._autopilot_orchestrator = None
+                self.widget_coordinator.set_autopilot_input_locked(False)
                 self.widget_coordinator.update_prompt_input(focus=True)
         else:
+            self.widget_coordinator.set_autopilot_input_locked(False)
             self.widget_coordinator.update_prompt_input(focus=True)
 
     @on(AutopilotReject)
@@ -3259,4 +3283,5 @@ Then confirm what you changed.
         self._autopilot_rejection_mode = False
 
         self.mount_hint("Autopilot stopped by user")
+        self.widget_coordinator.set_autopilot_input_locked(False)
         self.widget_coordinator.update_prompt_input(focus=True)

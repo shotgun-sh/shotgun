@@ -43,7 +43,7 @@ from shotgun.posthog_telemetry import track_event
 
 logger = logging.getLogger(__name__)
 
-MAX_STAGE_ITERATIONS = 5  # Max attempts to complete a stage
+MAX_STAGE_ITERATIONS = 20  # Max attempts to complete a stage
 
 
 class AutopilotConfig(BaseModel):
@@ -182,10 +182,13 @@ class AutopilotOrchestrator:
 
         if parsed.is_valid:
             self.state.stages = parsed.stages
+            # Initialize state based on task completion - skip completed stages
+            self.state.initialize_from_tasks()
             logger.info(
-                "LLM parsed %d stages with %d total tasks",
+                "LLM parsed %d stages with %d total tasks (starting at stage %d)",
                 len(parsed.stages),
                 parsed.total_tasks,
+                self.state.current_stage_index + 1,  # 1-indexed for display
             )
         else:
             logger.warning("Failed to parse tasks.md: %s", parsed.parse_errors)
@@ -267,6 +270,63 @@ class AutopilotOrchestrator:
             )
             if stage:
                 stage.status = StageStatus.FAILED
+            return
+
+        # Cowboy mode: self-review but skip PR creation and human approval
+        if self.state.mode == AutopilotMode.COWBOY:
+            # Self-review phase
+            stage.phase = StagePhase.REVIEWING
+            logger.info("Cowboy mode: Self-reviewing Stage %d", stage.number)
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"🔍 Self-reviewing Stage {stage.number}...",
+            )
+
+            async for output in self._review_and_fix(stage):
+                yield output
+                if self._cancelled:
+                    return
+
+            # Mark complete and move on (no PR, no human approval)
+            stage.status = StageStatus.COMPLETED
+            stage.phase = None
+
+            logger.info(
+                "Stage %d complete (cowboy mode - no PR, no human review)",
+                stage.number,
+            )
+
+            # Track stage completion
+            track_event(
+                "autopilot_stage_completed",
+                {
+                    "stage_number": stage.number,
+                    "total_stages": len(self.state.stages),
+                    "iterations_used": stage.iteration_count,
+                    "has_pr": False,
+                    "mode": self.state.mode.value,
+                },
+            )
+
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"✅ Stage {stage.number} complete",
+            )
+
+            # Auto-advance to next stage
+            if self.advance_to_next_stage():
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDOUT,
+                    content=f"🤠 Moving to Stage {self.state.current_stage.number if self.state.current_stage else '?'}...",
+                )
+                # Recursively run the next stage
+                async for output in self.run_stage_workflow():
+                    yield output
+            else:
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDOUT,
+                    content="🎉 All stages complete!",
+                )
             return
 
         # Phase 2: Create PR
