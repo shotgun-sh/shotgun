@@ -110,7 +110,7 @@ class AutopilotOrchestrator:
 
         Checks for:
         - tasks.md (REQUIRED) - cannot proceed without this
-        - spec.md (recommended) - specification document
+        - specification.md (recommended) - specification document
         - plan.md (recommended) - implementation plan
 
         Returns:
@@ -141,7 +141,7 @@ class AutopilotOrchestrator:
 
         validation = PrerequisiteValidation(
             tasks_file=check_file(self.config.tasks_file_path),
-            spec_file=check_file(".shotgun/spec.md"),
+            spec_file=check_file(".shotgun/specification.md"),
             plan_file=check_file(".shotgun/plan.md"),
         )
 

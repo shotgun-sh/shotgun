@@ -228,14 +228,14 @@ class PrerequisiteValidation(BaseModel):
     """
 
     tasks_file: FileStatus = Field(description="Status of tasks.md (REQUIRED)")
-    spec_file: FileStatus = Field(description="Status of spec.md (recommended)")
+    spec_file: FileStatus = Field(description="Status of specification.md (recommended)")
     plan_file: FileStatus = Field(description="Status of plan.md (recommended)")
 
     @property
     def can_proceed(self) -> bool:
         """Check if we have the minimum required files to proceed.
 
-        tasks.md is required. spec.md and plan.md are recommended but optional.
+        tasks.md is required. specification.md and plan.md are recommended but optional.
         """
         return self.tasks_file.exists and not self.tasks_file.is_empty
 
