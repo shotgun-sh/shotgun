@@ -93,7 +93,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
 
         AutopilotStartupScreen .requirement-notice {
             text-align: center;
-            color: $warning;
+            color: $text-muted;
             margin-bottom: 1;
             height: auto;
         }
@@ -221,7 +221,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
 
             # Claude Code requirement notice
             yield Static(
-                "[dim]⚠️  Requires Claude Code CLI to be installed and accessible in PATH[/]",
+                "[dim]NOTE: Requires Claude Code CLI to be installed and accessible in PATH[/]",
                 classes="requirement-notice",
             )
 
