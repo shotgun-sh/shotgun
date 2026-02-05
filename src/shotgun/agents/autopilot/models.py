@@ -100,6 +100,14 @@ class Stage(BaseModel):
     iteration_count: int = Field(
         default=0, description="Number of execution iterations for this stage"
     )
+    task_count_override: int | None = Field(
+        default=None,
+        description="Optional override for task count (used by lightweight parser)",
+    )
+    completed_count_override: int | None = Field(
+        default=None,
+        description="Optional override for completed count (used by lightweight parser)",
+    )
 
     @property
     def pending_tasks(self) -> list[Task]:
@@ -119,11 +127,17 @@ class Stage(BaseModel):
     @property
     def task_count(self) -> int:
         """Total number of tasks in this stage."""
+        # Use override if set (lightweight parser), otherwise compute from tasks
+        if self.task_count_override is not None:
+            return self.task_count_override
         return len(self.tasks)
 
     @property
     def completed_count(self) -> int:
         """Number of completed tasks."""
+        # Use override if set (lightweight parser), otherwise compute from tasks
+        if self.completed_count_override is not None:
+            return self.completed_count_override
         return len(self.completed_tasks)
 
     def format_task_list(self) -> str:
