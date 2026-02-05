@@ -38,7 +38,7 @@ from shotgun.agents.autopilot.prompts import (
     render_qa_testing,
     render_review_code,
 )
-from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
+from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile
 from shotgun.posthog_telemetry import track_event
 
 logger = logging.getLogger(__name__)
@@ -99,12 +99,11 @@ class AutopilotOrchestrator:
             tasks_file_path=self.config.tasks_file_path,
             base_branch=self.config.base_branch,
         )
-        # LLM parser for initial parsing (handles various formats)
+        # LLM parser for all parsing (handles various formats flexibly)
         self._llm_parser = LLMTasksParser(self.config.working_directory)
-        # Regex parser for fast refresh of task completion status
-        self._regex_parser = TasksParser(self.config.working_directory)
         self._claude: ClaudeSubprocess | None = None
         self._cancelled = False
+        self._last_claude_output: str | None = None  # Capture Claude's final output for context
 
     def validate_prerequisites(self) -> PrerequisiteValidation:
         """Validate that required .shotgun/ files exist before starting.
@@ -261,7 +260,7 @@ class AutopilotOrchestrator:
                 return
 
         # Check if stage completed successfully
-        self._refresh_stages()
+        await self._refresh_stages()
         stage = self.state.current_stage
         if not stage or not stage.is_complete:
             yield ClaudeOutput(
@@ -439,9 +438,12 @@ class AutopilotOrchestrator:
             prompt = self._build_execution_prompt(stage)
             async for output in self._run_claude(prompt):
                 yield output
+                # Capture text output for context in task parsing
+                if output.type == ClaudeOutputType.STDOUT:
+                    self._last_claude_output = output.content
 
             # Refresh and check completion
-            self._refresh_stages()
+            await self._refresh_stages()
             updated_stage = self.state.current_stage
             if updated_stage is None:
                 logger.warning("Stage became None after refresh - aborting")
@@ -614,15 +616,16 @@ class AutopilotOrchestrator:
         finally:
             self._claude = None
 
-    def _refresh_stages(self) -> None:
+    async def _refresh_stages(self) -> None:
         """Refresh stage task completion status from tasks.md.
 
-        Uses the fast regex parser to check checkbox status without
-        needing a full LLM parse.
+        Uses the LLM parser for flexible parsing of any tasks.md format.
+        Includes Claude's last output as context for better parsing.
         """
-        self.state.stages = self._regex_parser.refresh_stages(
+        self.state.stages = await self._llm_parser.refresh_stages(
             self.state.stages,
             self.config.tasks_file_path,
+            claude_output=self._last_claude_output,
         )
 
     def _extract_pr_url(self, content: str, stage: Stage) -> None:

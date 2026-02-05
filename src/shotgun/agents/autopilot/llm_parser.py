@@ -184,3 +184,123 @@ class LLMTasksParser:
             result.parse_errors.append(f"LLM parsing error: {e}")
 
         return result
+
+    async def refresh_stages(
+        self,
+        state_stages: list[Stage],
+        file_path: str | Path = ".shotgun/tasks.md",
+        claude_output: str | None = None,
+    ) -> list[Stage]:
+        """Re-parse the file using LLM and update task completion status.
+
+        This is used after Claude Code runs to verify which tasks were completed.
+        Uses the LLM parser for flexible parsing of any tasks.md format.
+
+        Args:
+            state_stages: Existing stages from AutopilotState.
+            file_path: Path to the tasks.md file.
+            claude_output: Optional final output from Claude Code for context.
+
+        Returns:
+            Updated list of stages with refreshed task completion status.
+        """
+        # Resolve the file path
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+
+        if not file_path.is_absolute():
+            file_path = self.working_directory / file_path
+
+        # Read the file content
+        if not file_path.exists():
+            logger.warning("tasks.md not found at %s, keeping original stages", file_path)
+            return state_stages
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            logger.exception("Failed to read tasks.md for refresh")
+            return state_stages
+
+        # Build prompt with context
+        prompt_parts = [
+            "Parse the following tasks.md file and extract all stages and tasks.",
+            "Pay close attention to which tasks are marked complete [x] vs incomplete [ ].",
+            "",
+            "## tasks.md content:",
+            content,
+        ]
+
+        # Add Claude's output as context if available
+        if claude_output:
+            prompt_parts.extend([
+                "",
+                "## Context from Claude Code's final output:",
+                "(Use this to help understand which tasks were completed)",
+                claude_output[:2000],  # Limit to avoid token issues
+            ])
+
+        prompt = "\n".join(prompt_parts)
+
+        # Parse using LLM
+        try:
+            agent = await self._get_agent()
+            result = await agent.run(prompt)
+            parsed_stages = result.output.stages
+        except Exception:
+            logger.exception("LLM refresh parsing failed")
+            return state_stages
+
+        # Create a map of stage number to parsed stage
+        parsed_stage_map = {stage.number: stage for stage in parsed_stages}
+
+        logger.info(
+            "LLM refresh: parsed %d stages from tasks.md",
+            len(parsed_stages),
+        )
+
+        # Update each existing stage with new task completion status
+        updated_stages: list[Stage] = []
+        for state_stage in state_stages:
+            if state_stage.number in parsed_stage_map:
+                parsed_stage = parsed_stage_map[state_stage.number]
+
+                # Convert parsed tasks to Task objects
+                updated_tasks = [
+                    Task(
+                        text=task.text,
+                        completed=task.completed,
+                        line_number=0,
+                    )
+                    for task in parsed_stage.tasks
+                ]
+
+                # Log completion status
+                completed = sum(1 for t in updated_tasks if t.completed)
+                logger.info(
+                    "Stage %d refresh: %d/%d tasks completed",
+                    state_stage.number,
+                    completed,
+                    len(updated_tasks),
+                )
+
+                # Create updated stage preserving metadata
+                updated_stage = Stage(
+                    number=state_stage.number,
+                    name=state_stage.name,
+                    tasks=updated_tasks,
+                    status=state_stage.status,
+                    phase=state_stage.phase,
+                    branch_name=state_stage.branch_name,
+                    pr_url=state_stage.pr_url,
+                    iteration_count=state_stage.iteration_count,
+                )
+                updated_stages.append(updated_stage)
+            else:
+                logger.warning(
+                    "Stage %d not found in parsed file, keeping original",
+                    state_stage.number,
+                )
+                updated_stages.append(state_stage)
+
+        return updated_stages
