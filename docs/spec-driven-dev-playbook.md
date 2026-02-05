@@ -1,19 +1,19 @@
 <!--
 DESIGN CUE LEGEND
 =================
-<!-- HERO SLIDE -->      = Full-bleed, bold typography, minimal text
-<!-- LIST SLIDE -->      = Bullet or icon-based list format
-<!-- PROBLEM SLIDE -->   = Tension/challenge framing, contrast layout
-<!-- CONCEPT SLIDE -->   = Core idea introduction, educational tone
-<!-- PROCESS SLIDE -->   = Step-by-step or numbered sequence
-<!-- FRAMEWORK SLIDE --> = Methodology explanation, may include diagram
-<!-- VALUE PROP SLIDE -->= Benefit-focused, feature highlights
-<!-- CHECKLIST SLIDE --> = Requirements or criteria with checkmarks
-<!-- CASE STUDY SLIDE -->= Example/proof, before-after or screenshots
-<!-- CTA SLIDE -->       = Call to action, links, branding
-<!-- PULL QUOTE -->      = Highlight a key phrase for emphasis
-<!-- DIAGRAM -->         = Placeholder for visual/diagram
-<!-- VERBATIM -->        = Do not edit; preserve exact wording
+HERO SLIDE       = Full-bleed, bold typography, minimal text
+LIST SLIDE       = Bullet or icon-based list format
+PROBLEM SLIDE    = Tension/challenge framing, contrast layout
+CONCEPT SLIDE    = Core idea introduction, educational tone
+PROCESS SLIDE    = Step-by-step or numbered sequence
+FRAMEWORK SLIDE  = Methodology explanation, may include diagram
+VALUE PROP SLIDE = Benefit-focused, feature highlights
+CHECKLIST SLIDE  = Requirements or criteria with checkmarks
+CASE STUDY SLIDE = Example/proof, before-after or screenshots
+CTA SLIDE        = Call to action, links, branding
+PULL QUOTE       = Highlight a key phrase for emphasis
+DIAGRAM          = Placeholder for visual/diagram
+VERBATIM         = Do not edit; preserve exact wording
 -->
 
 <!-- HERO SLIDE -->
@@ -172,3 +172,4 @@ Looking for a tool that does all of this?
 **Open source. BYOK.**
 
 [shotgun.sh](https://shotgun.sh)
+

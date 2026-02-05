@@ -9,23 +9,23 @@
 
 | Section | Slide(s) | Type | Purpose |
 |---------|----------|------|---------|
-| Title + Hook | 1 | Hero | Grab attention, establish topic |
-| Audience | 2 | List | Identify who benefits |
-| Problem | 3 | Problem Statement | Create tension |
-| Solution Overview | 4 | Concept | Introduce spec-driven dev |
-| Writing the Spec | 5 | Process | How to start |
-| Multi-Stage Planning | 6 | Framework | Break into PRs |
-| Task Breakdown | 7 | Framework | Detailed execution |
-| Sharing Specs | 8 | Value Prop | Collaboration benefit |
-| AI Agent Handoff | 9 | Checklist | What makes specs work |
-| Example | 10 | Case Study | Concrete proof |
-| CTA / Shotgun | 11 | CTA | Drive action |
+| Title + Hook | Hero | Hero | Grab attention, establish topic |
+| Audience | 1 | List | Identify who benefits |
+| Problem | 2 | Problem Statement | Create tension |
+| Solution Overview | 3 | Concept | Introduce spec-driven dev |
+| Writing the Spec | 4 | Process | How to start |
+| Multi-Stage Planning | 5 | Framework | Break into PRs |
+| Task Breakdown | 6 | Framework | Detailed execution |
+| Sharing Specs | 7 | Value Prop | Collaboration benefit |
+| AI Agent Handoff | 8 | Checklist | What makes specs work |
+| Example | 9 | Case Study | Concrete proof |
+| CTA / Shotgun | 10 | CTA | Drive action |
 
 ---
 
 ## Slide-by-Slide Breakdown
 
-### Slide 1: Title + Hook (HERO)
+### Hero Slide: Title + Hook
 - **Type**: Hero slide
 - **Content**:
   - Main title: "Spec-Driven Development + AI-Assisted Coding Playbook"
@@ -34,7 +34,7 @@
 
 ---
 
-### Slide 2: Who This Is For (AUDIENCE)
+### Slide 1: Who This Is For (AUDIENCE)
 - **Type**: Audience identification / list
 - **Content**:
   - 3 bullet points identifying target readers
@@ -43,7 +43,7 @@
 
 ---
 
-### Slide 3: The Problem (PROBLEM)
+### Slide 2: The Problem (PROBLEM)
 - **Type**: Problem statement
 - **Content**:
   - Opening challenge: LLM-assisted coding is hard for complex work
@@ -54,7 +54,7 @@
 
 ---
 
-### Slide 4: What's Spec-Driven Development? (CONCEPT)
+### Slide 3: What's Spec-Driven Development? (CONCEPT)
 - **Type**: Core concept introduction
 - **Content**:
   - Definition: doing hard work before code gets written
@@ -64,7 +64,7 @@
 
 ---
 
-### Slide 5: Writing the Spec (PROCESS)
+### Slide 4: Writing the Spec (PROCESS)
 - **Type**: Process/how-to
 - **Content**:
   - Starting prompt example
@@ -73,7 +73,7 @@
 
 ---
 
-### Slide 6: Generate Multi-Stage Plan (FRAMEWORK)
+### Slide 5: Generate Multi-Stage Plan (FRAMEWORK)
 - **Type**: Framework explanation
 - **Content**:
   - Core idea: break spec into PR-sized chunks
@@ -83,16 +83,16 @@
 
 ---
 
-### Slide 7: Generate Detailed Task List (FRAMEWORK)
+### Slide 6: Generate Detailed Task List (FRAMEWORK)
 - **Type**: Framework explanation (depth)
 - **Content**:
   - Contrast with stages: "stages = what ships, tasks = how it's built"
   - Task characteristics: scoped for AI execution, clear acceptance criteria
-- **Design notes**: Could pair with Slide 6 as a two-slide sequence; table or checklist format
+- **Design notes**: Could pair with Slide 5 as a two-slide sequence; table or checklist format
 
 ---
 
-### Slide 8: Sharing Specs (VALUE PROP)
+### Slide 7: Sharing Specs (VALUE PROP)
 - **Type**: Value proposition / collaboration
 - **Content**:
   - Key message: specs as first-class artifacts
@@ -102,7 +102,7 @@
 
 ---
 
-### Slide 9: Pass It to Your AI Agent (CHECKLIST)
+### Slide 8: Pass It to Your AI Agent (CHECKLIST)
 - **Type**: Checklist / handoff criteria
 - **Content**:
   - 3 requirements for a spec that works: codebase research, stages, file-by-file instructions
@@ -111,7 +111,7 @@
 
 ---
 
-### Slide 10: Before/After Example (CASE STUDY)
+### Slide 9: Before/After Example (CASE STUDY)
 - **Type**: Case study / proof
 - **Content**:
   - Placeholder for concrete example (e.g., LiteLLM case study)
@@ -119,7 +119,7 @@
 
 ---
 
-### Slide 11: Shotgun CTA (CTA)
+### Slide 10: Shotgun CTA (CTA)
 - **Type**: Call to action
 - **Content**:
   - Tool introduction: what Shotgun does
@@ -134,11 +134,11 @@
 
 | Group | Slides | Theme |
 |-------|--------|-------|
-| **Opening** | 1-3 | Hook, audience, problem |
-| **Core Concept** | 4-5 | What + how to start |
-| **Framework** | 6-7 | Planning methodology |
-| **Collaboration** | 8-9 | Sharing + handoff |
-| **Proof + CTA** | 10-11 | Example + action |
+| **Opening** | Hero, 1-2 | Hook, audience, problem |
+| **Core Concept** | 3-4 | What + how to start |
+| **Framework** | 5-6 | Planning methodology |
+| **Collaboration** | 7-8 | Sharing + handoff |
+| **Proof + CTA** | 9-10 | Example + action |
 
 ---
 
@@ -164,7 +164,7 @@
 
 ## Notes for Canva Design
 
-1. **Slide count**: 11 slides total (current doc has 10, recommend splitting Title from Slide 1 content OR adding dedicated CTA slide)
-2. **Longest slides**: Slides 3, 4, and 8 have the most content; may need tightening or splitting
-3. **Visual opportunities**: Slides 6-7 (multi-stage plan + tasks) could benefit from a diagram
-4. **Pull quote candidates**: "Context is king" (Slide 4), "Contract between humans and AI" (Slide 8)
+1. **Slide count**: 11 pages total (1 Hero slide + 10 numbered slides)
+2. **Longest slides**: Slides 2, 3, and 7 have the most content; may need tightening or splitting
+3. **Visual opportunities**: Slides 5-6 (multi-stage plan + tasks) could benefit from a diagram
+4. **Pull quote candidates**: "Context is king" (Slide 3), "Contract between humans and AI" (Slide 7)
