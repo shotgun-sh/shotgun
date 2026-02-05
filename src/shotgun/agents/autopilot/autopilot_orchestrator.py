@@ -20,7 +20,7 @@ from shotgun.agents.autopilot.claude_subprocess import (
     ClaudeSubprocess,
     ClaudeSubprocessConfig,
 )
-from shotgun.agents.autopilot.llm_parser import LLMTasksParser
+from shotgun.agents.autopilot.lightweight_parser import LightweightTasksParser
 from shotgun.agents.autopilot.models import (
     AutopilotMode,
     AutopilotState,
@@ -38,7 +38,6 @@ from shotgun.agents.autopilot.prompts import (
     render_qa_testing,
     render_review_code,
 )
-from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile
 from shotgun.posthog_telemetry import track_event
 
 logger = logging.getLogger(__name__)
@@ -100,7 +99,7 @@ class AutopilotOrchestrator:
             base_branch=self.config.base_branch,
         )
         # LLM parser for all parsing (handles various formats flexibly)
-        self._llm_parser = LLMTasksParser(self.config.working_directory)
+        self._lightweight_parser = LightweightTasksParser(self.config.working_directory)
         self._claude: ClaudeSubprocess | None = None
         self._cancelled = False
         self._last_claude_output: str | None = (
@@ -170,34 +169,34 @@ class AutopilotOrchestrator:
 
         return validation
 
-    async def initialize(self) -> ParsedTasksFile:
-        """Initialize autopilot by parsing tasks.md using LLM.
+    async def initialize(self) -> list[Stage]:
+        """Initialize autopilot by parsing tasks.md using lightweight status parser.
 
-        Uses a fast sub-agent model with structured output to parse
-        tasks.md files flexibly, handling various markdown formats.
+        Uses fast status parser to get all stages with completion status.
 
         Returns:
-            ParsedTasksFile with stages and any parse errors.
+            List of Stage objects with status.
         """
         logger.info("Initializing autopilot from %s", self.config.tasks_file_path)
 
-        # Use LLM parser for flexible parsing of various formats
-        parsed = await self._llm_parser.parse(self.config.tasks_file_path)
+        # Use lightweight status parser for fast initialization
+        stages = await self._lightweight_parser.parse_status(
+            self.config.tasks_file_path
+        )
 
-        if parsed.is_valid:
-            self.state.stages = parsed.stages
+        if stages:
+            self.state.stages = stages
             # Initialize state based on task completion - skip completed stages
             self.state.initialize_from_tasks()
             logger.info(
-                "LLM parsed %d stages with %d total tasks (starting at stage %d)",
-                len(parsed.stages),
-                parsed.total_tasks,
+                "Status parser found %d stages (starting at stage %d)",
+                len(stages),
                 self.state.current_stage_index + 1,  # 1-indexed for display
             )
         else:
-            logger.warning("Failed to parse tasks.md: %s", parsed.parse_errors)
+            logger.warning("No stages found in tasks.md")
 
-        return parsed
+        return stages
 
     def set_mode(self, mode: AutopilotMode) -> None:
         """Set the execution mode.
@@ -229,8 +228,39 @@ class AutopilotOrchestrator:
             )
             return
 
+        # If stage has no tasks (only status from status parser), load full tasks
+        if not stage.tasks:
+            logger.info(
+                "Stage %s has no tasks loaded, loading from tasks.md...",
+                stage.number,
+            )
+            detailed_stage = await self._lightweight_parser.parse_single_stage(
+                stage.number,
+                self.config.tasks_file_path,
+            )
+            if detailed_stage:
+                # Update stage with tasks, preserving metadata
+                detailed_stage.status = stage.status
+                detailed_stage.phase = stage.phase
+                detailed_stage.branch_name = stage.branch_name
+                detailed_stage.pr_url = stage.pr_url
+                detailed_stage.iteration_count = stage.iteration_count
+                self.state.stages[self.state.current_stage_index] = detailed_stage
+                stage = detailed_stage
+                logger.info(
+                    "Loaded %d tasks for Stage %s",
+                    len(stage.tasks),
+                    stage.number,
+                )
+            else:
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.ERROR,
+                    content=f"Failed to load tasks for Stage {stage.number}",
+                )
+                return
+
         logger.info(
-            "Starting workflow for Stage %d: %s (tasks: %d pending, %d completed)",
+            "Starting workflow for Stage %s: %s (tasks: %d pending, %d completed)",
             stage.number,
             stage.name,
             len(stage.pending_tasks),
@@ -259,7 +289,7 @@ class AutopilotOrchestrator:
 
         # Phase 1: Execute tasks until complete
         stage.phase = StagePhase.EXECUTING
-        logger.info("Entering Phase 1: EXECUTING for Stage %d", stage.number)
+        logger.info("Entering Phase 1: EXECUTING for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"📋 Phase 1: Executing tasks for Stage {stage.number}",
@@ -286,7 +316,7 @@ class AutopilotOrchestrator:
         if self.state.mode == AutopilotMode.COWBOY:
             # Self-review phase
             stage.phase = StagePhase.REVIEWING
-            logger.info("Cowboy mode: Self-reviewing Stage %d", stage.number)
+            logger.info("Cowboy mode: Self-reviewing Stage %s", stage.number)
             yield ClaudeOutput(
                 type=ClaudeOutputType.STDOUT,
                 content=f"🔍 Self-reviewing Stage {stage.number}...",
@@ -302,7 +332,7 @@ class AutopilotOrchestrator:
             stage.phase = None
 
             logger.info(
-                "Stage %d complete (cowboy mode - no PR, no human review)",
+                "Stage %s complete (cowboy mode - no PR, no human review)",
                 stage.number,
             )
 
@@ -341,7 +371,7 @@ class AutopilotOrchestrator:
 
         # Phase 2: Create PR
         stage.phase = StagePhase.CREATING_PR
-        logger.info("Entering Phase 2: CREATING_PR for Stage %d", stage.number)
+        logger.info("Entering Phase 2: CREATING_PR for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"📝 Phase 2: Creating PR for Stage {stage.number}",
@@ -354,7 +384,7 @@ class AutopilotOrchestrator:
 
         # Phase 3: Review and fix
         stage.phase = StagePhase.REVIEWING
-        logger.info("Entering Phase 3: REVIEWING for Stage %d", stage.number)
+        logger.info("Entering Phase 3: REVIEWING for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"🔍 Phase 3: Reviewing code for Stage {stage.number}",
@@ -367,7 +397,7 @@ class AutopilotOrchestrator:
 
         # Phase 4: QA Testing
         stage.phase = StagePhase.QA_TESTING
-        logger.info("Entering Phase 4: QA_TESTING for Stage %d", stage.number)
+        logger.info("Entering Phase 4: QA_TESTING for Stage %s", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"🧪 Phase 4: Running QA tests for Stage {stage.number}",
@@ -384,7 +414,7 @@ class AutopilotOrchestrator:
         self.state.awaiting_approval = True
 
         logger.info(
-            "Stage %d workflow complete - entering Phase 5: AWAITING_APPROVAL (PR: %s)",
+            "Stage %s workflow complete - entering Phase 5: AWAITING_APPROVAL (PR: %s)",
             stage.number,
             stage.pr_url or "no PR",
         )
@@ -418,21 +448,21 @@ class AutopilotOrchestrator:
             ClaudeOutput as execution progresses.
         """
         logger.info(
-            "Starting execution loop for Stage %d with %d pending tasks",
+            "Starting execution loop for Stage %s with %d pending tasks",
             stage.number,
             len(stage.pending_tasks),
         )
 
         while stage.iteration_count < self.config.max_iterations:
             if self._cancelled:
-                logger.info("Execution cancelled for Stage %d", stage.number)
+                logger.info("Execution cancelled for Stage %s", stage.number)
                 return
 
             stage.iteration_count += 1
             remaining = len(stage.pending_tasks)
 
             logger.info(
-                "Stage %d iteration %d/%d - %d tasks remaining: %s",
+                "Stage %s iteration %d/%d - %d tasks remaining: %s",
                 stage.number,
                 stage.iteration_count,
                 self.config.max_iterations,
@@ -464,7 +494,7 @@ class AutopilotOrchestrator:
             completed_count = len(updated_stage.completed_tasks)
             pending_count = len(updated_stage.pending_tasks)
             logger.info(
-                "Stage %d after iteration %d: %d completed, %d pending",
+                "Stage %s after iteration %d: %d completed, %d pending",
                 updated_stage.number,
                 stage.iteration_count,
                 completed_count,
@@ -476,7 +506,7 @@ class AutopilotOrchestrator:
 
             if stage.is_complete:
                 logger.info(
-                    "Stage %d COMPLETE after %d iteration(s)",
+                    "Stage %s COMPLETE after %d iteration(s)",
                     stage.number,
                     stage.iteration_count,
                 )
@@ -487,7 +517,7 @@ class AutopilotOrchestrator:
                 return
 
         logger.warning(
-            "Stage %d reached max iterations (%d) without completing",
+            "Stage %s reached max iterations (%d) without completing",
             stage.number,
             self.config.max_iterations,
         )
@@ -580,10 +610,12 @@ class AutopilotOrchestrator:
 
         # Determine branch names
         branch_name = f"{self.config.branch_prefix}{stage.number}"
-        if stage.number == 1:
+        # For the first stage, use main base branch; otherwise, stack on previous stage
+        if self.state.current_stage_index == 0:
             base_branch = self.state.base_branch
         else:
-            base_branch = f"{self.config.branch_prefix}{stage.number - 1}"
+            prev_stage = self.state.stages[self.state.current_stage_index - 1]
+            base_branch = f"{self.config.branch_prefix}{prev_stage.number}"
 
         return render_execute_stage(
             tasks_file_path=self.state.tasks_file_path,
@@ -634,14 +666,42 @@ class AutopilotOrchestrator:
     async def _refresh_stages(self) -> None:
         """Refresh stage task completion status from tasks.md.
 
-        Uses the LLM parser for flexible parsing of any tasks.md format.
-        Includes Claude's last output as context for better parsing.
+        Uses lightweight parsers:
+        1. Status parser to check overall stage completion
+        2. Single-stage parser to get detailed tasks for current stage
         """
-        self.state.stages = await self._llm_parser.refresh_stages(
-            self.state.stages,
+        # Get current stage before refresh
+        current_stage = self.state.current_stage
+        if current_stage is None:
+            logger.warning("No current stage to refresh")
+            return
+
+        # Parse the current stage's tasks to check completion status
+        refreshed_stage = await self._lightweight_parser.parse_single_stage(
+            current_stage.number,
             self.config.tasks_file_path,
-            claude_output=self._last_claude_output,
         )
+
+        if refreshed_stage:
+            # Update the current stage with refreshed task data
+            # Preserve metadata (status, phase, branch_name, pr_url, iteration_count)
+            refreshed_stage.status = current_stage.status
+            refreshed_stage.phase = current_stage.phase
+            refreshed_stage.branch_name = current_stage.branch_name
+            refreshed_stage.pr_url = current_stage.pr_url
+            refreshed_stage.iteration_count = current_stage.iteration_count
+
+            # Replace the stage in the list
+            self.state.stages[self.state.current_stage_index] = refreshed_stage
+
+            logger.info(
+                "Refreshed Stage %s: %d/%d tasks completed",
+                refreshed_stage.number,
+                refreshed_stage.completed_count,
+                refreshed_stage.task_count,
+            )
+        else:
+            logger.warning("Failed to refresh stage %s", current_stage.number)
 
     def _extract_pr_url(self, content: str, stage: Stage) -> None:
         """Extract PR URL from output content.
@@ -682,10 +742,10 @@ class AutopilotOrchestrator:
             )
 
             if approved:
-                logger.info("User approved Stage %d", stage.number)
+                logger.info("User approved Stage %s", stage.number)
                 stage.phase = None  # Clear phase
             else:
-                logger.info("User rejected Stage %d: %s", stage.number, feedback)
+                logger.info("User rejected Stage %s: %s", stage.number, feedback)
                 # Reset to allow re-work
                 stage.phase = StagePhase.EXECUTING
                 stage.status = StageStatus.IN_PROGRESS
@@ -700,7 +760,7 @@ class AutopilotOrchestrator:
         if result:
             stage = self.state.current_stage
             logger.info(
-                "Advanced to Stage %d: %s",
+                "Advanced to Stage %s: %s",
                 stage.number if stage else 0,
                 stage.name if stage else "",
             )

@@ -77,9 +77,10 @@ class Stage(BaseModel):
     """A stage containing multiple tasks.
 
     Stages are parsed from ### Stage N: Name headings in tasks.md.
+    Stage identifiers can be numeric (1, 2, 3) or alphanumeric (A, 1a, 2b).
     """
 
-    number: int = Field(description="Stage number (1-indexed)")
+    number: str = Field(description="Stage identifier (numeric or alphanumeric)")
     name: str = Field(description="Stage name/title")
     tasks: list[Task] = Field(
         default_factory=list, description="List of tasks in this stage"
@@ -217,25 +218,35 @@ class AutopilotState(BaseModel):
     def find_first_incomplete_stage_index(self) -> int:
         """Find the index of the first stage that isn't complete.
 
-        A stage is complete if all its tasks are marked as completed.
+        A stage is complete if:
+        - Its status is COMPLETED, or
+        - All its tasks are marked as completed (when tasks are loaded)
 
         Returns:
             Index of the first incomplete stage, or len(stages) if all complete.
         """
         for i, stage in enumerate(self.stages):
-            if not stage.is_complete:
-                return i
+            # Check status first (works even when tasks aren't loaded)
+            if stage.status == StageStatus.COMPLETED:
+                continue
+            # If status is not COMPLETED, this is the first incomplete stage
+            return i
         return len(self.stages)
 
     def initialize_from_tasks(self) -> None:
         """Initialize state based on task completion status.
 
         This should be called after stages are loaded to:
-        1. Mark already-complete stages as COMPLETED
+        1. Mark already-complete stages as COMPLETED (if tasks are loaded)
         2. Set current_stage_index to the first incomplete stage
+
+        Note: When using status parser, stages already have correct status set.
+        Only update status from tasks when tasks are actually loaded.
         """
         for stage in self.stages:
-            if stage.is_complete:
+            # Only check task completion if tasks are loaded
+            # (status parser sets status directly without loading tasks)
+            if stage.tasks and stage.is_complete:
                 stage.status = StageStatus.COMPLETED
 
         # Start at the first incomplete stage
@@ -381,7 +392,9 @@ class ParsedTask(BaseModel):
 class ParsedStage(BaseModel):
     """A parsed stage from the markdown file (LLM parser output)."""
 
-    number: int = Field(description="Stage number (e.g., 1, 2, 3)")
+    number: str = Field(
+        description="Stage identifier - can be numeric (1, 2, 3) or alphanumeric (A, 1a, 2b)"
+    )
     name: str = Field(description="Stage name/title")
     tasks: list[ParsedTask] = Field(description="List of tasks in this stage")
 

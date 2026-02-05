@@ -12,6 +12,7 @@ from shotgun.agents.autopilot.claude_subprocess import (
     ClaudeSubprocess,
     ClaudeSubprocessConfig,
 )
+from shotgun.agents.autopilot.lightweight_parser import LightweightTasksParser
 from shotgun.agents.autopilot.llm_parser import LLMTasksParser
 from shotgun.agents.autopilot.models import (
     AutopilotMode,
@@ -46,6 +47,7 @@ __all__ = [
     "ClaudeSubprocess",
     "ClaudeSubprocessConfig",
     "FileStatus",
+    "LightweightTasksParser",
     "LLMTasksParser",
     "ParsedStage",
     "ParsedTask",

@@ -84,6 +84,26 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             margin-bottom: 0;
         }
 
+        AutopilotStartupScreen .mode-description {
+            height: auto;
+            margin-left: 3;
+            margin-bottom: 1;
+            color: $text-muted;
+        }
+
+        AutopilotStartupScreen .requirement-notice {
+            text-align: center;
+            color: $text-muted;
+            margin-bottom: 1;
+            height: auto;
+        }
+
+        AutopilotStartupScreen .loading-message {
+            text-align: center;
+            color: $text-muted;
+            height: auto;
+        }
+
         AutopilotStartupScreen .stages-label {
             color: $text;
             height: auto;
@@ -150,6 +170,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         error_message: str | None = None,
         *,
         is_warning: bool = False,
+        loading: bool = False,
     ) -> None:
         """Initialize the startup screen.
 
@@ -157,6 +178,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             stages: List of stages parsed from tasks.md.
             error_message: Optional error/warning message to display.
             is_warning: If True, treat as warning (can still start). If False, treat as error (blocks start).
+            loading: If True, show loading state while parsing tasks.md.
         """
         super().__init__()
         self.stages = stages
@@ -164,6 +186,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         self.is_warning = (
             is_warning and len(stages) > 0
         )  # Warnings only make sense if we have stages
+        self.loading = loading
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
 
     def compose(self) -> ComposeResult:
@@ -196,6 +219,12 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                     classes="warning-message",
                 )
 
+            # Claude Code requirement notice
+            yield Static(
+                "[dim]NOTE: Requires Claude Code CLI to be installed and accessible in PATH[/]",
+                classes="requirement-notice",
+            )
+
             # Mode selection
             with Container(classes="mode-section"):
                 yield Static("Mode:", classes="mode-label")
@@ -205,44 +234,74 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                         id="mode-pause",
                         value=True,
                     )
+                    yield Static(
+                        "[dim]After completing each stage, Claude creates a PR and waits for your approval. You can review changes, request fixes, or accept to continue.[/]",
+                        classes="mode-description",
+                    )
                     yield RadioButton(
                         "Auto-continue with self-review (stacked PRs)",
                         id="mode-auto",
+                    )
+                    yield Static(
+                        "[dim]Claude completes all stages automatically with self-review between each. Creates stacked PRs for each stage without pausing for human review.[/]",
+                        classes="mode-description",
                     )
                     yield RadioButton(
                         "Cowboy (self-review, no human review, no PRs)",
                         id="mode-cowboy",
                     )
+                    yield Static(
+                        "[dim]Full speed ahead! Claude builds each stage with self-review but no PRs and no human approval required. Maximum velocity, use with caution.[/]",
+                        classes="mode-description",
+                    )
 
             # Stages preview section
-            total_tasks = sum(s.task_count for s in self.stages)
-            completed_tasks = sum(s.completed_count for s in self.stages)
-
-            yield Static(
-                f"Stages: [bold]{len(self.stages)}[/] ({completed_tasks}/{total_tasks} tasks done)",
-                classes="stages-label",
-            )
-
-            with VerticalScroll(classes="stages-scroll"):
-                for stage in self.stages:
-                    status_icon = "  "
-                    css_class = "stage-item"
-
-                    if stage.is_complete:
-                        status_icon = "[green]✓[/] "
-                        css_class = "stage-item-complete"
-                    elif stage.completed_count > 0:
-                        status_icon = "[yellow]◐[/] "
-
+            if self.loading:
+                yield Static(
+                    "Stages: [dim italic]Loading...[/]",
+                    classes="stages-label",
+                    id="stages-label",
+                )
+                with VerticalScroll(classes="stages-scroll", id="stages-scroll"):
                     yield Static(
-                        f"{status_icon}{stage.number}. {stage.name} "
-                        f"[dim]({stage.completed_count}/{stage.task_count})[/]",
-                        classes=css_class,
+                        "[dim]Parsing tasks.md with LLM...[/]",
+                        classes="loading-message",
                     )
+            else:
+                total_tasks = sum(s.task_count for s in self.stages)
+                completed_tasks = sum(s.completed_count for s in self.stages)
+
+                yield Static(
+                    f"Stages: [bold]{len(self.stages)}[/] ({completed_tasks}/{total_tasks} tasks done)",
+                    classes="stages-label",
+                    id="stages-label",
+                )
+
+                with VerticalScroll(classes="stages-scroll", id="stages-scroll"):
+                    for stage in self.stages:
+                        status_icon = "  "
+                        css_class = "stage-item"
+
+                        if stage.is_complete:
+                            status_icon = "[green]✓[/] "
+                            css_class = "stage-item-complete"
+                        elif stage.completed_count > 0:
+                            status_icon = "[yellow]◐[/] "
+
+                        yield Static(
+                            f"{status_icon}{stage.number}. {stage.name} "
+                            f"[dim]({stage.completed_count}/{stage.task_count})[/]",
+                            classes=css_class,
+                        )
 
             # Action buttons
             with Horizontal(classes="startup-buttons"):
-                yield Button("Start", id="btn-start", variant="success")
+                yield Button(
+                    "Start",
+                    id="btn-start",
+                    variant="success",
+                    disabled=self.loading,
+                )
                 yield Button("Cancel", id="btn-cancel")
 
             # Shortcut hints
@@ -262,6 +321,64 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 cancel_btn.focus()
             except NoMatches:
                 pass
+
+    def update_stages(self, stages: list[Stage]) -> None:
+        """Update the screen with parsed stages and enable interaction.
+
+        This is called after async parsing completes to replace the loading
+        state with actual stage data.
+
+        Args:
+            stages: The parsed stages from tasks.md.
+        """
+        self.stages = stages
+        self.loading = False
+
+        # Update the stages label
+        try:
+            total_tasks = sum(s.task_count for s in self.stages)
+            completed_tasks = sum(s.completed_count for s in self.stages)
+
+            stages_label = self.query_one("#stages-label", Static)
+            stages_label.update(
+                f"Stages: [bold]{len(self.stages)}[/] ({completed_tasks}/{total_tasks} tasks done)"
+            )
+        except NoMatches:
+            pass
+
+        # Replace the loading message with actual stages
+        try:
+            stages_scroll = self.query_one("#stages-scroll", VerticalScroll)
+            # Remove all children (the loading message)
+            stages_scroll.remove_children()
+
+            # Add the actual stage items
+            for stage in self.stages:
+                status_icon = "  "
+                css_class = "stage-item"
+
+                if stage.is_complete:
+                    status_icon = "[green]✓[/] "
+                    css_class = "stage-item-complete"
+                elif stage.completed_count > 0:
+                    status_icon = "[yellow]◐[/] "
+
+                stages_scroll.mount(
+                    Static(
+                        f"{status_icon}{stage.number}. {stage.name} "
+                        f"[dim]({stage.completed_count}/{stage.task_count})[/]",
+                        classes=css_class,
+                    )
+                )
+        except NoMatches:
+            pass
+
+        # Enable the Start button
+        try:
+            start_btn = self.query_one("#btn-start", Button)
+            start_btn.disabled = False
+        except NoMatches:
+            pass
 
     @on(RadioSet.Changed, "#mode-select")
     def handle_mode_change(self, event: RadioSet.Changed) -> None:

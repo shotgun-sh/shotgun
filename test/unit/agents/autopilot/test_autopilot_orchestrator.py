@@ -65,22 +65,22 @@ def test_set_mode():
 def test_advance_to_next_stage():
     """Test advancing through stages."""
     stages = [
-        Stage(number=1, name="Stage 1", tasks=[]),
-        Stage(number=2, name="Stage 2", tasks=[]),
-        Stage(number=3, name="Stage 3", tasks=[]),
+        Stage(number="1", name="Stage 1", tasks=[]),
+        Stage(number="2", name="Stage 2", tasks=[]),
+        Stage(number="3", name="Stage 3", tasks=[]),
     ]
     orchestrator = AutopilotOrchestrator()
     orchestrator.state.stages = stages
 
     # Start at stage 0
     assert orchestrator.state.current_stage_index == 0
-    assert orchestrator.state.current_stage.number == 1
+    assert orchestrator.state.current_stage.number == "1"
 
     # Advance to stage 2
     result = orchestrator.advance_to_next_stage()
     assert result is True
     assert orchestrator.state.current_stage_index == 1
-    assert orchestrator.state.current_stage.number == 2
+    assert orchestrator.state.current_stage.number == "2"
 
     # Advance to stage 3
     result = orchestrator.advance_to_next_stage()
@@ -96,8 +96,8 @@ def test_advance_to_next_stage():
 def test_is_complete():
     """Test is_complete property."""
     stages = [
-        Stage(number=1, name="Stage 1", status=StageStatus.PENDING, tasks=[]),
-        Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
+        Stage(number="1", name="Stage 1", status=StageStatus.PENDING, tasks=[]),
+        Stage(number="2", name="Stage 2", status=StageStatus.PENDING, tasks=[]),
     ]
     orchestrator = AutopilotOrchestrator()
     orchestrator.state.stages = stages
@@ -117,8 +117,8 @@ def test_is_complete():
 def test_awaiting_approval_set_by_workflow():
     """Test awaiting_approval is set after workflow completes."""
     stages = [
-        Stage(number=1, name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
-        Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
+        Stage(number="1", name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
+        Stage(number="2", name="Stage 2", status=StageStatus.PENDING, tasks=[]),
     ]
     orchestrator = AutopilotOrchestrator()
     orchestrator.state.stages = stages
@@ -135,8 +135,8 @@ def test_awaiting_approval_set_by_workflow():
 def test_awaiting_approval_default_false():
     """Test awaiting_approval defaults to false."""
     stages = [
-        Stage(number=1, name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
-        Stage(number=2, name="Stage 2", status=StageStatus.PENDING, tasks=[]),
+        Stage(number="1", name="Stage 1", status=StageStatus.COMPLETED, tasks=[]),
+        Stage(number="2", name="Stage 2", status=StageStatus.PENDING, tasks=[]),
     ]
     orchestrator = AutopilotOrchestrator()
     orchestrator.state.stages = stages
@@ -152,7 +152,7 @@ def test_build_execution_prompt():
         Task(text="Create login form", completed=False, line_number=10),
         Task(text="Add validation", completed=True, line_number=11),
     ]
-    stage = Stage(number=1, name="Authentication", tasks=tasks)
+    stage = Stage(number="1", name="Authentication", tasks=tasks)
 
     orchestrator = AutopilotOrchestrator()
     orchestrator.state.stages = [stage]

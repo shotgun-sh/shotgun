@@ -39,7 +39,7 @@ def test_parse_valid_tasks_content():
 
     # Check first stage
     stage1 = result.stages[0]
-    assert stage1.number == 1
+    assert stage1.number == "1"
     assert stage1.name == "Authentication Setup"
     assert len(stage1.tasks) == 3
     assert stage1.tasks[0].text == "Create login form"
@@ -48,7 +48,7 @@ def test_parse_valid_tasks_content():
 
     # Check second stage
     stage2 = result.stages[1]
-    assert stage2.number == 2
+    assert stage2.number == "2"
     assert stage2.name == "User Management"
     assert len(stage2.tasks) == 2
 
@@ -112,7 +112,7 @@ def test_parse_empty_stage():
 
 
 def test_parse_out_of_order_stages():
-    """Test parsing stages that are numbered out of order."""
+    """Test parsing stages that are numbered out of order (now allowed with alphanumeric)."""
     content = """### Stage 1: First
 - [ ] Task
 
@@ -122,8 +122,11 @@ def test_parse_out_of_order_stages():
     parser = TasksParser()
     result = parser.parse_content(content)
 
-    # Should have error about out of order
-    assert any("out of order" in e for e in result.parse_errors)
+    # With alphanumeric support, out-of-order stages are allowed
+    assert result.is_valid
+    assert len(result.stages) == 2
+    assert result.stages[0].number == "1"
+    assert result.stages[1].number == "3"
 
 
 def test_parse_stage_pattern_variations():
@@ -160,7 +163,7 @@ def test_parsed_tasks_file_properties():
     """Test ParsedTasksFile properties."""
     stages = [
         Stage(
-            number=1,
+            number="1",
             name="Stage 1",
             tasks=[
                 Task(text="T1", completed=True, line_number=1),
@@ -168,7 +171,7 @@ def test_parsed_tasks_file_properties():
             ],
         ),
         Stage(
-            number=2,
+            number="2",
             name="Stage 2",
             tasks=[
                 Task(text="T3", completed=True, line_number=3),
@@ -198,7 +201,7 @@ def test_refresh_stages_updates_completion():
     # Original stages with tasks not completed
     original_stages = [
         Stage(
-            number=1,
+            number="1",
             name="Stage 1",
             status=StageStatus.IN_PROGRESS,
             tasks=[
@@ -232,7 +235,7 @@ def test_refresh_stages_preserves_metadata():
     """Test refresh_stages preserves stage metadata like status and branch."""
     original_stages = [
         Stage(
-            number=1,
+            number="1",
             name="Stage 1",
             status=StageStatus.IN_PROGRESS,
             branch_name="autopilot/stage-1",
