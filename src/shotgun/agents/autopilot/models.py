@@ -325,6 +325,7 @@ class ClaudeOutputType(StrEnum):
     STDERR = "stderr"
     EXIT = "exit"
     ERROR = "error"
+    STAGE_CHANGE = "stage_change"  # Signals moving to a new stage
 
 
 class ClaudeOutput(BaseModel):

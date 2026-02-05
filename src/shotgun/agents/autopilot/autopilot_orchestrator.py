@@ -232,6 +232,12 @@ class AutopilotOrchestrator:
             len(stage.completed_tasks),
         )
 
+        # Signal stage change to TUI so it can update spinner
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STAGE_CHANGE,
+            content=f"Stage {stage.number}: {stage.name}",
+        )
+
         # Track stage start (no PII - just counts and numbers)
         track_event(
             "autopilot_stage_started",

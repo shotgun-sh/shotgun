@@ -3138,7 +3138,11 @@ Then confirm what you changed.
             async for output in orchestrator.run_stage_workflow():
                 self.post_message(AutopilotOutputReceived(output))
 
-                if output.type == ClaudeOutputType.ERROR:
+                # Update spinner when stage changes (e.g., in cowboy mode auto-advance)
+                if output.type == ClaudeOutputType.STAGE_CHANGE:
+                    self.processing_state.start_processing(output.content)
+                    self.mount_hint(f"**{output.content}**")
+                elif output.type == ClaudeOutputType.ERROR:
                     self.mount_hint(f"[red]Error:[/] {output.content}")
 
             # Check if awaiting approval
