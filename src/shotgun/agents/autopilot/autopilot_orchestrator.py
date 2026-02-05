@@ -159,11 +159,18 @@ class AutopilotOrchestrator:
             )
             return
 
-        logger.info("Starting workflow for Stage %d: %s", stage.number, stage.name)
+        logger.info(
+            "Starting workflow for Stage %d: %s (tasks: %d pending, %d completed)",
+            stage.number,
+            stage.name,
+            len(stage.pending_tasks),
+            len(stage.completed_tasks),
+        )
         stage.status = StageStatus.IN_PROGRESS
 
         # Phase 1: Execute tasks until complete
         stage.phase = StagePhase.EXECUTING
+        logger.info("Entering Phase 1: EXECUTING for Stage %d", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"📋 Phase 1: Executing tasks for Stage {stage.number}",
@@ -188,6 +195,7 @@ class AutopilotOrchestrator:
 
         # Phase 2: Create PR
         stage.phase = StagePhase.CREATING_PR
+        logger.info("Entering Phase 2: CREATING_PR for Stage %d", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"📝 Phase 2: Creating PR for Stage {stage.number}",
@@ -200,6 +208,7 @@ class AutopilotOrchestrator:
 
         # Phase 3: Review and fix
         stage.phase = StagePhase.REVIEWING
+        logger.info("Entering Phase 3: REVIEWING for Stage %d", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"🔍 Phase 3: Reviewing code for Stage {stage.number}",
@@ -212,6 +221,7 @@ class AutopilotOrchestrator:
 
         # Phase 4: QA Testing
         stage.phase = StagePhase.QA_TESTING
+        logger.info("Entering Phase 4: QA_TESTING for Stage %d", stage.number)
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"🧪 Phase 4: Running QA tests for Stage {stage.number}",
@@ -227,6 +237,11 @@ class AutopilotOrchestrator:
         stage.status = StageStatus.COMPLETED
         self.state.awaiting_approval = True
 
+        logger.info(
+            "Stage %d workflow complete - entering Phase 5: AWAITING_APPROVAL (PR: %s)",
+            stage.number,
+            stage.pr_url or "no PR",
+        )
         yield ClaudeOutput(
             type=ClaudeOutputType.STDOUT,
             content=f"✅ Stage {stage.number} ready for review. PR: {stage.pr_url or 'N/A'}",
@@ -243,12 +258,28 @@ class AutopilotOrchestrator:
         Yields:
             ClaudeOutput as execution progresses.
         """
+        logger.info(
+            "Starting execution loop for Stage %d with %d pending tasks",
+            stage.number,
+            len(stage.pending_tasks),
+        )
+
         while stage.iteration_count < self.config.max_iterations:
             if self._cancelled:
+                logger.info("Execution cancelled for Stage %d", stage.number)
                 return
 
             stage.iteration_count += 1
             remaining = len(stage.pending_tasks)
+
+            logger.info(
+                "Stage %d iteration %d/%d - %d tasks remaining: %s",
+                stage.number,
+                stage.iteration_count,
+                self.config.max_iterations,
+                remaining,
+                [t.text[:50] for t in stage.pending_tasks],
+            )
 
             yield ClaudeOutput(
                 type=ClaudeOutputType.STDOUT,
@@ -264,18 +295,40 @@ class AutopilotOrchestrator:
             self._refresh_stages()
             updated_stage = self.state.current_stage
             if updated_stage is None:
+                logger.warning("Stage became None after refresh - aborting")
                 return
+
+            # Log task progress
+            completed_count = len(updated_stage.completed_tasks)
+            pending_count = len(updated_stage.pending_tasks)
+            logger.info(
+                "Stage %d after iteration %d: %d completed, %d pending",
+                updated_stage.number,
+                stage.iteration_count,
+                completed_count,
+                pending_count,
+            )
 
             # Update the loop variable
             stage = updated_stage
 
             if stage.is_complete:
+                logger.info(
+                    "Stage %d COMPLETE after %d iteration(s)",
+                    stage.number,
+                    stage.iteration_count,
+                )
                 yield ClaudeOutput(
                     type=ClaudeOutputType.STDOUT,
                     content=f"  All tasks complete after {stage.iteration_count} iteration(s)",
                 )
                 return
 
+        logger.warning(
+            "Stage %d reached max iterations (%d) without completing",
+            stage.number,
+            self.config.max_iterations,
+        )
         yield ClaudeOutput(
             type=ClaudeOutputType.STDERR,
             content=f"  Max iterations ({self.config.max_iterations}) reached",
@@ -379,8 +432,15 @@ class AutopilotOrchestrator:
         )
         self._claude = ClaudeSubprocess(config)
 
+        logger.debug("Invoking Claude Code with prompt (%d chars)", len(prompt))
+
         try:
             async for output in self._claude.run(prompt):
+                # Log significant outputs
+                if output.type == ClaudeOutputType.ERROR:
+                    logger.error("Claude error output: %s", output.content)
+                elif output.type == ClaudeOutputType.EXIT:
+                    logger.info("Claude session ended: %s (exit code: %s)", output.content, output.exit_code)
                 yield output
         except Exception as e:
             logger.exception("Error running Claude")

@@ -119,15 +119,22 @@ class ClaudeSubprocess:
             options.system_prompt = self.config.system_prompt
 
         logger.info(
-            "Starting Claude SDK execution in %s",
+            "Starting Claude SDK execution in %s with prompt length %d chars",
             self.config.working_directory,
+            len(prompt),
         )
+        logger.debug("Claude prompt: %s", prompt[:500] + "..." if len(prompt) > 500 else prompt)
 
         got_result = False
+        message_count = 0
+        tool_call_count = 0
         try:
             async for message in query(prompt=prompt, options=options):
                 if self._cancelled:
+                    logger.info("Claude execution cancelled by user")
                     break
+
+                message_count += 1
 
                 # Handle different message types
                 if isinstance(message, AssistantMessage):
@@ -136,6 +143,10 @@ class ClaudeSubprocess:
                     for block in content:
                         if isinstance(block, TextBlock):
                             if block.text:
+                                # Log significant text messages (not just whitespace)
+                                text = block.text.strip()
+                                if text:
+                                    logger.info("Claude response: %s", text[:200] + "..." if len(text) > 200 else text)
                                 yield ClaudeOutput(
                                     type=ClaudeOutputType.STDOUT,
                                     content=block.text,
@@ -143,6 +154,10 @@ class ClaudeSubprocess:
                         elif isinstance(block, ToolUseBlock):
                             tool_name = getattr(block, "name", "unknown")
                             tool_input = getattr(block, "input", {}) or {}
+                            tool_call_count += 1
+
+                            logger.info("Claude tool call #%d: %s", tool_call_count, tool_name)
+                            logger.debug("Tool input: %s", tool_input)
 
                             # Format tool call with relevant details
                             detail = self._format_tool_detail(tool_name, tool_input)
@@ -158,6 +173,12 @@ class ClaudeSubprocess:
                     # Final result
                     got_result = True
                     subtype = getattr(message, "subtype", "completed")
+                    logger.info(
+                        "Claude completed with subtype '%s' after %d messages and %d tool calls",
+                        subtype,
+                        message_count,
+                        tool_call_count,
+                    )
                     yield ClaudeOutput(
                         type=ClaudeOutputType.EXIT,
                         content=f"Claude finished: {subtype}",
