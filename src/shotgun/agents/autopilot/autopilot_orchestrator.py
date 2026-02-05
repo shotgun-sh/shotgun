@@ -31,6 +31,12 @@ from shotgun.agents.autopilot.models import (
     StagePhase,
     StageStatus,
 )
+from shotgun.agents.autopilot.prompts import (
+    render_create_pr,
+    render_execute_stage,
+    render_qa_testing,
+    render_review_code,
+)
 from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
 
 logger = logging.getLogger(__name__)
@@ -292,19 +298,12 @@ class AutopilotOrchestrator:
         Yields:
             ClaudeOutput with progress.
         """
-        preamble = self._build_context_preamble()
-        prompt = f"""{preamble}Create a pull request for the work completed in Stage {stage.number}: {stage.name}
-
-Instructions:
-1. First, commit any uncommitted changes with a clear commit message
-2. Push the branch to origin
-3. Use `gh pr create` to create the PR with:
-   - Title: "Stage {stage.number}: {stage.name}"
-   - A description summarizing what was implemented
-   - Base branch: {self.state.base_branch}
-
-Report the PR URL when done.
-"""
+        prompt = render_create_pr(
+            tasks_file_path=self.state.tasks_file_path,
+            stage_number=stage.number,
+            stage_name=stage.name,
+            base_branch=self.state.base_branch,
+        )
         async for output in self._run_claude(prompt):
             yield output
             # Extract PR URL
@@ -320,23 +319,11 @@ Report the PR URL when done.
         Yields:
             ClaudeOutput with review progress.
         """
-        preamble = self._build_context_preamble()
-        prompt = f"""{preamble}Review the code changes for Stage {stage.number}: {stage.name}
-
-Look at the git diff of all changes made and check for:
-1. Code quality issues (unused variables, poor naming, etc.)
-2. Potential bugs or edge cases not handled
-3. Missing error handling
-4. Security issues
-5. Performance concerns
-
-If you find any issues:
-1. Fix them directly
-2. Commit the fixes with message "fix: address review feedback for Stage {stage.number}"
-3. Push the changes
-
-Be thorough but practical - focus on real issues, not style nitpicks.
-"""
+        prompt = render_review_code(
+            tasks_file_path=self.state.tasks_file_path,
+            stage_number=stage.number,
+            stage_name=stage.name,
+        )
         async for output in self._run_claude(prompt):
             yield output
 
@@ -349,45 +336,13 @@ Be thorough but practical - focus on real issues, not style nitpicks.
         Yields:
             ClaudeOutput with test progress.
         """
-        preamble = self._build_context_preamble()
-        prompt = f"""{preamble}Perform manual QA testing for Stage {stage.number}: {stage.name}
-
-DO NOT run unit tests (pytest, jest, etc.) - those are separate.
-
-Instead, do manual verification:
-1. If there's a CLI tool, run it with various inputs
-2. If there's an API, test endpoints with curl or similar
-3. If there's a script, execute it and verify output
-4. Check that files were created/modified as expected
-5. Verify any configuration is correct
-
-If you find bugs:
-1. Fix them
-2. Commit with message "fix: QA fixes for Stage {stage.number}"
-3. Push the changes
-4. Re-test to confirm the fix
-
-Report what you tested and the results.
-"""
+        prompt = render_qa_testing(
+            tasks_file_path=self.state.tasks_file_path,
+            stage_number=stage.number,
+            stage_name=stage.name,
+        )
         async for output in self._run_claude(prompt):
             yield output
-
-    def _build_context_preamble(self) -> str:
-        """Build a preamble that loads project context.
-
-        Returns:
-            Preamble text instructing Claude to load .shotgun/ context.
-        """
-        return f"""First, read these files to understand the project context:
-1. Read {self.state.tasks_file_path} to see all stages and tasks
-2. Read .shotgun/spec.md if it exists to understand the specification
-3. Read .shotgun/plan.md if it exists to understand the implementation plan
-
-This gives you fresh context about the project state.
-
----
-
-"""
 
     def _build_execution_prompt(self, stage: Stage) -> str:
         """Build the prompt for executing stage tasks.
@@ -398,26 +353,13 @@ This gives you fresh context about the project state.
         Returns:
             The formatted prompt.
         """
-        pending = stage.pending_tasks
-        task_list = "\n".join(f"- [ ] {task.text}" for task in pending)
-
-        preamble = self._build_context_preamble()
-
-        return f"""{preamble}Complete the remaining tasks for Stage {stage.number}: {stage.name}
-
-IMPORTANT: Only work on THIS stage's tasks. Do not work ahead.
-
-Remaining tasks:
-{task_list}
-
-Instructions:
-1. Complete each task thoroughly
-2. After completing a task, mark it done in {self.state.tasks_file_path} by changing `- [ ]` to `- [x]`
-3. Commit your changes after completing tasks
-4. Focus on quality - make sure the implementation is correct
-
-You MUST mark tasks as complete in {self.state.tasks_file_path} when done.
-"""
+        pending_tasks = [task.text for task in stage.pending_tasks]
+        return render_execute_stage(
+            tasks_file_path=self.state.tasks_file_path,
+            stage_number=stage.number,
+            stage_name=stage.name,
+            pending_tasks=pending_tasks,
+        )
 
     async def _create_stage_branch(
         self, stage_number: int

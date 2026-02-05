@@ -1,0 +1,12 @@
+{% include 'context_preamble.jinja' %}
+Create a pull request for the work completed in Stage {{ stage_number }}: {{ stage_name }}
+
+Instructions:
+1. First, commit any uncommitted changes with a clear commit message
+2. Push the branch to origin
+3. Use `gh pr create` to create the PR with:
+   - Title: "Stage {{ stage_number }}: {{ stage_name }}"
+   - A description summarizing what was implemented
+   - Base branch: {{ base_branch }}
+
+Report the PR URL when done.

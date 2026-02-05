@@ -1,0 +1,19 @@
+{% include 'context_preamble.jinja' %}
+Perform manual QA testing for Stage {{ stage_number }}: {{ stage_name }}
+
+DO NOT run unit tests (pytest, jest, etc.) - those are separate.
+
+Instead, do manual verification:
+1. If there's a CLI tool, run it with various inputs
+2. If there's an API, test endpoints with curl or similar
+3. If there's a script, execute it and verify output
+4. Check that files were created/modified as expected
+5. Verify any configuration is correct
+
+If you find bugs:
+1. Fix them
+2. Commit with message "fix: QA fixes for Stage {{ stage_number }}"
+3. Push the changes
+4. Re-test to confirm the fix
+
+Report what you tested and the results.
