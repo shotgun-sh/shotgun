@@ -123,7 +123,9 @@ class ClaudeSubprocess:
             self.config.working_directory,
             len(prompt),
         )
-        logger.debug("Claude prompt: %s", prompt[:500] + "..." if len(prompt) > 500 else prompt)
+        logger.debug(
+            "Claude prompt: %s", prompt[:500] + "..." if len(prompt) > 500 else prompt
+        )
 
         got_result = False
         message_count = 0
@@ -146,7 +148,10 @@ class ClaudeSubprocess:
                                 # Log significant text messages (not just whitespace)
                                 text = block.text.strip()
                                 if text:
-                                    logger.info("Claude response: %s", text[:200] + "..." if len(text) > 200 else text)
+                                    logger.info(
+                                        "Claude response: %s",
+                                        text[:200] + "..." if len(text) > 200 else text,
+                                    )
                                 yield ClaudeOutput(
                                     type=ClaudeOutputType.STDOUT,
                                     content=block.text,
@@ -156,7 +161,9 @@ class ClaudeSubprocess:
                             tool_input = getattr(block, "input", {}) or {}
                             tool_call_count += 1
 
-                            logger.info("Claude tool call #%d: %s", tool_call_count, tool_name)
+                            logger.info(
+                                "Claude tool call #%d: %s", tool_call_count, tool_name
+                            )
                             logger.debug("Tool input: %s", tool_input)
 
                             # Format tool call with relevant details

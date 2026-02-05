@@ -216,7 +216,9 @@ class LLMTasksParser:
 
         # Read the file content
         if not file_path.exists():
-            logger.warning("tasks.md not found at %s, keeping original stages", file_path)
+            logger.warning(
+                "tasks.md not found at %s, keeping original stages", file_path
+            )
             return state_stages
 
         try:
@@ -236,12 +238,14 @@ class LLMTasksParser:
 
         # Add Claude's output as context if available
         if claude_output:
-            prompt_parts.extend([
-                "",
-                "## Context from Claude Code's final output:",
-                "(Use this to help understand which tasks were completed)",
-                claude_output[:2000],  # Limit to avoid token issues
-            ])
+            prompt_parts.extend(
+                [
+                    "",
+                    "## Context from Claude Code's final output:",
+                    "(Use this to help understand which tasks were completed)",
+                    claude_output[:2000],  # Limit to avoid token issues
+                ]
+            )
 
         prompt = "\n".join(prompt_parts)
 

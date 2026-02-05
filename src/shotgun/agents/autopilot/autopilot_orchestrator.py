@@ -103,7 +103,9 @@ class AutopilotOrchestrator:
         self._llm_parser = LLMTasksParser(self.config.working_directory)
         self._claude: ClaudeSubprocess | None = None
         self._cancelled = False
-        self._last_claude_output: str | None = None  # Capture Claude's final output for context
+        self._last_claude_output: str | None = (
+            None  # Capture Claude's final output for context
+        )
 
     def validate_prerequisites(self) -> PrerequisiteValidation:
         """Validate that required .shotgun/ files exist before starting.
@@ -157,9 +159,12 @@ class AutopilotOrchestrator:
             "autopilot_validation",
             {
                 "can_proceed": validation.can_proceed,
-                "has_tasks_file": validation.tasks_file.exists and not validation.tasks_file.is_empty,
-                "has_spec_file": validation.spec_file.exists and not validation.spec_file.is_empty,
-                "has_plan_file": validation.plan_file.exists and not validation.plan_file.is_empty,
+                "has_tasks_file": validation.tasks_file.exists
+                and not validation.tasks_file.is_empty,
+                "has_spec_file": validation.spec_file.exists
+                and not validation.spec_file.is_empty,
+                "has_plan_file": validation.plan_file.exists
+                and not validation.plan_file.is_empty,
             },
         )
 
@@ -611,7 +616,11 @@ class AutopilotOrchestrator:
                 if output.type == ClaudeOutputType.ERROR:
                     logger.error("Claude error output: %s", output.content)
                 elif output.type == ClaudeOutputType.EXIT:
-                    logger.info("Claude session ended: %s (exit code: %s)", output.content, output.exit_code)
+                    logger.info(
+                        "Claude session ended: %s (exit code: %s)",
+                        output.content,
+                        output.exit_code,
+                    )
                 yield output
         except Exception as e:
             logger.exception("Error running Claude")

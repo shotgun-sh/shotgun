@@ -245,7 +245,9 @@ class FileStatus(BaseModel):
 
     path: str = Field(description="Path to the file")
     exists: bool = Field(description="Whether the file exists")
-    is_empty: bool = Field(default=True, description="Whether the file is empty or missing")
+    is_empty: bool = Field(
+        default=True, description="Whether the file is empty or missing"
+    )
     size_bytes: int = Field(default=0, description="File size in bytes")
 
 
@@ -256,7 +258,9 @@ class PrerequisiteValidation(BaseModel):
     """
 
     tasks_file: FileStatus = Field(description="Status of tasks.md (REQUIRED)")
-    spec_file: FileStatus = Field(description="Status of specification.md (recommended)")
+    spec_file: FileStatus = Field(
+        description="Status of specification.md (recommended)"
+    )
     plan_file: FileStatus = Field(description="Status of plan.md (recommended)")
 
     @property

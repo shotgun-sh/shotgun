@@ -22,9 +22,7 @@ class AutopilotStartResult(BaseModel):
     mode: AutopilotMode | None = Field(
         default=None, description="Selected execution mode"
     )
-    stages: list[Stage] | None = Field(
-        default=None, description="Stages to execute"
-    )
+    stages: list[Stage] | None = Field(default=None, description="Stages to execute")
 
 
 class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
@@ -163,7 +161,9 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         super().__init__()
         self.stages = stages
         self.error_message = error_message
-        self.is_warning = is_warning and len(stages) > 0  # Warnings only make sense if we have stages
+        self.is_warning = (
+            is_warning and len(stages) > 0
+        )  # Warnings only make sense if we have stages
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
 
     def compose(self) -> ComposeResult:

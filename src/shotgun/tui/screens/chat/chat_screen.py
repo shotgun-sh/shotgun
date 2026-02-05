@@ -2994,7 +2994,9 @@ class ChatScreen(Screen[None]):
                         f"Missing recommended files: {', '.join(validation.missing_recommended)}. "
                         "Consider using Shotgun to create a spec and plan first."
                     )
-                screen = AutopilotStartupScreen(parsed.stages, warning_msg, is_warning=True)
+                screen = AutopilotStartupScreen(
+                    parsed.stages, warning_msg, is_warning=True
+                )
             else:
                 error_msg = "\n".join(parsed.parse_errors)
                 screen = AutopilotStartupScreen([], error_msg, is_warning=False)
