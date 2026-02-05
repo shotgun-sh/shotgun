@@ -238,13 +238,13 @@ def test_autopilot_state_format_stages_summary():
     """Test AutopilotState.format_stages_summary method."""
     stages = [
         Stage(
-            number=1,
+            number="1",
             name="Stage 1",
             status=StageStatus.COMPLETED,
             tasks=[Task(text="Task", completed=True, line_number=1)],
         ),
         Stage(
-            number=2,
+            number="2",
             name="Stage 2",
             status=StageStatus.IN_PROGRESS,
             tasks=[Task(text="Task", completed=False, line_number=2)],
