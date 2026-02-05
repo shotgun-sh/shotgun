@@ -11,8 +11,8 @@ from shotgun.agents.autopilot import (
     AutopilotConfig,
     AutopilotOrchestrator,
     ClaudeOutputType,
-    LLMTasksParser,
 )
+from shotgun.agents.autopilot.lightweight_parser import LightweightTasksParser
 from shotgun.agents.autopilot.models import AutopilotMode, Stage
 from shotgun.tui.screens.autopilot_startup import AutopilotStartupScreen
 
@@ -2972,33 +2972,29 @@ class ChatScreen(Screen[None]):
                     validation.missing_recommended,
                 )
 
-            # Step 2: Use LLM parser for flexible parsing of various markdown formats
-            parser = LLMTasksParser(self.deps.working_directory)
-            parsed = await parser.parse()
+            # Step 2: Use lightweight status parser for fast initial load
+            parser = LightweightTasksParser(self.deps.working_directory)
+            stages = await parser.parse_status()
 
             logger.info(
-                "Autopilot: LLM parsed tasks.md - valid=%s, stages=%d, errors=%s",
-                parsed.is_valid,
-                len(parsed.stages),
-                parsed.parse_errors,
+                "Autopilot: Status parser found %d stages",
+                len(stages),
             )
 
             # Stop spinner before showing modal
             self.processing_state.stop_processing()
 
             # Show full-screen modal with warning about missing recommended files
-            if parsed.is_valid:
+            if stages:
                 warning_msg = None
                 if validation.missing_recommended:
                     warning_msg = (
                         f"Missing recommended files: {', '.join(validation.missing_recommended)}. "
                         "Consider using Shotgun to create a spec and plan first."
                     )
-                screen = AutopilotStartupScreen(
-                    parsed.stages, warning_msg, is_warning=True
-                )
+                screen = AutopilotStartupScreen(stages, warning_msg, is_warning=True)
             else:
-                error_msg = "\n".join(parsed.parse_errors)
+                error_msg = "No stages found in tasks.md"
                 screen = AutopilotStartupScreen([], error_msg, is_warning=False)
 
             result = await self.app.push_screen_wait(screen)
