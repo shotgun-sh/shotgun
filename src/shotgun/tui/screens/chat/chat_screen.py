@@ -7,9 +7,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from shotgun.agents.autopilot import (
+    AutopilotConfig,
+    AutopilotOrchestrator,
+    ClaudeOutputType,
+    LLMTasksParser,
+)
+from shotgun.agents.autopilot.models import AutopilotMode, Stage
+from shotgun.tui.screens.autopilot_startup import AutopilotStartupScreen
+
 if TYPE_CHECKING:
-    from shotgun.agents.autopilot import AutopilotOrchestrator
-    from shotgun.agents.autopilot.models import AutopilotMode, Stage
     from shotgun.agents.constants import FileContent
     from shotgun.agents.router.models import ExecutionStep
 
@@ -2926,13 +2933,6 @@ class ChatScreen(Screen[None]):
     @work(exclusive=True)
     async def _async_parse_and_show_autopilot(self) -> None:
         """Async worker to parse tasks.md using LLM parser and show startup screen."""
-        from shotgun.agents.autopilot import (
-            AutopilotConfig,
-            AutopilotOrchestrator,
-            LLMTasksParser,
-        )
-        from shotgun.tui.screens.autopilot_startup import AutopilotStartupScreen
-
         try:
             # Step 1: Validate prerequisites before doing any LLM parsing
             config = AutopilotConfig(working_directory=self.deps.working_directory)
@@ -3010,8 +3010,6 @@ class ChatScreen(Screen[None]):
                 )
 
                 # Track autopilot started (no PII - just counts and mode)
-                from shotgun.posthog_telemetry import track_event
-
                 total_tasks = sum(len(s.tasks) for s in result.stages)
                 completed_tasks = sum(len(s.completed_tasks) for s in result.stages)
                 track_event(
@@ -3062,13 +3060,6 @@ class ChatScreen(Screen[None]):
             stages: List of stages (with current state).
             feedback: Optional feedback from user rejection.
         """
-        from shotgun.agents.autopilot import (
-            AutopilotConfig,
-            AutopilotMode,
-            AutopilotOrchestrator,
-            ClaudeOutputType,
-        )
-
         # Create or reuse orchestrator
         if self._autopilot_orchestrator is None:
             config = AutopilotConfig(
@@ -3149,8 +3140,6 @@ Then confirm what you changed.
     @on(AutopilotOutputReceived)
     def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
         """Handle output from Claude Code subprocess."""
-        from shotgun.agents.autopilot.models import ClaudeOutputType
-
         output = event.output
         content = output.content.strip()
 

@@ -311,3 +311,31 @@ class ClaudeOutput(BaseModel):
         default_factory=datetime.now, description="When this output was received"
     )
     exit_code: int | None = Field(default=None, description="Exit code if type is EXIT")
+
+
+# LLM Parser models (used for structured output parsing of tasks.md)
+
+
+class ParsedTask(BaseModel):
+    """A parsed task from the markdown file (LLM parser output)."""
+
+    text: str = Field(description="The task description text")
+    completed: bool = Field(
+        description="Whether the task is marked complete ([x] or [X])"
+    )
+
+
+class ParsedStage(BaseModel):
+    """A parsed stage from the markdown file (LLM parser output)."""
+
+    number: int = Field(description="Stage number (e.g., 1, 2, 3)")
+    name: str = Field(description="Stage name/title")
+    tasks: list[ParsedTask] = Field(description="List of tasks in this stage")
+
+
+class ParsedTasksOutput(BaseModel):
+    """Structured output from the LLM parser."""
+
+    stages: list[ParsedStage] = Field(
+        description="All stages found in the file, in order"
+    )

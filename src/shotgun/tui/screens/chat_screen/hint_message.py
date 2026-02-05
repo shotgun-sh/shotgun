@@ -115,8 +115,12 @@ class HintMessageWidget(Widget):
             self.add_class("compact")
 
     def compose(self) -> ComposeResult:
-        # Main message markdown
-        yield Markdown(markdown=f"{self.message.message}")
+        # Use Static for compact mode (supports Rich markup like [dim]...[/])
+        # Use Markdown for regular mode
+        if self.message.compact:
+            yield Static(self.message.message)
+        else:
+            yield Markdown(markdown=f"{self.message.message}")
 
         # Optional email copy section
         if self.message.email:

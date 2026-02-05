@@ -34,41 +34,50 @@ class StageApprovalWidget(Widget):
         StageApprovalWidget {
             background: $surface;
             height: auto;
-            margin: 0 1;
+            margin: 1 2;
             padding: 1 2;
-            border: solid $success;
+            border: tall $success;
+        }
+
+        StageApprovalWidget .approval-content {
+            width: 100%;
+            height: auto;
         }
 
         StageApprovalWidget .approval-header {
             text-align: center;
-            margin-bottom: 1;
+            text-style: bold;
+            color: $success;
+            padding-bottom: 1;
         }
 
         StageApprovalWidget .stage-info {
-            margin-bottom: 1;
+            text-align: center;
+            color: $text;
         }
 
         StageApprovalWidget .pr-link {
-            color: $primary;
-            text-style: bold;
-            margin: 1 0;
+            text-align: center;
+            color: $text-muted;
+            padding: 0;
         }
 
         StageApprovalWidget .next-preview {
+            text-align: center;
             color: $text-muted;
-            margin-top: 1;
+            padding-top: 1;
         }
 
         StageApprovalWidget .button-row {
             height: auto;
             width: 100%;
             align: center middle;
-            margin-top: 1;
+            padding-top: 1;
         }
 
         StageApprovalWidget Button {
-            margin: 0 2;
-            min-width: 16;
+            margin: 0 1;
+            min-width: 20;
         }
 
         StageApprovalWidget #btn-accept {
@@ -80,13 +89,19 @@ class StageApprovalWidget(Widget):
         }
 
         StageApprovalWidget #btn-stop {
-            background: $error;
+            background: $error-darken-1;
         }
 
         StageApprovalWidget .all-done {
             color: $success;
             text-style: bold;
             text-align: center;
+        }
+
+        StageApprovalWidget .shortcut-hint {
+            text-align: center;
+            color: $text-muted;
+            padding-top: 1;
         }
     """
 
@@ -103,52 +118,64 @@ class StageApprovalWidget(Widget):
 
     def compose(self) -> ComposeResult:
         """Compose the approval widget layout."""
-        with Vertical():
+        with Vertical(classes="approval-content"):
             # Header
             yield Static(
-                f"[bold]Stage {self.completed_stage.number} Complete[/bold]",
+                f"✅ Stage {self.completed_stage.number} Complete",
                 classes="approval-header",
             )
 
             # Stage info
             yield Static(
-                f"{self.completed_stage.name} - "
+                f"{self.completed_stage.name} — "
                 f"{self.completed_stage.completed_count}/{self.completed_stage.task_count} tasks done",
                 classes="stage-info",
             )
 
-            # PR Link (prominent)
+            # PR Link
             if self.completed_stage.pr_url:
                 yield Static(
-                    f"PR: {self.completed_stage.pr_url}",
+                    f"[link={self.completed_stage.pr_url}]{self.completed_stage.pr_url}[/link]",
                     classes="pr-link",
                 )
             else:
                 yield Static(
-                    "[dim]No PR created[/dim]",
+                    "[dim]No PR created (local only)[/dim]",
                     classes="pr-link",
                 )
 
             # Next stage preview
             if self.next_stage:
                 yield Static(
-                    f"[dim]Next: Stage {self.next_stage.number}: {self.next_stage.name}[/dim]",
+                    f"Next: Stage {self.next_stage.number} — {self.next_stage.name}",
                     classes="next-preview",
                 )
             else:
                 yield Static(
-                    "[green]This is the final stage![/green]",
+                    "🎉 This is the final stage!",
                     classes="all-done",
                 )
 
             # Buttons
             with Horizontal(classes="button-row"):
                 if self.next_stage:
-                    yield Button("Accept", id="btn-accept", variant="success")
-                    yield Button("Reject", id="btn-reject", variant="warning")
+                    yield Button(
+                        f"Continue to Stage {self.next_stage.number}",
+                        id="btn-accept",
+                        variant="success",
+                    )
+                    yield Button("Request Changes", id="btn-reject", variant="warning")
+                    yield Button("Exit Autopilot", id="btn-stop", variant="error")
                 else:
-                    # Final stage - just Done button
-                    yield Button("Done", id="btn-accept", variant="success")
+                    # Final stage - just Finish button
+                    yield Button("Finish Autopilot", id="btn-accept", variant="success")
+                    yield Button("Exit", id="btn-stop", variant="error")
+
+            # Shortcut hints
+            yield Static(
+                "[dim]Press [bold]Enter[/] to continue, [bold]R[/] to request changes, [bold]Esc[/] to exit[/]",
+                classes="shortcut-hint",
+            )
 
     def on_mount(self) -> None:
         """Focus the Accept button on mount."""
@@ -178,11 +205,11 @@ class StageApprovalWidget(Widget):
         """Handle keyboard shortcuts.
 
         Shortcuts:
-            A/Enter: Accept
-            R: Reject
-            Escape: Stop
+            Enter: Accept/Continue
+            R: Request changes (Reject)
+            Escape: Stop/Exit autopilot
         """
-        if event.key in ("a", "A", "enter"):
+        if event.key == "enter":
             self.post_message(AutopilotAccept())
             event.stop()
         elif event.key in ("r", "R"):

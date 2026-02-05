@@ -4,8 +4,7 @@ This screen displays when the user invokes /autopilot, allowing them
 to select the execution mode and preview stages before starting.
 """
 
-from dataclasses import dataclass
-
+from pydantic import BaseModel, Field
 from textual import events, on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
@@ -16,13 +15,16 @@ from textual.widgets import Button, RadioButton, RadioSet, Static
 from shotgun.agents.autopilot.models import AutopilotMode, Stage
 
 
-@dataclass
-class AutopilotStartResult:
+class AutopilotStartResult(BaseModel):
     """Result from the autopilot startup screen."""
 
-    started: bool
-    mode: AutopilotMode | None = None
-    stages: list[Stage] | None = None
+    started: bool = Field(description="Whether the user started the autopilot")
+    mode: AutopilotMode | None = Field(
+        default=None, description="Selected execution mode"
+    )
+    stages: list[Stage] | None = Field(
+        default=None, description="Stages to execute"
+    )
 
 
 class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):

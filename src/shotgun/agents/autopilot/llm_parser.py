@@ -7,39 +7,18 @@ tasks.md files more flexibly than regex patterns.
 import logging
 from pathlib import Path
 
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
-from shotgun.agents.autopilot.models import Stage, StageStatus, Task
+from shotgun.agents.autopilot.models import (
+    ParsedTasksOutput,
+    Stage,
+    StageStatus,
+    Task,
+)
 from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile
 from shotgun.agents.config import get_provider_model
 
 logger = logging.getLogger(__name__)
-
-
-class ParsedTask(BaseModel):
-    """A parsed task from the markdown file."""
-
-    text: str = Field(description="The task description text")
-    completed: bool = Field(
-        description="Whether the task is marked complete ([x] or [X])"
-    )
-
-
-class ParsedStage(BaseModel):
-    """A parsed stage from the markdown file."""
-
-    number: int = Field(description="Stage number (e.g., 1, 2, 3)")
-    name: str = Field(description="Stage name/title")
-    tasks: list[ParsedTask] = Field(description="List of tasks in this stage")
-
-
-class ParsedTasksOutput(BaseModel):
-    """Structured output from the LLM parser."""
-
-    stages: list[ParsedStage] = Field(
-        description="All stages found in the file, in order"
-    )
 
 
 PARSER_SYSTEM_PROMPT = """You are a markdown parser that extracts stages and tasks from a tasks.md file.
