@@ -248,7 +248,7 @@ async def create_base_agent(
 
         # Set flag for Context7 availability (used in system prompt template)
         if mcp_servers:
-            deps._has_context7 = True  # type: ignore[attr-defined]
+            deps.has_context7 = True
 
     except Exception as e:
         logger.warning("Failed to load configured model, using fallback: %s", e)
@@ -578,7 +578,7 @@ def build_agent_system_prompt(
     supports_images = model_config.supports_images if model_config else True
 
     # Check if Context7 MCP server is available (for research agent prompt)
-    has_context7 = getattr(ctx.deps, "_has_context7", False)
+    has_context7 = ctx.deps.has_context7
 
     template_context = AgentSystemPromptContext(
         interactive_mode=ctx.deps.interactive_mode,

@@ -421,6 +421,11 @@ class AgentDeps(AgentRuntimeOptions):
         description="Count of web searches performed in this agent session",
     )
 
+    has_context7: bool = Field(
+        default=False,
+        description="Whether Context7 MCP server is available for documentation lookup",
+    )
+
 
 # Rebuild model to resolve forward references after imports are available
 try:

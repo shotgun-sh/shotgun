@@ -7,6 +7,8 @@ from shotgun.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+CONTEXT7_MCP_URL = "https://mcp.context7.com/mcp"
+
 
 async def get_context7_mcp_server() -> MCPServerHTTP | None:
     """Get Context7 MCP server if API key is configured.
@@ -22,7 +24,7 @@ async def get_context7_mcp_server() -> MCPServerHTTP | None:
 
     logger.info("Context7 MCP server configured for documentation lookup")
     return MCPServerHTTP(
-        "https://mcp.context7.com/mcp",
+        CONTEXT7_MCP_URL,
         headers={"CONTEXT7_API_KEY": api_key},
         tool_prefix="context7",
     )

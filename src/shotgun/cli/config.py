@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from shotgun.agents.config import ProviderType, get_config_manager
+from shotgun.agents.config.constants import ConfigSection
 from shotgun.logging_config import get_logger
 from shotgun.utils.env_utils import is_shotgun_account_enabled
 
@@ -222,19 +223,21 @@ def _show_provider_config(provider: ProviderType, config: Any) -> None:
 
 def _mask_secrets(data: dict[str, Any]) -> None:
     """Mask secrets in configuration data."""
-    providers = ["openai", "anthropic", "google"]
+    sections = [
+        ConfigSection.OPENAI.value,
+        ConfigSection.ANTHROPIC.value,
+        ConfigSection.GOOGLE.value,
+        ConfigSection.CONTEXT7.value,
+    ]
 
     # Only mask shotgun if feature flag is enabled
     if is_shotgun_account_enabled():
-        providers.append("shotgun")
+        sections.append(ConfigSection.SHOTGUN.value)
 
-    # Always mask context7
-    providers.append("context7")
-
-    for provider in providers:
-        if provider in data and isinstance(data[provider], dict):
-            if "api_key" in data[provider] and data[provider]["api_key"]:
-                data[provider]["api_key"] = _mask_value(data[provider]["api_key"])
+    for section in sections:
+        if section in data and isinstance(data[section], dict):
+            if "api_key" in data[section] and data[section]["api_key"]:
+                data[section]["api_key"] = _mask_value(data[section]["api_key"])
 
 
 def _mask_value(value: str) -> str:
