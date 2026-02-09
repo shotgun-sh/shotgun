@@ -127,6 +127,32 @@ def test_stage_task_count():
     assert stage.completed_count == 1
 
 
+def test_stage_task_count_override():
+    """Test Stage.task_count and completed_count with override fields."""
+    # Test with empty tasks but override counts (lightweight parser use case)
+    stage = Stage(
+        number="1",
+        name="Test Stage",
+        tasks=[],  # No tasks loaded
+        task_count_override=10,
+        completed_count_override=7,
+    )
+
+    assert stage.task_count == 10  # Uses override
+    assert stage.completed_count == 7  # Uses override
+
+    # Test that normal computation still works when override not set
+    tasks = [
+        Task(text="Task 1", completed=False, line_number=10),
+        Task(text="Task 2", completed=True, line_number=11),
+        Task(text="Task 3", completed=True, line_number=12),
+    ]
+    stage_normal = Stage(number="2", name="Normal Stage", tasks=tasks)
+
+    assert stage_normal.task_count == 3  # Computed from tasks
+    assert stage_normal.completed_count == 2  # Computed from tasks
+
+
 def test_stage_format_task_list():
     """Test Stage.format_task_list method."""
     tasks = [

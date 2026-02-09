@@ -34,6 +34,10 @@ class ParsedStageStatus(BaseModel):
     status: StageCompletionStatus = Field(
         description="not_started if no tasks done, in_progress if some done, completed if all done"
     )
+    total_tasks: int = Field(description="Total number of tasks in this stage")
+    completed_tasks: int = Field(
+        description="Number of completed tasks (checkboxes with [x] or [X])"
+    )
 
 
 class ParsedStagesStatus(BaseModel):
@@ -61,17 +65,19 @@ STATUS_PARSER_PROMPT = """You are a markdown parser that extracts stage informat
 
 Your job is to:
 1. Find all stages (marked with ## Stage N: or ### Stage N: headers)
-2. For each stage, determine its status based on task completion
-3. Return the stage number, name, and status
+2. For each stage, count total tasks and completed tasks
+3. Determine the stage status based on task completion
+4. Return the stage number, name, status, and task counts
 
 Rules:
 - Stage headers contain "Stage" followed by an identifier and name
 - Tasks are checkboxes: - [ ] (incomplete) or - [x]/- [X] (complete)
+- Count ALL checkbox tasks under each stage (until the next stage header)
 - Status determination:
   * "not_started" if ALL tasks are incomplete (all [ ])
   * "in_progress" if SOME tasks are complete (mix of [x] and [ ])
   * "completed" if ALL tasks are complete (all [x])
-- Be precise with status determination
+- Be precise with task counts and status determination
 - Preserve exact stage identifiers (can be numeric or alphanumeric)"""
 
 SINGLE_STAGE_PARSER_PROMPT = """You are a markdown parser that extracts tasks from a SINGLE stage in a tasks.md file.
@@ -187,6 +193,8 @@ class LightweightTasksParser:
                 name=parsed_stage.name,
                 tasks=[],  # No individual tasks in status parse
                 status=stage_status,
+                task_count_override=parsed_stage.total_tasks,
+                completed_count_override=parsed_stage.completed_tasks,
             )
             stages.append(stage)
 
