@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import webbrowser
 from typing import TYPE_CHECKING, cast
 
@@ -534,25 +533,18 @@ class ProviderConfigScreen(Screen[None]):
         detected_tier: int | None = None
         should_warn_tier1 = False
 
-        if self.selected_provider == "anthropic":
-            # Check test mode
-            if os.environ.get("SHOTGUN_ANTHROPIC_TIER1", "").lower() == "true":
-                detected_tier = 1
-                should_warn_tier1 = True
-                status_label.update("🔍 Tier 1 detected (test mode)...")
-            else:
-                # Show detection in progress
-                status_label.update("🔍 Detecting API tier...")
+        if self.selected_provider == ProviderType.ANTHROPIC:
+            status_label.update("🔍 Detecting API tier...")
 
-                try:
-                    tier_enum, rate_limits = detect_anthropic_tier(api_key)
-                    detected_tier = (
-                        int(tier_enum) if tier_enum != AnthropicTier.UNKNOWN else -1
-                    )
-                    should_warn_tier1 = tier_enum == AnthropicTier.TIER_1
-                except Exception as exc:
-                    logger.warning(f"Failed to detect tier: {exc}")
-                    detected_tier = -1  # Mark as failed, don't block
+            try:
+                tier_enum, rate_limits = await detect_anthropic_tier(api_key)
+                detected_tier = (
+                    int(tier_enum) if tier_enum != AnthropicTier.UNKNOWN else -1
+                )
+                should_warn_tier1 = tier_enum == AnthropicTier.TIER_1
+            except Exception as exc:
+                logger.warning(f"Failed to detect tier: {exc}")
+                detected_tier = -1  # Mark as failed, don't block
 
             # Save tier to config
             try:

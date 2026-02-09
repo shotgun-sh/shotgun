@@ -5,10 +5,10 @@ and extracting tier information from response headers.
 """
 
 import os
-from dataclasses import dataclass
 from enum import IntEnum
 
 import httpx
+from pydantic import BaseModel
 
 from shotgun.logging_config import get_logger
 
@@ -25,8 +25,7 @@ class AnthropicTier(IntEnum):
     UNKNOWN = -1
 
 
-@dataclass
-class RateLimitInfo:
+class RateLimitInfo(BaseModel):
     """Rate limit information extracted from API response headers."""
 
     requests_limit: int | None = None
@@ -148,7 +147,7 @@ def detect_tier_from_limits(
     return AnthropicTier.UNKNOWN
 
 
-def detect_anthropic_tier(api_key: str) -> tuple[AnthropicTier, RateLimitInfo]:
+async def detect_anthropic_tier(api_key: str) -> tuple[AnthropicTier, RateLimitInfo]:
     """Detect Anthropic API tier by making a minimal request.
 
     Makes the cheapest possible API request (Haiku with 1 output token)
@@ -184,9 +183,9 @@ def detect_anthropic_tier(api_key: str) -> tuple[AnthropicTier, RateLimitInfo]:
         "messages": [{"role": "user", "content": "Hi"}],
     }
 
-    # Make the request
-    with httpx.Client() as client:
-        response = client.post(url, headers=headers, json=payload, timeout=30.0)
+    # Make the request asynchronously to avoid blocking the event loop
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, headers=headers, json=payload, timeout=30.0)
         response.raise_for_status()
 
     # Extract rate limits from response headers
