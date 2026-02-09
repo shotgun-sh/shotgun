@@ -566,7 +566,11 @@ class ConfigManager:
                     provider_config.supports_streaming = None
 
         # Support tier updates for Anthropic
-        if "tier" in kwargs and not is_shotgun and provider_enum == ProviderType.ANTHROPIC:
+        if (
+            "tier" in kwargs
+            and not is_shotgun
+            and provider_enum == ProviderType.ANTHROPIC
+        ):
             if isinstance(provider_config, AnthropicConfig):
                 provider_config.tier = kwargs["tier"]
 
