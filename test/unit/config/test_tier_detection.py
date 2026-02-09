@@ -3,7 +3,7 @@
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import anthropic
 import pytest
 
 from shotgun.agents.config.tier_detection import (
@@ -187,15 +187,20 @@ async def test_detect_tier_successful():
         "anthropic-ratelimit-input-tokens-limit": "450000",
         "anthropic-ratelimit-output-tokens-limit": "90000",
     }
-    mock_response.raise_for_status = MagicMock()
 
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_with_raw_response = AsyncMock()
+    mock_with_raw_response.create = AsyncMock(return_value=mock_response)
 
-    with patch("shotgun.agents.config.tier_detection.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+    mock_messages = MagicMock()
+    mock_messages.with_raw_response = mock_with_raw_response
 
+    mock_client = MagicMock()
+    mock_client.messages = mock_messages
+
+    with patch(
+        "shotgun.agents.config.tier_detection.anthropic.AsyncAnthropic",
+        return_value=mock_client,
+    ):
         tier, limits = await detect_anthropic_tier("test-api-key")
 
     assert tier == AnthropicTier.TIER_2
@@ -206,14 +211,22 @@ async def test_detect_tier_successful():
 @pytest.mark.asyncio
 async def test_detect_tier_network_error():
     """Test network error raises exception."""
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(side_effect=httpx.ConnectError("Network error"))
+    mock_with_raw_response = AsyncMock()
+    mock_with_raw_response.create = AsyncMock(
+        side_effect=anthropic.APIConnectionError(request=MagicMock())
+    )
 
-    with patch("shotgun.agents.config.tier_detection.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+    mock_messages = MagicMock()
+    mock_messages.with_raw_response = mock_with_raw_response
 
-        with pytest.raises(httpx.ConnectError):
+    mock_client = MagicMock()
+    mock_client.messages = mock_messages
+
+    with patch(
+        "shotgun.agents.config.tier_detection.anthropic.AsyncAnthropic",
+        return_value=mock_client,
+    ):
+        with pytest.raises(anthropic.APIConnectionError):
             await detect_anthropic_tier("test-api-key")
 
 
@@ -221,20 +234,29 @@ async def test_detect_tier_network_error():
 async def test_detect_tier_api_error():
     """Test API error raises exception."""
     mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock(
-        side_effect=httpx.HTTPStatusError(
-            "Unauthorized", request=MagicMock(), response=MagicMock()
+    mock_response.status_code = 401
+    mock_response.json.return_value = {"error": {"message": "Unauthorized"}}
+
+    mock_with_raw_response = AsyncMock()
+    mock_with_raw_response.create = AsyncMock(
+        side_effect=anthropic.AuthenticationError(
+            message="Unauthorized",
+            response=mock_response,
+            body={"error": {"message": "Unauthorized"}},
         )
     )
 
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_messages = MagicMock()
+    mock_messages.with_raw_response = mock_with_raw_response
 
-    with patch("shotgun.agents.config.tier_detection.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+    mock_client = MagicMock()
+    mock_client.messages = mock_messages
 
-        with pytest.raises(httpx.HTTPStatusError):
+    with patch(
+        "shotgun.agents.config.tier_detection.anthropic.AsyncAnthropic",
+        return_value=mock_client,
+    ):
+        with pytest.raises(anthropic.AuthenticationError):
             await detect_anthropic_tier("test-api-key")
 
 
@@ -243,15 +265,20 @@ async def test_detect_tier_missing_headers_returns_unknown():
     """Test missing rate limit headers returns UNKNOWN tier."""
     mock_response = MagicMock()
     mock_response.headers = {}
-    mock_response.raise_for_status = MagicMock()
 
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_with_raw_response = AsyncMock()
+    mock_with_raw_response.create = AsyncMock(return_value=mock_response)
 
-    with patch("shotgun.agents.config.tier_detection.httpx.AsyncClient") as mock_cls:
-        mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+    mock_messages = MagicMock()
+    mock_messages.with_raw_response = mock_with_raw_response
 
+    mock_client = MagicMock()
+    mock_client.messages = mock_messages
+
+    with patch(
+        "shotgun.agents.config.tier_detection.anthropic.AsyncAnthropic",
+        return_value=mock_client,
+    ):
         tier, limits = await detect_anthropic_tier("test-api-key")
 
     assert tier == AnthropicTier.UNKNOWN

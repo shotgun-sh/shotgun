@@ -7,7 +7,7 @@ and extracting tier information from response headers.
 import os
 from enum import IntEnum
 
-import httpx
+import anthropic
 from pydantic import BaseModel
 
 from shotgun.logging_config import get_logger
@@ -169,24 +169,13 @@ async def detect_anthropic_tier(api_key: str) -> tuple[AnthropicTier, RateLimitI
         logger.info("SHOTGUN_ANTHROPIC_TIER1=true detected, simulating Tier 1")
         return AnthropicTier.TIER_1, RateLimitInfo(requests_limit=50)
 
-    # Use httpx directly to access response headers
-    # The Anthropic SDK doesn't expose headers easily
-    url = "https://api.anthropic.com/v1/messages"
-    headers = {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "X-Api-Key": api_key,
-    }
-    payload = {
-        "model": "claude-haiku-4-5",
-        "max_tokens": 1,
-        "messages": [{"role": "user", "content": "Hi"}],
-    }
-
-    # Make the request asynchronously to avoid blocking the event loop
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=payload, timeout=30.0)
-        response.raise_for_status()
+    # Use the Anthropic SDK with with_raw_response to access headers
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    response = await client.messages.with_raw_response.create(
+        model="claude-haiku-4-5",
+        max_tokens=1,
+        messages=[{"role": "user", "content": "Hi"}],
+    )
 
     # Extract rate limits from response headers
     rate_limits = extract_rate_limits_from_headers(dict(response.headers))
