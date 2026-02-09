@@ -67,7 +67,8 @@ class ChatHistory(Widget):
                 elif isinstance(item, HintMessage):
                     yield HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
-                    yield AgentResponseWidget(item)
+                    is_sub_agent = getattr(item, "_shotgun_is_sub_agent", False)
+                    yield AgentResponseWidget(item, is_sub_agent=is_sub_agent)
             yield PartialResponseWidget(None).data_bind(
                 item=ChatHistory.partial_response
             )
@@ -135,7 +136,8 @@ class ChatHistory(Widget):
                 elif isinstance(item, HintMessage):
                     widget = HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
-                    widget = AgentResponseWidget(item)
+                    is_sub_agent = getattr(item, "_shotgun_is_sub_agent", False)
+                    widget = AgentResponseWidget(item, is_sub_agent=is_sub_agent)
                 else:
                     logger.debug(
                         "[CHAT_HISTORY] Skipping unknown message type: %s",

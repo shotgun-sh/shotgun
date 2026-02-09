@@ -11,7 +11,7 @@ from .agent_response import AgentResponseWidget
 from .user_question import UserQuestionWidget
 
 
-class PartialResponseWidget(Widget):  # TODO: doesn't work lol
+class PartialResponseWidget(Widget):
     """Widget that displays a streaming/partial response in the chat history."""
 
     DEFAULT_CSS = """
