@@ -53,7 +53,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 7
+CURRENT_CONFIG_VERSION = 8
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -228,6 +228,27 @@ def _migrate_v6_to_v7(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v7_to_v8(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 7 to version 8.
+
+    Changes:
+    - Add 'tier' field to anthropic config
+
+    Args:
+        data: Config data dict at version 7
+
+    Returns:
+        Modified config data dict at version 8
+    """
+    if "anthropic" in data and isinstance(data["anthropic"], dict):
+        if "tier" not in data["anthropic"]:
+            data["anthropic"]["tier"] = None
+            logger.info("Migrated config v7->v8: added tier to anthropic configuration")
+
+    data["config_version"] = 8
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -250,6 +271,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         4: _migrate_v4_to_v5,
         5: _migrate_v5_to_v6,
         6: _migrate_v6_to_v7,
+        7: _migrate_v7_to_v8,
     }
 
     # Apply migrations sequentially
@@ -520,7 +542,7 @@ class ConfigManager:
 
         Args:
             provider: Provider to update
-            **kwargs: Configuration fields to update (only api_key supported)
+            **kwargs: Configuration fields to update (api_key and tier supported)
         """
         config = await self.load()
 
@@ -543,8 +565,13 @@ class ConfigManager:
                 if isinstance(provider_config, OpenAIConfig):
                     provider_config.supports_streaming = None
 
+        # Support tier updates for Anthropic
+        if "tier" in kwargs and not is_shotgun and provider_enum == ProviderType.ANTHROPIC:
+            if isinstance(provider_config, AnthropicConfig):
+                provider_config.tier = kwargs["tier"]
+
         # Reject other fields
-        unsupported_fields = set(kwargs.keys()) - {API_KEY_FIELD}
+        unsupported_fields = set(kwargs.keys()) - {API_KEY_FIELD, "tier"}
         if unsupported_fields:
             raise ValueError(f"Unsupported configuration fields: {unsupported_fields}")
 

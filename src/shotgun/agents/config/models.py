@@ -224,6 +224,10 @@ class AnthropicConfig(BaseModel):
     """Configuration for Anthropic provider."""
 
     api_key: SecretStr | None = None
+    tier: int | None = Field(
+        default=None,
+        description="Detected API tier (1-4). None if not detected, -1 if failed.",
+    )
 
 
 class GoogleConfig(BaseModel):

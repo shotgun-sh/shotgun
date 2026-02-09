@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import webbrowser
 from typing import TYPE_CHECKING, cast
 
@@ -25,6 +26,8 @@ from textual.widgets import (
 )
 
 from shotgun.agents.config import ConfigManager, ProviderType
+from shotgun.agents.config.tier_detection import AnthropicTier, detect_anthropic_tier
+from shotgun.logging_config import get_logger
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.services.ollama import (
     OLLAMA_DOWNLOAD_URL,
@@ -32,8 +35,12 @@ from shotgun.tui.services.ollama import (
     get_ollama_status,
 )
 
+from .tier1_warning_modal import Tier1WarningModal
+
 if TYPE_CHECKING:
     from ..app import ShotgunApp
+
+logger = get_logger(__name__)
 
 
 def get_configurable_providers() -> list[str]:
@@ -523,13 +530,60 @@ class ProviderConfigScreen(Screen[None]):
             status_label.add_class("error")
             return
 
+        # Detect tier for Anthropic keys
+        detected_tier: int | None = None
+        should_warn_tier1 = False
+
+        if self.selected_provider == "anthropic":
+            # Check test mode
+            if os.environ.get("SHOTGUN_ANTHROPIC_TIER1", "").lower() == "true":
+                detected_tier = 1
+                should_warn_tier1 = True
+                status_label.update("🔍 Tier 1 detected (test mode)...")
+            else:
+                # Show detection in progress
+                status_label.update("🔍 Detecting API tier...")
+
+                try:
+                    tier_enum, rate_limits = detect_anthropic_tier(api_key)
+                    detected_tier = (
+                        int(tier_enum) if tier_enum != AnthropicTier.UNKNOWN else -1
+                    )
+                    should_warn_tier1 = tier_enum == AnthropicTier.TIER_1
+                except Exception as exc:
+                    logger.warning(f"Failed to detect tier: {exc}")
+                    detected_tier = -1  # Mark as failed, don't block
+
+            # Save tier to config
+            try:
+                await self.config_manager.update_provider(
+                    self.selected_provider, tier=detected_tier
+                )
+            except Exception as exc:
+                logger.warning(f"Failed to save tier to config: {exc}")
+
         input_widget.value = ""
         await self.refresh_provider_status()
         await self._update_done_button_visibility()
-        status_label.update(
-            f"✓ Saved API key for {self._provider_display_name(self.selected_provider)}."
-        )
+
+        # Update status with tier info
+        if detected_tier == -1:
+            status_label.update(
+                "✓ Saved. (Tier detection failed - will retry on first use)"
+            )
+        elif detected_tier:
+            status_label.update(
+                f"✓ Saved API key for {self._provider_display_name(self.selected_provider)} (Tier {detected_tier})."
+            )
+        else:
+            status_label.update(
+                f"✓ Saved API key for {self._provider_display_name(self.selected_provider)}."
+            )
         status_label.remove_class("error")
+
+        # Show Tier 1 warning modal (blocking)
+        if should_warn_tier1:
+            await self.app.push_screen_wait(Tier1WarningModal())
 
     def _clear_api_key(self) -> None:
         self.run_worker(self._do_clear_api_key(), exclusive=True)
