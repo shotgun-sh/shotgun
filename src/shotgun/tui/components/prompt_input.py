@@ -36,6 +36,12 @@ class PromptInput(TextArea):
 
     def on_key(self, event: events.Key) -> None:
         """Handle key presses for special actions."""
+        # Guard against backspace/delete on empty input to prevent crash
+        if event.key in ("backspace", "delete") and not self.text:
+            event.stop()
+            event.prevent_default()
+            return
+
         # Submit on Enter
         if event.key == "enter":
             event.stop()

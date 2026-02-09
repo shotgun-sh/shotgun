@@ -97,6 +97,74 @@ async def test_slash_in_whitespace_only_input_posts_open_command_palette() -> No
         assert isinstance(messages_received[0], PromptInput.OpenCommandPalette)
 
 
+async def test_backspace_on_empty_input_does_not_crash() -> None:
+    """Test that pressing backspace on empty input is safely handled."""
+
+    class TestApp(App):
+        def compose(self):
+            yield PromptInput()
+
+    async with TestApp().run_test() as pilot:
+        prompt_input = pilot.app.query_one(PromptInput)
+        prompt_input.focus()
+
+        # Press backspace on empty input - should not crash
+        await pilot.press("backspace")
+        assert prompt_input.text == ""
+
+        # Press delete on empty input - should not crash
+        await pilot.press("delete")
+        assert prompt_input.text == ""
+
+        # Multiple backspaces on empty input
+        await pilot.press("backspace", "backspace", "backspace")
+        assert prompt_input.text == ""
+
+
+async def test_backspace_after_clearing_input_does_not_crash() -> None:
+    """Test that backspace works safely after typing and deleting all text."""
+
+    class TestApp(App):
+        def compose(self):
+            yield PromptInput()
+
+    async with TestApp().run_test() as pilot:
+        prompt_input = pilot.app.query_one(PromptInput)
+        prompt_input.focus()
+
+        # Type some text
+        await pilot.press("h", "i")
+        assert prompt_input.text == "hi"
+
+        # Delete all text
+        await pilot.press("backspace", "backspace")
+        assert prompt_input.text == ""
+
+        # Now press backspace on empty input - should not crash
+        await pilot.press("backspace")
+        assert prompt_input.text == ""
+
+
+async def test_backspace_with_text_still_works() -> None:
+    """Test that backspace still deletes characters when input has text."""
+
+    class TestApp(App):
+        def compose(self):
+            yield PromptInput()
+
+    async with TestApp().run_test() as pilot:
+        prompt_input = pilot.app.query_one(PromptInput)
+        prompt_input.focus()
+
+        # Type some text
+        await pilot.press("h", "e", "l", "l", "o")
+        assert prompt_input.text == "hello"
+
+        # Backspace should delete last character
+        await pilot.press("backspace")
+        assert prompt_input.text == "hell"
+
+
 async def test_prompt_input_submit_message() -> None:
     """Test that Enter key posts Submitted message."""
     messages_received: list = []
