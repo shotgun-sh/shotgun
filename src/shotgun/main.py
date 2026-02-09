@@ -37,6 +37,7 @@ from shotgun.logging_config import configure_root_logger, get_logger
 from shotgun.posthog_telemetry import setup_posthog_observability
 from shotgun.telemetry import setup_logfire_observability
 from shotgun.tui import app as tui_app
+from shotgun.utils.file_system_utils import set_spec_dir
 from shotgun.utils.update_checker import perform_auto_update_async
 
 # Load environment variables from .env file
@@ -180,9 +181,20 @@ def main(
             help="Model name for sub-agents (requires --model to be set)",
         ),
     ] = None,
+    spec_dir: Annotated[
+        str | None,
+        typer.Option(
+            "--spec-dir",
+            help="Custom spec directory path (default: .shotgun/ in current directory)",
+        ),
+    ] = None,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
+
+    # Set spec dir override early so it applies to both TUI and subcommands
+    if spec_dir and not ctx.resilient_parsing:
+        set_spec_dir(spec_dir)
 
     # Start async update check and install (non-blocking)
     if not ctx.resilient_parsing:
@@ -212,6 +224,7 @@ def main(
                     force_reindex=force_reindex,
                     model_override=model,
                     sub_agent_model_override=sub_agent_model,
+                    spec_dir_override=spec_dir,
                 )
             finally:
                 # Ensure PostHog is shut down cleanly even if server exits unexpectedly

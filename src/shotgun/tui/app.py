@@ -447,6 +447,7 @@ def serve(
     force_reindex: bool = False,
     model_override: str | None = None,
     sub_agent_model_override: str | None = None,
+    spec_dir_override: str | None = None,
 ) -> None:
     """Serve the TUI application as a web application.
 
@@ -459,6 +460,7 @@ def serve(
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
         model_override: If provided, pass --model flag to spawned process.
         sub_agent_model_override: If provided, pass --sub-agent-model flag to spawned process.
+        spec_dir_override: If provided, pass --spec-dir flag to spawned process.
     """
     # Detect database issues BEFORE starting the TUI
     # Note: In serve mode, issues are logged but user interaction happens in
@@ -508,6 +510,8 @@ def serve(
         command += f" --model={model_override}"
     if sub_agent_model_override:
         command += f" --sub-agent-model={sub_agent_model_override}"
+    if spec_dir_override:
+        command += f" --spec-dir={spec_dir_override}"
 
     # Get the path to our custom templates directory
     templates_path = Path(__file__).parent / "templates"

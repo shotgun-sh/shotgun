@@ -327,6 +327,9 @@ class ChatScreen(Screen[None]):
         if self.show_pull_hint:
             self.call_later(self._show_pull_hint)
 
+        # Show spec dir hint if --spec-dir override is active
+        self.call_later(self._show_spec_dir_hint)
+
         self.call_later(self.check_if_codebase_is_indexed)
         # Initial update of context indicator
         self.call_later(self.update_context_indicator)
@@ -1130,6 +1133,16 @@ class ChatScreen(Screen[None]):
     ) -> None:
         hint = HintMessage(message=markdown, link=link, link_text=link_text)
         self.agent_manager.add_hint_message(hint)
+
+    def _show_spec_dir_hint(self) -> None:
+        """Show hint when --spec-dir override is active."""
+        from shotgun.utils.file_system_utils import get_spec_dir_override
+
+        override = get_spec_dir_override()
+        if override is None:
+            return
+
+        self.mount_hint(f"Using custom spec directory: `{override}`")
 
     def _show_pull_hint(self) -> None:
         """Show hint about recently pulled spec from meta.json."""
