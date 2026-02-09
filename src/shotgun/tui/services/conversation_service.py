@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 
 import aiofiles.os
 
-from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import ProviderType
+from shotgun.agents.config.tier_detection import get_configured_anthropic_tier
 from shotgun.agents.conversation import (
     ConversationHistory,
     ConversationManager,
@@ -73,17 +73,12 @@ class ConversationService:
 
             # Read Anthropic tier for debugging metadata if using an Anthropic model
             anthropic_tier: int | None = None
-            try:
-                config_manager = get_config_manager()
-                config = await config_manager.load()
-                if (
-                    agent_manager.deps
-                    and agent_manager.deps.llm_model
-                    and agent_manager.deps.llm_model.provider == ProviderType.ANTHROPIC
-                ):
-                    anthropic_tier = config.anthropic.tier
-            except Exception:
-                logger.debug("Failed to read anthropic tier for conversation metadata")
+            if (
+                agent_manager.deps
+                and agent_manager.deps.llm_model
+                and agent_manager.deps.llm_model.provider == ProviderType.ANTHROPIC
+            ):
+                anthropic_tier = await get_configured_anthropic_tier()
 
             conversation = ConversationHistory(
                 last_agent_model=state.agent_type,

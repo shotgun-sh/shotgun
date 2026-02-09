@@ -52,7 +52,10 @@ from shotgun.agents.config.models import (
     ModelName,
     ProviderType,
 )
-from shotgun.agents.config.tier_detection import AnthropicTier
+from shotgun.agents.config.tier_detection import (
+    AnthropicTier,
+    get_configured_anthropic_tier,
+)
 from shotgun.agents.constants import (
     IMAGE_EXTENSIONS,
     MAX_BINARY_FILE_SIZE_BYTES,
@@ -930,18 +933,12 @@ class AgentManager(Widget):
             and deps.llm_model is not None
             and deps.llm_model.provider == ProviderType.ANTHROPIC
         ):
-            try:
-                from shotgun.agents.config import get_config_manager
-
-                config_manager = get_config_manager()
-                config = await config_manager.load()
-                anthropic_tier = config.anthropic.tier
+            anthropic_tier = await get_configured_anthropic_tier()
+            if anthropic_tier is not None:
                 event_properties["is_tier1_anthropic"] = (
                     anthropic_tier == AnthropicTier.TIER_1
                 )
                 event_properties["anthropic_tier"] = anthropic_tier
-            except Exception:
-                logger.debug("Failed to read anthropic tier for telemetry")
 
         track_event(event_name, event_properties)
 

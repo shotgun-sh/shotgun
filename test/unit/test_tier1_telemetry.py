@@ -6,8 +6,41 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from shotgun.agents.config.models import ProviderType
-from shotgun.agents.config.tier_detection import AnthropicTier
+from shotgun.agents.config.tier_detection import (
+    AnthropicTier,
+    get_configured_anthropic_tier,
+)
 from shotgun.agents.conversation import ConversationHistory
+
+
+@pytest.mark.asyncio
+async def test_get_configured_anthropic_tier_returns_tier():
+    """Test that get_configured_anthropic_tier reads tier from config."""
+    mock_config = MagicMock()
+    mock_config.anthropic.tier = 2
+
+    with patch(
+        "shotgun.agents.config.get_config_manager"
+    ) as mock_get_cm:
+        mock_cm = MagicMock()
+        mock_cm.load = AsyncMock(return_value=mock_config)
+        mock_get_cm.return_value = mock_cm
+
+        result = await get_configured_anthropic_tier()
+
+    assert result == 2
+
+
+@pytest.mark.asyncio
+async def test_get_configured_anthropic_tier_returns_none_on_error():
+    """Test that get_configured_anthropic_tier returns None on failure."""
+    with patch(
+        "shotgun.agents.config.get_config_manager",
+        side_effect=Exception("config error"),
+    ):
+        result = await get_configured_anthropic_tier()
+
+    assert result is None
 
 
 def test_conversation_history_anthropic_tier_field():
@@ -88,17 +121,15 @@ async def test_conversation_service_saves_anthropic_tier():
 
     with (
         patch(
-            "shotgun.tui.services.conversation_service.get_config_manager"
-        ) as mock_get_cm,
+            "shotgun.tui.services.conversation_service.get_configured_anthropic_tier",
+            new_callable=AsyncMock,
+            return_value=1,
+        ),
         patch(
             "shotgun.utils.file_system_utils.get_spec_dir_override",
             return_value=None,
         ),
     ):
-        mock_cm = MagicMock()
-        mock_cm.load = AsyncMock(return_value=mock_config)
-        mock_get_cm.return_value = mock_cm
-
         result = await service.save_conversation(mock_agent_manager)
 
     assert result is True
@@ -126,22 +157,17 @@ async def test_conversation_service_no_tier_for_non_anthropic():
     mock_agent_manager.get_conversation_state.return_value = mock_state
     mock_agent_manager.deps.llm_model.provider = ProviderType.OPENAI
 
-    mock_config = MagicMock()
-    mock_config.anthropic.tier = 2
-
     with (
         patch(
-            "shotgun.tui.services.conversation_service.get_config_manager"
-        ) as mock_get_cm,
+            "shotgun.tui.services.conversation_service.get_configured_anthropic_tier",
+            new_callable=AsyncMock,
+            return_value=2,
+        ),
         patch(
             "shotgun.utils.file_system_utils.get_spec_dir_override",
             return_value=None,
         ),
     ):
-        mock_cm = MagicMock()
-        mock_cm.load = AsyncMock(return_value=mock_config)
-        mock_get_cm.return_value = mock_cm
-
         result = await service.save_conversation(mock_agent_manager)
 
     assert result is True
