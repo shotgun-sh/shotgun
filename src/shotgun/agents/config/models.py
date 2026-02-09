@@ -224,6 +224,10 @@ class AnthropicConfig(BaseModel):
     """Configuration for Anthropic provider."""
 
     api_key: SecretStr | None = None
+    tier: int | None = Field(
+        default=None,
+        description="Detected API tier (1-4). None if not detected, -1 if failed.",
+    )
 
 
 class GoogleConfig(BaseModel):
@@ -351,7 +355,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=5, description="Configuration schema version")
+    config_version: int = Field(default=8, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",

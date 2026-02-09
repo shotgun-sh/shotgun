@@ -18,6 +18,7 @@ from shotgun.agents.config.manager import (
     _migrate_v3_to_v4,
     _migrate_v4_to_v5,
     _migrate_v6_to_v7,
+    _migrate_v7_to_v8,
     get_backup_dir,
 )
 from shotgun.agents.config.models import ProviderType, ShotgunConfig
@@ -89,6 +90,20 @@ V7_CONFIG = {
     "selected_model": "gpt-5",
     "shotgun_instance_id": "test-user-id-12345",
     "config_version": 7,
+    "shown_welcome_screen": False,
+    "marketing": {"messages": {}},
+    "router_mode": "planning",
+}
+
+V8_CONFIG = {
+    "openai": {"api_key": "sk-test123", "supports_streaming": None},
+    "anthropic": {"api_key": None, "tier": None},
+    "google": {"api_key": None},
+    "shotgun": {"api_key": None, "supabase_jwt": None},
+    "ollama": {"enabled": False, "base_url": "http://localhost:11434"},
+    "selected_model": "gpt-5",
+    "shotgun_instance_id": "test-user-id-12345",
+    "config_version": 8,
     "shown_welcome_screen": False,
     "marketing": {"messages": {}},
     "router_mode": "planning",
@@ -192,6 +207,45 @@ def test_migrate_v6_to_v7_preserves_existing_fields():
     assert result["router_mode"] == "drafting"
 
 
+def test_migrate_v7_to_v8():
+    """Test migration from version 7 to version 8."""
+    config = V7_CONFIG.copy()
+
+    result = _migrate_v7_to_v8(config)
+
+    assert result["config_version"] == 8
+    assert "tier" in result["anthropic"]
+    assert result["anthropic"]["tier"] is None
+    assert result["shotgun_instance_id"] == "test-user-id-12345"
+
+
+def test_migrate_v7_to_v8_preserves_existing_fields():
+    """Test v7->v8 migration preserves all existing fields."""
+    config = V7_CONFIG.copy()
+    config["openai"]["api_key"] = "sk-proj-test"
+    config["anthropic"]["api_key"] = "sk-ant-test"
+    config["ollama"]["enabled"] = True
+
+    result = _migrate_v7_to_v8(config)
+
+    assert result["config_version"] == 8
+    assert result["anthropic"]["tier"] is None
+    assert result["openai"]["api_key"] == "sk-proj-test"
+    assert result["anthropic"]["api_key"] == "sk-ant-test"
+    assert result["ollama"]["enabled"] is True
+
+
+def test_migrate_v7_to_v8_with_existing_tier():
+    """Test v7->v8 migration doesn't overwrite existing tier field."""
+    config = V7_CONFIG.copy()
+    config["anthropic"]["tier"] = 2  # Already has tier
+
+    result = _migrate_v7_to_v8(config)
+
+    assert result["config_version"] == 8
+    assert result["anthropic"]["tier"] == 2  # Should preserve existing tier
+
+
 def test_apply_migrations_from_v2_to_current():
     """Test applying all migrations from v2 to current version."""
     config = V2_CONFIG.copy()
@@ -232,16 +286,16 @@ def test_apply_migrations_from_v4_to_current():
 
 def test_apply_migrations_already_current():
     """Test applying migrations when already at current version."""
-    config = V7_CONFIG.copy()
+    config = V8_CONFIG.copy()
 
     result = _apply_migrations(config)
 
     assert result["config_version"] == CURRENT_CONFIG_VERSION
-    assert result == V7_CONFIG  # Should be unchanged
+    assert result == V8_CONFIG  # Should be unchanged
 
 
 def test_apply_migrations_sequential():
-    """Test that migrations are applied sequentially v2->v3->v4->v5->v6->v7."""
+    """Test that migrations are applied sequentially v2->v3->v4->v5->v6->v7->v8."""
     config = V2_CONFIG.copy()
 
     result = _apply_migrations(config)
@@ -255,6 +309,7 @@ def test_apply_migrations_sequential():
     assert result["router_mode"] == "planning"  # v5->v6 change
     assert result["ollama"]["enabled"] is False  # v6->v7 change
     assert result["ollama"]["base_url"] == "http://localhost:11434"  # v6->v7 change
+    assert result["anthropic"]["tier"] is None  # v7->v8 change
     assert result["config_version"] == CURRENT_CONFIG_VERSION
 
 
@@ -722,7 +777,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config (no migration needed)
-        current_config = V7_CONFIG.copy()
+        current_config = V8_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
@@ -807,7 +862,7 @@ async def test_update_ollama_enabled():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config
-        current_config = V7_CONFIG.copy()
+        current_config = V8_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
@@ -838,7 +893,7 @@ async def test_is_ollama_enabled():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a config with Ollama enabled
-        current_config = V7_CONFIG.copy()
+        current_config = V8_CONFIG.copy()
         current_config["ollama"]["enabled"] = True
         config_path.write_text(json.dumps(current_config))
 
