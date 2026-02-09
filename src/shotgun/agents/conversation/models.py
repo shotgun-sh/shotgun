@@ -64,6 +64,8 @@ class ConversationHistory(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
     # Write-only debugging field: records the --spec-dir override if set (never read back)
     spec_dir_override: str | None = None
+    # Write-only debugging field: records the Anthropic API tier if using an Anthropic model (never read back)
+    anthropic_tier: int | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
