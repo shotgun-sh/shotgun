@@ -184,3 +184,20 @@ async def detect_anthropic_tier(api_key: str) -> tuple[AnthropicTier, RateLimitI
     tier = detect_tier_from_limits(rate_limits, model_name="claude-haiku-4-5")
 
     return tier, rate_limits
+
+
+async def get_configured_anthropic_tier() -> int | None:
+    """Read the stored Anthropic tier from config.
+
+    Returns:
+        The stored tier value (1-4), -1 if detection failed, or None if not detected.
+    """
+    try:
+        from shotgun.agents.config import get_config_manager
+
+        config_manager = get_config_manager()
+        config = await config_manager.load()
+        return config.anthropic.tier
+    except Exception:
+        logger.debug("Failed to read anthropic tier from config")
+        return None

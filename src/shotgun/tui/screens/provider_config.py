@@ -27,6 +27,7 @@ from textual.widgets import (
 from shotgun.agents.config import ConfigManager, ProviderType
 from shotgun.agents.config.tier_detection import AnthropicTier, detect_anthropic_tier
 from shotgun.logging_config import get_logger
+from shotgun.posthog_telemetry import track_event
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
 from shotgun.tui.services.ollama import (
     OLLAMA_DOWNLOAD_URL,
@@ -572,6 +573,16 @@ class ProviderConfigScreen(Screen[None]):
                 f"✓ Saved API key for {self._provider_display_name(self.selected_provider)}."
             )
         status_label.remove_class("error")
+
+        # Track Tier 1 detection in PostHog (metadata only, no PII/keys)
+        if should_warn_tier1:
+            track_event(
+                "tier1_anthropic_detected",
+                {
+                    "detected_tier": detected_tier,
+                    "account_type": "byok",
+                },
+            )
 
         # Show Tier 1 warning modal (blocking)
         if should_warn_tier1:
