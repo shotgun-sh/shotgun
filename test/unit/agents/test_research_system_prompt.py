@@ -87,5 +87,6 @@ def test_research_system_prompt_template_loading():
             router_mode=None,
             supports_pdf=True,
             supports_images=True,
+            has_context7=False,
         )
         assert result == "Test system prompt"

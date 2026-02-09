@@ -189,6 +189,7 @@ async def create_base_agent(
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
     for_sub_agent: bool = False,
+    mcp_servers: list[Any] | None = None,
 ) -> tuple[ShotgunAgent, AgentDeps]:
     """Create a base agent with common configuration.
 
@@ -200,6 +201,7 @@ async def create_base_agent(
         provider: Optional provider override. If None, uses configured default
         agent_mode: The mode of the agent (research, plan, tasks, specify, export)
         for_sub_agent: If True, use cheaper model for cost optimization
+        mcp_servers: Optional list of MCP server toolsets to connect to the agent
 
     Returns:
         Tuple of (Configured Pydantic AI agent, Agent dependencies)
@@ -243,6 +245,10 @@ async def create_base_agent(
             system_prompt_fn=system_prompt_fn,
             agent_mode=agent_mode,
         )
+
+        # Set flag for Context7 availability (used in system prompt template)
+        if mcp_servers:
+            deps._has_context7 = True  # type: ignore[attr-defined]
 
     except Exception as e:
         logger.warning("Failed to load configured model, using fallback: %s", e)
@@ -310,6 +316,7 @@ async def create_base_agent(
         instrument=True,
         history_processors=[history_processor],
         retries=3,  # Default retry count for tool calls and output validation
+        toolsets=mcp_servers or None,
     )
 
     # System prompt function is stored in deps and will be called manually in run_agent
@@ -570,6 +577,9 @@ def build_agent_system_prompt(
     supports_pdf = model_config.supports_pdf if model_config else True
     supports_images = model_config.supports_images if model_config else True
 
+    # Check if Context7 MCP server is available (for research agent prompt)
+    has_context7 = getattr(ctx.deps, "_has_context7", False)
+
     template_context = AgentSystemPromptContext(
         interactive_mode=ctx.deps.interactive_mode,
         mode=agent_type,
@@ -577,6 +587,7 @@ def build_agent_system_prompt(
         router_mode=router_mode,
         supports_pdf=supports_pdf,
         supports_images=supports_images,
+        has_context7=has_context7,
     )
 
     result = prompt_loader.render(

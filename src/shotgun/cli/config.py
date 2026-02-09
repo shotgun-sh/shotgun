@@ -184,6 +184,12 @@ def _show_full_config(config: Any) -> None:
         table.add_row("  API Key", api_key_status)
         table.add_row("", "")  # Separator
 
+    # Context7 (experimental)
+    table.add_row("[bold]Context7 (experimental)[/bold]", "")
+    context7_status = "✅ Set" if config.context7.api_key else "❌ Not set"
+    table.add_row("  API Key", context7_status)
+    table.add_row("", "")
+
     console.print(table)
 
 
@@ -222,6 +228,9 @@ def _mask_secrets(data: dict[str, Any]) -> None:
     if is_shotgun_account_enabled():
         providers.append("shotgun")
 
+    # Always mask context7
+    providers.append("context7")
+
     for provider in providers:
         if provider in data and isinstance(data[provider], dict):
             if "api_key" in data[provider] and data[provider]["api_key"]:
@@ -233,6 +242,48 @@ def _mask_value(value: str) -> str:
     if len(value) <= 8:
         return "••••••••"
     return f"{value[:4]}{'•' * (len(value) - 8)}{value[-4:]}"
+
+
+@app.command(name="set-context7")
+def set_context7(
+    api_key: Annotated[
+        str | None,
+        typer.Option("--api-key", "-k", help="Context7 API key"),
+    ] = None,
+) -> None:
+    """Set Context7 API key for documentation lookup (experimental)."""
+    config_manager = get_config_manager()
+
+    if api_key is None:
+        api_key = typer.prompt(
+            "Enter your Context7 API key",
+            hide_input=True,
+            default="",
+        )
+
+    if not api_key:
+        console.print("❌ No API key provided.", style="red")
+        raise typer.Exit(1)
+
+    try:
+        asyncio.run(config_manager.update_context7(api_key))
+        console.print("✅ Context7 API key configured successfully.")
+    except Exception as e:
+        console.print(f"❌ Failed to update Context7 configuration: {e}", style="red")
+        raise typer.Exit(1) from e
+
+
+@app.command(name="clear-context7")
+def clear_context7() -> None:
+    """Remove the Context7 API key."""
+    config_manager = get_config_manager()
+
+    try:
+        asyncio.run(config_manager.update_context7(None))
+        console.print("✅ Context7 API key removed.")
+    except Exception as e:
+        console.print(f"❌ Failed to clear Context7 configuration: {e}", style="red")
+        raise typer.Exit(1) from e
 
 
 @app.command()

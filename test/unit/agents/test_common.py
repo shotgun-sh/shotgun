@@ -225,6 +225,7 @@ def test_build_agent_system_prompt_research_agent():
             router_mode=None,
             supports_pdf=True,
             supports_images=True,
+            has_context7=False,
         )
 
 
@@ -256,6 +257,7 @@ def test_build_agent_system_prompt_custom_context():
             router_mode=None,
             supports_pdf=True,
             supports_images=True,
+            has_context7=False,
         )
 
 
@@ -287,6 +289,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
             router_mode=None,
             supports_pdf=True,
             supports_images=True,
+            has_context7=False,
         )
 
 

@@ -325,6 +325,12 @@ class OllamaConfig(BaseModel):
     )
 
 
+class Context7Config(BaseModel):
+    """Configuration for Context7 documentation MCP server (experimental)."""
+
+    api_key: SecretStr | None = None
+
+
 class MarketingMessageRecord(BaseModel):
     """Record of when a marketing message was shown to the user."""
 
@@ -348,6 +354,7 @@ class ShotgunConfig(BaseModel):
     google: GoogleConfig = Field(default_factory=GoogleConfig)
     shotgun: ShotgunAccountConfig = Field(default_factory=ShotgunAccountConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+    context7: Context7Config = Field(default_factory=Context7Config)
     selected_model: ModelName | str | None = Field(
         default=None,
         description="User-selected model (ModelName enum or 'ollama/<model>' string)",
@@ -355,7 +362,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=8, description="Configuration schema version")
+    config_version: int = Field(default=9, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",
