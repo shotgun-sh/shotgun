@@ -103,7 +103,9 @@ async def run_research_agent(
         usage_limits = create_usage_limits()
 
         # Use async context manager to initialize MCP server connections if any
+        logger.debug("🔌 Entering agent context (initializing MCP servers if any)...")
         async with agent:
+            logger.debug("🔌 Agent context entered, MCP servers ready")
             result = await run_agent(
                 agent=agent,
                 prompt=prompt,

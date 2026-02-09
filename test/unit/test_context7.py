@@ -228,8 +228,8 @@ async def test_get_context7_mcp_server_returns_none_when_no_key():
 
 @pytest.mark.asyncio
 async def test_get_context7_mcp_server_returns_server_when_key_set():
-    """Test that get_context7_mcp_server returns MCPServerHTTP when key is set."""
-    from pydantic_ai.mcp import MCPServerHTTP
+    """Test that get_context7_mcp_server returns MCPServerStreamableHTTP when key is set."""
+    from pydantic_ai.mcp import MCPServerStreamableHTTP
 
     mock_manager = AsyncMock()
     mock_manager.get_context7_api_key.return_value = "test-api-key"
@@ -241,7 +241,7 @@ async def test_get_context7_mcp_server_returns_server_when_key_set():
 
         result = await get_context7_mcp_server()
         assert result is not None
-        assert isinstance(result, MCPServerHTTP)
+        assert isinstance(result, MCPServerStreamableHTTP)
 
 
 # --- AgentSystemPromptContext tests ---
