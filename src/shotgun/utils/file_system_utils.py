@@ -1,5 +1,6 @@
 """File system utility functions."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -7,9 +8,42 @@ import aiofiles
 
 from shotgun.settings import settings
 
+logger = logging.getLogger(__name__)
+
+# Module-level override for the spec directory (set via --spec-dir CLI flag)
+_spec_dir_override: Path | None = None
+
+
+def set_spec_dir(spec_dir: str | None) -> None:
+    """Set a custom spec directory override.
+
+    When set, get_shotgun_base_path() will return this path instead of .shotgun/ in CWD.
+    Relative paths are resolved to absolute paths.
+
+    Args:
+        spec_dir: Path to custom spec directory, or None to clear the override.
+    """
+    global _spec_dir_override
+    if spec_dir:
+        _spec_dir_override = Path(spec_dir).resolve()
+        logger.info("Spec directory override set to: %s", _spec_dir_override)
+    else:
+        _spec_dir_override = None
+
+
+def get_spec_dir_override() -> str | None:
+    """Get the current spec directory override, if set.
+
+    Returns:
+        The override path as a string, or None if no override is active.
+    """
+    return str(_spec_dir_override) if _spec_dir_override is not None else None
+
 
 def get_shotgun_base_path() -> Path:
     """Get the absolute path to the .shotgun directory."""
+    if _spec_dir_override is not None:
+        return _spec_dir_override
     return Path.cwd() / ".shotgun"
 
 

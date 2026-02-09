@@ -67,8 +67,11 @@ class ConversationService:
             state = agent_manager.get_conversation_state()
 
             # Create conversation history object
+            from shotgun.utils.file_system_utils import get_spec_dir_override
+
             conversation = ConversationHistory(
                 last_agent_model=state.agent_type,
+                spec_dir_override=get_spec_dir_override(),
             )
             conversation.set_agent_messages(state.agent_messages)
             conversation.set_ui_messages(state.ui_messages)

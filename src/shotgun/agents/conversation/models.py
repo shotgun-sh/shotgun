@@ -62,6 +62,8 @@ class ConversationHistory(BaseModel):
     )  # Stores serialized ModelMessage and HintMessage objects
     last_agent_model: str = "research"
     updated_at: datetime = Field(default_factory=datetime.now)
+    # Write-only debugging field: records the --spec-dir override if set (never read back)
+    spec_dir_override: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
