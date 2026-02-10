@@ -4,6 +4,9 @@ import { SolutionSection } from "@/components/SolutionSection";
 import { WorkflowDiagram } from "@/components/WorkflowDiagram";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { ComparisonSection } from "@/components/ComparisonSection";
+import { SocialProofSection } from "@/components/SocialProofSection";
+import { GettingStartedSection } from "@/components/GettingStartedSection";
+import { FinalCTASection } from "@/components/FinalCTASection";
 import { ScrollTracker } from "@/components/ScrollTracker";
 
 export default function Home() {
@@ -74,10 +77,28 @@ export default function Home() {
         </ScrollTracker>
       </section>
 
-      {/* Comparison Section — Intelligence vs Templates positioning */}
+      {/* Social Proof Section — LiteLLM case study + competitive scoring */}
       <section
+        id="social-proof"
         className="
           bg-surface
+          py-[var(--space-16)] md:py-[var(--space-24)]
+        "
+        data-gtm-section="social-proof"
+        aria-labelledby="social-proof-heading"
+      >
+        <ScrollTracker sectionName="social-proof">
+          <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
+            <SocialProofSection />
+          </div>
+        </ScrollTracker>
+      </section>
+
+      {/* Comparison Section — Intelligence vs Templates positioning */}
+      <section
+        id="comparison"
+        className="
+          bg-[var(--color-background)]
           py-[var(--space-16)] md:py-[var(--space-24)]
         "
         data-gtm-section="comparison"
@@ -86,6 +107,38 @@ export default function Home() {
         <ScrollTracker sectionName="comparison">
           <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
             <ComparisonSection />
+          </div>
+        </ScrollTracker>
+      </section>
+
+      {/* Getting Started Section — 3-step onboarding guide */}
+      <section
+        className="
+          bg-surface
+          py-[var(--space-16)] md:py-[var(--space-24)]
+        "
+        data-gtm-section="getting-started"
+        aria-labelledby="getting-started-heading"
+      >
+        <ScrollTracker sectionName="getting-started">
+          <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
+            <GettingStartedSection />
+          </div>
+        </ScrollTracker>
+      </section>
+
+      {/* Final CTA Section — compelling close with primary CTA */}
+      <section
+        className="
+          bg-primary text-text-inverse
+          py-[var(--space-16)] md:py-[var(--space-24)]
+        "
+        data-gtm-section="final-cta"
+        aria-labelledby="final-cta-heading"
+      >
+        <ScrollTracker sectionName="final-cta">
+          <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
+            <FinalCTASection />
           </div>
         </ScrollTracker>
       </section>

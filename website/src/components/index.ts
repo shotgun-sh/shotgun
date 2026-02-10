@@ -29,3 +29,23 @@ export {
   ComparisonSection,
   type ComparisonSectionProps,
 } from "./ComparisonSection";
+export {
+  CaseStudyBlock,
+  type CaseStudyBlockProps,
+} from "./CaseStudyBlock";
+export {
+  SocialProofSection,
+  type SocialProofSectionProps,
+} from "./SocialProofSection";
+export {
+  OnboardingStep,
+  type OnboardingStepProps,
+} from "./OnboardingStep";
+export {
+  GettingStartedSection,
+  type GettingStartedSectionProps,
+} from "./GettingStartedSection";
+export {
+  FinalCTASection,
+  type FinalCTASectionProps,
+} from "./FinalCTASection";
