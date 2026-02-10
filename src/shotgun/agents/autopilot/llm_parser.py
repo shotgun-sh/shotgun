@@ -28,17 +28,21 @@ PARSER_SYSTEM_PROMPT = """You are a markdown parser that extracts stages and tas
 
 Your job is to:
 1. Find all stages in the document (usually marked with ## Stage N: or ### Stage N: headers)
-2. For each stage, extract all tasks (checkbox items like - [ ] or - [x])
-3. Return structured data with stages and their tasks
+2. For each stage, extract any "Depends on:" line listing stage dependencies
+3. For each stage, extract all tasks (checkbox items like - [ ] or - [x])
+4. Return structured data with stages, their dependencies, and their tasks
 
 Rules:
 - A stage header contains "Stage" followed by an identifier (numeric like 1, 2, 3 or alphanumeric like A, 1a, 2b) and a name
 - The stage identifier should be extracted exactly as written (preserve letters, numbers, and case)
+- A "Depends on:" line may appear after the stage header, listing stage identifiers (e.g. "Depends on: Stage 1, Stage 3")
+- Extract only the stage identifiers from depends_on (e.g. ["1", "3"]), not the word "Stage"
+- If no "Depends on:" line exists, or it says "None", depends_on should be an empty list
 - Tasks are checkbox items: - [ ] means incomplete, - [x] or - [X] means complete
 - Only extract actual tasks (checkboxes), not other bullet points or text
 - Preserve the exact task text after the checkbox
 - Stages should be in the order they appear in the document
-- Ignore any content that isn't a stage header or task checkbox
+- Ignore any content that isn't a stage header, depends_on line, or task checkbox
 
 Be precise and extract all stages and tasks from the document."""
 
@@ -157,6 +161,7 @@ class LLMTasksParser:
             stage = Stage(
                 number=parsed_stage.number,
                 name=parsed_stage.name,
+                depends_on=parsed_stage.depends_on,
                 tasks=tasks,
                 status=StageStatus.PENDING,
             )
@@ -269,6 +274,7 @@ class LLMTasksParser:
             Stage(
                 number=ps.number,
                 name=ps.name,
+                depends_on=ps.depends_on,
                 tasks=[
                     Task(text=t.text, completed=t.completed, line_number=0)
                     for t in ps.tasks

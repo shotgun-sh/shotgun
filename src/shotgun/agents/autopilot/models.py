@@ -82,6 +82,10 @@ class Stage(BaseModel):
 
     number: str = Field(description="Stage identifier (numeric or alphanumeric)")
     name: str = Field(description="Stage name/title")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Stage identifiers this stage depends on (e.g. ['1', '2'])",
+    )
     tasks: list[Task] = Field(
         default_factory=list, description="List of tasks in this stage"
     )
@@ -410,6 +414,10 @@ class ParsedStage(BaseModel):
         description="Stage identifier - can be numeric (1, 2, 3) or alphanumeric (A, 1a, 2b)"
     )
     name: str = Field(description="Stage name/title")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Stage identifiers this stage depends on (e.g. ['1', '2']). Empty if no dependencies.",
+    )
     tasks: list[ParsedTask] = Field(description="List of tasks in this stage")
 
 

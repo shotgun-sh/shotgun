@@ -104,35 +104,47 @@ For task management:
 ## Instructions for AI Coding Agents
 
 When working on these tasks:
-1. Focus on ONE stage at a time, completing all tasks in that stage before moving to the next
-2. Mark each task complete by replacing `[ ]` with `[X]` as you finish it
-3. Do NOT modify any other content in this file unless explicitly instructed by the user
-4. Tasks without an `[X]` are not finished yet
+1. Check the "Depends on:" line for each stage - only start a stage when all its dependencies are complete
+2. Stages with no shared dependencies CAN be worked on in parallel by separate agents
+3. Mark each task complete by replacing `[ ]` with `[X]` as you finish it
+4. Do NOT modify any other content in this file unless explicitly instructed by the user
+5. Tasks without an `[X]` are not finished yet
 
 ---
 
 ### Stage 1: [Stage Name]
+Depends on: None
 - [ ] Task description with clear action
 - [ ] Another specific task to complete
 
-### Stage 2: [Stage Name]
+### Stage 2: [Another Stage Name]
+Depends on: None
 - [ ] Task in the next stage
+- [ ] Another task in this stage
+
+### Stage 3: [Stage Name]
+Depends on: Stage 1, Stage 2
+- [ ] Task that requires Stage 1 and 2 to be complete first
 - [ ] Another task in this stage
 ```
 
 **IMPORTANT**:
 - Group related tasks under numbered stages (Stage 1, Stage 2, etc.)
+- **Every stage MUST have a "Depends on:" line** immediately after the stage header
+- Use "Depends on: None" for stages with no dependencies
+- Use "Depends on: Stage 1, Stage 3" to list specific stage dependencies
+- Stages with no shared dependencies can be executed in parallel
 - Do NOT create separate "In Progress", "Done", or "Blocked" sections
 - The `[ ]` / `[X]` checkboxes are the ONLY mechanism for tracking completion
-- Each stage should be completable independently before moving to the next
 
 ## TASK CREATION PRINCIPLES
 
 - **ALWAYS use checkbox format `[ ]` for every task**
+- **ALWAYS include a "Depends on:" line for every stage** (use "None" if no dependencies)
 - Base tasks on available research findings and plan requirements
 - Create specific, actionable tasks with clear acceptance criteria
-- Include effort estimates and priority levels when possible
-- Consider dependencies between tasks
+- Mirror the dependency structure from plan.md when creating stages
+- Maximize parallelism: if stages don't depend on each other's outputs, keep them independent
 - Make tasks testable and verifiable
 - Align with goals and steps from project plans
 - Include both development and testing/validation tasks

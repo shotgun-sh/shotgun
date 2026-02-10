@@ -285,6 +285,23 @@ def test_autopilot_state_format_stages_summary():
     assert "0/1" in summary  # Completed tasks in stage 2
 
 
+def test_stage_depends_on_default():
+    """Test Stage.depends_on defaults to empty list."""
+    stage = Stage(number="1", name="First Stage", tasks=[])
+    assert stage.depends_on == []
+
+
+def test_stage_depends_on_set():
+    """Test Stage.depends_on with explicit dependencies."""
+    stage = Stage(
+        number="3",
+        name="Integration",
+        depends_on=["1", "2"],
+        tasks=[],
+    )
+    assert stage.depends_on == ["1", "2"]
+
+
 def test_claude_output_creation():
     """Test ClaudeOutput model creation."""
     output = ClaudeOutput(

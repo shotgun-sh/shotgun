@@ -31,6 +31,10 @@ class ParsedStageStatus(BaseModel):
 
     number: str = Field(description="Stage identifier (1, 2, A, 1a, etc)")
     name: str = Field(description="Stage name")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Stage identifiers this stage depends on (e.g. ['1', '2']). Empty if no dependencies.",
+    )
     status: StageCompletionStatus = Field(
         description="not_started if no tasks done, in_progress if some done, completed if all done"
     )
@@ -58,6 +62,10 @@ class ParsedSingleStage(BaseModel):
 
     number: str = Field(description="Stage identifier")
     name: str = Field(description="Stage name")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Stage identifiers this stage depends on (e.g. ['1', '2']). Empty if no dependencies.",
+    )
     tasks: list[ParsedTaskSimple] = Field(description="All tasks in this stage")
 
 
@@ -65,12 +73,16 @@ STATUS_PARSER_PROMPT = """You are a markdown parser that extracts stage informat
 
 Your job is to:
 1. Find all stages (marked with ## Stage N: or ### Stage N: headers)
-2. For each stage, count total tasks and completed tasks
-3. Determine the stage status based on task completion
-4. Return the stage number, name, status, and task counts
+2. For each stage, extract any "Depends on:" line listing stage dependencies
+3. Count total tasks and completed tasks per stage
+4. Determine the stage status based on task completion
+5. Return the stage number, name, depends_on, status, and task counts
 
 Rules:
 - Stage headers contain "Stage" followed by an identifier and name
+- A "Depends on:" line may appear after the stage header, listing stage identifiers (e.g. "Depends on: Stage 1, Stage 3")
+- Extract only the stage identifiers from depends_on (e.g. ["1", "3"]), not the word "Stage"
+- If no "Depends on:" line exists, or it says "None", depends_on is an empty list
 - Tasks are checkboxes: - [ ] (incomplete) or - [x]/- [X] (complete)
 - Count ALL checkbox tasks under each stage (until the next stage header)
 - Status determination:
@@ -84,11 +96,15 @@ SINGLE_STAGE_PARSER_PROMPT = """You are a markdown parser that extracts tasks fr
 
 Your job is to:
 1. Find the specified stage in the document
-2. Extract ALL tasks (checkboxes) under that stage only
-3. Return the stage info and its tasks
+2. Extract any "Depends on:" line listing stage dependencies
+3. Extract ALL tasks (checkboxes) under that stage only
+4. Return the stage info, dependencies, and its tasks
 
 Rules:
 - Stage headers contain "Stage" followed by an identifier and name
+- A "Depends on:" line may appear after the stage header, listing stage identifiers (e.g. "Depends on: Stage 1, Stage 3")
+- Extract only the stage identifiers from depends_on (e.g. ["1", "3"]), not the word "Stage"
+- If no "Depends on:" line exists, or it says "None", depends_on is an empty list
 - Tasks are checkboxes: - [ ] (incomplete) or - [x]/- [X] (complete)
 - Only extract tasks that belong to the specified stage
 - Stop when you reach the next stage header
@@ -191,6 +207,7 @@ class LightweightTasksParser:
             stage = Stage(
                 number=parsed_stage.number,
                 name=parsed_stage.name,
+                depends_on=parsed_stage.depends_on,
                 tasks=[],  # No individual tasks in status parse
                 status=stage_status,
                 task_count_override=parsed_stage.total_tasks,
@@ -254,6 +271,7 @@ class LightweightTasksParser:
         stage = Stage(
             number=parsed.number,
             name=parsed.name,
+            depends_on=parsed.depends_on,
             tasks=tasks,
             status=StageStatus.PENDING,
         )
