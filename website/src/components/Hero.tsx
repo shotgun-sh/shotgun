@@ -1,5 +1,3 @@
-"use client";
-
 import { HeroButton } from "@/components/HeroButton";
 import { CodeBlock } from "@/components/CodeBlock";
 import { HeroImage } from "@/components/HeroImage";
@@ -26,7 +24,7 @@ export interface HeroProps {
  */
 export function Hero({ heroImageSrc, className = "" }: HeroProps) {
   return (
-    <div className={`${className}`}>
+    <div className={className}>
       {/* Content layout: two-column on desktop, stacked on mobile */}
       <div className="flex flex-col gap-[var(--space-12)] lg:flex-row lg:items-center lg:gap-[var(--space-16)]">
         {/* Left column: Text content + CTAs */}
