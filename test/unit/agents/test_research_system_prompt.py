@@ -19,6 +19,7 @@ def mock_context():
     context.deps.llm_model = MagicMock()
     context.deps.llm_model.supports_pdf = True
     context.deps.llm_model.supports_images = True
+    context.deps.has_context7 = False
     return context
 
 
@@ -70,6 +71,7 @@ def test_research_system_prompt_template_loading():
     mock_context.deps.llm_model = MagicMock()
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -87,5 +89,6 @@ def test_research_system_prompt_template_loading():
             router_mode=None,
             supports_pdf=True,
             supports_images=True,
+            has_context7=False,
         )
         assert result == "Test system prompt"

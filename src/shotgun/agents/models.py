@@ -73,6 +73,10 @@ class AgentSystemPromptContext(BaseModel):
         default=True,
         description="Whether the current model supports image file input",
     )
+    has_context7: bool = Field(
+        default=False,
+        description="Whether Context7 MCP server is available for documentation lookup",
+    )
 
 
 class AgentResponse(BaseModel):
@@ -415,6 +419,11 @@ class AgentDeps(AgentRuntimeOptions):
     web_search_count: int = Field(
         default=0,
         description="Count of web searches performed in this agent session",
+    )
+
+    has_context7: bool = Field(
+        default=False,
+        description="Whether Context7 MCP server is available for documentation lookup",
     )
 
 

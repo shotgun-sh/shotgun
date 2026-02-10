@@ -53,7 +53,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 8
+CURRENT_CONFIG_VERSION = 9
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -249,6 +249,26 @@ def _migrate_v7_to_v8(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v8_to_v9(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 8 to version 9.
+
+    Changes:
+    - Add 'context7' section for Context7 documentation MCP server
+
+    Args:
+        data: Config data dict at version 8
+
+    Returns:
+        Modified config data dict at version 9
+    """
+    if "context7" not in data:
+        data["context7"] = {}
+        logger.info("Migrated config v8->v9: added context7 configuration")
+
+    data["config_version"] = 9
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -272,6 +292,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         5: _migrate_v5_to_v6,
         6: _migrate_v6_to_v7,
         7: _migrate_v7_to_v8,
+        8: _migrate_v8_to_v9,
     }
 
     # Apply migrations sequentially
@@ -900,6 +921,29 @@ class ConfigManager:
         config.ollama.enabled = enabled
         await self.save(config)
         logger.info("Ollama enabled: %s", enabled)
+
+    async def update_context7(self, api_key: str | None) -> None:
+        """Update Context7 API key configuration.
+
+        Args:
+            api_key: Context7 API key, or None to clear it
+        """
+        config = await self.load()
+        config.context7.api_key = SecretStr(api_key) if api_key else None
+        await self.save(config)
+        logger.info("Updated Context7 configuration")
+
+    async def get_context7_api_key(self) -> str | None:
+        """Get the Context7 API key if configured.
+
+        Returns:
+            The API key string, or None if not configured
+        """
+        config = await self.load(force_reload=False)
+        if config.context7.api_key is None:
+            return None
+        value = config.context7.api_key.get_secret_value()
+        return value if value and value.strip() else None
 
     async def is_ollama_enabled(self) -> bool:
         """Check if Ollama is enabled in configuration.

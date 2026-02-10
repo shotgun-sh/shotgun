@@ -16,6 +16,7 @@ class ConfigSection(StrEnum):
     ANTHROPIC = auto()
     GOOGLE = auto()
     SHOTGUN = auto()
+    CONTEXT7 = auto()
 
 
 # Backwards compatibility - deprecated

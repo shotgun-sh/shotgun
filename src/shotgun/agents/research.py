@@ -21,6 +21,7 @@ from .common import (
 )
 from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 from .tools import get_available_web_search_tools
+from .tools.context7 import get_context7_mcp_server
 
 logger = get_logger(__name__)
 
@@ -52,6 +53,12 @@ async def create_research_agent(
     else:
         logger.warning("Research agent configured without web search tools")
 
+    # Check for Context7 MCP server
+    context7_server = await get_context7_mcp_server()
+    mcp_servers = [context7_server] if context7_server else None
+    if context7_server:
+        logger.info("Research agent configured with Context7 documentation lookup")
+
     # Use partial to create system prompt function for research agent
     system_prompt_fn = partial(build_agent_system_prompt, "research")
 
@@ -63,6 +70,7 @@ async def create_research_agent(
         provider=provider,
         agent_mode=AgentType.RESEARCH,
         for_sub_agent=for_sub_agent,
+        mcp_servers=mcp_servers,
     )
     return agent, deps
 
@@ -94,14 +102,18 @@ async def run_research_agent(
         # Create usage limits for responsible API usage
         usage_limits = create_usage_limits()
 
-        result = await run_agent(
-            agent=agent,
-            prompt=prompt,
-            deps=deps,
-            message_history=message_history,
-            usage_limits=usage_limits,
-            event_stream_handler=event_stream_handler,
-        )
+        # Use async context manager to initialize MCP server connections if any
+        logger.debug("🔌 Entering agent context (initializing MCP servers if any)...")
+        async with agent:
+            logger.debug("🔌 Agent context entered, MCP servers ready")
+            result = await run_agent(
+                agent=agent,
+                prompt=prompt,
+                deps=deps,
+                message_history=message_history,
+                usage_limits=usage_limits,
+                event_stream_handler=event_stream_handler,
+            )
 
         logger.debug("✅ Research completed successfully")
         return result
