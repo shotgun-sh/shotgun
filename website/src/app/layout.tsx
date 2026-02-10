@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     images: [
       {
-        url: "/images/og-image.png",
+        url: "/images/og-image.svg",
         width: 1200,
         height: 630,
         alt: "Shotgun — Intelligent Specs, Not Templates. Analyze your codebase, research solutions, generate specs.",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     title: "Shotgun — Intelligent Specs, Not Templates",
     description:
       "Analyze your codebase. Research solutions. Generate specs. Keep your AI agent on track.",
-    images: ["/images/og-image.png"],
+    images: ["/images/og-image.svg"],
   },
   robots: {
     index: true,
