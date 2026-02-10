@@ -110,7 +110,7 @@ export function ComparisonTable({ className = "" }: ComparisonTableProps) {
               >
                 <span className="flex items-start gap-[var(--space-2)]">
                   {row.shotgunAdvantage && (
-                    <span className="mt-0.5 shrink-0 text-[var(--color-success)]" aria-label="advantage">
+                    <span className="mt-0.5 shrink-0 text-[var(--color-success)]" role="img" aria-label="advantage">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>

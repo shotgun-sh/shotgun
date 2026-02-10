@@ -75,6 +75,16 @@ export function ComparisonSection({ className = "" }: ComparisonSectionProps) {
           Spec Kit provides structure: &ldquo;Here&rsquo;s how to organize a spec.&rdquo;
           Shotgun provides intelligence: &ldquo;Here&rsquo;s what your spec should be, based on your codebase and research.&rdquo;
         </p>
+        <p
+          className="
+            text-[length:var(--font-size-base)] md:text-[length:var(--font-size-lg)]
+            leading-[var(--line-height-relaxed)]
+            text-text-secondary
+            mt-[var(--space-2)]
+          "
+        >
+          Templates help you write better specs. Intelligence helps you write specs in the first place.
+        </p>
       </div>
     </div>
   );
