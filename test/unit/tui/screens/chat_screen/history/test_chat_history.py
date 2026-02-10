@@ -160,3 +160,39 @@ def test_update_messages_appends_new_messages(chat_history):
 
     # Rendered count should be updated
     assert chat_history._rendered_count == 2
+
+
+def test_update_messages_sub_agent_response_renders_with_prefix(chat_history):
+    """Sub-agent responses marked with _shotgun_is_sub_agent should render with is_sub_agent=True."""
+    chat_history._rendered_count = 0
+
+    mock_vertical_tail = MockVerticalTail(children=[MockPartialResponseWidget()])
+    chat_history.vertical_tail = mock_vertical_tail
+
+    # Create a sub-agent response with the marker
+    sub_agent_resp = ModelResponse(parts=[TextPart(content="Sub-agent findings")])
+    sub_agent_resp._shotgun_is_sub_agent = True  # type: ignore[attr-defined]
+
+    chat_history.update_messages([sub_agent_resp])
+
+    # Widget should be mounted
+    assert len(mock_vertical_tail.mounted) == 1
+    widget = mock_vertical_tail.mounted[0]
+    assert isinstance(widget, AgentResponseWidget)
+    assert widget.is_sub_agent is True
+
+
+def test_update_messages_regular_response_no_sub_agent_prefix(chat_history):
+    """Regular responses without marker should render with is_sub_agent=False."""
+    chat_history._rendered_count = 0
+
+    mock_vertical_tail = MockVerticalTail(children=[MockPartialResponseWidget()])
+    chat_history.vertical_tail = mock_vertical_tail
+
+    regular_resp = ModelResponse(parts=[TextPart(content="Regular response")])
+    chat_history.update_messages([regular_resp])
+
+    assert len(mock_vertical_tail.mounted) == 1
+    widget = mock_vertical_tail.mounted[0]
+    assert isinstance(widget, AgentResponseWidget)
+    assert widget.is_sub_agent is False

@@ -387,6 +387,9 @@ class AgentManager(Widget):
         self._file_request_pending: bool = False
         self._pending_file_requests: list[str] = []
 
+        # Sub-agent streaming responses to persist in UI history
+        self._sub_agent_messages: list[ModelResponse] = []
+
     async def _ensure_agents_initialized(self) -> None:
         """Ensure all agents are initialized (lazy initialization)."""
         if self._agents_initialized:
@@ -826,6 +829,9 @@ class AgentManager(Widget):
         # Save current message history before the run
         original_messages = self.ui_message_history.copy()
 
+        # Clear sub-agent messages from any previous run
+        self._sub_agent_messages = []
+
         # Start with persistent message history
         message_history = self.message_history
 
@@ -1118,6 +1124,10 @@ class AgentManager(Widget):
             )
 
         self.ui_message_history = original_messages + deduplicated_new_messages
+
+        # Persist sub-agent streaming responses into UI history so they survive
+        # the MessageHistoryUpdated rebuild.
+        self._interleave_sub_agent_messages(len(original_messages))
 
         # Get file operations early so we can use them for contextual messages
         file_operations = deps.file_tracker.operations.copy()
@@ -1586,10 +1596,48 @@ class AgentManager(Widget):
                 state.messages.append(final_message)
             state.current_response = None
             self._post_partial_message(True)
+
+            # Persist sub-agent responses so they survive MessageHistoryUpdated rebuild.
+            # Sub-agent turns have a different agent_mode than the current (router) agent.
+            # Sub-agent turns contain ToolCallPart (tool calls like read_file, list_directory)
+            # which render as "Reading file: X", "Listing directory: Y" in the UI.
+            agent_mode = _ctx.deps.agent_mode
+            if agent_mode is not None and agent_mode != self._current_agent_type:
+                # Mark as sub-agent response for rendering with ↳ prefix
+                final_message._shotgun_is_sub_agent = True  # type: ignore[attr-defined]
+                self._sub_agent_messages.append(final_message)
+
         state.current_response = None
 
         # Notify UI that streaming has completed
         self.post_message(AgentStreamingCompleted())
+
+    def _interleave_sub_agent_messages(self, original_count: int) -> None:
+        """Insert captured sub-agent messages into ui_message_history.
+
+        Sub-agent streaming responses are captured during _handle_event_stream
+        but lost during the MessageHistoryUpdated rebuild. This method inserts
+        them before the router's final ModelResponse so the chat shows:
+        user -> router delegation -> sub-agent tools -> router summary.
+
+        Args:
+            original_count: Number of messages from before the current run,
+                used as a lower bound when searching for the insertion point.
+        """
+        if not self._sub_agent_messages:
+            return
+        insert_idx = len(self.ui_message_history)
+        for i in range(
+            len(self.ui_message_history) - 1,
+            original_count - 1,
+            -1,
+        ):
+            if isinstance(self.ui_message_history[i], ModelResponse):
+                insert_idx = i
+                break
+        for j, msg in enumerate(self._sub_agent_messages):
+            self.ui_message_history.insert(insert_idx + j, msg)
+        self._sub_agent_messages = []
 
     def _build_partial_response(
         self, parts: list[ModelResponsePart | ToolCallPartDelta]

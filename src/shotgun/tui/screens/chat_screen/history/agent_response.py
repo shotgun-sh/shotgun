@@ -70,7 +70,10 @@ class AgentResponseWidget(Widget):
             elif isinstance(part, ToolCallPart):
                 parts_str = ToolFormatter.format_tool_call_part(part)
                 if parts_str:  # Only add if there's actual content
-                    acc += parts_str + "\n\n"
+                    if self.is_sub_agent:
+                        acc += f"  **↳** {parts_str}\n\n"
+                    else:
+                        acc += parts_str + "\n\n"
             elif isinstance(part, BuiltinToolCallPart):
                 # Format builtin tool calls using registry
                 formatted = ToolFormatter.format_builtin_tool_call(part)
