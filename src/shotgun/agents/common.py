@@ -11,6 +11,7 @@ from pydantic_ai import (
     UsageLimits,
 )
 from pydantic_ai.agent import AgentRunResult
+from pydantic_ai.mcp import MCPServer
 
 # Import for type checking of message parts
 from pydantic_ai.messages import (
@@ -189,7 +190,7 @@ async def create_base_agent(
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
     for_sub_agent: bool = False,
-    mcp_servers: list[Any] | None = None,
+    mcp_servers: list[MCPServer] | None = None,
 ) -> tuple[ShotgunAgent, AgentDeps]:
     """Create a base agent with common configuration.
 
