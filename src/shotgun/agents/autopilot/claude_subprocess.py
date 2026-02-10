@@ -35,6 +35,10 @@ class ClaudeSubprocessConfig(BaseModel):
         default=None,
         description="Optional system prompt to prepend",
     )
+    env_vars: dict[str, str] = Field(
+        default_factory=dict,
+        description="Extra environment variables for Claude Code",
+    )
 
 
 class ClaudeSubprocessError(Exception):
@@ -111,6 +115,9 @@ class ClaudeSubprocess:
             # Ensure fresh session - no conversation continuation
             continue_conversation=False,
         )
+
+        if self.config.env_vars:
+            options.env = self.config.env_vars
 
         if self.config.model:
             options.model = self.config.model

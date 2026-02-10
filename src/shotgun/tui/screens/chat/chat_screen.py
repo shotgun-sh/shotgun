@@ -3035,6 +3035,7 @@ class ChatScreen(Screen[None]):
                         "completed_tasks": completed_tasks,
                         "has_spec_file": not validation.spec_file.is_empty,
                         "has_plan_file": not validation.plan_file.is_empty,
+                        "use_teams": result.use_teams,
                     },
                 )
 
@@ -3042,7 +3043,9 @@ class ChatScreen(Screen[None]):
                     f"Starting Autopilot in **{result.mode.value}** mode with "
                     f"**{len(result.stages)}** stages"
                 )
-                self._run_autopilot_stage(result.mode, result.stages)
+                self._run_autopilot_stage(
+                    result.mode, result.stages, use_teams=result.use_teams
+                )
             else:
                 logger.info("Autopilot: Cancelled by user")
                 self.mount_hint("Autopilot cancelled")
@@ -3058,6 +3061,7 @@ class ChatScreen(Screen[None]):
         mode: "AutopilotMode",
         stages: "list[Stage]",
         feedback: str | None = None,
+        use_teams: bool = True,
     ) -> None:
         """Run the autopilot workflow for the current stage.
 
@@ -3072,15 +3076,18 @@ class ChatScreen(Screen[None]):
             mode: The execution mode.
             stages: List of stages (with current state).
             feedback: Optional feedback from user rejection.
+            use_teams: Whether to use Claude Code Teams for parallel execution.
         """
         # Create or reuse orchestrator
         if self._autopilot_orchestrator is None:
             config = AutopilotConfig(
                 working_directory=self.deps.working_directory,
+                use_teams=use_teams,
             )
             self._autopilot_orchestrator = AutopilotOrchestrator(config)
             self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))
             self._autopilot_orchestrator.state.stages = stages
+            self._autopilot_orchestrator.state.use_teams = use_teams
             # Initialize state based on task completion - skip completed stages
             self._autopilot_orchestrator.state.initialize_from_tasks()
 
@@ -3144,8 +3151,13 @@ Then confirm what you changed.
         self.mount_hint(f"**Stage {current_stage.number}:** {current_stage.name}")
 
         try:
-            # Run the complete stage workflow
-            async for output in orchestrator.run_stage_workflow():
+            # Choose workflow based on teams setting
+            if orchestrator.config.use_teams:
+                workflow = orchestrator.run_batch_workflow()
+            else:
+                workflow = orchestrator.run_stage_workflow()
+
+            async for output in workflow:
                 self.post_message(AutopilotOutputReceived(output))
 
                 # Update spinner when stage changes (e.g., in cowboy mode auto-advance)

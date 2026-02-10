@@ -20,6 +20,10 @@ from shotgun.agents.autopilot.claude_subprocess import (
     ClaudeSubprocess,
     ClaudeSubprocessConfig,
 )
+from shotgun.agents.autopilot.dependency_graph import (
+    compute_execution_batches,
+    validate_dependencies,
+)
 from shotgun.agents.autopilot.lightweight_parser import LightweightTasksParser
 from shotgun.agents.autopilot.models import (
     AutopilotMode,
@@ -33,7 +37,9 @@ from shotgun.agents.autopilot.models import (
     StageStatus,
 )
 from shotgun.agents.autopilot.prompts import (
+    _ParallelStageInfo,
     render_create_pr,
+    render_execute_parallel_stages,
     render_execute_stage,
     render_qa_testing,
     render_review_code,
@@ -67,6 +73,10 @@ class AutopilotConfig(BaseModel):
     max_iterations: int = Field(
         default=MAX_STAGE_ITERATIONS,
         description="Maximum iterations per stage before giving up",
+    )
+    use_teams: bool = Field(
+        default=True,
+        description="Use Claude Code Teams for parallel batch execution",
     )
 
 
@@ -779,6 +789,367 @@ class AutopilotOrchestrator:
             )
             logger.info("All stages complete")
         return result
+
+    async def run_batch_workflow(self) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run stages using dependency-aware batch execution.
+
+        This is the teams-aware entry point that:
+        1. Validates the dependency graph
+        2. Computes execution batches from pending stages
+        3. For each batch:
+           - Single stage -> normal run_stage_workflow()
+           - Multiple stages + use_teams -> _run_parallel_batch()
+        4. After each batch, computes the next batch
+
+        Yields:
+            ClaudeOutput objects as work progresses.
+        """
+        # Validate dependency graph
+        errors = validate_dependencies(self.state.stages)
+        if errors:
+            for error in errors:
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.ERROR,
+                    content=f"Dependency error ({error.error_type}): {error.details}",
+                )
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDERR,
+                content="Falling back to sequential execution due to dependency errors",
+            )
+            # Fall back to sequential execution
+            async for output in self.run_stage_workflow():
+                yield output
+            return
+
+        # Compute execution batches from pending stages
+        plan = compute_execution_batches(self.state.stages)
+
+        if not plan.batches:
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content="No pending stages to execute",
+            )
+            return
+
+        logger.info(
+            "Batch workflow: %d batches, %d total stages",
+            plan.total_batches,
+            plan.total_stages,
+        )
+
+        # Track batch workflow start
+        track_event(
+            "autopilot_batch_workflow_started",
+            {
+                "total_batches": plan.total_batches,
+                "total_stages": plan.total_stages,
+                "use_teams": self.config.use_teams,
+                "mode": self.state.mode.value,
+            },
+        )
+
+        for batch in plan.batches:
+            if self._cancelled:
+                return
+
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"--- Batch {batch.level}: stages {', '.join(batch.stage_numbers)} ---",
+            )
+
+            if len(batch.stage_numbers) == 1 or not self.config.use_teams:
+                # Single stage or teams disabled -> sequential execution
+                for stage_num in batch.stage_numbers:
+                    if self._cancelled:
+                        return
+                    # Set current stage index to this stage
+                    stage_idx = next(
+                        (
+                            i
+                            for i, s in enumerate(self.state.stages)
+                            if s.number == stage_num
+                        ),
+                        None,
+                    )
+                    if stage_idx is not None:
+                        self.state.current_stage_index = stage_idx
+                        async for output in self.run_stage_workflow():
+                            yield output
+            else:
+                # Multiple stages with teams enabled -> parallel execution
+                async for output in self._run_parallel_batch(batch.stage_numbers):
+                    yield output
+
+    async def _run_parallel_batch(
+        self, stage_numbers: list[str]
+    ) -> AsyncGenerator[ClaudeOutput, None]:
+        """Execute multiple stages in parallel using Claude Code Teams.
+
+        Args:
+            stage_numbers: Stage identifiers to execute in parallel.
+
+        Yields:
+            ClaudeOutput as execution progresses.
+        """
+        # Build stage lookup
+        stage_map = {s.number: s for s in self.state.stages}
+        batch_stages = [stage_map[num] for num in stage_numbers if num in stage_map]
+
+        if not batch_stages:
+            yield ClaudeOutput(
+                type=ClaudeOutputType.ERROR,
+                content=f"No stages found for batch: {stage_numbers}",
+            )
+            return
+
+        # Load tasks for stages that don't have them
+        for stage in batch_stages:
+            if not stage.tasks:
+                detailed = await self._lightweight_parser.parse_single_stage(
+                    stage.number, self.config.tasks_file_path
+                )
+                if detailed:
+                    idx = next(
+                        i
+                        for i, s in enumerate(self.state.stages)
+                        if s.number == stage.number
+                    )
+                    detailed.status = stage.status
+                    detailed.phase = stage.phase
+                    detailed.branch_name = stage.branch_name
+                    detailed.pr_url = stage.pr_url
+                    detailed.iteration_count = stage.iteration_count
+                    self.state.stages[idx] = detailed
+                    stage_map[stage.number] = detailed
+
+        # Build parallel stage info for the template
+        parallel_stages = []
+        for stage in batch_stages:
+            stage = stage_map[stage.number]  # Re-fetch in case it was updated
+            branch_name = f"{self.config.branch_prefix}{stage.number}"
+            parallel_stages.append(
+                _ParallelStageInfo(
+                    number=stage.number,
+                    name=stage.name,
+                    branch_name=branch_name,
+                    pending_tasks=[t.text for t in stage.pending_tasks],
+                )
+            )
+
+        # Determine base branch (all stages in a batch branch from the same base)
+        base_branch = self.state.base_branch
+
+        # Render the parallel execution prompt
+        prompt = render_execute_parallel_stages(
+            tasks_file_path=self.state.tasks_file_path,
+            stages=parallel_stages,
+            base_branch=base_branch,
+            batch_level=0,
+        )
+
+        # Mark all batch stages as in progress
+        for stage in batch_stages:
+            stage_map[stage.number].status = StageStatus.IN_PROGRESS
+            stage_map[stage.number].phase = StagePhase.EXECUTING
+
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"Executing {len(batch_stages)} stages in parallel via Claude Code Teams",
+        )
+
+        # Track parallel batch start
+        track_event(
+            "autopilot_parallel_batch_started",
+            {
+                "batch_size": len(batch_stages),
+                "stage_numbers": stage_numbers,
+                "mode": self.state.mode.value,
+            },
+        )
+
+        # Run Claude with teams enabled
+        async for output in self._run_claude_with_teams(prompt):
+            yield output
+
+        # After parallel execution, refresh all batch stages
+        for stage in batch_stages:
+            refreshed = await self._lightweight_parser.parse_single_stage(
+                stage.number, self.config.tasks_file_path
+            )
+            if refreshed:
+                idx = next(
+                    i
+                    for i, s in enumerate(self.state.stages)
+                    if s.number == stage.number
+                )
+                refreshed.status = self.state.stages[idx].status
+                refreshed.phase = self.state.stages[idx].phase
+                refreshed.branch_name = self.state.stages[idx].branch_name
+                refreshed.pr_url = self.state.stages[idx].pr_url
+                refreshed.iteration_count = self.state.stages[idx].iteration_count
+                self.state.stages[idx] = refreshed
+
+                if refreshed.is_complete:
+                    self.state.stages[idx].status = StageStatus.COMPLETED
+                    self.state.stages[idx].phase = None
+
+        # Run post-execution workflow for each stage in the batch
+        for stage_num in stage_numbers:
+            if self._cancelled:
+                return
+            stage_idx = next(
+                (i for i, s in enumerate(self.state.stages) if s.number == stage_num),
+                -1,
+            )
+            if stage_idx >= 0:
+                self.state.current_stage_index = stage_idx
+                stage = self.state.stages[stage_idx]
+                if stage.status == StageStatus.COMPLETED:
+                    async for output in self._post_execution_workflow(stage):
+                        yield output
+
+    async def _run_claude_with_teams(
+        self, prompt: str
+    ) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run Claude Code with teams feature enabled.
+
+        Creates a ClaudeSubprocess with the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+        environment variable set, and without tool restrictions (teams need
+        TeamCreate, TaskCreate, SendMessage, Task, etc.).
+
+        Args:
+            prompt: The prompt to send.
+
+        Yields:
+            ClaudeOutput as execution progresses.
+        """
+        subprocess_config = ClaudeSubprocessConfig(
+            working_directory=self.config.working_directory,
+            env_vars={"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"},
+        )
+        self._claude = ClaudeSubprocess(subprocess_config)
+
+        logger.info("Invoking Claude Code with teams enabled (%d chars)", len(prompt))
+
+        try:
+            async for output in self._claude.run(prompt):
+                if output.type == ClaudeOutputType.ERROR:
+                    logger.error("Claude teams error: %s", output.content)
+                elif output.type == ClaudeOutputType.EXIT:
+                    logger.info(
+                        "Claude teams session ended: %s (exit code: %s)",
+                        output.content,
+                        output.exit_code,
+                    )
+                yield output
+        except Exception as e:
+            logger.exception("Error running Claude with teams")
+            yield ClaudeOutput(
+                type=ClaudeOutputType.ERROR,
+                content=f"Claude teams error: {e}",
+            )
+        finally:
+            self._claude = None
+
+    async def _post_execution_workflow(
+        self, stage: Stage
+    ) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run the post-execution workflow for a completed stage.
+
+        Handles PR creation, review, QA, and approval based on mode.
+        Shared by both sequential and parallel execution flows.
+
+        Args:
+            stage: The completed stage.
+
+        Yields:
+            ClaudeOutput as the workflow progresses.
+        """
+        if self.state.mode == AutopilotMode.COWBOY:
+            # Self-review only
+            stage.phase = StagePhase.REVIEWING
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"Self-reviewing Stage {stage.number}...",
+            )
+            async for output in self._review_and_fix(stage):
+                yield output
+                if self._cancelled:
+                    return
+
+            stage.status = StageStatus.COMPLETED
+            stage.phase = None
+
+            track_event(
+                "autopilot_stage_completed",
+                {
+                    "stage_number": stage.number,
+                    "total_stages": len(self.state.stages),
+                    "iterations_used": stage.iteration_count,
+                    "has_pr": False,
+                    "mode": self.state.mode.value,
+                    "parallel": True,
+                },
+            )
+
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"Stage {stage.number} complete (parallel)",
+            )
+            return
+
+        # Non-cowboy modes: PR creation, review, QA
+        stage.phase = StagePhase.CREATING_PR
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"Creating PR for Stage {stage.number}",
+        )
+        async for output in self._create_pr(stage):
+            yield output
+            if self._cancelled:
+                return
+
+        stage.phase = StagePhase.REVIEWING
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"Reviewing Stage {stage.number}",
+        )
+        async for output in self._review_and_fix(stage):
+            yield output
+            if self._cancelled:
+                return
+
+        stage.phase = StagePhase.QA_TESTING
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"QA testing Stage {stage.number}",
+        )
+        async for output in self._run_qa_tests(stage):
+            yield output
+            if self._cancelled:
+                return
+
+        # Mark ready for approval
+        stage.phase = StagePhase.AWAITING_APPROVAL
+        stage.status = StageStatus.COMPLETED
+        self.state.awaiting_approval = True
+
+        track_event(
+            "autopilot_stage_completed",
+            {
+                "stage_number": stage.number,
+                "total_stages": len(self.state.stages),
+                "iterations_used": stage.iteration_count,
+                "has_pr": stage.pr_url is not None,
+                "mode": self.state.mode.value,
+                "parallel": True,
+            },
+        )
+
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"Stage {stage.number} ready for review. PR: {stage.pr_url or 'N/A'}",
+        )
 
     async def cancel(self) -> None:
         """Cancel current execution."""

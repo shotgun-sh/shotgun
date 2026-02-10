@@ -66,7 +66,7 @@ def merge_stages_with_parsed_tasks(
             # Use parsed depends_on if available, fall back to existing
             depends_on = (
                 parsed_stage.depends_on
-                if parsed_stage.depends_on
+                if parsed_stage.depends_on is not None
                 else state_stage.depends_on
             )
             updated_stage = Stage(

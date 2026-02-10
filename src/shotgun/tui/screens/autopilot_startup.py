@@ -10,7 +10,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
-from textual.widgets import Button, RadioButton, RadioSet, Static
+from textual.widgets import Button, RadioButton, RadioSet, Static, Switch
 
 from shotgun.agents.autopilot.models import AutopilotMode, Stage
 
@@ -23,6 +23,10 @@ class AutopilotStartResult(BaseModel):
         default=None, description="Selected execution mode"
     )
     stages: list[Stage] | None = Field(default=None, description="Stages to execute")
+    use_teams: bool = Field(
+        default=True,
+        description="Use Claude Code Teams for parallel stage execution",
+    )
 
 
 class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
@@ -162,6 +166,27 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             color: $text-muted;
             height: auto;
         }
+
+        AutopilotStartupScreen .teams-section {
+            height: auto;
+            margin-bottom: 1;
+        }
+
+        AutopilotStartupScreen .teams-toggle-row {
+            height: auto;
+            align: left middle;
+        }
+
+        AutopilotStartupScreen .teams-label {
+            margin-left: 1;
+            color: $text;
+        }
+
+        AutopilotStartupScreen .teams-description {
+            height: auto;
+            margin-left: 3;
+            color: $text-muted;
+        }
     """
 
     def __init__(
@@ -188,6 +213,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         )  # Warnings only make sense if we have stages
         self.loading = loading
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
+        self.use_teams = True
 
     def compose(self) -> ComposeResult:
         """Compose the startup screen layout."""
@@ -254,6 +280,19 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                         "[dim]Full speed ahead! Claude builds each stage with self-review but no PRs and no human approval required. Maximum velocity, use with caution.[/]",
                         classes="mode-description",
                     )
+
+            # Teams toggle
+            with Container(classes="teams-section"):
+                with Horizontal(classes="teams-toggle-row"):
+                    yield Switch(value=True, id="teams-toggle")
+                    yield Static(
+                        "Use Claude Teams for parallel execution",
+                        classes="teams-label",
+                    )
+                yield Static(
+                    "[dim]Stages with independent dependencies will execute in parallel using Claude Code Teams[/]",
+                    classes="teams-description",
+                )
 
             # Stages preview section
             if self.loading:
@@ -380,6 +419,11 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         except NoMatches:
             pass
 
+    @on(Switch.Changed, "#teams-toggle")
+    def handle_teams_toggle(self, event: Switch.Changed) -> None:
+        """Handle teams toggle change."""
+        self.use_teams = event.value
+
     @on(RadioSet.Changed, "#mode-select")
     def handle_mode_change(self, event: RadioSet.Changed) -> None:
         """Handle mode selection change."""
@@ -399,6 +443,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 started=True,
                 mode=self.selected_mode,
                 stages=self.stages,
+                use_teams=self.use_teams,
             )
         )
 
@@ -417,6 +462,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             P: Select pause mode
             A: Select auto-continue mode
             C: Select cowboy mode
+            T: Toggle teams
         """
         if event.key == "enter":
             if not self.error_message or self.is_warning:
@@ -425,6 +471,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                         started=True,
                         mode=self.selected_mode,
                         stages=self.stages,
+                        use_teams=self.use_teams,
                     )
                 )
             else:
@@ -454,6 +501,14 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             try:
                 radio = self.query_one("#mode-cowboy", RadioButton)
                 radio.value = True
+            except NoMatches:
+                pass
+            event.stop()
+        elif event.key in ("t", "T"):
+            self.use_teams = not self.use_teams
+            try:
+                toggle = self.query_one("#teams-toggle", Switch)
+                toggle.value = self.use_teams
             except NoMatches:
                 pass
             event.stop()

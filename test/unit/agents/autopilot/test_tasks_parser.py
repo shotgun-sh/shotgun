@@ -381,6 +381,37 @@ def test_parse_depends_on_static_method():
     assert TasksParser._parse_depends_on("Stage A, Stage 2b") == ["A", "2b"]
 
 
+def test_merge_preserves_empty_depends_on():
+    """Test that merge preserves explicit empty depends_on (not falsy fallback)."""
+    from shotgun.agents.autopilot.tasks_parser import merge_stages_with_parsed_tasks
+
+    # State has depends_on=["1"] (stale), parsed has depends_on=[] (cleared to None/empty)
+    state_stages = [
+        Stage(
+            number="2",
+            name="Stage 2",
+            depends_on=["1"],
+            status=StageStatus.IN_PROGRESS,
+            tasks=[Task(text="Task 2", completed=False, line_number=2)],
+        ),
+    ]
+
+    # Parsed stage has empty depends_on (e.g. "Depends on: None" was parsed)
+    parsed_stages = [
+        Stage(
+            number="2",
+            name="Stage 2",
+            depends_on=[],  # Explicitly empty - should NOT fall through to state
+            tasks=[Task(text="Task 2", completed=True, line_number=2)],
+        ),
+    ]
+
+    result = merge_stages_with_parsed_tasks(state_stages, parsed_stages)
+
+    # The empty list from parsed should be preserved, not replaced by stale ["1"]
+    assert result[0].depends_on == []
+
+
 def test_merge_stages_preserves_depends_on():
     """Test that merge_stages_with_parsed_tasks preserves depends_on."""
     from shotgun.agents.autopilot.tasks_parser import merge_stages_with_parsed_tasks

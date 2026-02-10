@@ -188,6 +188,10 @@ class AutopilotState(BaseModel):
     tasks_file_path: str = Field(
         default=".shotgun/tasks.md", description="Path to the tasks.md file"
     )
+    use_teams: bool = Field(
+        default=True,
+        description="Use Claude Code Teams for parallel stage execution",
+    )
 
     @property
     def current_stage(self) -> Stage | None:
