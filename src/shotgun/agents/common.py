@@ -1,6 +1,6 @@
 """Common utilities for agent creation and management."""
 
-from collections.abc import AsyncIterable, Awaitable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -190,7 +190,7 @@ async def create_base_agent(
     provider: ProviderType | None = None,
     agent_mode: AgentType | None = None,
     for_sub_agent: bool = False,
-    mcp_servers: list[MCPServer] | None = None,
+    mcp_servers: Sequence[MCPServer] | None = None,
 ) -> tuple[ShotgunAgent, AgentDeps]:
     """Create a base agent with common configuration.
 

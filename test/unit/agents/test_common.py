@@ -208,6 +208,7 @@ def test_build_agent_system_prompt_research_agent():
     mock_context.deps.llm_model = MagicMock()
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -240,6 +241,7 @@ def test_build_agent_system_prompt_custom_context():
     mock_context.deps.llm_model = MagicMock()
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -272,6 +274,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
     mock_context.deps.llm_model = MagicMock()
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
