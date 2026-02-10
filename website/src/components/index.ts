@@ -13,3 +13,6 @@ export { Section, type SectionProps } from "./Section";
 export { CodeBlock, type CodeBlockProps } from "./CodeBlock";
 export { GridLayout, type GridLayoutProps } from "./GridLayout";
 export { ResponsiveImage, type ResponsiveImageProps } from "./ResponsiveImage";
+export { Hero, type HeroProps } from "./Hero";
+export { HeroButton, type HeroButtonProps } from "./HeroButton";
+export { HeroImage, type HeroImageProps } from "./HeroImage";
