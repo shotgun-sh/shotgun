@@ -248,7 +248,8 @@ async def create_base_agent(
             agent_mode=agent_mode,
         )
 
-        # Set flag for Context7 availability (used in system prompt template)
+        # TODO: This assumes all MCP servers are Context7. When adding other MCP
+        # servers, check specifically for Context7 rather than any MCP server.
         if mcp_servers:
             deps.has_context7 = True
 

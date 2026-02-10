@@ -146,16 +146,40 @@ def test_is_retryable_error_key_error():
 # =============================================================================
 
 
-def test_create_agent_runtime_options(mock_router_deps):
-    """Test creating AgentRuntimeOptions from RouterDeps."""
+def test_create_agent_runtime_options_openai_compatible_inherits_model(
+    mock_router_deps,
+):
+    """Test that OPENAI_COMPATIBLE provider inherits model config for sub-agents."""
+    # Fixture default is OPENAI_COMPATIBLE
+    assert mock_router_deps.llm_model.provider == ProviderType.OPENAI_COMPATIBLE
+
     options = _create_agent_runtime_options(mock_router_deps)
 
     assert options.interactive_mode == mock_router_deps.interactive_mode
     assert options.working_directory == mock_router_deps.working_directory
     assert options.is_tui_context == mock_router_deps.is_tui_context
     assert options.max_iterations == mock_router_deps.max_iterations
-    # Verify model config is passed through for sub-agent inheritance
+    # OPENAI_COMPATIBLE should inherit model config (can't resolve via get_provider_model)
     assert options.inherited_model_config == mock_router_deps.llm_model
+
+
+def test_create_agent_runtime_options_anthropic_does_not_inherit_model(
+    mock_router_deps,
+):
+    """Test that ANTHROPIC provider does NOT inherit model config, allowing sub-agent substitution."""
+    mock_router_deps.llm_model = ModelConfig(
+        name="claude-sonnet-4-5",
+        provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=200000,
+        max_output_tokens=16000,
+        api_key="test-key",
+    )
+
+    options = _create_agent_runtime_options(mock_router_deps)
+
+    # Standard providers should NOT inherit so get_provider_model(for_sub_agent=True) applies
+    assert options.inherited_model_config is None
 
 
 # =============================================================================
