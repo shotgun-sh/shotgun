@@ -153,14 +153,22 @@ export function CodeBlock({
       await navigator.clipboard.writeText(code);
     } catch {
       // Fallback for older browsers that don't support Clipboard API
-      const textArea = document.createElement("textarea");
-      textArea.value = code;
-      textArea.style.position = "fixed";
-      textArea.style.left = "-9999px";
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
+      let textArea: HTMLTextAreaElement | null = null;
+      try {
+        textArea = document.createElement("textarea");
+        textArea.value = code;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+      } catch {
+        // Copy failed silently — no clipboard access available
+      } finally {
+        if (textArea?.parentNode) {
+          textArea.parentNode.removeChild(textArea);
+        }
+      }
     }
 
     setCopied(true);

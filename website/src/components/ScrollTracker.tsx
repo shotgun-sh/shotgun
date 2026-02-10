@@ -26,7 +26,7 @@ export function ScrollTracker({
   const ref = useScrollTracking(sectionName);
 
   return (
-    <div ref={ref as React.RefObject<HTMLDivElement>} className={className}>
+    <div ref={ref} className={className}>
       {children}
     </div>
   );

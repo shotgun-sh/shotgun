@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
-export interface ProblemCardProps extends HTMLAttributes<HTMLDivElement> {
+export interface ProblemCardProps extends HTMLAttributes<HTMLElement> {
   /** Icon element to display in the card header */
   icon: ReactNode;
   /** Problem title */
@@ -24,7 +24,7 @@ export function ProblemCard({
   ...props
 }: ProblemCardProps) {
   return (
-    <div
+    <article
       className={`
         rounded-[var(--radius-lg)]
         border border-border-light
@@ -65,6 +65,6 @@ export function ProblemCard({
       >
         {copy}
       </p>
-    </div>
+    </article>
   );
 }

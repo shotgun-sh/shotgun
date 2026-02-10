@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ProblemCard } from "@/components/ProblemCard";
 import { problems } from "@/data/problems";
 
@@ -5,7 +6,7 @@ import { problems } from "@/data/problems";
  * Problem section icons — inline SVGs for each pain point.
  * Simple line-based icons matching the design system.
  */
-const problemIcons: Record<string, React.ReactNode> = {
+const problemIcons: Record<string, ReactNode> = {
   "context-loss": (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
@@ -46,12 +47,24 @@ export interface ProblemSectionProps {
  * Displays 4 problem cards in a 2x2 grid on desktop,
  * responsive to 1x2 on tablet and 1x1 on mobile.
  */
+/** Fallback icon displayed when a problem ID has no matching icon */
+function FallbackIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
 export function ProblemSection({ className = "" }: ProblemSectionProps) {
   return (
-    <div className={className} data-gtm-section="problems">
+    <div className={className}>
       {/* Section heading */}
       <div className="mb-[var(--space-12)] text-center">
         <h2
+          id="problems-heading"
           className="
             text-[length:var(--font-size-3xl)] md:text-[length:var(--font-size-4xl)]
             font-[var(--font-weight-bold)]
@@ -69,7 +82,7 @@ export function ProblemSection({ className = "" }: ProblemSectionProps) {
         {problems.map((problem) => (
           <ProblemCard
             key={problem.id}
-            icon={problemIcons[problem.id]}
+            icon={problemIcons[problem.id] ?? <FallbackIcon />}
             title={problem.title}
             copy={problem.copy}
           />

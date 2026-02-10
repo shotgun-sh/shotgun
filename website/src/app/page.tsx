@@ -28,6 +28,7 @@ export default function Home() {
           py-[var(--space-16)] md:py-[var(--space-24)]
         "
         data-gtm-section="problems"
+        aria-labelledby="problems-heading"
       >
         <ScrollTracker sectionName="problems">
           <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
@@ -43,6 +44,7 @@ export default function Home() {
           py-[var(--space-16)] md:py-[var(--space-24)]
         "
         data-gtm-section="solutions"
+        aria-labelledby="solutions-heading"
       >
         <ScrollTracker sectionName="solutions">
           <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">

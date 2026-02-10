@@ -14,7 +14,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
  * ```
  */
 export function useScrollTracking(sectionName: string) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const hasFired = useRef(false);
   const { trackSectionView } = useAnalytics();
 

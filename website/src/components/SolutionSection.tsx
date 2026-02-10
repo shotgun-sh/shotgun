@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { SolutionCard } from "@/components/SolutionCard";
 import { solutions } from "@/data/solutions";
 
@@ -5,7 +6,7 @@ import { solutions } from "@/data/solutions";
  * Solution section icons — inline SVGs mirroring problem icons.
  * Complementary line-based icons matching the design system.
  */
-const solutionIcons: Record<string, React.ReactNode> = {
+const solutionIcons: Record<string, ReactNode> = {
   "persistent-understanding": (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -53,12 +54,24 @@ export interface SolutionSectionProps {
  * in a 2x2 grid on desktop, responsive to smaller breakpoints.
  * Includes section heading and overview copy.
  */
+/** Fallback icon displayed when a solution ID has no matching icon */
+function FallbackIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
 export function SolutionSection({ className = "" }: SolutionSectionProps) {
   return (
-    <div className={className} data-gtm-section="solutions">
+    <div className={className}>
       {/* Section heading */}
       <div className="mb-[var(--space-12)] text-center">
         <h2
+          id="solutions-heading"
           className="
             text-[length:var(--font-size-3xl)] md:text-[length:var(--font-size-4xl)]
             font-[var(--font-weight-bold)]
@@ -91,7 +104,7 @@ export function SolutionSection({ className = "" }: SolutionSectionProps) {
         {solutions.map((solution) => (
           <SolutionCard
             key={solution.id}
-            icon={solutionIcons[solution.id]}
+            icon={solutionIcons[solution.id] ?? <FallbackIcon />}
             title={solution.title}
             benefit={solution.benefit}
             copy={solution.copy}
