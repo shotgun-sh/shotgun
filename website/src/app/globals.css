@@ -1,0 +1,124 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  /* Map design tokens to Tailwind theme */
+
+  /* Colors */
+  --color-navy-50: var(--color-navy-50);
+  --color-navy-100: var(--color-navy-100);
+  --color-navy-200: var(--color-navy-200);
+  --color-navy-300: var(--color-navy-300);
+  --color-navy-400: var(--color-navy-400);
+  --color-navy-500: var(--color-navy-500);
+  --color-navy-600: var(--color-navy-600);
+  --color-navy-700: var(--color-navy-700);
+  --color-navy-800: var(--color-navy-800);
+  --color-navy-900: var(--color-navy-900);
+
+  --color-accent-orange-50: var(--color-orange-50);
+  --color-accent-orange-100: var(--color-orange-100);
+  --color-accent-orange-200: var(--color-orange-200);
+  --color-accent-orange-300: var(--color-orange-300);
+  --color-accent-orange-400: var(--color-orange-400);
+  --color-accent-orange-500: var(--color-orange-500);
+  --color-accent-orange-600: var(--color-orange-600);
+  --color-accent-orange-700: var(--color-orange-700);
+
+  --color-accent-blue-50: var(--color-blue-50);
+  --color-accent-blue-100: var(--color-blue-100);
+  --color-accent-blue-200: var(--color-blue-200);
+  --color-accent-blue-300: var(--color-blue-300);
+  --color-accent-blue-400: var(--color-blue-400);
+  --color-accent-blue-500: var(--color-blue-500);
+  --color-accent-blue-600: var(--color-blue-600);
+  --color-accent-blue-700: var(--color-blue-700);
+
+  --color-primary: var(--color-primary);
+  --color-primary-light: var(--color-primary-light);
+  --color-primary-dark: var(--color-primary-dark);
+
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+  --color-accent-dark: var(--color-accent-dark);
+
+  --color-secondary: var(--color-secondary);
+  --color-secondary-light: var(--color-secondary-light);
+  --color-secondary-dark: var(--color-secondary-dark);
+
+  --color-surface: var(--color-surface);
+  --color-surface-elevated: var(--color-surface-elevated);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-inverse: var(--color-text-inverse);
+
+  --color-border: var(--color-border);
+  --color-border-light: var(--color-border-light);
+
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+
+  /* Font families */
+  --font-sans: var(--font-family-primary);
+  --font-mono: var(--font-family-mono);
+
+  /* Breakpoints - defined via @theme for Tailwind v4 */
+  --breakpoint-sm: 320px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1440px;
+}
+
+/* ===========================
+ * BASE STYLES
+ * =========================== */
+
+body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-primary);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Heading Styles */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text-primary);
+}
+
+/* ===========================
+ * UTILITY CLASSES
+ * =========================== */
+
+/* Focus ring for accessibility */
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-navy-200);
+  color: var(--color-navy-900);
+}
