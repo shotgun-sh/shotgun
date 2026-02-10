@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f2240;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#152d54;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)" rx="12"/>
+
+  <!-- Window chrome -->
+  <rect x="80" y="60" width="1040" height="680" rx="8" fill="#1a1a2e" stroke="#2a2a4a" stroke-width="1"/>
+  <rect x="80" y="60" width="1040" height="40" rx="8" fill="#1a1a2e"/>
+  <circle cx="108" cy="80" r="6" fill="#ff5f57"/>
+  <circle cx="128" cy="80" r="6" fill="#febc2e"/>
+  <circle cx="148" cy="80" r="6" fill="#28c840"/>
+
+  <!-- Content area -->
+  <rect x="100" y="120" width="300" height="16" rx="4" fill="#3a6bb5" opacity="0.6"/>
+  <rect x="100" y="150" width="240" height="12" rx="3" fill="#5a8ed4" opacity="0.4"/>
+  <rect x="100" y="175" width="280" height="12" rx="3" fill="#5a8ed4" opacity="0.3"/>
+
+  <!-- Code block -->
+  <rect x="100" y="210" width="460" height="120" rx="6" fill="#0d1117"/>
+  <text x="120" y="245" font-family="monospace" font-size="14" fill="#8ab4e8">$ uvx shotgun-sh@latest</text>
+  <text x="120" y="270" font-family="monospace" font-size="14" fill="#6b7280">Analyzing codebase...</text>
+  <text x="120" y="295" font-family="monospace" font-size="14" fill="#a5d6a7">✓ 847 files indexed</text>
+  <text x="120" y="320" font-family="monospace" font-size="14" fill="#a5d6a7">✓ Spec generated</text>
+
+  <!-- Side panel -->
+  <rect x="600" y="120" width="500" height="500" rx="6" fill="#0d1117" opacity="0.5"/>
+  <rect x="620" y="140" width="180" height="14" rx="3" fill="#f97316" opacity="0.7"/>
+  <rect x="620" y="170" width="440" height="10" rx="3" fill="#5a8ed4" opacity="0.3"/>
+  <rect x="620" y="190" width="400" height="10" rx="3" fill="#5a8ed4" opacity="0.3"/>
+  <rect x="620" y="210" width="420" height="10" rx="3" fill="#5a8ed4" opacity="0.3"/>
+
+  <!-- Stage indicators -->
+  <rect x="620" y="250" width="460" height="40" rx="6" fill="#16a34a" opacity="0.2"/>
+  <text x="640" y="275" font-family="sans-serif" font-size="13" fill="#a5d6a7">Stage 1: Research</text>
+  <text x="1020" y="275" font-family="sans-serif" font-size="13" fill="#a5d6a7">✓</text>
+
+  <rect x="620" y="300" width="460" height="40" rx="6" fill="#16a34a" opacity="0.2"/>
+  <text x="640" y="325" font-family="sans-serif" font-size="13" fill="#a5d6a7">Stage 2: Specification</text>
+  <text x="1020" y="325" font-family="sans-serif" font-size="13" fill="#a5d6a7">✓</text>
+
+  <rect x="620" y="350" width="460" height="40" rx="6" fill="#3b82f6" opacity="0.2"/>
+  <text x="640" y="375" font-family="sans-serif" font-size="13" fill="#93c5fd">Stage 3: Planning</text>
+  <text x="1000" y="375" font-family="sans-serif" font-size="13" fill="#93c5fd">...</text>
+
+  <rect x="620" y="400" width="460" height="40" rx="6" fill="#404040" opacity="0.3"/>
+  <text x="640" y="425" font-family="sans-serif" font-size="13" fill="#737373">Stage 4: Tasks</text>
+
+  <rect x="620" y="450" width="460" height="40" rx="6" fill="#404040" opacity="0.3"/>
+  <text x="640" y="475" font-family="sans-serif" font-size="13" fill="#737373">Stage 5: Export</text>
+
+  <!-- Metrics -->
+  <rect x="100" y="370" width="460" height="100" rx="6" fill="#0d1117" opacity="0.5"/>
+  <text x="120" y="400" font-family="sans-serif" font-size="12" fill="#737373">FILES ANALYZED</text>
+  <text x="120" y="430" font-family="sans-serif" font-size="28" font-weight="bold" fill="#f97316">847</text>
+  <text x="260" y="400" font-family="sans-serif" font-size="12" fill="#737373">SPECS GENERATED</text>
+  <text x="260" y="430" font-family="sans-serif" font-size="28" font-weight="bold" fill="#3b82f6">12</text>
+  <text x="400" y="400" font-family="sans-serif" font-size="12" fill="#737373">TIME SAVED</text>
+  <text x="400" y="430" font-family="sans-serif" font-size="28" font-weight="bold" fill="#16a34a">3wks</text>
+</svg>
