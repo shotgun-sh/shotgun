@@ -212,8 +212,8 @@ class DeleteCodebasePaletteProvider(Provider):
             help_text = f"{graph.graph_id} • {graph.repo_path}"
             yield DiscoveryHit(
                 title,
-                lambda graph_id=graph.graph_id: self.chat_screen.delete_codebase_from_palette(
-                    graph_id
+                lambda graph_id=graph.graph_id: (
+                    self.chat_screen.delete_codebase_from_palette(graph_id)
                 ),
                 help=help_text,
             )
@@ -228,8 +228,8 @@ class DeleteCodebasePaletteProvider(Provider):
                 yield Hit(
                     score,
                     matcher.highlight(display),
-                    lambda graph_id=graph.graph_id: self.chat_screen.delete_codebase_from_palette(
-                        graph_id
+                    lambda graph_id=graph.graph_id: (
+                        self.chat_screen.delete_codebase_from_palette(graph_id)
                     ),
                     help=graph.repo_path,
                 )
