@@ -19,9 +19,7 @@ async def test_get_configured_anthropic_tier_returns_tier():
     mock_config = MagicMock()
     mock_config.anthropic.tier = 2
 
-    with patch(
-        "shotgun.agents.config.get_config_manager"
-    ) as mock_get_cm:
+    with patch("shotgun.agents.config.get_config_manager") as mock_get_cm:
         mock_cm = MagicMock()
         mock_cm.load = AsyncMock(return_value=mock_config)
         mock_get_cm.return_value = mock_cm
