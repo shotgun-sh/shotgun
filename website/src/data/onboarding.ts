@@ -20,7 +20,7 @@ export const onboardingSteps: OnboardingStepData[] = [
     number: 1,
     title: "Install Shotgun",
     description:
-      "One command. No dependencies. Run `$ uvx shotgun-sh@latest` and you're ready to go.",
+      "One command. No dependencies. Works on macOS, Linux, and WSL. You're ready in seconds.",
   },
   {
     id: "api-key",

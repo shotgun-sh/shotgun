@@ -158,11 +158,11 @@ export function SocialProofSection({ className = "" }: SocialProofSectionProps) 
 
             <div className="space-y-[var(--space-3)]">
               {[
-                { label: "Codebase Understanding", shotgun: true, specKit: false },
-                { label: "Research Capability", shotgun: true, specKit: false },
-                { label: "Multi-Agent Architecture", shotgun: true, specKit: false },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center gap-[var(--space-3)]">
+                "Codebase Understanding",
+                "Research Capability",
+                "Multi-Agent Architecture",
+              ].map((label) => (
+                <div key={label} className="flex items-center gap-[var(--space-3)]">
                   <span className="
                     inline-flex items-center justify-center
                     w-5 h-5 rounded-full
@@ -177,7 +177,7 @@ export function SocialProofSection({ className = "" }: SocialProofSectionProps) 
                     text-[length:var(--font-size-sm)]
                     text-text-primary
                   ">
-                    {item.label}
+                    {label}
                   </span>
                   <span className="
                     ml-auto
