@@ -315,9 +315,7 @@ async def test_get_configured_mcp_servers_with_context7_key():
     mock_manager = AsyncMock()
     mock_manager.get_context7_api_key.return_value = "test-key"
 
-    with patch(
-        "shotgun.agents.config.get_config_manager", return_value=mock_manager
-    ):
+    with patch("shotgun.agents.config.get_config_manager", return_value=mock_manager):
         from shotgun.agents.agent_manager import AgentManager
 
         # Call the static-like method directly by creating a minimal instance
@@ -333,9 +331,7 @@ async def test_get_configured_mcp_servers_without_context7_key():
     mock_manager = AsyncMock()
     mock_manager.get_context7_api_key.return_value = None
 
-    with patch(
-        "shotgun.agents.config.get_config_manager", return_value=mock_manager
-    ):
+    with patch("shotgun.agents.config.get_config_manager", return_value=mock_manager):
         from shotgun.agents.agent_manager import AgentManager
 
         result = await AgentManager._get_configured_mcp_servers(

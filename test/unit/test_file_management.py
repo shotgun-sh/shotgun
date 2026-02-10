@@ -625,7 +625,9 @@ class TestIntegrationScenarios:
 
                 for malicious_path in malicious_paths:
                     # All operations should fail with security error
-                    read_result = await read_file(mock_ctx, malicious_path, "test security")
+                    read_result = await read_file(
+                        mock_ctx, malicious_path, "test security"
+                    )
                     assert "Error reading file" in read_result
 
                     write_result = await write_file(

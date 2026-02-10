@@ -10,7 +10,7 @@ updates:
       interval: "daily"
       time: "04:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     assignees:
       - "scottfrasso"
     labels:
@@ -20,6 +20,10 @@ updates:
       prefix: "build"
       prefix-development: "build"
       include: "scope"
+    groups:
+      all-python-deps:
+        patterns:
+          - "*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -28,7 +32,7 @@ updates:
       interval: "daily"
       time: "04:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     assignees:
       - "scottfrasso"
     labels:
@@ -37,3 +41,7 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
+    groups:
+      all-github-actions:
+        patterns:
+          - "*"

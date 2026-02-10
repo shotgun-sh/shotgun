@@ -232,7 +232,9 @@ class RouterExecutor:
                 if shotgun_agent_type == ShotgunAgentType.ROUTER:
                     # Get router mode from test case context (default: planning)
                     context = test_case.inputs.context
-                    router_mode = context.router_mode if context else RouterMode.PLANNING
+                    router_mode = (
+                        context.router_mode if context else RouterMode.PLANNING
+                    )
 
                     deps: AgentDeps = RouterDeps(
                         interactive_mode=True,
@@ -317,7 +319,8 @@ class RouterExecutor:
                 token_usage = {
                     "prompt_tokens": usage.input_tokens or 0,
                     "completion_tokens": usage.output_tokens or 0,
-                    "total_tokens": (usage.input_tokens or 0) + (usage.output_tokens or 0),
+                    "total_tokens": (usage.input_tokens or 0)
+                    + (usage.output_tokens or 0),
                 }
 
                 # Extract router-specific fields
@@ -329,7 +332,9 @@ class RouterExecutor:
 
             return AgentExecutionOutput(
                 response=response,
-                clarifying_questions=clarifying_questions if clarifying_questions else None,
+                clarifying_questions=clarifying_questions
+                if clarifying_questions
+                else None,
                 file_operations=file_operations,
                 tools_used=tools_used,
                 tool_call_counts=tool_call_counts,
