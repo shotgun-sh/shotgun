@@ -6,6 +6,7 @@ from typing import TypeGuard
 
 from pydantic import BaseModel, Field, PrivateAttr, SecretStr
 from pydantic_ai.models import Model
+from pydantic_ai.models.anthropic import AnthropicModelSettings
 
 
 class ProviderType(StrEnum):
@@ -22,6 +23,21 @@ class KeyProvider(StrEnum):
 
     BYOK = "byok"  # Bring Your Own Key (individual provider keys)
     SHOTGUN = "shotgun"  # Shotgun Account (unified LiteLLM proxy)
+
+
+class AnthropicCacheTTL(StrEnum):
+    """Anthropic prompt caching TTL values."""
+
+    SHORT = "5m"  # Sub-agents: short-lived, lower cache duration
+    LONG = "1h"  # Router: long-lived session, higher cache duration
+
+    def to_model_settings(self) -> AnthropicModelSettings:
+        """Build AnthropicModelSettings with this TTL for all cache fields."""
+        return AnthropicModelSettings(
+            anthropic_cache_instructions=self.value,
+            anthropic_cache_tool_definitions=self.value,
+            anthropic_cache_messages=self.value,
+        )
 
 
 class ModelName(StrEnum):

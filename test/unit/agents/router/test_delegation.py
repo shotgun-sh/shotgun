@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pydantic_ai import RunContext
+from pydantic_ai import RunContext, RunUsage
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.tools import ToolDefinition
 
@@ -62,6 +62,8 @@ def mock_router_deps():
     deps.parent_stream_handler = None  # For streaming support
     deps.pending_approval = None  # No pending approval by default
     deps.cancellation_event = None  # For ESC cancellation support
+    deps.usage_manager = MagicMock()
+    deps.usage_manager.add_usage = AsyncMock()
     # Create a real ModelConfig for sub-agent inheritance testing
     deps.llm_model = ModelConfig(
         name="test-model",
@@ -144,16 +146,40 @@ def test_is_retryable_error_key_error():
 # =============================================================================
 
 
-def test_create_agent_runtime_options(mock_router_deps):
-    """Test creating AgentRuntimeOptions from RouterDeps."""
+def test_create_agent_runtime_options_openai_compatible_inherits_model(
+    mock_router_deps,
+):
+    """Test that OPENAI_COMPATIBLE provider inherits model config for sub-agents."""
+    # Fixture default is OPENAI_COMPATIBLE
+    assert mock_router_deps.llm_model.provider == ProviderType.OPENAI_COMPATIBLE
+
     options = _create_agent_runtime_options(mock_router_deps)
 
     assert options.interactive_mode == mock_router_deps.interactive_mode
     assert options.working_directory == mock_router_deps.working_directory
     assert options.is_tui_context == mock_router_deps.is_tui_context
     assert options.max_iterations == mock_router_deps.max_iterations
-    # Verify model config is passed through for sub-agent inheritance
+    # OPENAI_COMPATIBLE should inherit model config (can't resolve via get_provider_model)
     assert options.inherited_model_config == mock_router_deps.llm_model
+
+
+def test_create_agent_runtime_options_anthropic_does_not_inherit_model(
+    mock_router_deps,
+):
+    """Test that ANTHROPIC provider does NOT inherit model config, allowing sub-agent substitution."""
+    mock_router_deps.llm_model = ModelConfig(
+        name="claude-sonnet-4-5",
+        provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=200000,
+        max_output_tokens=16000,
+        api_key="test-key",
+    )
+
+    options = _create_agent_runtime_options(mock_router_deps)
+
+    # Standard providers should NOT inherit so get_provider_model(for_sub_agent=True) applies
+    assert options.inherited_model_config is None
 
 
 # =============================================================================
@@ -684,3 +710,46 @@ async def test_run_sub_agent_none_stream_handler(mock_context, mock_agent_result
     # Verify that event_stream_handler was passed but is None
     assert "event_stream_handler" in captured_kwargs
     assert captured_kwargs["event_stream_handler"] is None
+
+
+# =============================================================================
+# Tests for sub-agent usage tracking
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_run_sub_agent_tracks_usage(mock_context, mock_agent_result):
+    """Test that sub-agent usage is tracked via usage_manager after delegation."""
+    mock_agent = MagicMock()
+    mock_sub_deps = _create_mock_sub_agent_deps()
+    mock_sub_deps.llm_model = ModelConfig(
+        name="claude-haiku-4-5",
+        provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=200000,
+        max_output_tokens=8192,
+        api_key="test-key",
+    )
+    mock_context.deps.sub_agent_cache = {}
+
+    # Set up a real RunUsage on the mock result
+    expected_usage = RunUsage(input_tokens=100, output_tokens=50, cache_read_tokens=10)
+    mock_agent_result.usage.return_value = expected_usage
+
+    with patch.dict(
+        "shotgun.agents.router.tools.delegation_tools.AGENT_FACTORIES",
+        {
+            AgentType.RESEARCH: (
+                AsyncMock(return_value=(mock_agent, mock_sub_deps)),
+                AsyncMock(return_value=mock_agent_result),
+            )
+        },
+    ):
+        result = await _run_sub_agent(mock_context, AgentType.RESEARCH, "Test task")
+
+    assert result.success is True
+    mock_context.deps.usage_manager.add_usage.assert_awaited_once_with(
+        expected_usage,
+        model_name="claude-haiku-4-5",
+        provider=ProviderType.ANTHROPIC,
+    )

@@ -19,6 +19,7 @@ from shotgun.agents.common import (
     run_agent,
 )
 from shotgun.agents.config import ProviderType, get_provider_model
+from shotgun.agents.config.models import AnthropicCacheTTL
 from shotgun.agents.conversation.history import token_limit_compactor
 from shotgun.agents.models import AgentResponse, AgentRuntimeOptions, AgentType
 from shotgun.agents.router.models import RouterDeps
@@ -122,6 +123,7 @@ async def create_router_agent(
         history_processors=[history_processor],
         retries=3,
         tools=delegation_tools,
+        model_settings=AnthropicCacheTTL.LONG.to_model_settings(),
     )
 
     # Register plan management tools (router-specific, always available)

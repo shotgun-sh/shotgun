@@ -14,6 +14,7 @@ from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.tools import ToolDefinition
 
+from shotgun.agents.config.models import ProviderType
 from shotgun.agents.export import create_export_agent, run_export_agent
 from shotgun.agents.models import (
     AgentDeps,
@@ -138,6 +139,16 @@ def _create_agent_runtime_options(deps: RouterDeps) -> AgentRuntimeOptions:
     Returns:
         AgentRuntimeOptions configured for sub-agent creation.
     """
+    # Only inherit model config for providers that can't resolve via get_provider_model
+    # (Ollama/OpenAI-compatible endpoints configured via TUI/env vars).
+    # Standard providers (Anthropic, OpenAI, Google) should NOT inherit so that
+    # get_provider_model(for_sub_agent=True) can apply cheaper model substitution.
+    inherited_config = (
+        deps.llm_model
+        if deps.llm_model.provider == ProviderType.OPENAI_COMPATIBLE
+        else None
+    )
+
     return AgentRuntimeOptions(
         interactive_mode=deps.interactive_mode,
         working_directory=deps.working_directory,
@@ -145,9 +156,7 @@ def _create_agent_runtime_options(deps: RouterDeps) -> AgentRuntimeOptions:
         max_iterations=deps.max_iterations,
         queue=deps.queue,
         tasks=deps.tasks,
-        # Pass the model config so sub-agents use the same model as the Router
-        # This is critical for Ollama/OpenAI-compatible models selected in TUI
-        inherited_model_config=deps.llm_model,
+        inherited_model_config=inherited_config,
     )
 
 
@@ -294,6 +303,14 @@ async def _run_sub_agent(
                 deps=sub_agent_deps,
                 message_history=[],  # Isolated context
                 event_stream_handler=deps.parent_stream_handler,  # Forward streaming
+            )
+
+            # Track sub-agent usage
+            usage = result.usage()
+            await deps.usage_manager.add_usage(
+                usage,
+                model_name=sub_agent_deps.llm_model.name,
+                provider=sub_agent_deps.llm_model.provider,
             )
 
             # Extract response text

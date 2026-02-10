@@ -28,6 +28,7 @@ from shotgun.agents.config.constants import (
     WEB_SEARCH_STOP_THRESHOLD,
     WEB_SEARCH_WARNING_THRESHOLD,
 )
+from shotgun.agents.config.models import AnthropicCacheTTL
 from shotgun.agents.models import (
     AgentResponse,
     AgentSystemPromptContext,
@@ -247,7 +248,8 @@ async def create_base_agent(
             agent_mode=agent_mode,
         )
 
-        # Set flag for Context7 availability (used in system prompt template)
+        # TODO: This assumes all MCP servers are Context7. When adding other MCP
+        # servers, check specifically for Context7 rather than any MCP server.
         if mcp_servers:
             deps.has_context7 = True
 
@@ -318,6 +320,7 @@ async def create_base_agent(
         history_processors=[history_processor],
         retries=3,  # Default retry count for tool calls and output validation
         toolsets=mcp_servers or None,
+        model_settings=AnthropicCacheTTL.SHORT.to_model_settings(),
     )
 
     # System prompt function is stored in deps and will be called manually in run_agent
