@@ -677,6 +677,24 @@ class AgentManager(Widget):
         }
         return deps_map[agent_type]
 
+    async def _get_configured_mcp_servers(self) -> dict[str, bool]:
+        """Get which MCP servers are configured.
+
+        Returns a dict mapping MCP server names to their availability status.
+        Extensible for future MCP integrations beyond Context7.
+
+        Returns:
+            Dict of MCP server names to boolean availability.
+        """
+        from shotgun.agents.config import get_config_manager
+
+        config_manager = get_config_manager()
+        context7_key = await config_manager.get_context7_api_key()
+
+        return {
+            "context7": context7_key is not None,
+        }
+
     def _create_merged_deps(self, agent_type: AgentType) -> AgentDeps:
         """Create merged dependencies combining shared and agent-specific deps.
 
@@ -945,6 +963,11 @@ class AgentManager(Widget):
                     anthropic_tier == AnthropicTier.TIER_1
                 )
                 event_properties["anthropic_tier"] = anthropic_tier
+
+        # Track which MCP servers are configured (extensible for future MCP integrations)
+        if self._current_agent_type == AgentType.ROUTER:
+            mcp_servers = await self._get_configured_mcp_servers()
+            event_properties["mcp_servers"] = mcp_servers
 
         track_event(event_name, event_properties)
 

@@ -217,6 +217,22 @@ _**Mode switching:** `Shift+Tab` cycles through modes_
 
  **Note:** CLI available in [docs/CLI.md](docs/CLI.md), but TUI is recommended.
 
+### Context7 Documentation Lookup (Experimental)
+
+The Research agent can fetch up-to-date library documentation via [Context7](https://context7.com). When configured, the agent will prefer Context7 over web search for documentation lookups.
+
+To enable it, set your Context7 API key:
+
+```bash
+shotgun config set-context7 --api-key <your-context7-api-key>
+```
+
+To remove it:
+
+```bash
+shotgun config clear-context7
+```
+
 ---
 
 # 🤝 Share Specs with Your Team
