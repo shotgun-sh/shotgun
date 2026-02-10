@@ -12,6 +12,7 @@ from shotgun.agents.common import (
     build_agent_system_prompt,
     run_agent,
 )
+from shotgun.agents.messages import SystemStatusPrompt
 from shotgun.agents.models import AgentDeps, AgentRuntimeOptions
 
 
@@ -84,7 +85,7 @@ async def test_add_system_status_message_empty_history(mock_deps):
                     assert len(result) == 1
                     assert isinstance(result[0], ModelRequest)
                     assert len(result[0].parts) == 1
-                    assert isinstance(result[0].parts[0], SystemPromptPart)
+                    assert isinstance(result[0].parts[0], SystemStatusPrompt)
                     assert result[0].parts[0].content == "System state content"
 
                     mock_get_files.assert_called_once_with(None)

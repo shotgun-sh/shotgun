@@ -8,7 +8,6 @@ from pydantic_ai.models.test import TestModel
 
 from shotgun.agents.common import build_agent_system_prompt, create_base_agent
 from shotgun.agents.config.models import (
-    AnthropicCacheTTL,
     ModelConfig,
     ModelName,
     ProviderType,
@@ -49,14 +48,14 @@ def mock_codebase_service():
 @patch("shotgun.agents.common.get_codebase_service")
 @patch("shotgun.agents.common.get_provider_model", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_sub_agent_has_5m_cache_settings(
+async def test_sub_agent_caches_only_tool_definitions(
     mock_get_model,
     mock_get_codebase,
     mock_model_config,
     mock_runtime_options,
     mock_codebase_service,
 ):
-    """Sub-agents created via create_base_agent should have 5m Anthropic cache TTL."""
+    """Sub-agents should only cache tool definitions at 1h TTL."""
     mock_get_model.return_value = mock_model_config
     mock_get_codebase.return_value = mock_codebase_service
 
@@ -69,22 +68,22 @@ async def test_sub_agent_has_5m_cache_settings(
 
     settings = agent.model_settings
     assert settings is not None
-    assert settings.get("anthropic_cache_instructions") == AnthropicCacheTTL.SHORT
-    assert settings.get("anthropic_cache_tool_definitions") == AnthropicCacheTTL.SHORT
-    assert settings.get("anthropic_cache_messages") == AnthropicCacheTTL.SHORT
+    assert settings.get("anthropic_cache_tool_definitions") == "1h"
+    assert settings.get("anthropic_cache_instructions") == "1h"
+    assert "anthropic_cache_messages" not in settings
 
 
 @patch("shotgun.agents.router.router.get_codebase_service")
 @patch("shotgun.agents.router.router.get_provider_model", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_router_agent_has_1h_cache_settings(
+async def test_router_agent_caches_tools_and_instructions(
     mock_get_model,
     mock_get_codebase,
     mock_model_config,
     mock_runtime_options,
     mock_codebase_service,
 ):
-    """Router agent should have 1h Anthropic cache TTL."""
+    """Router agent should cache tool definitions and instructions at 1h TTL."""
     mock_get_model.return_value = mock_model_config
     mock_get_codebase.return_value = mock_codebase_service
 
@@ -92,9 +91,9 @@ async def test_router_agent_has_1h_cache_settings(
 
     settings = agent.model_settings
     assert settings is not None
-    assert settings.get("anthropic_cache_instructions") == AnthropicCacheTTL.LONG
-    assert settings.get("anthropic_cache_tool_definitions") == AnthropicCacheTTL.LONG
-    assert settings.get("anthropic_cache_messages") == AnthropicCacheTTL.LONG
+    assert settings.get("anthropic_cache_tool_definitions") == "1h"
+    assert settings.get("anthropic_cache_instructions") == "1h"
+    assert "anthropic_cache_messages" not in settings
 
 
 @patch("shotgun.agents.router.router.get_codebase_service")
@@ -122,14 +121,14 @@ async def test_router_cache_settings_do_not_include_parallel_tool_calls(
 @patch("shotgun.agents.common.get_codebase_service")
 @patch("shotgun.agents.common.get_provider_model", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_cache_settings_different_between_router_and_sub_agents(
+async def test_router_and_sub_agents_share_same_cache_settings(
     mock_get_model,
     mock_get_codebase,
     mock_model_config,
     mock_runtime_options,
     mock_codebase_service,
 ):
-    """Router should have 1h cache TTL while sub-agents should have 5m."""
+    """Router and sub-agents should have identical cache settings."""
     mock_get_model.return_value = mock_model_config
     mock_get_codebase.return_value = mock_codebase_service
 
@@ -138,8 +137,6 @@ async def test_cache_settings_different_between_router_and_sub_agents(
 
     sub_settings = sub_agent.model_settings
     assert sub_settings is not None
-    assert sub_settings.get("anthropic_cache_instructions") == AnthropicCacheTTL.SHORT
-    assert (
-        sub_settings.get("anthropic_cache_tool_definitions") == AnthropicCacheTTL.SHORT
-    )
-    assert sub_settings.get("anthropic_cache_messages") == AnthropicCacheTTL.SHORT
+    assert sub_settings.get("anthropic_cache_tool_definitions") == "1h"
+    assert sub_settings.get("anthropic_cache_instructions") == "1h"
+    assert "anthropic_cache_messages" not in sub_settings

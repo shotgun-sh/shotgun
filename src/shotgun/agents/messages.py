@@ -25,14 +25,20 @@ class AgentSystemPrompt(SystemPromptPart):
 
 
 @dataclass
-class SystemStatusPrompt(SystemPromptPart):
-    """System prompt containing current system status information.
+class SystemStatusPrompt(UserPromptPart):
+    """Dynamic system status injected as a user message (not a system prompt).
 
-    This includes table of contents, available files, and other contextual
-    information about the current state. Only the most recent status should
-    be preserved during compaction.
+    This includes table of contents, available files, datetime, and other
+    contextual information about the current state. Only the most recent
+    status should be preserved during compaction.
+
+    This extends UserPromptPart (not SystemPromptPart) so that it stays in
+    the messages array rather than being extracted into Anthropic's system
+    parameter. This allows the static AgentSystemPrompt to be cached via
+    anthropic_cache_instructions without the dynamic status invalidating it.
     """
 
+    part_kind: Literal["system-status"] = "system-status"  # type: ignore[assignment]
     prompt_type: str = "status"
 
 

@@ -80,5 +80,6 @@ def get_latest_system_status(messages: list[ModelMessage]) -> str | None:
         if isinstance(msg, ModelRequest):
             for part in msg.parts:
                 if isinstance(part, SystemStatusPrompt):
-                    return part.content
+                    content = part.content
+                    return content if isinstance(content, str) else None
     return None

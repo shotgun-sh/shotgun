@@ -25,19 +25,10 @@ class KeyProvider(StrEnum):
     SHOTGUN = "shotgun"  # Shotgun Account (unified LiteLLM proxy)
 
 
-class AnthropicCacheTTL(StrEnum):
-    """Anthropic prompt caching TTL values."""
-
-    SHORT = "5m"  # Sub-agents: short-lived, lower cache duration
-    LONG = "1h"  # Router: long-lived session, higher cache duration
-
-    def to_model_settings(self) -> AnthropicModelSettings:
-        """Build AnthropicModelSettings with this TTL for all cache fields."""
-        return AnthropicModelSettings(
-            anthropic_cache_instructions=self.value,
-            anthropic_cache_tool_definitions=self.value,
-            anthropic_cache_messages=self.value,
-        )
+ANTHROPIC_CACHE_MODEL_SETTINGS = AnthropicModelSettings(
+    anthropic_cache_tool_definitions="1h",
+    anthropic_cache_instructions="1h",
+)
 
 
 class ModelName(StrEnum):
