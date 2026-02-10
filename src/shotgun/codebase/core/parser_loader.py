@@ -45,8 +45,8 @@ def load_parsers() -> tuple[dict[str, Parser], dict[str, Any]]:
     try:
         import tree_sitter_typescript
 
-        language_loaders["typescript"] = (
-            lambda: tree_sitter_typescript.language_typescript()
+        language_loaders["typescript"] = lambda: (
+            tree_sitter_typescript.language_typescript()
         )
         available_languages.append("typescript")
     except ImportError as e:
