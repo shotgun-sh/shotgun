@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pydantic_ai import RunContext
+from pydantic_ai import RunContext, RunUsage
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.tools import ToolDefinition
 
@@ -696,8 +696,6 @@ async def test_run_sub_agent_none_stream_handler(mock_context, mock_agent_result
 @pytest.mark.asyncio
 async def test_run_sub_agent_tracks_usage(mock_context, mock_agent_result):
     """Test that sub-agent usage is tracked via usage_manager after delegation."""
-    from pydantic_ai import RunUsage
-
     mock_agent = MagicMock()
     mock_sub_deps = _create_mock_sub_agent_deps()
     mock_sub_deps.llm_model = ModelConfig(

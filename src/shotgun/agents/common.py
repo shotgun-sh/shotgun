@@ -21,7 +21,6 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     ToolCallPart,
 )
-from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import ProviderType, get_provider_model
@@ -29,6 +28,7 @@ from shotgun.agents.config.constants import (
     WEB_SEARCH_STOP_THRESHOLD,
     WEB_SEARCH_WARNING_THRESHOLD,
 )
+from shotgun.agents.config.models import AnthropicCacheTTL
 from shotgun.agents.models import (
     AgentResponse,
     AgentSystemPromptContext,
@@ -319,11 +319,7 @@ async def create_base_agent(
         history_processors=[history_processor],
         retries=3,  # Default retry count for tool calls and output validation
         toolsets=mcp_servers or None,
-        model_settings=AnthropicModelSettings(
-            anthropic_cache_instructions="5m",
-            anthropic_cache_tool_definitions="5m",
-            anthropic_cache_messages="5m",
-        ),
+        model_settings=AnthropicCacheTTL.SHORT.to_model_settings(),
     )
 
     # System prompt function is stored in deps and will be called manually in run_agent

@@ -10,7 +10,6 @@ from functools import partial
 from pydantic_ai import Agent, Tool
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
-from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.common import (
@@ -20,6 +19,7 @@ from shotgun.agents.common import (
     run_agent,
 )
 from shotgun.agents.config import ProviderType, get_provider_model
+from shotgun.agents.config.models import AnthropicCacheTTL
 from shotgun.agents.conversation.history import token_limit_compactor
 from shotgun.agents.models import AgentResponse, AgentRuntimeOptions, AgentType
 from shotgun.agents.router.models import RouterDeps
@@ -123,11 +123,7 @@ async def create_router_agent(
         history_processors=[history_processor],
         retries=3,
         tools=delegation_tools,
-        model_settings=AnthropicModelSettings(
-            anthropic_cache_instructions="1h",
-            anthropic_cache_tool_definitions="1h",
-            anthropic_cache_messages="1h",
-        ),
+        model_settings=AnthropicCacheTTL.LONG.to_model_settings(),
     )
 
     # Register plan management tools (router-specific, always available)
