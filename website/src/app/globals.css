@@ -122,3 +122,19 @@ html {
   background-color: var(--color-navy-200);
   color: var(--color-navy-900);
 }
+
+/* ===========================
+ * SYNTAX HIGHLIGHTING TOKENS
+ * ===========================
+ * These must be global (not scoped via styled-jsx) because
+ * they target elements injected via dangerouslySetInnerHTML
+ * in the CodeBlock component.
+ */
+.token-comment { color: #6b7280; font-style: italic; }
+.token-string { color: #a5d6a7; }
+.token-command { color: #93c5fd; }
+.token-flag { color: #fdba74; }
+.token-version { color: #c4b5fd; }
+.token-keyword { color: #93c5fd; font-weight: 600; }
+.token-number { color: #fdba74; }
+.token-key { color: #93c5fd; }

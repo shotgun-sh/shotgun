@@ -151,20 +151,8 @@ export function CodeBlock({
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(code);
-      setCopied(true);
-
-      if (gtmEvent) {
-        trackEvent(gtmEvent, {
-          component: "CodeBlock",
-          language,
-          code,
-        });
-      }
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for older browsers
+      // Fallback for older browsers that don't support Clipboard API
       const textArea = document.createElement("textarea");
       textArea.value = code;
       textArea.style.position = "fixed";
@@ -173,23 +161,22 @@ export function CodeBlock({
       textArea.select();
       document.execCommand("copy");
       document.body.removeChild(textArea);
-      setCopied(true);
-
-      if (gtmEvent) {
-        trackEvent(gtmEvent, {
-          component: "CodeBlock",
-          language,
-          code,
-        });
-      }
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
     }
+
+    setCopied(true);
+
+    if (gtmEvent) {
+      trackEvent(gtmEvent, {
+        component: "CodeBlock",
+        language,
+        code,
+      });
+    }
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setCopied(false), 2000);
   }, [code, gtmEvent, language, trackEvent]);
 
-  const lines = code.split("\n");
-  const highlightedCode = highlightCode(code, language);
   const isShell = language === "bash" && showPrompt;
 
   return (
@@ -220,7 +207,7 @@ export function CodeBlock({
         <pre className="m-0">
           <code>
             {showLineNumbers ? (
-              lines.map((line, i) => (
+              code.split("\n").map((line, i) => (
                 <div key={i} className="flex">
                   <span className="mr-[var(--space-4)] inline-block w-8 select-none text-right text-[var(--color-gray-500)]">
                     {i + 1}
@@ -240,7 +227,7 @@ export function CodeBlock({
                   </span>
                 )}
                 <span
-                  dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                  dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }}
                 />
               </span>
             )}
@@ -281,17 +268,6 @@ export function CodeBlock({
         )}
       </div>
 
-      {/* Syntax highlighting styles */}
-      <style jsx>{`
-        .token-comment { color: #6b7280; font-style: italic; }
-        .token-string { color: #a5d6a7; }
-        .token-command { color: #93c5fd; }
-        .token-flag { color: #fdba74; }
-        .token-version { color: #c4b5fd; }
-        .token-keyword { color: #93c5fd; font-weight: 600; }
-        .token-number { color: #fdba74; }
-        .token-key { color: #93c5fd; }
-      `}</style>
     </div>
   );
 }

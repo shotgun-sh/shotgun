@@ -426,16 +426,16 @@ for stage in result.stages:
 
         {/* Current breakpoint indicator */}
         <div className="mb-[var(--space-6)] rounded-[var(--radius-lg)] bg-navy-800 p-[var(--space-4)] text-text-inverse text-center">
-          <span className="block md:hidden lg:hidden xl:hidden text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
+          <span className="block md:hidden text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
             📱 Mobile (&lt;768px)
           </span>
-          <span className="hidden md:block lg:hidden xl:hidden text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
+          <span className="hidden md:block lg:hidden text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
             📱 Tablet (768px–1023px)
           </span>
-          <span className="hidden md:hidden lg:block xl:hidden text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
+          <span className="hidden lg:block xl:hidden text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
             💻 Desktop (1024px–1439px)
           </span>
-          <span className="hidden md:hidden lg:hidden xl:block text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
+          <span className="hidden xl:block text-[length:var(--font-size-lg)] font-[var(--font-weight-bold)]">
             🖥️ Wide Desktop (1440px+)
           </span>
         </div>
