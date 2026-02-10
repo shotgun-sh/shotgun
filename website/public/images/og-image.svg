@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f2240;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <!-- Accent line -->
+  <rect x="100" y="200" width="60" height="4" rx="2" fill="#f97316" />
+  <!-- Title -->
+  <text x="100" y="260" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#ffffff" letter-spacing="-1">Intelligent Specs, Not Templates.</text>
+  <text x="100" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#fdba74" letter-spacing="-1">Your Codebase Understanding.</text>
+  <!-- Subtitle -->
+  <text x="100" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="#8ab4e8">Analyze your codebase. Research solutions. Generate specs.</text>
+  <text x="100" y="412" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="#8ab4e8">Keep your AI agent on track.</text>
+  <!-- Command -->
+  <rect x="100" y="450" width="380" height="44" rx="8" fill="#171717" />
+  <text x="120" y="479" font-family="monospace" font-size="18" fill="#737373">$ </text>
+  <text x="140" y="479" font-family="monospace" font-size="18" fill="#93c5fd">uvx shotgun-sh@latest</text>
+  <!-- Brand mark -->
+  <text x="100" y="570" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#5a8ed4">shotgun.sh</text>
+  <!-- Workflow boxes on right side -->
+  <rect x="750" y="180" width="160" height="60" rx="8" fill="#152d54" stroke="#3a6bb5" stroke-width="1.5" />
+  <text x="830" y="215" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#bdd6f4" text-anchor="middle">Research</text>
+  <rect x="940" y="180" width="160" height="60" rx="8" fill="#152d54" stroke="#3a6bb5" stroke-width="1.5" />
+  <text x="1020" y="215" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#bdd6f4" text-anchor="middle">Specification</text>
+  <rect x="750" y="270" width="160" height="60" rx="8" fill="#152d54" stroke="#3a6bb5" stroke-width="1.5" />
+  <text x="830" y="305" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#bdd6f4" text-anchor="middle">Planning</text>
+  <rect x="940" y="270" width="160" height="60" rx="8" fill="#152d54" stroke="#3a6bb5" stroke-width="1.5" />
+  <text x="1020" y="305" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#bdd6f4" text-anchor="middle">Tasks</text>
+  <rect x="845" y="360" width="160" height="60" rx="8" fill="#152d54" stroke="#f97316" stroke-width="1.5" />
+  <text x="925" y="395" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#f97316" text-anchor="middle">Export</text>
+  <!-- Arrows -->
+  <line x1="910" y1="210" x2="940" y2="210" stroke="#3a6bb5" stroke-width="1.5" />
+  <line x1="830" y1="240" x2="830" y2="270" stroke="#3a6bb5" stroke-width="1.5" />
+  <line x1="1020" y1="240" x2="1020" y2="270" stroke="#3a6bb5" stroke-width="1.5" />
+  <line x1="910" y1="300" x2="940" y2="300" stroke="#3a6bb5" stroke-width="1.5" />
+  <line x1="925" y1="330" x2="925" y2="360" stroke="#f97316" stroke-width="1.5" />
+</svg>

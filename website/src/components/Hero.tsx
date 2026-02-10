@@ -31,6 +31,7 @@ export function Hero({ heroImageSrc, className = "" }: HeroProps) {
         <div className="flex-1 lg:max-w-[55%]">
           {/* Headline */}
           <h1
+            id="hero-heading"
             className="
               text-[length:2rem] md:text-[length:var(--font-size-5xl)]
               font-[var(--font-weight-bold)]

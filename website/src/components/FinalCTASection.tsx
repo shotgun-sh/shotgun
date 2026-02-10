@@ -43,8 +43,8 @@ export function FinalCTASection({ className = "" }: FinalCTASectionProps) {
         leading-[var(--line-height-relaxed)]
         text-[var(--color-gray-300)]
       ">
-        Stop losing context on complex features. Shotgun keeps your AI agent on track.
-        Research before building. Specs that understand your codebase. Export to any tool.
+        Shotgun keeps your AI agent on track. Research before building.
+        Specs that understand your codebase. Export to any tool.
       </p>
 
       {/* Primary CTA button */}

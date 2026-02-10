@@ -92,10 +92,10 @@
    * TYPOGRAPHY - PP Supply Sans
    * =========================== */
 
-  /* Font Family */
-  --font-family-primary: "PP Supply Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  /* Font Family — PP Supply Sans (brand) with Geist Sans (approved fallback) */
+  --font-family-primary: "PP Supply Sans", var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, sans-serif;
-  --font-family-mono: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, "Courier New", monospace;
+  --font-family-mono: "JetBrains Mono", var(--font-geist-mono), "Fira Code", "SF Mono", Consolas, "Courier New", monospace;
 
   /* Font Weights */
   --font-weight-regular: 400;

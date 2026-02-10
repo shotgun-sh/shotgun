@@ -39,17 +39,18 @@ export function FeatureRow({
 
       {/* Title + Benefit — horizontal on desktop, stacked on mobile */}
       <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-[var(--space-2)] min-w-0">
-        <span
+        <h3
           className="
             text-[length:var(--font-size-base)] lg:text-[length:var(--font-size-lg)]
             font-[var(--font-weight-semibold)]
             leading-[var(--line-height-snug)]
             text-text-primary
             shrink-0
+            m-0
           "
         >
           {title}
-        </span>
+        </h3>
         <span className="hidden sm:inline text-text-muted" aria-hidden="true">
           —
         </span>

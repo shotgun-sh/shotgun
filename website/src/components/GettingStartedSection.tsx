@@ -118,8 +118,9 @@ export function GettingStartedSection({ className = "" }: GettingStartedSectionP
         {[
           "No credit card required",
           "Free tier for personal projects",
-          "$10 = $10 transparent pricing",
+          "$10 = $10 usage",
           "Works locally or cloud",
+          "Open source research agent",
         ].map((signal) => (
           <div
             key={signal}

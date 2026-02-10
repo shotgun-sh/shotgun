@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#152d54;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fafafa;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Window frame -->
+  <rect width="1280" height="720" rx="12" fill="#1b1b1f" />
+  <!-- Title bar -->
+  <rect width="1280" height="36" rx="12" fill="#2a2a2e" />
+  <rect y="24" width="1280" height="12" fill="#2a2a2e" />
+  <!-- Traffic lights -->
+  <circle cx="20" cy="18" r="6" fill="#ff5f57" />
+  <circle cx="40" cy="18" r="6" fill="#ffbd2e" />
+  <circle cx="60" cy="18" r="6" fill="#28c840" />
+  <!-- Tab -->
+  <rect x="100" y="6" width="180" height="24" rx="6" fill="#1b1b1f" />
+  <text x="140" y="23" font-family="system-ui, sans-serif" font-size="12" fill="#a3a3a3">Shotgun — Workspace</text>
+
+  <!-- Sidebar -->
+  <rect x="0" y="36" width="240" height="684" fill="url(#headerGrad)" />
+  <!-- Sidebar logo -->
+  <text x="24" y="72" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#ffffff">Shotgun</text>
+  <rect x="130" y="58" width="40" height="20" rx="4" fill="#f97316" opacity="0.2" />
+  <text x="138" y="72" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#f97316">PRO</text>
+  <!-- Sidebar divider -->
+  <line x1="24" y1="92" x2="216" y2="92" stroke="#1b3968" stroke-width="1" />
+  <!-- Sidebar nav items -->
+  <rect x="12" y="104" width="216" height="32" rx="6" fill="#1b3968" />
+  <text x="44" y="125" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#ffffff">Research</text>
+  <text x="44" y="165" font-family="system-ui, sans-serif" font-size="13" fill="#5a8ed4">Specifications</text>
+  <text x="44" y="197" font-family="system-ui, sans-serif" font-size="13" fill="#5a8ed4">Planning</text>
+  <text x="44" y="229" font-family="system-ui, sans-serif" font-size="13" fill="#5a8ed4">Tasks</text>
+  <text x="44" y="261" font-family="system-ui, sans-serif" font-size="13" fill="#5a8ed4">Export</text>
+  <!-- Sidebar icons -->
+  <circle cx="28" cy="120" r="4" fill="#f97316" />
+  <circle cx="28" cy="160" r="4" fill="#3a6bb5" />
+  <circle cx="28" cy="192" r="4" fill="#3a6bb5" />
+  <circle cx="28" cy="224" r="4" fill="#3a6bb5" />
+  <circle cx="28" cy="256" r="4" fill="#3a6bb5" />
+  <!-- Sidebar workspace -->
+  <line x1="24" y1="290" x2="216" y2="290" stroke="#1b3968" stroke-width="1" />
+  <text x="24" y="316" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#5a8ed4" text-transform="uppercase" letter-spacing="1">WORKSPACE</text>
+  <text x="24" y="340" font-family="system-ui, sans-serif" font-size="12" fill="#8ab4e8">my-saas-app</text>
+  <text x="24" y="362" font-family="system-ui, sans-serif" font-size="11" fill="#3a6bb5">12 files analyzed</text>
+
+  <!-- Main content area -->
+  <rect x="240" y="36" width="1040" height="684" fill="#f8f9fa" />
+
+  <!-- Content header -->
+  <rect x="240" y="36" width="1040" height="56" fill="#ffffff" />
+  <line x1="240" y1="92" x2="1280" y2="92" stroke="#e5e5e5" stroke-width="1" />
+  <text x="272" y="70" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#171717">Research Phase — Usage-Based Billing</text>
+
+  <!-- Research findings card -->
+  <rect x="272" y="112" width="480" height="280" rx="8" fill="url(#cardGrad)" stroke="#e5e5e5" stroke-width="1" />
+  <text x="296" y="144" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#3b82f6" text-transform="uppercase" letter-spacing="1">RESEARCH FINDINGS</text>
+  <text x="296" y="172" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#171717">Existing Solutions Discovered</text>
+  <!-- Finding items -->
+  <rect x="296" y="190" width="430" height="36" rx="4" fill="#eff6ff" />
+  <circle cx="316" cy="208" r="8" fill="#16a34a" />
+  <text x="310" y="212" font-family="system-ui, sans-serif" font-size="10" fill="#ffffff" font-weight="700" text-anchor="middle">&#10003;</text>
+  <text x="332" y="213" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#171717">LiteLLM Proxy — Usage-based billing for LLM calls</text>
+  <rect x="296" y="234" width="430" height="36" rx="4" fill="#f5f5f5" />
+  <circle cx="316" cy="252" r="8" fill="#d4d4d4" />
+  <text x="332" y="257" font-family="system-ui, sans-serif" font-size="13" fill="#525252">OpenMeter — Generic usage metering</text>
+  <rect x="296" y="278" width="430" height="36" rx="4" fill="#f5f5f5" />
+  <circle cx="316" cy="296" r="8" fill="#d4d4d4" />
+  <text x="332" y="301" font-family="system-ui, sans-serif" font-size="13" fill="#525252">Custom Proxy — Build from scratch (4 weeks est.)</text>
+  <!-- Recommendation badge -->
+  <rect x="296" y="330" width="120" height="24" rx="12" fill="#16a34a" opacity="0.1" />
+  <text x="312" y="346" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#16a34a">Recommended</text>
+  <text x="424" y="346" font-family="system-ui, sans-serif" font-size="11" fill="#525252">Use LiteLLM Proxy — 5 day implementation</text>
+
+  <!-- Codebase analysis card -->
+  <rect x="772" y="112" width="476" height="280" rx="8" fill="url(#cardGrad)" stroke="#e5e5e5" stroke-width="1" />
+  <text x="796" y="144" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#f97316" text-transform="uppercase" letter-spacing="1">CODEBASE ANALYSIS</text>
+  <text x="796" y="172" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#171717">Architecture Overview</text>
+  <!-- Analysis items -->
+  <text x="796" y="200" font-family="system-ui, sans-serif" font-size="12" fill="#525252">Patterns Detected</text>
+  <rect x="796" y="210" width="200" height="6" rx="3" fill="#e5e5e5" />
+  <rect x="796" y="210" width="180" height="6" rx="3" fill="#3b82f6" />
+  <text x="1004" y="218" font-family="system-ui, sans-serif" font-size="10" fill="#737373">18/20</text>
+  <text x="796" y="244" font-family="system-ui, sans-serif" font-size="12" fill="#525252">Dependencies Mapped</text>
+  <rect x="796" y="254" width="200" height="6" rx="3" fill="#e5e5e5" />
+  <rect x="796" y="254" width="166" height="6" rx="3" fill="#f97316" />
+  <text x="1004" y="262" font-family="system-ui, sans-serif" font-size="10" fill="#737373">42 pkgs</text>
+  <text x="796" y="288" font-family="system-ui, sans-serif" font-size="12" fill="#525252">Existing Auth System</text>
+  <rect x="796" y="298" width="200" height="6" rx="3" fill="#e5e5e5" />
+  <rect x="796" y="298" width="200" height="6" rx="3" fill="#16a34a" />
+  <text x="1004" y="306" font-family="system-ui, sans-serif" font-size="10" fill="#737373">Found</text>
+  <!-- Architecture note -->
+  <rect x="796" y="326" width="430" height="48" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1" />
+  <text x="816" y="348" font-family="system-ui, sans-serif" font-size="12" fill="#9a3412" font-weight="500">Existing billing module detected in src/billing/</text>
+  <text x="816" y="364" font-family="system-ui, sans-serif" font-size="11" fill="#c2410c">Integration recommended over rebuild</text>
+
+  <!-- Workflow progress bar at bottom -->
+  <rect x="240" y="668" width="1040" height="52" fill="#ffffff" />
+  <line x1="240" y1="668" x2="1280" y2="668" stroke="#e5e5e5" stroke-width="1" />
+  <!-- Progress stages -->
+  <circle cx="340" cy="694" r="12" fill="#16a34a" />
+  <text x="340" y="698" font-family="system-ui, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle" font-weight="700">1</text>
+  <text x="370" y="698" font-family="system-ui, sans-serif" font-size="11" fill="#16a34a" font-weight="500">Research</text>
+  <line x1="430" y1="694" x2="520" y2="694" stroke="#e5e5e5" stroke-width="2" />
+  <circle cx="550" cy="694" r="12" fill="#e5e5e5" stroke="#3b82f6" stroke-width="2" />
+  <text x="550" y="698" font-family="system-ui, sans-serif" font-size="10" fill="#3b82f6" text-anchor="middle" font-weight="700">2</text>
+  <text x="580" y="698" font-family="system-ui, sans-serif" font-size="11" fill="#525252">Specification</text>
+  <line x1="670" y1="694" x2="760" y2="694" stroke="#e5e5e5" stroke-width="2" />
+  <circle cx="790" cy="694" r="12" fill="#e5e5e5" />
+  <text x="790" y="698" font-family="system-ui, sans-serif" font-size="10" fill="#737373" text-anchor="middle">3</text>
+  <text x="820" y="698" font-family="system-ui, sans-serif" font-size="11" fill="#a3a3a3">Planning</text>
+  <line x1="890" y1="694" x2="980" y2="694" stroke="#e5e5e5" stroke-width="2" />
+  <circle cx="1010" cy="694" r="12" fill="#e5e5e5" />
+  <text x="1010" y="698" font-family="system-ui, sans-serif" font-size="10" fill="#737373" text-anchor="middle">4</text>
+  <text x="1040" y="698" font-family="system-ui, sans-serif" font-size="11" fill="#a3a3a3">Tasks</text>
+  <line x1="1090" y1="694" x2="1150" y2="694" stroke="#e5e5e5" stroke-width="2" />
+  <circle cx="1180" cy="694" r="12" fill="#e5e5e5" />
+  <text x="1180" y="698" font-family="system-ui, sans-serif" font-size="10" fill="#737373" text-anchor="middle">5</text>
+  <text x="1210" y="698" font-family="system-ui, sans-serif" font-size="11" fill="#a3a3a3">Export</text>
+</svg>

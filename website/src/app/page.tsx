@@ -11,7 +11,7 @@ import { ScrollTracker } from "@/components/ScrollTracker";
 
 export default function Home() {
   return (
-    <main className="min-h-screen">
+    <main id="main-content" className="min-h-screen">
       {/* Hero Section — above the fold, drives 70%+ of conversion */}
       <section
         className="
@@ -20,9 +20,10 @@ export default function Home() {
           py-[var(--space-16)] md:py-[var(--space-24)]
         "
         data-gtm-section="hero"
+        aria-labelledby="hero-heading"
       >
         <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
-          <Hero />
+          <Hero heroImageSrc="/images/hero-dashboard.svg" />
         </div>
       </section>
 
