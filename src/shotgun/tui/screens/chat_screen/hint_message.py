@@ -24,6 +24,8 @@ class HintMessage(BaseModel):
     link_text: str | None = None  # Button label, defaults to "Open link"
     # Compact mode for autopilot output
     compact: bool = False
+    # Source tag for filtering (e.g. "autopilot")
+    source: str | None = None
 
 
 class HintMessageWidget(Widget):

@@ -31,6 +31,7 @@ from shotgun.agents.autopilot.models import (
     ClaudeOutput,
     ClaudeOutputType,
     FileStatus,
+    MonitorAction,
     PrerequisiteValidation,
     Stage,
     StagePhase,
@@ -44,11 +45,11 @@ from shotgun.agents.autopilot.prompts import (
     render_qa_testing,
     render_review_code,
 )
+from shotgun.agents.autopilot.stage_monitor import StageMonitor
 from shotgun.posthog_telemetry import track_event
 
 logger = logging.getLogger(__name__)
-
-MAX_STAGE_ITERATIONS = 20  # Max attempts to complete a stage
+trail_logger = logging.getLogger("shotgun.agents.autopilot.trail")
 
 
 class AutopilotConfig(BaseModel):
@@ -69,10 +70,6 @@ class AutopilotConfig(BaseModel):
     branch_prefix: str = Field(
         default="autopilot/stage-",
         description="Prefix for stage branch names",
-    )
-    max_iterations: int = Field(
-        default=MAX_STAGE_ITERATIONS,
-        description="Maximum iterations per stage before giving up",
     )
     use_teams: bool = Field(
         default=True,
@@ -254,7 +251,6 @@ class AutopilotOrchestrator:
                 detailed_stage.phase = stage.phase
                 detailed_stage.branch_name = stage.branch_name
                 detailed_stage.pr_url = stage.pr_url
-                detailed_stage.iteration_count = stage.iteration_count
                 self.state.stages[self.state.current_stage_index] = detailed_stage
                 stage = detailed_stage
                 logger.info(
@@ -316,7 +312,7 @@ class AutopilotOrchestrator:
         if not stage or not stage.is_complete:
             yield ClaudeOutput(
                 type=ClaudeOutputType.ERROR,
-                content=f"Stage {stage.number if stage else '?'} failed to complete after {self.config.max_iterations} iterations",
+                content=f"Stage {stage.number if stage else '?'} did not complete — monitor escalated or deferred",
             )
             if stage:
                 stage.status = StageStatus.FAILED
@@ -352,7 +348,6 @@ class AutopilotOrchestrator:
                 {
                     "stage_number": stage.number,
                     "total_stages": len(self.state.stages),
-                    "iterations_used": stage.iteration_count,
                     "has_pr": False,
                     "mode": self.state.mode.value,
                 },
@@ -435,7 +430,6 @@ class AutopilotOrchestrator:
             {
                 "stage_number": stage.number,
                 "total_stages": len(self.state.stages),
-                "iterations_used": stage.iteration_count,
                 "has_pr": stage.pr_url is not None,
                 "mode": self.state.mode.value,
             },
@@ -451,104 +445,147 @@ class AutopilotOrchestrator:
     ) -> AsyncGenerator[ClaudeOutput, None]:
         """Execute stage tasks until all are marked complete.
 
+        Uses a monitor agent (main model) to evaluate Claude Code's output
+        after each iteration and decide what to do next, instead of a fixed
+        iteration counter.
+
         Args:
             stage: The stage to execute.
 
         Yields:
             ClaudeOutput as execution progresses.
         """
-        logger.info(
-            "Starting execution loop for Stage %s with %d pending tasks",
+        trail_logger.info(
+            "STAGE_START stage=%s tasks=%d",
             stage.number,
             len(stage.pending_tasks),
         )
 
-        while stage.iteration_count < self.config.max_iterations:
+        monitor = StageMonitor(working_directory=self.config.working_directory)
+        next_prompt: str | None = None  # First iteration uses standard template
+
+        while True:
             if self._cancelled:
-                logger.info("Execution cancelled for Stage %s", stage.number)
+                trail_logger.info("CANCELLED stage=%s", stage.number)
                 return
 
-            stage.iteration_count += 1
             remaining = len(stage.pending_tasks)
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"  {remaining} tasks remaining",
+            )
 
-            logger.info(
-                "Stage %s iteration %d/%d - %d tasks remaining: %s",
+            # Build prompt — first time use standard template, then monitor's crafted prompt
+            if next_prompt is None:
+                prompt = self._build_execution_prompt(stage)
+            else:
+                prompt = next_prompt
+
+            # Run Claude Code and collect substantive text output
+            claude_text_output: list[str] = []
+            async for output in self._run_claude(prompt):
+                yield output
+                if output.type == ClaudeOutputType.STDOUT:
+                    self._last_claude_output = output.content
+                    claude_text_output.append(output.content)
+
+            trail_logger.info(
+                "CLAUDE_RESPONSE stage=%s summary=%s",
                 stage.number,
-                stage.iteration_count,
-                self.config.max_iterations,
-                remaining,
-                [t.text[:50] for t in stage.pending_tasks],
+                (claude_text_output[-1][:100] if claude_text_output else "empty"),
+            )
+
+            # Quick check via lightweight parser (Haiku — fast)
+            await self._refresh_stages()
+            refreshed_stage = self.state.current_stage
+            if not refreshed_stage:
+                trail_logger.warning("Stage became None after refresh")
+                return
+            stage = refreshed_stage
+
+            trail_logger.info(
+                "TASK_REFRESH stage=%s completed=%d pending=%d",
+                stage.number,
+                len(stage.completed_tasks),
+                len(stage.pending_tasks),
+            )
+
+            if stage.is_complete:
+                trail_logger.info("STAGE_COMPLETE stage=%s", stage.number)
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDOUT,
+                    content="  All tasks complete",
+                )
+                return
+
+            # Ask the monitor (main model) — reads files, verifies state, crafts next prompt
+            decision = await monitor.evaluate(
+                claude_output_summary="\n".join(claude_text_output[-20:]),
+                stage_number=stage.number,
+                stage_name=stage.name,
+                working_directory=self.config.working_directory,
+                tasks_file_path=self.state.tasks_file_path,
+            )
+
+            trail_logger.info(
+                "MONITOR_DECISION stage=%s action=%s reason=%s",
+                stage.number,
+                decision.action.value,
+                decision.reasoning[:200],
             )
 
             yield ClaudeOutput(
                 type=ClaudeOutputType.STDOUT,
-                content=f"  Iteration {stage.iteration_count}: {remaining} tasks remaining",
+                content=f"  Monitor: {decision.action.value} — {decision.reasoning}",
             )
 
-            # Build and run the prompt
-            prompt = self._build_execution_prompt(stage)
-            async for output in self._run_claude(prompt):
-                yield output
-                # Capture text output for context in task parsing
-                if output.type == ClaudeOutputType.STDOUT:
-                    self._last_claude_output = output.content
-
-            # Refresh and check completion
-            await self._refresh_stages()
-            updated_stage = self.state.current_stage
-            if updated_stage is None:
-                logger.warning("Stage became None after refresh - aborting")
+            # Act on decision
+            if decision.action == MonitorAction.COMPLETE:
+                trail_logger.info("STAGE_COMPLETE stage=%s (monitor)", stage.number)
                 return
-
-            # Log task progress
-            completed_count = len(updated_stage.completed_tasks)
-            pending_count = len(updated_stage.pending_tasks)
-            logger.info(
-                "Stage %s after iteration %d: %d completed, %d pending",
-                updated_stage.number,
-                stage.iteration_count,
-                completed_count,
-                pending_count,
-            )
-
-            # Update the loop variable
-            stage = updated_stage
-
-            if stage.is_complete:
-                logger.info(
-                    "Stage %s COMPLETE after %d iteration(s)",
+            elif decision.action == MonitorAction.ESCALATE:
+                trail_logger.warning(
+                    "ESCALATED stage=%s reason=%s",
                     stage.number,
-                    stage.iteration_count,
+                    decision.reasoning,
+                )
+                track_event(
+                    "autopilot_stage_failed",
+                    {
+                        "stage_number": stage.number,
+                        "total_stages": len(self.state.stages),
+                        "failure_reason": "monitor_escalated",
+                        "pending_tasks": len(stage.pending_tasks),
+                        "completed_tasks": len(stage.completed_tasks),
+                        "mode": self.state.mode.value,
+                    },
+                )
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDERR,
+                    content=f"  Monitor escalated: {decision.reasoning}",
+                )
+                return
+            elif decision.action == MonitorAction.DEFER:
+                trail_logger.info(
+                    "DEFERRED stage=%s reason=%s",
+                    stage.number,
+                    decision.reasoning,
                 )
                 yield ClaudeOutput(
                     type=ClaudeOutputType.STDOUT,
-                    content=f"  All tasks complete after {stage.iteration_count} iteration(s)",
+                    content=f"  Deferring remaining tasks: {decision.reasoning}",
+                )
+                return
+            elif decision.action in (MonitorAction.REVIEW, MonitorAction.CREATE_PR):
+                trail_logger.info(
+                    "PHASE_TRANSITION stage=%s action=%s",
+                    stage.number,
+                    decision.action.value,
                 )
                 return
 
-        logger.warning(
-            "Stage %s reached max iterations (%d) without completing",
-            stage.number,
-            self.config.max_iterations,
-        )
-
-        # Track stage failure (no PII - just counts)
-        track_event(
-            "autopilot_stage_failed",
-            {
-                "stage_number": stage.number,
-                "total_stages": len(self.state.stages),
-                "max_iterations": self.config.max_iterations,
-                "pending_tasks": len(stage.pending_tasks),
-                "completed_tasks": len(stage.completed_tasks),
-                "mode": self.state.mode.value,
-            },
-        )
-
-        yield ClaudeOutput(
-            type=ClaudeOutputType.STDERR,
-            content=f"  Max iterations ({self.config.max_iterations}) reached",
-        )
+            # CONTINUE: use monitor's crafted prompt for next Claude Code call
+            next_prompt = decision.next_prompt
 
     async def _create_pr(self, stage: Stage) -> AsyncGenerator[ClaudeOutput, None]:
         """Create a PR for the completed stage.
@@ -700,12 +737,11 @@ class AutopilotOrchestrator:
 
         if refreshed_stage:
             # Update the current stage with refreshed task data
-            # Preserve metadata (status, phase, branch_name, pr_url, iteration_count)
+            # Preserve metadata (status, phase, branch_name, pr_url)
             refreshed_stage.status = current_stage.status
             refreshed_stage.phase = current_stage.phase
             refreshed_stage.branch_name = current_stage.branch_name
             refreshed_stage.pr_url = current_stage.pr_url
-            refreshed_stage.iteration_count = current_stage.iteration_count
 
             # Replace the stage in the list
             self.state.stages[self.state.current_stage_index] = refreshed_stage
@@ -924,7 +960,6 @@ class AutopilotOrchestrator:
                     detailed.phase = stage.phase
                     detailed.branch_name = stage.branch_name
                     detailed.pr_url = stage.pr_url
-                    detailed.iteration_count = stage.iteration_count
                     self.state.stages[idx] = detailed
                     stage_map[stage.number] = detailed
 
@@ -994,7 +1029,6 @@ class AutopilotOrchestrator:
                 refreshed.phase = self.state.stages[idx].phase
                 refreshed.branch_name = self.state.stages[idx].branch_name
                 refreshed.pr_url = self.state.stages[idx].pr_url
-                refreshed.iteration_count = self.state.stages[idx].iteration_count
                 self.state.stages[idx] = refreshed
 
                 if refreshed.is_complete:
@@ -1050,7 +1084,6 @@ class AutopilotOrchestrator:
                 {
                     "stage_number": stage.number,
                     "total_stages": len(self.state.stages),
-                    "iterations_used": stage.iteration_count,
                     "has_pr": False,
                     "mode": self.state.mode.value,
                     "parallel": True,
@@ -1104,7 +1137,6 @@ class AutopilotOrchestrator:
             {
                 "stage_number": stage.number,
                 "total_stages": len(self.state.stages),
-                "iterations_used": stage.iteration_count,
                 "has_pr": stage.pr_url is not None,
                 "mode": self.state.mode.value,
                 "parallel": True,

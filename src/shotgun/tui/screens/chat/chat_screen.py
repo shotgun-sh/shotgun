@@ -3186,6 +3186,8 @@ Then confirm what you changed.
         finally:
             self.processing_state.stop_processing()
 
+    _AUTOPILOT_MAX_VISIBLE_MESSAGES = 50
+
     @on(AutopilotOutputReceived)
     def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
         """Handle output from Claude Code subprocess."""
@@ -3195,6 +3197,12 @@ Then confirm what you changed.
         if not content:
             return
 
+        # Always log to file regardless of UI display
+        logger.info("[autopilot-output] [%s] %s", output.type.value, content)
+
+        # Trim old autopilot hints if over the limit
+        self._trim_old_autopilot_hints()
+
         # Format based on output type
         if output.type == ClaudeOutputType.STDOUT:
             # Tool calls (start with emoji) are compact
@@ -3202,24 +3210,63 @@ Then confirm what you changed.
                 content.startswith(c) for c in ["📖", "✏️", "📝", "💻", "🔍", "🔎", "🔧"]
             )
             self.agent_manager.add_hint_message(
-                HintMessage(message=content, compact=is_tool_call)
+                HintMessage(message=content, compact=is_tool_call, source="autopilot")
             )
         elif output.type == ClaudeOutputType.STDERR:
             self.agent_manager.add_hint_message(
-                HintMessage(message=f"[yellow]{content}[/]", compact=True)
+                HintMessage(
+                    message=f"[yellow]{content}[/]", compact=True, source="autopilot"
+                )
             )
         elif output.type == ClaudeOutputType.EXIT:
             if output.exit_code == 0:
                 self.agent_manager.add_hint_message(
-                    HintMessage(message="[dim]✓ Claude completed[/]", compact=True)
+                    HintMessage(
+                        message="[dim]✓ Claude completed[/]",
+                        compact=True,
+                        source="autopilot",
+                    )
                 )
             else:
                 self.agent_manager.add_hint_message(
                     HintMessage(
                         message=f"[yellow]⚠ Claude exited: {output.exit_code}[/]",
                         compact=True,
+                        source="autopilot",
                     )
                 )
+
+    def _trim_old_autopilot_hints(self) -> None:
+        """Remove oldest autopilot hint messages when over the visible limit.
+
+        Prioritizes removing compact (tool-call) messages first.
+        """
+        history = self.agent_manager.ui_message_history
+        autopilot_indices = [
+            i
+            for i, msg in enumerate(history)
+            if isinstance(msg, HintMessage) and msg.source == "autopilot"
+        ]
+
+        excess = len(autopilot_indices) - self._AUTOPILOT_MAX_VISIBLE_MESSAGES
+        if excess <= 0:
+            return
+
+        # Remove oldest autopilot messages, preferring compact ones first
+        compact_indices = [
+            i
+            for i in autopilot_indices
+            if isinstance(history[i], HintMessage) and history[i].compact  # type: ignore[union-attr]
+        ]
+        non_compact_indices = [i for i in autopilot_indices if i not in compact_indices]
+
+        to_remove = compact_indices[:excess]
+        if len(to_remove) < excess:
+            to_remove.extend(non_compact_indices[: excess - len(to_remove)])
+
+        # Remove in reverse order to preserve indices
+        for idx in sorted(to_remove, reverse=True):
+            history.pop(idx)
 
     @on(AutopilotApprovalRequired)
     def handle_autopilot_approval_required(

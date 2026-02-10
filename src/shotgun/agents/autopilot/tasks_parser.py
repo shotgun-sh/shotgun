@@ -32,7 +32,7 @@ def merge_stages_with_parsed_tasks(
 
     This utility function is used by the LLM parser to update
     task completion status while preserving stage metadata (status, phase,
-    branch_name, pr_url, iteration_count).
+    branch_name, pr_url).
 
     Args:
         state_stages: Existing stages from AutopilotState with metadata.
@@ -78,7 +78,6 @@ def merge_stages_with_parsed_tasks(
                 phase=state_stage.phase,
                 branch_name=state_stage.branch_name,
                 pr_url=state_stage.pr_url,
-                iteration_count=state_stage.iteration_count,
             )
             updated_stages.append(updated_stage)
         else:

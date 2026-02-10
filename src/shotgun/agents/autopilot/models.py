@@ -38,6 +38,28 @@ class ClaudeModel(StrEnum):
         return names.get(model, model.value)
 
 
+class MonitorAction(StrEnum):
+    """Actions the monitor can recommend."""
+
+    CONTINUE = "continue"  # Re-prompt Claude Code with remaining tasks
+    REVIEW = "review"  # Move to code review phase
+    CREATE_PR = "create_pr"  # Move to PR creation
+    COMPLETE = "complete"  # Stage is done, all tasks verified
+    ESCALATE = "escalate"  # Something is wrong, needs human attention
+    DEFER = "defer"  # Skip stuck tasks, note for later
+
+
+class MonitorDecision(BaseModel):
+    """Decision from the stage monitor about what to do next."""
+
+    action: MonitorAction
+    reasoning: str = Field(description="Brief explanation of why this action")
+    next_prompt: str | None = Field(
+        default=None,
+        description="Crafted prompt for next Claude Code call",
+    )
+
+
 class StageStatus(StrEnum):
     """Status of a stage in the execution plan."""
 
@@ -100,9 +122,6 @@ class Stage(BaseModel):
     )
     pr_url: str | None = Field(
         default=None, description="URL of the PR created for this stage"
-    )
-    iteration_count: int = Field(
-        default=0, description="Number of execution iterations for this stage"
     )
     task_count_override: int | None = Field(
         default=None,

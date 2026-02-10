@@ -23,7 +23,8 @@ def _make_stage(
         name=f"Stage {number}",
         depends_on=depends_on or [],
         status=status,
-        tasks=tasks or [Task(text=f"Task for stage {number}", completed=False, line_number=1)],
+        tasks=tasks
+        or [Task(text=f"Task for stage {number}", completed=False, line_number=1)],
     )
 
 
