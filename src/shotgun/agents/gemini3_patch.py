@@ -5,9 +5,9 @@ a ResponseOutputMessage with content that has `text: null`. Pydantic-ai creates
 a TextPart with content=None, which later crashes when agent code tries to
 concatenate it.
 
-Bug location in pydantic-ai 1.44.0:
-- pydantic_ai/models/openai.py line 1323:
-  `items.append(TextPart(content.text, id=item.id, ...))`
+Bug location in pydantic-ai (still present as of 1.57.0):
+- pydantic_ai/models/openai.py, in _process_response:
+  `items.append(TextPart(content.text, ...))`
   This doesn't check if content.text is None.
 
 This patch fixes the issue by monkey-patching the _process_response method
@@ -45,14 +45,10 @@ def apply_gemini3_patch() -> bool:
         # Store the original method
         original_process_response = OpenAIResponsesModel._process_response
 
-        def patched_process_response(
-            self: Any, response: Any, model_request_parameters: Any
-        ) -> Any:
+        def patched_process_response(self: Any, *args: Any, **kwargs: Any) -> Any:
             """Patched _process_response that filters out TextParts with None content."""
             # Call the original method
-            model_response = original_process_response(
-                self, response, model_request_parameters
-            )
+            model_response = original_process_response(self, *args, **kwargs)
 
             # Filter out any TextParts with None content
             from pydantic_ai.messages import TextPart
