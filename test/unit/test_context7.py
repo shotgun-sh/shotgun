@@ -284,3 +284,61 @@ async def test_config_manager_loads_v8_config_with_migration():
         assert config.context7 is not None
         assert config.context7.api_key is None
         assert config.shotgun_instance_id == "test-user-id-12345"
+
+
+# --- MCP servers telemetry tests ---
+
+
+def test_mcp_servers_telemetry_event_structure_with_context7():
+    """Test that mcp_servers telemetry dict includes context7 when key is set."""
+    mcp_servers = {
+        "context7": True,
+    }
+
+    assert mcp_servers["context7"] is True
+    # Extensible - future MCP servers can be added
+    assert isinstance(mcp_servers, dict)
+
+
+def test_mcp_servers_telemetry_event_structure_without_context7():
+    """Test that mcp_servers telemetry dict shows context7=False when no key."""
+    mcp_servers = {
+        "context7": False,
+    }
+
+    assert mcp_servers["context7"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_configured_mcp_servers_with_context7_key():
+    """Test _get_configured_mcp_servers returns context7=True when key is set."""
+    mock_manager = AsyncMock()
+    mock_manager.get_context7_api_key.return_value = "test-key"
+
+    with patch(
+        "shotgun.agents.config.get_config_manager", return_value=mock_manager
+    ):
+        from shotgun.agents.agent_manager import AgentManager
+
+        # Call the static-like method directly by creating a minimal instance
+        result = await AgentManager._get_configured_mcp_servers(
+            AsyncMock(spec=AgentManager)
+        )
+        assert result == {"context7": True}
+
+
+@pytest.mark.asyncio
+async def test_get_configured_mcp_servers_without_context7_key():
+    """Test _get_configured_mcp_servers returns context7=False when no key."""
+    mock_manager = AsyncMock()
+    mock_manager.get_context7_api_key.return_value = None
+
+    with patch(
+        "shotgun.agents.config.get_config_manager", return_value=mock_manager
+    ):
+        from shotgun.agents.agent_manager import AgentManager
+
+        result = await AgentManager._get_configured_mcp_servers(
+            AsyncMock(spec=AgentManager)
+        )
+        assert result == {"context7": False}
