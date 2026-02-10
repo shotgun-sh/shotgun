@@ -2,6 +2,8 @@ import { Hero } from "@/components/Hero";
 import { ProblemSection } from "@/components/ProblemSection";
 import { SolutionSection } from "@/components/SolutionSection";
 import { WorkflowDiagram } from "@/components/WorkflowDiagram";
+import { FeaturesSection } from "@/components/FeaturesSection";
+import { ComparisonSection } from "@/components/ComparisonSection";
 import { ScrollTracker } from "@/components/ScrollTracker";
 
 export default function Home() {
@@ -52,6 +54,38 @@ export default function Home() {
 
             {/* Workflow Diagram — visual reinforcement below solution cards */}
             <WorkflowDiagram className="mt-[var(--space-16)]" />
+          </div>
+        </ScrollTracker>
+      </section>
+
+      {/* Features Section — concrete benefits list */}
+      <section
+        className="
+          bg-[var(--color-background)]
+          py-[var(--space-16)] md:py-[var(--space-24)]
+        "
+        data-gtm-section="features"
+        aria-labelledby="features-heading"
+      >
+        <ScrollTracker sectionName="features">
+          <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
+            <FeaturesSection />
+          </div>
+        </ScrollTracker>
+      </section>
+
+      {/* Comparison Section — Intelligence vs Templates positioning */}
+      <section
+        className="
+          bg-surface
+          py-[var(--space-16)] md:py-[var(--space-24)]
+        "
+        data-gtm-section="comparison"
+        aria-labelledby="comparison-heading"
+      >
+        <ScrollTracker sectionName="comparison">
+          <div className="mx-auto w-full max-w-7xl px-[var(--space-4)] md:px-[var(--space-8)] lg:px-[var(--space-12)]">
+            <ComparisonSection />
           </div>
         </ScrollTracker>
       </section>

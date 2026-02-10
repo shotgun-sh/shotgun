@@ -22,3 +22,10 @@ export { SolutionCard, type SolutionCardProps } from "./SolutionCard";
 export { SolutionSection, type SolutionSectionProps } from "./SolutionSection";
 export { WorkflowDiagram, type WorkflowDiagramProps } from "./WorkflowDiagram";
 export { ScrollTracker, type ScrollTrackerProps } from "./ScrollTracker";
+export { FeatureRow, type FeatureRowProps } from "./FeatureRow";
+export { FeaturesSection, type FeaturesSectionProps } from "./FeaturesSection";
+export { ComparisonTable, type ComparisonTableProps } from "./ComparisonTable";
+export {
+  ComparisonSection,
+  type ComparisonSectionProps,
+} from "./ComparisonSection";
