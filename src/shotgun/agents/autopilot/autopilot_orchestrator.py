@@ -636,17 +636,23 @@ class AutopilotOrchestrator:
             base_branch=base_branch,
         )
 
-    async def _run_claude(self, prompt: str) -> AsyncGenerator[ClaudeOutput, None]:
+    async def _run_claude(
+        self,
+        prompt: str,
+        env_vars: dict[str, str] | None = None,
+    ) -> AsyncGenerator[ClaudeOutput, None]:
         """Run Claude Code with a prompt.
 
         Args:
             prompt: The prompt to send.
+            env_vars: Optional extra environment variables for the subprocess.
 
         Yields:
             ClaudeOutput as execution progresses.
         """
         subprocess_config = ClaudeSubprocessConfig(
             working_directory=self.config.working_directory,
+            env_vars=env_vars or {},
         )
         self._claude = ClaudeSubprocess(subprocess_config)
 
@@ -968,7 +974,9 @@ class AutopilotOrchestrator:
         )
 
         # Run Claude with teams enabled
-        async for output in self._run_claude_with_teams(prompt):
+        async for output in self._run_claude(
+            prompt, env_vars={"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
+        ):
             yield output
 
         # After parallel execution, refresh all batch stages
@@ -1007,49 +1015,6 @@ class AutopilotOrchestrator:
                 if stage.status == StageStatus.COMPLETED:
                     async for output in self._post_execution_workflow(stage):
                         yield output
-
-    async def _run_claude_with_teams(
-        self, prompt: str
-    ) -> AsyncGenerator[ClaudeOutput, None]:
-        """Run Claude Code with teams feature enabled.
-
-        Creates a ClaudeSubprocess with the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
-        environment variable set, and without tool restrictions (teams need
-        TeamCreate, TaskCreate, SendMessage, Task, etc.).
-
-        Args:
-            prompt: The prompt to send.
-
-        Yields:
-            ClaudeOutput as execution progresses.
-        """
-        subprocess_config = ClaudeSubprocessConfig(
-            working_directory=self.config.working_directory,
-            env_vars={"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"},
-        )
-        self._claude = ClaudeSubprocess(subprocess_config)
-
-        logger.info("Invoking Claude Code with teams enabled (%d chars)", len(prompt))
-
-        try:
-            async for output in self._claude.run(prompt):
-                if output.type == ClaudeOutputType.ERROR:
-                    logger.error("Claude teams error: %s", output.content)
-                elif output.type == ClaudeOutputType.EXIT:
-                    logger.info(
-                        "Claude teams session ended: %s (exit code: %s)",
-                        output.content,
-                        output.exit_code,
-                    )
-                yield output
-        except Exception as e:
-            logger.exception("Error running Claude with teams")
-            yield ClaudeOutput(
-                type=ClaudeOutputType.ERROR,
-                content=f"Claude teams error: {e}",
-            )
-        finally:
-            self._claude = None
 
     async def _post_execution_workflow(
         self, stage: Stage
