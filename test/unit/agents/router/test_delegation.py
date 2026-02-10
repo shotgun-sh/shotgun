@@ -62,6 +62,8 @@ def mock_router_deps():
     deps.parent_stream_handler = None  # For streaming support
     deps.pending_approval = None  # No pending approval by default
     deps.cancellation_event = None  # For ESC cancellation support
+    deps.usage_manager = MagicMock()
+    deps.usage_manager.add_usage = AsyncMock()
     # Create a real ModelConfig for sub-agent inheritance testing
     deps.llm_model = ModelConfig(
         name="test-model",
@@ -684,3 +686,48 @@ async def test_run_sub_agent_none_stream_handler(mock_context, mock_agent_result
     # Verify that event_stream_handler was passed but is None
     assert "event_stream_handler" in captured_kwargs
     assert captured_kwargs["event_stream_handler"] is None
+
+
+# =============================================================================
+# Tests for sub-agent usage tracking
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_run_sub_agent_tracks_usage(mock_context, mock_agent_result):
+    """Test that sub-agent usage is tracked via usage_manager after delegation."""
+    from pydantic_ai import RunUsage
+
+    mock_agent = MagicMock()
+    mock_sub_deps = _create_mock_sub_agent_deps()
+    mock_sub_deps.llm_model = ModelConfig(
+        name="claude-haiku-4-5",
+        provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=200000,
+        max_output_tokens=8192,
+        api_key="test-key",
+    )
+    mock_context.deps.sub_agent_cache = {}
+
+    # Set up a real RunUsage on the mock result
+    expected_usage = RunUsage(input_tokens=100, output_tokens=50, cache_read_tokens=10)
+    mock_agent_result.usage.return_value = expected_usage
+
+    with patch.dict(
+        "shotgun.agents.router.tools.delegation_tools.AGENT_FACTORIES",
+        {
+            AgentType.RESEARCH: (
+                AsyncMock(return_value=(mock_agent, mock_sub_deps)),
+                AsyncMock(return_value=mock_agent_result),
+            )
+        },
+    ):
+        result = await _run_sub_agent(mock_context, AgentType.RESEARCH, "Test task")
+
+    assert result.success is True
+    mock_context.deps.usage_manager.add_usage.assert_awaited_once_with(
+        expected_usage,
+        model_name="claude-haiku-4-5",
+        provider=ProviderType.ANTHROPIC,
+    )

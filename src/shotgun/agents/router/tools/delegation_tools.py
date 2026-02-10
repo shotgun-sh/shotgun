@@ -296,6 +296,14 @@ async def _run_sub_agent(
                 event_stream_handler=deps.parent_stream_handler,  # Forward streaming
             )
 
+            # Track sub-agent usage
+            usage = result.usage()
+            await deps.usage_manager.add_usage(
+                usage,
+                model_name=sub_agent_deps.llm_model.name,
+                provider=sub_agent_deps.llm_model.provider,
+            )
+
             # Extract response text
             response_text = ""
             if result and result.output:
