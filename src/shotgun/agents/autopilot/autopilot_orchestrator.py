@@ -16,6 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from shotgun.agents.autopilot.claude_cli_subprocess import ClaudeCliSubprocess
 from shotgun.agents.autopilot.claude_subprocess import (
     ClaudeSubprocess,
     ClaudeSubprocessConfig,
@@ -108,6 +109,7 @@ class AutopilotOrchestrator:
         # LLM parser for all parsing (handles various formats flexibly)
         self._lightweight_parser = LightweightTasksParser(self.config.working_directory)
         self._claude: ClaudeSubprocess | None = None
+        self._claude_cli: ClaudeCliSubprocess | None = None
         self._cancelled = False
         self._last_claude_output: str | None = (
             None  # Capture Claude's final output for context
@@ -745,6 +747,48 @@ class AutopilotOrchestrator:
         finally:
             self._claude = None
 
+    async def _run_claude_cli(
+        self,
+        prompt: str,
+        env_vars: dict[str, str] | None = None,
+    ) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run Claude Code CLI for teams-enabled execution.
+
+        Args:
+            prompt: The prompt to send.
+            env_vars: Optional extra environment variables for the subprocess.
+
+        Yields:
+            ClaudeOutput as execution progresses.
+        """
+        subprocess_config = ClaudeSubprocessConfig(
+            working_directory=self.config.working_directory,
+            env_vars=env_vars or {},
+        )
+        self._claude_cli = ClaudeCliSubprocess(subprocess_config)
+
+        logger.debug("Invoking Claude Code CLI with prompt (%d chars)", len(prompt))
+
+        try:
+            async for output in self._claude_cli.run(prompt):
+                if output.type == ClaudeOutputType.ERROR:
+                    logger.error("Claude CLI error output: %s", output.content)
+                elif output.type == ClaudeOutputType.EXIT:
+                    logger.info(
+                        "Claude CLI session ended: %s (exit code: %s)",
+                        output.content,
+                        output.exit_code,
+                    )
+                yield output
+        except Exception as e:
+            logger.exception("Error running Claude CLI")
+            yield ClaudeOutput(
+                type=ClaudeOutputType.ERROR,
+                content=f"Claude CLI error: {e}",
+            )
+        finally:
+            self._claude_cli = None
+
     async def _refresh_stages(self) -> None:
         """Refresh stage task completion status from tasks.md.
 
@@ -1037,8 +1081,8 @@ class AutopilotOrchestrator:
             },
         )
 
-        # Run Claude with teams enabled
-        async for output in self._run_claude(
+        # Run Claude CLI with teams enabled
+        async for output in self._run_claude_cli(
             prompt, env_vars={"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
         ):
             yield output
@@ -1182,6 +1226,8 @@ class AutopilotOrchestrator:
         self._cancelled = True
         if self._claude:
             await self._claude.cancel()
+        if self._claude_cli:
+            await self._claude_cli.cancel()
 
         # Track cancellation (no PII - just state info)
         stage = self.state.current_stage
