@@ -261,6 +261,7 @@ class ChatScreen(Screen[None]):
         continue_session: bool = False,
         force_reindex: bool = False,
         show_pull_hint: bool = False,
+        claude_teams: bool = False,
     ) -> None:
         """Initialize the ChatScreen.
 
@@ -280,6 +281,7 @@ class ChatScreen(Screen[None]):
             continue_session: Whether to continue a previous session
             force_reindex: Whether to force reindexing of codebases
             show_pull_hint: Whether to show hint about recently pulled spec
+            claude_teams: Whether Claude Code Teams is enabled for parallel execution
         """
         super().__init__()
 
@@ -301,6 +303,7 @@ class ChatScreen(Screen[None]):
         self.continue_session = continue_session
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
+        self.claude_teams = claude_teams
 
         # Initialize mode from agent_manager before compose() runs
         # This ensures ModeIndicator shows correct mode on first render
@@ -2972,7 +2975,9 @@ class ChatScreen(Screen[None]):
                     "  3. Use /tasks to generate the stage-based tasks.md",
                 ]
                 error_msg = "\n".join(error_lines)
-                screen = AutopilotStartupScreen([], error_msg)
+                screen = AutopilotStartupScreen(
+                    [], error_msg, show_teams=self.claude_teams
+                )
                 result = await self.app.push_screen_wait(screen)
                 if not result.started:
                     self.widget_coordinator.update_prompt_input(focus=True)
@@ -3005,10 +3010,17 @@ class ChatScreen(Screen[None]):
                         f"Missing recommended files: {', '.join(validation.missing_recommended)}. "
                         "Consider using Shotgun to create a spec and plan first."
                     )
-                screen = AutopilotStartupScreen(stages, warning_msg, is_warning=True)
+                screen = AutopilotStartupScreen(
+                    stages,
+                    warning_msg,
+                    is_warning=True,
+                    show_teams=self.claude_teams,
+                )
             else:
                 error_msg = "No stages found in tasks.md"
-                screen = AutopilotStartupScreen([], error_msg, is_warning=False)
+                screen = AutopilotStartupScreen(
+                    [], error_msg, is_warning=False, show_teams=self.claude_teams
+                )
 
             result = await self.app.push_screen_wait(screen)
 
@@ -3035,6 +3047,7 @@ class ChatScreen(Screen[None]):
                         "completed_tasks": completed_tasks,
                         "has_spec_file": not validation.spec_file.is_empty,
                         "has_plan_file": not validation.plan_file.is_empty,
+                        "use_teams": result.use_teams,
                     },
                 )
 
@@ -3042,7 +3055,9 @@ class ChatScreen(Screen[None]):
                     f"Starting Autopilot in **{result.mode.value}** mode with "
                     f"**{len(result.stages)}** stages"
                 )
-                self._run_autopilot_stage(result.mode, result.stages)
+                self._run_autopilot_stage(
+                    result.mode, result.stages, use_teams=result.use_teams
+                )
             else:
                 logger.info("Autopilot: Cancelled by user")
                 self.mount_hint("Autopilot cancelled")
@@ -3058,6 +3073,7 @@ class ChatScreen(Screen[None]):
         mode: "AutopilotMode",
         stages: "list[Stage]",
         feedback: str | None = None,
+        use_teams: bool = True,
     ) -> None:
         """Run the autopilot workflow for the current stage.
 
@@ -3072,15 +3088,18 @@ class ChatScreen(Screen[None]):
             mode: The execution mode.
             stages: List of stages (with current state).
             feedback: Optional feedback from user rejection.
+            use_teams: Whether to use Claude Code Teams for parallel execution.
         """
         # Create or reuse orchestrator
         if self._autopilot_orchestrator is None:
             config = AutopilotConfig(
                 working_directory=self.deps.working_directory,
+                use_teams=use_teams,
             )
             self._autopilot_orchestrator = AutopilotOrchestrator(config)
             self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))
             self._autopilot_orchestrator.state.stages = stages
+            self._autopilot_orchestrator.state.use_teams = use_teams
             # Initialize state based on task completion - skip completed stages
             self._autopilot_orchestrator.state.initialize_from_tasks()
 
@@ -3144,8 +3163,13 @@ Then confirm what you changed.
         self.mount_hint(f"**Stage {current_stage.number}:** {current_stage.name}")
 
         try:
-            # Run the complete stage workflow
-            async for output in orchestrator.run_stage_workflow():
+            # Choose workflow based on teams setting
+            if orchestrator.config.use_teams:
+                workflow = orchestrator.run_batch_workflow()
+            else:
+                workflow = orchestrator.run_stage_workflow()
+
+            async for output in workflow:
                 self.post_message(AutopilotOutputReceived(output))
 
                 # Update spinner when stage changes (e.g., in cowboy mode auto-advance)
@@ -3174,6 +3198,8 @@ Then confirm what you changed.
         finally:
             self.processing_state.stop_processing()
 
+    _MAX_HINT_MESSAGES = 50
+
     @on(AutopilotOutputReceived)
     def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
         """Handle output from Claude Code subprocess."""
@@ -3183,6 +3209,12 @@ Then confirm what you changed.
         if not content:
             return
 
+        # Always log to file regardless of UI display
+        logger.info("[autopilot-output] [%s] %s", output.type.value, content)
+
+        # Trim old hint messages to keep UI performant
+        self._trim_old_hint_messages()
+
         # Format based on output type
         if output.type == ClaudeOutputType.STDOUT:
             # Tool calls (start with emoji) are compact
@@ -3190,24 +3222,64 @@ Then confirm what you changed.
                 content.startswith(c) for c in ["📖", "✏️", "📝", "💻", "🔍", "🔎", "🔧"]
             )
             self.agent_manager.add_hint_message(
-                HintMessage(message=content, compact=is_tool_call)
+                HintMessage(message=content, compact=is_tool_call, source="autopilot")
             )
         elif output.type == ClaudeOutputType.STDERR:
             self.agent_manager.add_hint_message(
-                HintMessage(message=f"[yellow]{content}[/]", compact=True)
+                HintMessage(
+                    message=f"[yellow]{content}[/]", compact=True, source="autopilot"
+                )
             )
         elif output.type == ClaudeOutputType.EXIT:
             if output.exit_code == 0:
                 self.agent_manager.add_hint_message(
-                    HintMessage(message="[dim]✓ Claude completed[/]", compact=True)
+                    HintMessage(
+                        message="[dim]✓ Claude completed[/]",
+                        compact=True,
+                        source="autopilot",
+                    )
                 )
             else:
                 self.agent_manager.add_hint_message(
                     HintMessage(
                         message=f"[yellow]⚠ Claude exited: {output.exit_code}[/]",
                         compact=True,
+                        source="autopilot",
                     )
                 )
+
+    def _trim_old_hint_messages(self) -> None:
+        """Remove oldest hint messages when over the visible limit.
+
+        Keeps only the last _MAX_HINT_MESSAGES hint messages in UI history,
+        removing oldest first (compact/tool-call messages prioritized for removal).
+        Rebuilds the list to avoid in-place index mutation.
+        """
+        history = self.agent_manager.ui_message_history
+        hint_indices = [
+            i for i, msg in enumerate(history) if isinstance(msg, HintMessage)
+        ]
+
+        excess = len(hint_indices) - self._MAX_HINT_MESSAGES
+        if excess <= 0:
+            return
+
+        # Pick indices to remove: prefer compact (tool-call noise) first
+        compact_indices = [
+            i
+            for i in hint_indices
+            if isinstance(history[i], HintMessage) and history[i].compact  # type: ignore[union-attr]
+        ]
+        non_compact_indices = [i for i in hint_indices if i not in compact_indices]
+
+        to_remove = set(compact_indices[:excess])
+        if len(to_remove) < excess:
+            to_remove.update(non_compact_indices[: excess - len(to_remove)])
+
+        # Rebuild list, skipping removed indices
+        self.agent_manager.ui_message_history = [
+            msg for i, msg in enumerate(history) if i not in to_remove
+        ]
 
     @on(AutopilotApprovalRequired)
     def handle_autopilot_approval_required(

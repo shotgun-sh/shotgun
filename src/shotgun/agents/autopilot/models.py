@@ -38,6 +38,34 @@ class ClaudeModel(StrEnum):
         return names.get(model, model.value)
 
 
+class MonitorAction(StrEnum):
+    """Actions the monitor can recommend."""
+
+    CONTINUE = "continue"  # Re-prompt Claude Code with remaining tasks
+    REVIEW = "review"  # Move to code review phase
+    CREATE_PR = "create_pr"  # Move to PR creation
+    COMPLETE = "complete"  # Stage is done, all tasks verified
+    ESCALATE = "escalate"  # Something is wrong, needs human attention
+    DEFER = "defer"  # Skip stuck tasks, note for later
+
+
+class MonitorDecision(BaseModel):
+    """Decision from the stage monitor about what to do next."""
+
+    action: MonitorAction
+    reasoning: str = Field(description="Brief explanation of why this action")
+    next_prompt: str | None = Field(
+        default=None,
+        description="Crafted prompt for next Claude Code call",
+    )
+    status_summary: str = Field(
+        default="",
+        description="Short (under 80 chars) human-readable status for the UI spinner. "
+        "Describes what stage is being worked on, current activity, and progress. "
+        "Example: 'Auth API — 3/5 tasks done, adding JWT validation'",
+    )
+
+
 class StageStatus(StrEnum):
     """Status of a stage in the execution plan."""
 
@@ -82,6 +110,10 @@ class Stage(BaseModel):
 
     number: str = Field(description="Stage identifier (numeric or alphanumeric)")
     name: str = Field(description="Stage name/title")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Stage identifiers this stage depends on (e.g. ['1', '2'])",
+    )
     tasks: list[Task] = Field(
         default_factory=list, description="List of tasks in this stage"
     )
@@ -97,9 +129,21 @@ class Stage(BaseModel):
     pr_url: str | None = Field(
         default=None, description="URL of the PR created for this stage"
     )
-    iteration_count: int = Field(
-        default=0, description="Number of execution iterations for this stage"
-    )
+
+    def copy_metadata_from(self, source: "Stage") -> None:
+        """Copy execution metadata from another stage instance.
+
+        Preserves status, phase, branch_name, and pr_url from the source
+        stage. Used when refreshing task data while keeping orchestration state.
+
+        Args:
+            source: The stage to copy metadata from.
+        """
+        self.status = source.status
+        self.phase = source.phase
+        self.branch_name = source.branch_name
+        self.pr_url = source.pr_url
+
     task_count_override: int | None = Field(
         default=None,
         description="Optional override for task count (used by lightweight parser)",
@@ -183,6 +227,10 @@ class AutopilotState(BaseModel):
     )
     tasks_file_path: str = Field(
         default=".shotgun/tasks.md", description="Path to the tasks.md file"
+    )
+    use_teams: bool = Field(
+        default=True,
+        description="Use Claude Code Teams for parallel stage execution",
     )
 
     @property
@@ -410,6 +458,10 @@ class ParsedStage(BaseModel):
         description="Stage identifier - can be numeric (1, 2, 3) or alphanumeric (A, 1a, 2b)"
     )
     name: str = Field(description="Stage name/title")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Stage identifiers this stage depends on (e.g. ['1', '2']). Empty if no dependencies.",
+    )
     tasks: list[ParsedTask] = Field(description="List of tasks in this stage")
 
 

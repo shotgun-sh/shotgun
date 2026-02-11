@@ -32,7 +32,7 @@ def merge_stages_with_parsed_tasks(
 
     This utility function is used by the LLM parser to update
     task completion status while preserving stage metadata (status, phase,
-    branch_name, pr_url, iteration_count).
+    branch_name, pr_url).
 
     Args:
         state_stages: Existing stages from AutopilotState with metadata.
@@ -63,15 +63,21 @@ def merge_stages_with_parsed_tasks(
             )
 
             # Create updated stage preserving metadata
+            # Use parsed depends_on if available, fall back to existing
+            depends_on = (
+                parsed_stage.depends_on
+                if parsed_stage.depends_on is not None
+                else state_stage.depends_on
+            )
             updated_stage = Stage(
                 number=state_stage.number,
                 name=state_stage.name,
+                depends_on=depends_on,
                 tasks=updated_tasks,
                 status=state_stage.status,
                 phase=state_stage.phase,
                 branch_name=state_stage.branch_name,
                 pr_url=state_stage.pr_url,
-                iteration_count=state_stage.iteration_count,
             )
             updated_stages.append(updated_stage)
         else:
@@ -122,6 +128,9 @@ class TasksParser:
         r"^###\s+Stage\s+([A-Za-z0-9]+)\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE
     )
     TASK_PATTERN = re.compile(r"^-\s*\[([ xX])\]\s*(.+)$", re.MULTILINE)
+    DEPENDS_ON_PATTERN = re.compile(
+        r"^(?:#+\s*)?Depends\s+on\s*:\s*(.+)$", re.IGNORECASE
+    )
 
     def __init__(self, working_directory: Path | None = None):
         """Initialize the parser.
@@ -179,6 +188,35 @@ class TasksParser:
         result.stages = self._parse_content(content, result.parse_errors)
         return result
 
+    @staticmethod
+    def _parse_depends_on(value: str) -> list[str]:
+        """Parse a 'Depends on:' value into a list of stage identifiers.
+
+        Handles formats like:
+            "Stage 1, Stage 2"
+            "Stage 1, Stage 3"
+            "1, 2"
+            "None"
+
+        Args:
+            value: The raw text after "Depends on:".
+
+        Returns:
+            List of stage identifier strings (e.g. ["1", "2"]).
+        """
+        value = value.strip()
+        if not value or value.lower() == "none":
+            return []
+
+        parts = [p.strip() for p in value.split(",")]
+        identifiers: list[str] = []
+        for part in parts:
+            # Strip "Stage " prefix if present
+            cleaned = re.sub(r"(?i)^stage\s+", "", part).strip()
+            if cleaned:
+                identifiers.append(cleaned)
+        return identifiers
+
     def _parse_content(self, content: str, errors: list[str]) -> list[Stage]:
         """Parse the content and extract stages with tasks.
 
@@ -210,6 +248,15 @@ class TasksParser:
 
                 current_stage = Stage(number=stage_number, name=stage_name)
                 continue
+
+            # Check for depends_on line (only valid right after a stage header, before tasks)
+            if current_stage is not None and not current_stage.tasks:
+                depends_match = self.DEPENDS_ON_PATTERN.match(line.strip())
+                if depends_match:
+                    current_stage.depends_on = self._parse_depends_on(
+                        depends_match.group(1)
+                    )
+                    continue
 
             # Check for task checkbox
             task_match = self.TASK_PATTERN.match(line.strip())

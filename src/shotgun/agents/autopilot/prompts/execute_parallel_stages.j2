@@ -1,0 +1,51 @@
+{% include 'context_preamble.j2' %}
+# Parallel Stage Execution - Batch Level {{ batch_level }}
+
+You are executing **{{ stages|length }} stages in parallel** using Claude Code Teams.
+All stages in this batch have their dependencies satisfied and can run concurrently.
+
+## Stages to Execute
+
+{% for stage in stages %}
+### Stage {{ stage.number }}: {{ stage.name }}
+**Branch:** `{{ stage.branch_name }}`
+**Base branch:** `{{ base_branch }}`
+
+**Pending tasks:**
+{% for task in stage.pending_tasks %}
+- [ ] {{ task }}
+{% endfor %}
+
+{% endfor %}
+
+## Execution Instructions
+
+You MUST use Claude Code Teams to execute these stages in parallel:
+
+1. **Create a team** using `TeamCreate` with a descriptive name like "parallel-batch-{{ batch_level }}"
+
+2. **Create tasks** using `TaskCreate` for each stage:
+{% for stage in stages %}
+   - Task for Stage {{ stage.number }}: "{{ stage.name }}"
+{% endfor %}
+
+3. **Spawn worker agents** (one per stage) using the `Task` tool with `subagent_type: "general-purpose"` and the team name. Each worker should:
+   - Check out the branch `<branch_name>` from `{{ base_branch }}`
+     - If branch doesn't exist: `git checkout -b <branch_name> {{ base_branch }}`
+     - If branch exists: `git checkout <branch_name>`
+   - Complete all pending tasks for its assigned stage
+   - Mark each task as `[x]` in {{ tasks_file_path }}
+   - Commit changes with a descriptive message
+   - Mark its task as completed using `TaskUpdate`
+
+4. **Wait for all workers** to complete their tasks
+
+5. **Clean up** the team when all stages are done
+
+## IMPORTANT RULES
+
+1. **All branches are based on `{{ base_branch }}`** - stages in the same batch do NOT stack on each other
+2. Each worker operates on its OWN branch independently
+3. Workers must ONLY work on their assigned stage's tasks
+4. Workers must mark tasks complete in {{ tasks_file_path }} by changing `[ ]` to `[x]`
+5. After all workers complete, report the status of each stage

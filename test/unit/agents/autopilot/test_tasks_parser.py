@@ -3,7 +3,11 @@
 from pathlib import Path
 
 from shotgun.agents.autopilot.models import Stage, StageStatus, Task
-from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
+from shotgun.agents.autopilot.tasks_parser import (
+    ParsedTasksFile,
+    TasksParser,
+    merge_stages_with_parsed_tasks,
+)
 
 
 def test_parser_initialization():
@@ -283,3 +287,173 @@ def test_parse_special_characters_in_task():
     assert len(result.stages[0].tasks) == 3
     assert "`code`" in result.stages[0].tasks[0].text
     assert "https://example.com" in result.stages[0].tasks[1].text
+
+
+def test_parse_depends_on_with_stage_prefix():
+    """Test parsing Depends on lines with 'Stage N' format."""
+    content = """### Stage 1: Database Layer
+Depends on: None
+- [ ] Create models
+
+### Stage 2: API Framework
+Depends on: None
+- [ ] Set up routing
+
+### Stage 3: Business Logic
+Depends on: Stage 1, Stage 2
+- [ ] Implement services
+"""
+    parser = TasksParser()
+    result = parser.parse_content(content)
+
+    assert result.is_valid
+    assert len(result.stages) == 3
+    assert result.stages[0].depends_on == []
+    assert result.stages[1].depends_on == []
+    assert result.stages[2].depends_on == ["1", "2"]
+
+
+def test_parse_depends_on_bare_numbers():
+    """Test parsing Depends on lines with bare numbers."""
+    content = """### Stage 1: First
+Depends on: None
+- [ ] Task
+
+### Stage 2: Second
+Depends on: 1
+- [ ] Task
+"""
+    parser = TasksParser()
+    result = parser.parse_content(content)
+
+    assert result.is_valid
+    assert result.stages[0].depends_on == []
+    assert result.stages[1].depends_on == ["1"]
+
+
+def test_parse_depends_on_missing():
+    """Test that missing Depends on line results in empty list."""
+    content = """### Stage 1: No Depends Line
+- [ ] Task
+"""
+    parser = TasksParser()
+    result = parser.parse_content(content)
+
+    assert result.is_valid
+    assert result.stages[0].depends_on == []
+
+
+def test_parse_depends_on_multiple():
+    """Test parsing Depends on with multiple dependencies."""
+    content = """### Stage 4: Integration Testing
+Depends on: Stage 1, Stage 2, Stage 3
+- [ ] Run integration tests
+"""
+    parser = TasksParser()
+    result = parser.parse_content(content)
+
+    assert result.is_valid
+    assert result.stages[0].depends_on == ["1", "2", "3"]
+
+
+def test_parse_depends_on_with_markdown_header():
+    """Test parsing Depends on as a markdown sub-header."""
+    content = """### Stage 1: Database
+#### Depends on: None
+- [ ] Task
+
+### Stage 2: Logic
+#### Depends on: Stage 1
+- [ ] Task
+"""
+    parser = TasksParser()
+    result = parser.parse_content(content)
+
+    assert result.is_valid
+    assert result.stages[0].depends_on == []
+    assert result.stages[1].depends_on == ["1"]
+
+
+def test_parse_depends_on_static_method():
+    """Test _parse_depends_on static method directly."""
+    assert TasksParser._parse_depends_on("None") == []
+    assert TasksParser._parse_depends_on("none") == []
+    assert TasksParser._parse_depends_on("") == []
+    assert TasksParser._parse_depends_on("Stage 1") == ["1"]
+    assert TasksParser._parse_depends_on("Stage 1, Stage 2") == ["1", "2"]
+    assert TasksParser._parse_depends_on("1, 2, 3") == ["1", "2", "3"]
+    assert TasksParser._parse_depends_on("Stage A, Stage 2b") == ["A", "2b"]
+
+
+def test_merge_preserves_empty_depends_on():
+    """Test that merge preserves explicit empty depends_on (not falsy fallback)."""
+    # State has depends_on=["1"] (stale), parsed has depends_on=[] (cleared to None/empty)
+    state_stages = [
+        Stage(
+            number="2",
+            name="Stage 2",
+            depends_on=["1"],
+            status=StageStatus.IN_PROGRESS,
+            tasks=[Task(text="Task 2", completed=False, line_number=2)],
+        ),
+    ]
+
+    # Parsed stage has empty depends_on (e.g. "Depends on: None" was parsed)
+    parsed_stages = [
+        Stage(
+            number="2",
+            name="Stage 2",
+            depends_on=[],  # Explicitly empty - should NOT fall through to state
+            tasks=[Task(text="Task 2", completed=True, line_number=2)],
+        ),
+    ]
+
+    result = merge_stages_with_parsed_tasks(state_stages, parsed_stages)
+
+    # The empty list from parsed should be preserved, not replaced by stale ["1"]
+    assert result[0].depends_on == []
+
+
+def test_merge_stages_preserves_depends_on():
+    """Test that merge_stages_with_parsed_tasks preserves depends_on."""
+    state_stages = [
+        Stage(
+            number="1",
+            name="Stage 1",
+            depends_on=[],
+            status=StageStatus.COMPLETED,
+            tasks=[Task(text="Task 1", completed=True, line_number=1)],
+        ),
+        Stage(
+            number="2",
+            name="Stage 2",
+            depends_on=["1"],
+            status=StageStatus.IN_PROGRESS,
+            tasks=[Task(text="Task 2", completed=False, line_number=2)],
+        ),
+    ]
+
+    parsed_stages = [
+        Stage(
+            number="1",
+            name="Stage 1",
+            depends_on=[],
+            tasks=[Task(text="Task 1", completed=True, line_number=1)],
+        ),
+        Stage(
+            number="2",
+            name="Stage 2",
+            depends_on=["1"],
+            tasks=[Task(text="Task 2", completed=True, line_number=2)],
+        ),
+    ]
+
+    result = merge_stages_with_parsed_tasks(state_stages, parsed_stages)
+
+    assert result[0].depends_on == []
+    assert result[1].depends_on == ["1"]
+    # Metadata preserved
+    assert result[0].status == StageStatus.COMPLETED
+    assert result[1].status == StageStatus.IN_PROGRESS
+    # Tasks updated from parsed
+    assert result[1].tasks[0].completed is True

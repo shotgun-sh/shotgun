@@ -6,6 +6,7 @@ This module provides template loading and rendering for autopilot prompts.
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from pydantic import BaseModel
 
 # Set up Jinja2 environment with the prompts directory
 _PROMPTS_DIR = Path(__file__).parent
@@ -121,4 +122,39 @@ def render_qa_testing(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
         stage_name=stage_name,
+    )
+
+
+class ParallelStageInfo(BaseModel):
+    """Stage info passed to the parallel execution template."""
+
+    number: str
+    name: str
+    branch_name: str
+    pending_tasks: list[str]
+
+
+def render_execute_parallel_stages(
+    tasks_file_path: str,
+    stages: list[ParallelStageInfo],
+    base_branch: str,
+    batch_level: int,
+) -> str:
+    """Render the parallel stage execution prompt.
+
+    Args:
+        tasks_file_path: Path to the tasks.md file.
+        stages: List of stage info dicts with number, name, branch_name, pending_tasks.
+        base_branch: The base branch all stages branch from.
+        batch_level: The batch level number.
+
+    Returns:
+        Rendered prompt string.
+    """
+    template = _env.get_template("execute_parallel_stages.j2")
+    return template.render(
+        tasks_file_path=tasks_file_path,
+        stages=stages,
+        base_branch=base_branch,
+        batch_level=batch_level,
     )
