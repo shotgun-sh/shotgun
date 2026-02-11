@@ -188,6 +188,14 @@ def main(
             help="Custom spec directory path (default: .shotgun/ in current directory)",
         ),
     ] = None,
+    claude_teams: Annotated[
+        bool,
+        typer.Option(
+            "--claude-teams",
+            help="Enable Claude Code Teams for parallel stage execution (experimental)",
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Shotgun - AI-powered CLI tool."""
     logger.debug("Starting shotgun CLI application")
@@ -225,6 +233,7 @@ def main(
                     model_override=model,
                     sub_agent_model_override=sub_agent_model,
                     spec_dir_override=spec_dir,
+                    claude_teams=claude_teams,
                 )
             finally:
                 # Ensure PostHog is shut down cleanly even if server exits unexpectedly
@@ -238,6 +247,7 @@ def main(
                     no_update_check=no_update_check,
                     continue_session=continue_session,
                     force_reindex=force_reindex,
+                    claude_teams=claude_teams,
                 )
             finally:
                 # Ensure PostHog is shut down cleanly even if TUI exits unexpectedly

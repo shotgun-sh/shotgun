@@ -71,6 +71,7 @@ class ShotgunApp(App[None]):
         show_pull_hint: bool = False,
         pull_version_id: str | None = None,
         pending_db_issues: list[DatabaseIssue] | None = None,
+        claude_teams: bool = False,
     ) -> None:
         super().__init__()
         self.config_manager: ConfigManager = get_config_manager()
@@ -79,6 +80,7 @@ class ShotgunApp(App[None]):
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
         self.pull_version_id = pull_version_id
+        self.claude_teams = claude_teams
         # Database issues detected at startup (locked, corrupted, timeout)
         # These will be shown to the user via dialogs when ChatScreen mounts
         self.pending_db_issues = pending_db_issues or []
@@ -235,6 +237,7 @@ class ShotgunApp(App[None]):
                 continue_session=self.continue_session,
                 force_reindex=self.force_reindex,
                 show_pull_hint=self.show_pull_hint,
+                claude_teams=self.claude_teams,
             )
 
             # Update the ProcessingStateManager and WidgetCoordinator with the actual ChatScreen instance
@@ -367,6 +370,7 @@ def run(
     force_reindex: bool = False,
     show_pull_hint: bool = False,
     pull_version_id: str | None = None,
+    claude_teams: bool = False,
 ) -> None:
     """Run the TUI application.
 
@@ -376,6 +380,7 @@ def run(
         force_reindex: If True, force re-indexing of codebase (ignores existing index).
         show_pull_hint: If True, show hint about recently pulled spec.
         pull_version_id: If provided, pull this spec version before showing ChatScreen.
+        claude_teams: If True, enable Claude Code Teams for parallel execution.
     """
     # Log startup information
     _log_startup_info()
@@ -434,6 +439,7 @@ def run(
         show_pull_hint=show_pull_hint,
         pull_version_id=pull_version_id,
         pending_db_issues=pending_db_issues,
+        claude_teams=claude_teams,
     )
     app.run(inline_no_clear=True)
 
@@ -448,6 +454,7 @@ def serve(
     model_override: str | None = None,
     sub_agent_model_override: str | None = None,
     spec_dir_override: str | None = None,
+    claude_teams: bool = False,
 ) -> None:
     """Serve the TUI application as a web application.
 
@@ -461,6 +468,7 @@ def serve(
         model_override: If provided, pass --model flag to spawned process.
         sub_agent_model_override: If provided, pass --sub-agent-model flag to spawned process.
         spec_dir_override: If provided, pass --spec-dir flag to spawned process.
+        claude_teams: If True, enable Claude Code Teams for parallel execution.
     """
     # Detect database issues BEFORE starting the TUI
     # Note: In serve mode, issues are logged but user interaction happens in
@@ -512,6 +520,8 @@ def serve(
         command += f" --sub-agent-model={sub_agent_model_override}"
     if spec_dir_override:
         command += f" --spec-dir={spec_dir_override}"
+    if claude_teams:
+        command += " --claude-teams"
 
     # Get the path to our custom templates directory
     templates_path = Path(__file__).parent / "templates"

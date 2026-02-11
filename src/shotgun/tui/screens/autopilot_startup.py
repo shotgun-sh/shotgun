@@ -196,6 +196,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         *,
         is_warning: bool = False,
         loading: bool = False,
+        show_teams: bool = False,
     ) -> None:
         """Initialize the startup screen.
 
@@ -204,6 +205,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             error_message: Optional error/warning message to display.
             is_warning: If True, treat as warning (can still start). If False, treat as error (blocks start).
             loading: If True, show loading state while parsing tasks.md.
+            show_teams: If True, show the Claude Code Teams toggle.
         """
         super().__init__()
         self.stages = stages
@@ -212,8 +214,9 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             is_warning and len(stages) > 0
         )  # Warnings only make sense if we have stages
         self.loading = loading
+        self.show_teams = show_teams
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
-        self.use_teams = True
+        self.use_teams = show_teams
 
     def compose(self) -> ComposeResult:
         """Compose the startup screen layout."""
@@ -281,18 +284,19 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                         classes="mode-description",
                     )
 
-            # Teams toggle
-            with Container(classes="teams-section"):
-                with Horizontal(classes="teams-toggle-row"):
-                    yield Switch(value=True, id="teams-toggle")
+            # Teams toggle (only shown with --claude-teams flag)
+            if self.show_teams:
+                with Container(classes="teams-section"):
+                    with Horizontal(classes="teams-toggle-row"):
+                        yield Switch(value=True, id="teams-toggle")
+                        yield Static(
+                            "Use Claude Teams for parallel execution",
+                            classes="teams-label",
+                        )
                     yield Static(
-                        "Use Claude Teams for parallel execution",
-                        classes="teams-label",
+                        "[dim]Stages with independent dependencies will execute in parallel using Claude Code Teams[/]",
+                        classes="teams-description",
                     )
-                yield Static(
-                    "[dim]Stages with independent dependencies will execute in parallel using Claude Code Teams[/]",
-                    classes="teams-description",
-                )
 
             # Stages preview section
             if self.loading:
@@ -462,7 +466,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             P: Select pause mode
             A: Select auto-continue mode
             C: Select cowboy mode
-            T: Toggle teams
+            T: Toggle teams (only with --claude-teams)
         """
         if event.key == "enter":
             if not self.error_message or self.is_warning:
@@ -504,7 +508,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             except NoMatches:
                 pass
             event.stop()
-        elif event.key in ("t", "T"):
+        elif event.key in ("t", "T") and self.show_teams:
             self.use_teams = not self.use_teams
             try:
                 toggle = self.query_one("#teams-toggle", Switch)

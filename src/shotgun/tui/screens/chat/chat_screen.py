@@ -261,6 +261,7 @@ class ChatScreen(Screen[None]):
         continue_session: bool = False,
         force_reindex: bool = False,
         show_pull_hint: bool = False,
+        claude_teams: bool = False,
     ) -> None:
         """Initialize the ChatScreen.
 
@@ -280,6 +281,7 @@ class ChatScreen(Screen[None]):
             continue_session: Whether to continue a previous session
             force_reindex: Whether to force reindexing of codebases
             show_pull_hint: Whether to show hint about recently pulled spec
+            claude_teams: Whether Claude Code Teams is enabled for parallel execution
         """
         super().__init__()
 
@@ -301,6 +303,7 @@ class ChatScreen(Screen[None]):
         self.continue_session = continue_session
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
+        self.claude_teams = claude_teams
 
         # Initialize mode from agent_manager before compose() runs
         # This ensures ModeIndicator shows correct mode on first render
@@ -2972,7 +2975,9 @@ class ChatScreen(Screen[None]):
                     "  3. Use /tasks to generate the stage-based tasks.md",
                 ]
                 error_msg = "\n".join(error_lines)
-                screen = AutopilotStartupScreen([], error_msg)
+                screen = AutopilotStartupScreen(
+                    [], error_msg, show_teams=self.claude_teams
+                )
                 result = await self.app.push_screen_wait(screen)
                 if not result.started:
                     self.widget_coordinator.update_prompt_input(focus=True)
@@ -3005,10 +3010,17 @@ class ChatScreen(Screen[None]):
                         f"Missing recommended files: {', '.join(validation.missing_recommended)}. "
                         "Consider using Shotgun to create a spec and plan first."
                     )
-                screen = AutopilotStartupScreen(stages, warning_msg, is_warning=True)
+                screen = AutopilotStartupScreen(
+                    stages,
+                    warning_msg,
+                    is_warning=True,
+                    show_teams=self.claude_teams,
+                )
             else:
                 error_msg = "No stages found in tasks.md"
-                screen = AutopilotStartupScreen([], error_msg, is_warning=False)
+                screen = AutopilotStartupScreen(
+                    [], error_msg, is_warning=False, show_teams=self.claude_teams
+                )
 
             result = await self.app.push_screen_wait(screen)
 
