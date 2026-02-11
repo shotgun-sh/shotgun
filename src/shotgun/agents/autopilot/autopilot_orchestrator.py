@@ -276,7 +276,7 @@ class AutopilotOrchestrator:
         # Signal stage change to TUI so it can update spinner
         yield ClaudeOutput(
             type=ClaudeOutputType.STAGE_CHANGE,
-            content=f"Stage {stage.number}: {stage.name}",
+            content=f"Stage {stage.number}: {stage.name} — 0/{stage.task_count} tasks",
         )
 
         # Track stage start (no PII - just counts and numbers)
@@ -541,6 +541,12 @@ class AutopilotOrchestrator:
                 type=ClaudeOutputType.STDOUT,
                 content=f"  Monitor: {decision.action.value} — {decision.reasoning}",
             )
+
+            if decision.status_summary:
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STAGE_CHANGE,
+                    content=decision.status_summary[:80],
+                )
 
             # Act on decision
             if decision.action == MonitorAction.COMPLETE:

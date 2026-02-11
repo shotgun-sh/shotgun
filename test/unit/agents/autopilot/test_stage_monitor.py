@@ -211,6 +211,26 @@ async def test_stage_monitor_evaluate_returns_decision():
     assert decision.reasoning == "Stuck in a loop"
 
 
+def test_monitor_decision_status_summary_default():
+    """Test MonitorDecision status_summary defaults to empty string."""
+    decision = MonitorDecision(
+        action=MonitorAction.COMPLETE,
+        reasoning="All tasks verified",
+    )
+    assert decision.status_summary == ""
+
+
+def test_monitor_decision_with_status_summary():
+    """Test MonitorDecision with explicit status_summary."""
+    decision = MonitorDecision(
+        action=MonitorAction.CONTINUE,
+        reasoning="Tasks remain",
+        next_prompt="Finish task 3",
+        status_summary="Auth API — 3/5 tasks done, implementing JWT",
+    )
+    assert decision.status_summary == "Auth API — 3/5 tasks done, implementing JWT"
+
+
 @pytest.mark.asyncio
 async def test_stage_monitor_evaluate_passes_correct_prompt():
     """Test that evaluate passes stage info in the prompt to the agent."""

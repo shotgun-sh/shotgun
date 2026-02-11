@@ -11,6 +11,8 @@ from pydantic_ai import Agent, RunContext
 
 from shotgun.agents.autopilot.models import MonitorDecision
 from shotgun.agents.config import get_provider_model
+from shotgun.agents.config.models import ModelConfig
+from shotgun.agents.usage_manager import get_session_usage_manager
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,11 @@ Guidelines:
 no task progress between iterations), consider ESCALATE or DEFER.
 - When using CONTINUE, write a specific next_prompt that tells Claude Code exactly \
 what to do — not a generic "finish remaining tasks" message.
-- When using ESCALATE, explain clearly what went wrong in reasoning."""
+- When using ESCALATE, explain clearly what went wrong in reasoning.
+- Always provide a `status_summary`: a short (under 80 chars) description for the user's UI spinner.
+  It should convey which stage is being worked on, what's currently happening, and progress.
+  Good: "Auth API — 3/5 tasks done, implementing JWT validation"
+  Bad: "Working on tasks" (too vague) or a 200-char paragraph (too long)."""
 
 
 class MonitorDeps:
@@ -67,6 +73,7 @@ class StageMonitor:
         self._recent_outputs: list[str] = []
         self._max_history = 3
         self._agent: Agent[MonitorDeps, MonitorDecision] | None = None
+        self._model_config: ModelConfig | None = None
 
     async def _get_agent(self) -> Agent[MonitorDeps, MonitorDecision]:
         """Get or create the monitor agent."""
@@ -75,6 +82,7 @@ class StageMonitor:
 
         # Use main model (not sub-agent) for intelligent monitoring
         model_config = await get_provider_model(for_sub_agent=False)
+        self._model_config = model_config
         logger.info("Stage monitor using model: %s", model_config.name)
 
         agent: Agent[MonitorDeps, MonitorDecision] = Agent(
@@ -188,6 +196,17 @@ Decide what action to take next."""
         )
 
         result = await agent.run(prompt, deps=deps)
+
+        # Track monitor usage
+        try:
+            if self._model_config and result.usage():
+                await get_session_usage_manager().add_usage(
+                    result.usage(),
+                    model_name=self._model_config.name,
+                    provider=self._model_config.provider,
+                )
+        except Exception:
+            logger.debug("Failed to track stage monitor usage")
 
         logger.info(
             "Monitor decision for Stage %s: action=%s reasoning=%s",

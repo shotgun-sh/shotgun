@@ -58,6 +58,12 @@ class MonitorDecision(BaseModel):
         default=None,
         description="Crafted prompt for next Claude Code call",
     )
+    status_summary: str = Field(
+        default="",
+        description="Short (under 80 chars) human-readable status for the UI spinner. "
+        "Describes what stage is being worked on, current activity, and progress. "
+        "Example: 'Auth API — 3/5 tasks done, adding JWT validation'",
+    )
 
 
 class StageStatus(StrEnum):
