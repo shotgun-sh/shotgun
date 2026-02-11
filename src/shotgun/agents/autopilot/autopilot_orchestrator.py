@@ -461,10 +461,13 @@ class AutopilotOrchestrator:
             len(stage.pending_tasks),
         )
 
+        max_iterations = 30
         monitor = StageMonitor(working_directory=self.config.working_directory)
         next_prompt: str | None = None  # First iteration uses standard template
+        iteration = 0
 
-        while True:
+        while iteration < max_iterations:
+            iteration += 1
             if self._cancelled:
                 trail_logger.info("CANCELLED stage=%s", stage.number)
                 return
@@ -586,6 +589,26 @@ class AutopilotOrchestrator:
 
             # CONTINUE: use monitor's crafted prompt for next Claude Code call
             next_prompt = decision.next_prompt
+
+        # Safety cap reached
+        trail_logger.warning(
+            "MAX_ITERATIONS stage=%s iterations=%d", stage.number, max_iterations
+        )
+        track_event(
+            "autopilot_stage_failed",
+            {
+                "stage_number": stage.number,
+                "total_stages": len(self.state.stages),
+                "failure_reason": "max_iterations",
+                "pending_tasks": len(stage.pending_tasks),
+                "completed_tasks": len(stage.completed_tasks),
+                "mode": self.state.mode.value,
+            },
+        )
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDERR,
+            content=f"  Safety limit reached ({max_iterations} iterations)",
+        )
 
     async def _create_pr(self, stage: Stage) -> AsyncGenerator[ClaudeOutput, None]:
         """Create a PR for the completed stage.

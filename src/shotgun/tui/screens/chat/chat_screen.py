@@ -3186,7 +3186,7 @@ Then confirm what you changed.
         finally:
             self.processing_state.stop_processing()
 
-    _AUTOPILOT_MAX_VISIBLE_MESSAGES = 50
+    _MAX_HINT_MESSAGES = 50
 
     @on(AutopilotOutputReceived)
     def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
@@ -3200,8 +3200,8 @@ Then confirm what you changed.
         # Always log to file regardless of UI display
         logger.info("[autopilot-output] [%s] %s", output.type.value, content)
 
-        # Trim old autopilot hints if over the limit
-        self._trim_old_autopilot_hints()
+        # Trim old hint messages to keep UI performant
+        self._trim_old_hint_messages()
 
         # Format based on output type
         if output.type == ClaudeOutputType.STDOUT:
@@ -3236,35 +3236,33 @@ Then confirm what you changed.
                     )
                 )
 
-    def _trim_old_autopilot_hints(self) -> None:
-        """Remove oldest autopilot hint messages when over the visible limit.
+    def _trim_old_hint_messages(self) -> None:
+        """Remove oldest hint messages when over the visible limit.
 
-        Prioritizes removing compact (tool-call) messages first.
+        Keeps only the last _MAX_HINT_MESSAGES hint messages in UI history,
+        removing oldest first (compact/tool-call messages prioritized for removal).
         """
         history = self.agent_manager.ui_message_history
-        autopilot_indices = [
-            i
-            for i, msg in enumerate(history)
-            if isinstance(msg, HintMessage) and msg.source == "autopilot"
+        hint_indices = [
+            i for i, msg in enumerate(history) if isinstance(msg, HintMessage)
         ]
 
-        excess = len(autopilot_indices) - self._AUTOPILOT_MAX_VISIBLE_MESSAGES
+        excess = len(hint_indices) - self._MAX_HINT_MESSAGES
         if excess <= 0:
             return
 
-        # Remove oldest autopilot messages, preferring compact ones first
+        # Remove oldest hints, preferring compact ones first
         compact_indices = [
             i
-            for i in autopilot_indices
+            for i in hint_indices
             if isinstance(history[i], HintMessage) and history[i].compact  # type: ignore[union-attr]
         ]
-        non_compact_indices = [i for i in autopilot_indices if i not in compact_indices]
+        non_compact_indices = [i for i in hint_indices if i not in compact_indices]
 
         to_remove = compact_indices[:excess]
         if len(to_remove) < excess:
             to_remove.extend(non_compact_indices[: excess - len(to_remove)])
 
-        # Remove in reverse order to preserve indices
         for idx in sorted(to_remove, reverse=True):
             history.pop(idx)
 
