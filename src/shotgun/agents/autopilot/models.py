@@ -129,6 +129,21 @@ class Stage(BaseModel):
     pr_url: str | None = Field(
         default=None, description="URL of the PR created for this stage"
     )
+
+    def copy_metadata_from(self, source: "Stage") -> None:
+        """Copy execution metadata from another stage instance.
+
+        Preserves status, phase, branch_name, and pr_url from the source
+        stage. Used when refreshing task data while keeping orchestration state.
+
+        Args:
+            source: The stage to copy metadata from.
+        """
+        self.status = source.status
+        self.phase = source.phase
+        self.branch_name = source.branch_name
+        self.pr_url = source.pr_url
+
     task_count_override: int | None = Field(
         default=None,
         description="Optional override for task count (used by lightweight parser)",

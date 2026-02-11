@@ -2,6 +2,7 @@
 
 from shotgun.agents.autopilot.dependency_graph import (
     DependencyError,
+    DependencyErrorType,
     ExecutionBatch,
     ExecutionPlan,
     compute_execution_batches,
@@ -97,8 +98,8 @@ def test_validate_multiple_errors():
     errors = validate_dependencies(stages)
     assert len(errors) >= 2
     error_types = {e.error_type for e in errors}
-    assert "missing_ref" in error_types
-    assert "cycle" in error_types
+    assert DependencyErrorType.MISSING_REF in error_types
+    assert DependencyErrorType.CYCLE in error_types
 
 
 def test_compute_no_dependencies_single_batch():
@@ -289,12 +290,14 @@ def test_execution_plan_properties():
 
 def test_dependency_error_model():
     """Test DependencyError model construction."""
-    err = DependencyError(error_type="cycle", details="cycle in 1,2")
-    assert err.error_type == "cycle"
+    err = DependencyError(error_type=DependencyErrorType.CYCLE, details="cycle in 1,2")
+    assert err.error_type == DependencyErrorType.CYCLE
     assert err.details == "cycle in 1,2"
 
-    err2 = DependencyError(error_type="missing_ref", details="stage 99 not found")
-    assert err2.error_type == "missing_ref"
+    err2 = DependencyError(
+        error_type=DependencyErrorType.MISSING_REF, details="stage 99 not found"
+    )
+    assert err2.error_type == DependencyErrorType.MISSING_REF
 
 
 def test_compute_skipped_stages_excluded():

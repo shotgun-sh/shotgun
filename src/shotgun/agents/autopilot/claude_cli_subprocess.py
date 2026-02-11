@@ -19,7 +19,16 @@ logger = logging.getLogger(__name__)
 
 # Team-related tools whose invocations we want to surface to the orchestrator
 _TEAM_TOOLS = frozenset(
-    {"Task", "TeamCreate", "SendMessage", "TaskCreate", "TaskUpdate", "TaskList"}
+    {
+        "Task",
+        "TeamCreate",
+        "TeamDelete",
+        "SendMessage",
+        "TaskCreate",
+        "TaskUpdate",
+        "TaskList",
+        "TaskGet",
+    }
 )
 
 
@@ -290,7 +299,14 @@ def _format_team_tool(name: str, tool_input: dict[str, Any]) -> str:
         status = tool_input.get("status", "")
         return f"[Teams] Task {task_id} → {status}"
 
+    if name == "TaskGet":
+        task_id = tool_input.get("taskId", "")
+        return f"[Teams] Getting task {task_id}"
+
     if name == "TaskList":
         return "[Teams] Listing tasks"
+
+    if name == "TeamDelete":
+        return "[Teams] Deleting team"
 
     return f"[Teams] {name}"

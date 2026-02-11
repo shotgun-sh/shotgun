@@ -39,7 +39,7 @@ from shotgun.agents.autopilot.models import (
     StageStatus,
 )
 from shotgun.agents.autopilot.prompts import (
-    _ParallelStageInfo,
+    ParallelStageInfo,
     render_create_pr,
     render_execute_parallel_stages,
     render_execute_stage,
@@ -88,6 +88,9 @@ class AutopilotOrchestrator:
     4. Run manual QA testing
     5. Present to user for approval (Accept/Reject)
     """
+
+    MAX_STAGE_ITERATIONS = 30
+    """Safety cap on execution iterations per stage."""
 
     def __init__(
         self,
@@ -249,10 +252,7 @@ class AutopilotOrchestrator:
             )
             if detailed_stage:
                 # Update stage with tasks, preserving metadata
-                detailed_stage.status = stage.status
-                detailed_stage.phase = stage.phase
-                detailed_stage.branch_name = stage.branch_name
-                detailed_stage.pr_url = stage.pr_url
+                detailed_stage.copy_metadata_from(stage)
                 self.state.stages[self.state.current_stage_index] = detailed_stage
                 stage = detailed_stage
                 logger.info(
@@ -463,12 +463,11 @@ class AutopilotOrchestrator:
             len(stage.pending_tasks),
         )
 
-        max_iterations = 30
         monitor = StageMonitor(working_directory=self.config.working_directory)
         next_prompt: str | None = None  # First iteration uses standard template
         iteration = 0
 
-        while iteration < max_iterations:
+        while iteration < self.MAX_STAGE_ITERATIONS:
             iteration += 1
             if self._cancelled:
                 trail_logger.info("CANCELLED stage=%s", stage.number)
@@ -600,7 +599,9 @@ class AutopilotOrchestrator:
 
         # Safety cap reached
         trail_logger.warning(
-            "MAX_ITERATIONS stage=%s iterations=%d", stage.number, max_iterations
+            "MAX_ITERATIONS stage=%s iterations=%d",
+            stage.number,
+            self.MAX_STAGE_ITERATIONS,
         )
         track_event(
             "autopilot_stage_failed",
@@ -615,7 +616,7 @@ class AutopilotOrchestrator:
         )
         yield ClaudeOutput(
             type=ClaudeOutputType.STDERR,
-            content=f"  Safety limit reached ({max_iterations} iterations)",
+            content=f"  Safety limit reached ({self.MAX_STAGE_ITERATIONS} iterations)",
         )
 
     async def _create_pr(self, stage: Stage) -> AsyncGenerator[ClaudeOutput, None]:
@@ -810,13 +811,7 @@ class AutopilotOrchestrator:
 
         if refreshed_stage:
             # Update the current stage with refreshed task data
-            # Preserve metadata (status, phase, branch_name, pr_url)
-            refreshed_stage.status = current_stage.status
-            refreshed_stage.phase = current_stage.phase
-            refreshed_stage.branch_name = current_stage.branch_name
-            refreshed_stage.pr_url = current_stage.pr_url
-
-            # Replace the stage in the list
+            refreshed_stage.copy_metadata_from(current_stage)
             self.state.stages[self.state.current_stage_index] = refreshed_stage
 
             logger.info(
@@ -1029,10 +1024,7 @@ class AutopilotOrchestrator:
                         for i, s in enumerate(self.state.stages)
                         if s.number == stage.number
                     )
-                    detailed.status = stage.status
-                    detailed.phase = stage.phase
-                    detailed.branch_name = stage.branch_name
-                    detailed.pr_url = stage.pr_url
+                    detailed.copy_metadata_from(stage)
                     self.state.stages[idx] = detailed
                     stage_map[stage.number] = detailed
 
@@ -1042,7 +1034,7 @@ class AutopilotOrchestrator:
             stage = stage_map[stage.number]  # Re-fetch in case it was updated
             branch_name = f"{self.config.branch_prefix}{stage.number}"
             parallel_stages.append(
-                _ParallelStageInfo(
+                ParallelStageInfo(
                     number=stage.number,
                     name=stage.name,
                     branch_name=branch_name,
@@ -1098,10 +1090,7 @@ class AutopilotOrchestrator:
                     for i, s in enumerate(self.state.stages)
                     if s.number == stage.number
                 )
-                refreshed.status = self.state.stages[idx].status
-                refreshed.phase = self.state.stages[idx].phase
-                refreshed.branch_name = self.state.stages[idx].branch_name
-                refreshed.pr_url = self.state.stages[idx].pr_url
+                refreshed.copy_metadata_from(self.state.stages[idx])
                 self.state.stages[idx] = refreshed
 
                 if refreshed.is_complete:

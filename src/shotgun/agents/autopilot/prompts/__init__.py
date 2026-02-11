@@ -125,7 +125,7 @@ def render_qa_testing(
     )
 
 
-class _ParallelStageInfo(BaseModel):
+class ParallelStageInfo(BaseModel):
     """Stage info passed to the parallel execution template."""
 
     number: str
@@ -136,7 +136,7 @@ class _ParallelStageInfo(BaseModel):
 
 def render_execute_parallel_stages(
     tasks_file_path: str,
-    stages: list[_ParallelStageInfo],
+    stages: list[ParallelStageInfo],
     base_branch: str,
     batch_level: int,
 ) -> str:

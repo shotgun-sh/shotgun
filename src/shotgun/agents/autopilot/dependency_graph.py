@@ -6,7 +6,7 @@ enabling the autopilot to determine which stages can run in parallel.
 
 import logging
 from collections import deque
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -44,12 +44,17 @@ class ExecutionPlan(BaseModel):
         return sum(len(b.stage_numbers) for b in self.batches)
 
 
+class DependencyErrorType(StrEnum):
+    """Types of dependency validation errors."""
+
+    CYCLE = "cycle"
+    MISSING_REF = "missing_ref"
+
+
 class DependencyError(BaseModel):
     """Error found during dependency validation."""
 
-    error_type: Literal["cycle", "missing_ref"] = Field(
-        description="Type of dependency error"
-    )
+    error_type: DependencyErrorType = Field(description="Type of dependency error")
     details: str = Field(description="Human-readable error description")
 
 
@@ -71,7 +76,7 @@ def validate_dependencies(stages: list[Stage]) -> list[DependencyError]:
             if dep not in stage_numbers:
                 errors.append(
                     DependencyError(
-                        error_type="missing_ref",
+                        error_type=DependencyErrorType.MISSING_REF,
                         details=f"Stage {stage.number} depends on Stage {dep}, which does not exist",
                     )
                 )
@@ -106,7 +111,7 @@ def validate_dependencies(stages: list[Stage]) -> list[DependencyError]:
         cycle_stages = [num for num, deg in in_degree.items() if deg > 0]
         errors.append(
             DependencyError(
-                error_type="cycle",
+                error_type=DependencyErrorType.CYCLE,
                 details=f"Dependency cycle detected involving stages: {', '.join(sorted(cycle_stages))}",
             )
         )

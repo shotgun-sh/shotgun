@@ -7,6 +7,7 @@ Claude Code's output against actual files on disk and decide what to do next.
 import logging
 from pathlib import Path
 
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 
 from shotgun.agents.autopilot.models import MonitorDecision
@@ -50,12 +51,11 @@ what to do — not a generic "finish remaining tasks" message.
   Bad: "Working on tasks" (too vague) or a 200-char paragraph (too long)."""
 
 
-class MonitorDeps:
+class MonitorDeps(BaseModel):
     """Dependencies for the stage monitor agent."""
 
-    def __init__(self, working_directory: Path, tasks_file_path: str):
-        self.working_directory = working_directory
-        self.tasks_file_path = tasks_file_path
+    working_directory: Path = Field(description="Working directory for file access")
+    tasks_file_path: str = Field(description="Path to tasks.md relative to working dir")
 
 
 class StageMonitor:
