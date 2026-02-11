@@ -3253,6 +3253,7 @@ Then confirm what you changed.
 
         Keeps only the last _MAX_HINT_MESSAGES hint messages in UI history,
         removing oldest first (compact/tool-call messages prioritized for removal).
+        Rebuilds the list to avoid in-place index mutation.
         """
         history = self.agent_manager.ui_message_history
         hint_indices = [
@@ -3263,7 +3264,7 @@ Then confirm what you changed.
         if excess <= 0:
             return
 
-        # Remove oldest hints, preferring compact ones first
+        # Pick indices to remove: prefer compact (tool-call noise) first
         compact_indices = [
             i
             for i in hint_indices
@@ -3271,12 +3272,14 @@ Then confirm what you changed.
         ]
         non_compact_indices = [i for i in hint_indices if i not in compact_indices]
 
-        to_remove = compact_indices[:excess]
+        to_remove = set(compact_indices[:excess])
         if len(to_remove) < excess:
-            to_remove.extend(non_compact_indices[: excess - len(to_remove)])
+            to_remove.update(non_compact_indices[: excess - len(to_remove)])
 
-        for idx in sorted(to_remove, reverse=True):
-            history.pop(idx)
+        # Rebuild list, skipping removed indices
+        self.agent_manager.ui_message_history = [
+            msg for i, msg in enumerate(history) if i not in to_remove
+        ]
 
     @on(AutopilotApprovalRequired)
     def handle_autopilot_approval_required(

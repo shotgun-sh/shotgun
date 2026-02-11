@@ -3,7 +3,11 @@
 from pathlib import Path
 
 from shotgun.agents.autopilot.models import Stage, StageStatus, Task
-from shotgun.agents.autopilot.tasks_parser import ParsedTasksFile, TasksParser
+from shotgun.agents.autopilot.tasks_parser import (
+    ParsedTasksFile,
+    TasksParser,
+    merge_stages_with_parsed_tasks,
+)
 
 
 def test_parser_initialization():
@@ -383,8 +387,6 @@ def test_parse_depends_on_static_method():
 
 def test_merge_preserves_empty_depends_on():
     """Test that merge preserves explicit empty depends_on (not falsy fallback)."""
-    from shotgun.agents.autopilot.tasks_parser import merge_stages_with_parsed_tasks
-
     # State has depends_on=["1"] (stale), parsed has depends_on=[] (cleared to None/empty)
     state_stages = [
         Stage(
@@ -414,8 +416,6 @@ def test_merge_preserves_empty_depends_on():
 
 def test_merge_stages_preserves_depends_on():
     """Test that merge_stages_with_parsed_tasks preserves depends_on."""
-    from shotgun.agents.autopilot.tasks_parser import merge_stages_with_parsed_tasks
-
     state_stages = [
         Stage(
             number="1",
