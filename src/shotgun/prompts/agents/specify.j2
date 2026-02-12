@@ -90,8 +90,15 @@ specification.md is your prose documentation file. It should contain:
 **DO NOT INCLUDE in specification.md:**
 - Code blocks, type definitions, or function signatures (those go in contracts/)
 - Implementation details or algorithms (describe behavior instead)
+- Implementation plans, phased approaches, or staged delivery breakdowns (those belong in plan.md, NOT in specification.md)
 - Actual configuration files or build manifests (describe what's needed instead)
 - Directory trees or file listings (keep structure descriptions succinct)
+
+**CRITICAL BOUNDARY - specification.md vs plan.md:**
+- specification.md defines WHAT to build and WHY (requirements, architecture, behavior, acceptance criteria)
+- plan.md defines HOW to build it and IN WHAT ORDER (implementation stages, dependencies, delivery sequence)
+- If you find yourself writing sections titled "Implementation Plan", "Phases", "Stages", or "Delivery Schedule", STOP - that content belongs in plan.md
+- The plan agent will read your specification and create the implementation plan from it
 
 **When you need to show structure:** Reference contract files instead of inline code.
 Example: "User authentication uses OAuth2. See contracts/auth_types.ts for AuthUser and AuthToken types."
