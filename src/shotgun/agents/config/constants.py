@@ -28,7 +28,7 @@ SHOTGUN_PROVIDER = ConfigSection.SHOTGUN.value
 # Token limits
 MEDIUM_TEXT_8K_TOKENS = 8192  # Default max_tokens for web search requests
 SUB_AGENT_MAX_OUTPUT_TOKENS = (
-    2000  # Max output tokens for sub-agents delegated by Router
+    4096  # Max output tokens for sub-agents delegated by Router
 )
 
 # Web search behavior thresholds

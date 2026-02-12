@@ -831,6 +831,6 @@ async def test_all_sub_agents_receive_token_limit(
 
 
 @pytest.mark.asyncio
-async def test_sub_agent_token_limit_is_2000():
-    """Test that the sub-agent token limit constant is 2000."""
-    assert SUB_AGENT_MAX_OUTPUT_TOKENS == 2000
+async def test_sub_agent_token_limit_is_4096():
+    """Test that the sub-agent token limit constant is 4096."""
+    assert SUB_AGENT_MAX_OUTPUT_TOKENS == 4096
