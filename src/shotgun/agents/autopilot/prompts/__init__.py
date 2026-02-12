@@ -25,6 +25,7 @@ def render_execute_stage(
     pending_tasks: list[str],
     branch_name: str,
     base_branch: str,
+    push_to_remote: bool = True,
 ) -> str:
     """Render the execute stage prompt.
 
@@ -35,6 +36,7 @@ def render_execute_stage(
         pending_tasks: List of pending task descriptions.
         branch_name: The branch name to create/checkout for this stage.
         base_branch: The base branch to create from.
+        push_to_remote: Whether to allow pushing to remote.
 
     Returns:
         Rendered prompt string.
@@ -47,6 +49,7 @@ def render_execute_stage(
         pending_tasks=pending_tasks,
         branch_name=branch_name,
         base_branch=base_branch,
+        push_to_remote=push_to_remote,
     )
 
 
@@ -83,6 +86,7 @@ def render_review_code(
     tasks_file_path: str,
     stage_number: str | int,
     stage_name: str,
+    push_to_remote: bool = True,
 ) -> str:
     """Render the code review prompt.
 
@@ -90,6 +94,7 @@ def render_review_code(
         tasks_file_path: Path to the tasks.md file.
         stage_number: The stage number.
         stage_name: The stage name.
+        push_to_remote: Whether to instruct Claude to push changes.
 
     Returns:
         Rendered prompt string.
@@ -99,6 +104,7 @@ def render_review_code(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
         stage_name=stage_name,
+        push_to_remote=push_to_remote,
     )
 
 

@@ -76,6 +76,10 @@ class AutopilotConfig(BaseModel):
         default=True,
         description="Use Claude Code Teams for parallel batch execution",
     )
+    push_to_remote: bool = Field(
+        default=False,
+        description="Whether to push changes to remote repo (cowboy mode only)",
+    )
 
 
 class AutopilotOrchestrator:
@@ -326,45 +330,12 @@ class AutopilotOrchestrator:
                 stage.status = StageStatus.FAILED
             return
 
-        # Cowboy mode: self-review but skip PR creation and human approval
+        # Cowboy mode: self-review but skip human approval
         if self.state.mode == AutopilotMode.COWBOY:
-            # Self-review phase
-            stage.phase = StagePhase.REVIEWING
-            logger.info("Cowboy mode: Self-reviewing Stage %s", stage.number)
-            yield ClaudeOutput(
-                type=ClaudeOutputType.STDOUT,
-                content=f"🔍 Self-reviewing Stage {stage.number}...",
-            )
-
-            async for output in self._review_and_fix(stage):
+            async for output in self._cowboy_post_execution(stage):
                 yield output
                 if self._cancelled:
                     return
-
-            # Mark complete and move on (no PR, no human approval)
-            stage.status = StageStatus.COMPLETED
-            stage.phase = None
-
-            logger.info(
-                "Stage %s complete (cowboy mode - no PR, no human review)",
-                stage.number,
-            )
-
-            # Track stage completion
-            track_event(
-                "autopilot_stage_completed",
-                {
-                    "stage_number": stage.number,
-                    "total_stages": len(self.state.stages),
-                    "has_pr": False,
-                    "mode": self.state.mode.value,
-                },
-            )
-
-            yield ClaudeOutput(
-                type=ClaudeOutputType.STDOUT,
-                content=f"✅ Stage {stage.number} complete",
-            )
 
             # Auto-advance to next stage
             if self.advance_to_next_stage():
@@ -660,10 +631,15 @@ class AutopilotOrchestrator:
         Yields:
             ClaudeOutput with review progress.
         """
+        # Push review fixes unless we're in cowboy mode with local-only
+        push_in_review = (
+            self.state.mode != AutopilotMode.COWBOY or self.config.push_to_remote
+        )
         prompt = render_review_code(
             tasks_file_path=self.state.tasks_file_path,
             stage_number=stage.number,
             stage_name=stage.name,
+            push_to_remote=push_in_review,
         )
         async for output in self._run_claude(prompt):
             yield output
@@ -705,6 +681,11 @@ class AutopilotOrchestrator:
             prev_stage = self.state.stages[self.state.current_stage_index - 1]
             base_branch = f"{self.config.branch_prefix}{prev_stage.number}"
 
+        # In cowboy mode with local-only, tell Claude not to push
+        push_to_remote = (
+            self.state.mode != AutopilotMode.COWBOY or self.config.push_to_remote
+        )
+
         return render_execute_stage(
             tasks_file_path=self.state.tasks_file_path,
             stage_number=stage.number,
@@ -712,6 +693,7 @@ class AutopilotOrchestrator:
             pending_tasks=pending_tasks,
             branch_name=branch_name,
             base_branch=base_branch,
+            push_to_remote=push_to_remote,
         )
 
     async def _run_claude(
@@ -1121,6 +1103,75 @@ class AutopilotOrchestrator:
                     async for output in self._post_execution_workflow(stage):
                         yield output
 
+    async def _cowboy_post_execution(
+        self, stage: Stage
+    ) -> AsyncGenerator[ClaudeOutput, None]:
+        """Run the cowboy mode post-execution workflow: self-review, optional push, mark complete.
+
+        Shared by both sequential (run_stage_workflow) and parallel (_post_execution_workflow)
+        cowboy mode flows.
+
+        Args:
+            stage: The completed stage.
+
+        Yields:
+            ClaudeOutput as the workflow progresses.
+        """
+        # Self-review phase
+        stage.phase = StagePhase.REVIEWING
+        logger.info("Cowboy mode: Self-reviewing Stage %s", stage.number)
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"🔍 Self-reviewing Stage {stage.number}...",
+        )
+
+        async for output in self._review_and_fix(stage):
+            yield output
+            if self._cancelled:
+                return
+
+        # Optionally push to remote and create PR
+        if self.config.push_to_remote:
+            stage.phase = StagePhase.CREATING_PR
+            logger.info("Cowboy mode: Pushing Stage %s to remote", stage.number)
+            yield ClaudeOutput(
+                type=ClaudeOutputType.STDOUT,
+                content=f"📤 Pushing Stage {stage.number} to remote...",
+            )
+            async for output in self._create_pr(stage):
+                yield output
+                if self._cancelled:
+                    return
+
+        # Mark complete (no human approval in cowboy mode)
+        stage.status = StageStatus.COMPLETED
+        stage.phase = None
+
+        push_label = (
+            "pushed to remote" if self.config.push_to_remote else "local only, no PR"
+        )
+        logger.info(
+            "Stage %s complete (cowboy mode - %s)",
+            stage.number,
+            push_label,
+        )
+
+        track_event(
+            "autopilot_stage_completed",
+            {
+                "stage_number": stage.number,
+                "total_stages": len(self.state.stages),
+                "has_pr": self.config.push_to_remote and stage.pr_url is not None,
+                "mode": self.state.mode.value,
+                "push_to_remote": self.config.push_to_remote,
+            },
+        )
+
+        yield ClaudeOutput(
+            type=ClaudeOutputType.STDOUT,
+            content=f"✅ Stage {stage.number} complete",
+        )
+
     async def _post_execution_workflow(
         self, stage: Stage
     ) -> AsyncGenerator[ClaudeOutput, None]:
@@ -1136,35 +1187,10 @@ class AutopilotOrchestrator:
             ClaudeOutput as the workflow progresses.
         """
         if self.state.mode == AutopilotMode.COWBOY:
-            # Self-review only
-            stage.phase = StagePhase.REVIEWING
-            yield ClaudeOutput(
-                type=ClaudeOutputType.STDOUT,
-                content=f"Self-reviewing Stage {stage.number}...",
-            )
-            async for output in self._review_and_fix(stage):
+            async for output in self._cowboy_post_execution(stage):
                 yield output
                 if self._cancelled:
                     return
-
-            stage.status = StageStatus.COMPLETED
-            stage.phase = None
-
-            track_event(
-                "autopilot_stage_completed",
-                {
-                    "stage_number": stage.number,
-                    "total_stages": len(self.state.stages),
-                    "has_pr": False,
-                    "mode": self.state.mode.value,
-                    "parallel": True,
-                },
-            )
-
-            yield ClaudeOutput(
-                type=ClaudeOutputType.STDOUT,
-                content=f"Stage {stage.number} complete (parallel)",
-            )
             return
 
         # Non-cowboy modes: PR creation, review, QA

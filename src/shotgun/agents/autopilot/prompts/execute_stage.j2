@@ -24,6 +24,9 @@ Before starting work, ensure git is set up correctly:
 3. After completing each task, mark it done in {{ tasks_file_path }} by changing `- [ ]` to `- [x]`
 4. Commit your changes after completing tasks
 5. Focus on quality - make sure the implementation is correct
+{% if not push_to_remote %}
+6. **Keep all changes local. Under no circumstances should you push code to a remote repo.** Do not run `git push`, do not create pull requests, do not use `gh pr create`.
+{% endif %}
 
 ## IMPORTANT
 
