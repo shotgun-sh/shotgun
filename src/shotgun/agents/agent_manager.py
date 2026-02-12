@@ -1064,9 +1064,7 @@ class AgentManager(Widget):
                     tool_name=failed_tool_name,
                 )
                 # Add hint message so the failure shows in conversation history
-                tool_info = (
-                    f" (`{failed_tool_name}`)" if failed_tool_name else ""
-                )
+                tool_info = f" (`{failed_tool_name}`)" if failed_tool_name else ""
                 self.ui_message_history.append(
                     HintMessage(
                         message=f"⚠️ A tool call{tool_info} failed — the model's output "
@@ -1076,9 +1074,7 @@ class AgentManager(Widget):
                 )
                 self._post_messages_updated()
                 # Raise user-friendly exception instead of raw ValueError
-                raise IncompleteToolCallError(
-                    tool_name=failed_tool_name
-                ) from e
+                raise IncompleteToolCallError(tool_name=failed_tool_name) from e
             # Re-raise non-JSON ValueErrors as-is
             raise
         except Exception as e:
