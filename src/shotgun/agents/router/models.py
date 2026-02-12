@@ -392,3 +392,15 @@ class RouterDeps(AgentDeps):
         default_factory=dict,
         description="Accumulated tool call counts from all sub-agent delegations",
     )
+    # Escalation state for tiered Router → Planner architecture
+    # Set by escalate_to_planner tool, consumed by AgentManager.run()
+    escalation_requested: bool = Field(
+        default=False,
+        exclude=True,
+        description="Whether the Router wants to escalate to the Planner",
+    )
+    escalation_reason: str = Field(
+        default="",
+        exclude=True,
+        description="Reason for escalation to Planner",
+    )

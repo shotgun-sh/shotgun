@@ -130,6 +130,7 @@ class AgentType(StrEnum):
     TASKS = "tasks"
     EXPORT = "export"
     ROUTER = "router"
+    PLANNER = "planner"
     FILE_READ = "file_read"
 
 

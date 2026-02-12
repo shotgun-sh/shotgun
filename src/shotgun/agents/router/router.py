@@ -1,7 +1,9 @@
-"""Router agent factory for the intelligent orchestrator.
+"""Router agent factory for the triage agent.
 
-The Router agent is the single user-facing interface that orchestrates
-sub-agents (Research, Specify, Plan, Tasks, Export) based on user intent.
+The Router agent is the first user-facing interface. In tiered mode, it runs
+on the cheap model and handles simple requests directly or escalates complex
+tasks to the Planner agent. When the cheap and expensive models are the same
+(e.g., user selected Haiku), it falls back to single-tier mode with full tools.
 """
 
 import traceback
@@ -37,6 +39,7 @@ from shotgun.agents.router.tools.delegation_tools import (
     delegate_to_tasks,
     prepare_delegation_tool,
 )
+from shotgun.agents.router.tools.escalation_tool import escalate_to_planner
 from shotgun.agents.tools import read_file
 from shotgun.logging_config import get_logger
 from shotgun.sdk.services import get_codebase_service
@@ -49,13 +52,17 @@ async def create_router_agent(
     agent_runtime_options: AgentRuntimeOptions,
     provider: ProviderType | None = None,
 ) -> tuple[Agent[RouterDeps, AgentResponse], RouterDeps]:
-    """Create the Router agent with plan management and delegation capabilities.
+    """Create the Router agent for triage and simple request handling.
 
-    The Router is the intelligent orchestrator that:
-    - Understands user intent
-    - Creates and manages execution plans
-    - Delegates work to specialized sub-agents
-    - Operates in Planning (incremental) or Drafting (auto-execute) mode
+    In tiered mode (cheap != expensive model), the Router:
+    - Runs on the cheap model (for_sub_agent=True)
+    - Has only read_file + escalate_to_planner tools
+    - Handles simple questions directly, escalates complex work
+
+    In single-tier mode (cheap == expensive model), the Router:
+    - Uses the full tool suite (delegation, plan management, read_file)
+    - Uses the planner prompt template
+    - Behaves like the original Router (no Planner needed)
 
     Args:
         agent_runtime_options: Runtime options for the agent
@@ -67,22 +74,38 @@ async def create_router_agent(
     logger.debug("Initializing router agent")
     ensure_shotgun_directory_exists()
 
-    # Get configured model
+    # Get both cheap and expensive models to determine tiering mode
     try:
-        model_config = await get_provider_model(provider)
-        logger.debug(
-            "Router agent using %s model: %s",
-            model_config.provider.value.upper(),
-            model_config.name,
-        )
-        model = model_config.model_instance
+        cheap_config = await get_provider_model(provider, for_sub_agent=True)
+        expensive_config = await get_provider_model(provider)
     except Exception as e:
         logger.error("Failed to load configured model for router: %s", e)
         raise ValueError("Configured model is required for router agent") from e
 
-    # Create RouterDeps (extends AgentDeps with router-specific state)
+    # Determine if we're in tiered mode (different cheap vs expensive models)
+    is_tiered = cheap_config.name != expensive_config.name
+
+    if is_tiered:
+        model_config = cheap_config
+        prompt_template = "router"
+        logger.info(
+            "Router in TIERED mode: cheap=%s, expensive=%s",
+            cheap_config.name,
+            expensive_config.name,
+        )
+    else:
+        model_config = expensive_config
+        prompt_template = "planner"  # Use full planner prompt in single-tier mode
+        logger.info(
+            "Router in SINGLE-TIER mode: model=%s (no Planner needed)",
+            expensive_config.name,
+        )
+
+    model = model_config.model_instance
+
+    # Create RouterDeps
     codebase_service = get_codebase_service()
-    system_prompt_fn = partial(build_agent_system_prompt, "router")
+    system_prompt_fn = partial(build_agent_system_prompt, prompt_template)
 
     deps = RouterDeps(
         **agent_runtime_options.model_dump(),
@@ -104,42 +127,53 @@ async def create_router_agent(
         ctx = ProcessorContext(deps)
         return await token_limit_compactor(ctx, messages)  # type: ignore[arg-type]
 
-    # Delegation tools with prepare function - only visible after plan is approved
-    # in Planning mode, always available in Drafting mode
-    delegation_tools = [
-        Tool(delegate_to_research, prepare=prepare_delegation_tool),
-        Tool(delegate_to_specification, prepare=prepare_delegation_tool),
-        Tool(delegate_to_plan, prepare=prepare_delegation_tool),
-        Tool(delegate_to_tasks, prepare=prepare_delegation_tool),
-        Tool(delegate_to_export, prepare=prepare_delegation_tool),
-    ]
+    if is_tiered:
+        # Tiered mode: Router has only read_file + escalate_to_planner
+        agent: Agent[RouterDeps, AgentResponse] = Agent(
+            model,
+            output_type=AgentResponse,
+            deps_type=RouterDeps,
+            instrument=True,
+            history_processors=[history_processor],
+            retries=3,
+            model_settings=ANTHROPIC_CACHE_MODEL_SETTINGS,
+        )
 
-    # Create the agent with delegation tools that have prepare functions
-    agent: Agent[RouterDeps, AgentResponse] = Agent(
-        model,
-        output_type=AgentResponse,
-        deps_type=RouterDeps,
-        instrument=True,
-        history_processors=[history_processor],
-        retries=3,
-        tools=delegation_tools,
-        model_settings=ANTHROPIC_CACHE_MODEL_SETTINGS,
-    )
+        # Triage tools only
+        agent.tool(read_file)
+        agent.tool(escalate_to_planner)
 
-    # Register plan management tools (router-specific, always available)
-    agent.tool(create_plan)
-    agent.tool(mark_step_done)
-    agent.tool(add_step)
-    agent.tool(remove_step)
+        logger.debug("Router agent tools registered (tiered mode: read_file, escalate_to_planner)")
+    else:
+        # Single-tier mode: Router has full tool suite (original behavior)
+        delegation_tools = [
+            Tool(delegate_to_research, prepare=prepare_delegation_tool),
+            Tool(delegate_to_specification, prepare=prepare_delegation_tool),
+            Tool(delegate_to_plan, prepare=prepare_delegation_tool),
+            Tool(delegate_to_tasks, prepare=prepare_delegation_tool),
+            Tool(delegate_to_export, prepare=prepare_delegation_tool),
+        ]
 
-    # Register read-only file access for .shotgun/ directory
-    agent.tool(read_file)
+        agent = Agent(
+            model,
+            output_type=AgentResponse,
+            deps_type=RouterDeps,
+            instrument=True,
+            history_processors=[history_processor],
+            retries=3,
+            tools=delegation_tools,
+            model_settings=ANTHROPIC_CACHE_MODEL_SETTINGS,
+        )
 
-    # Note: The Router does NOT have write_file, append_file, or codebase tools.
-    # All file modifications and codebase understanding must be delegated to
-    # the appropriate sub-agent (Research, Specify, Plan, Tasks, Export).
+        # Full tool suite
+        agent.tool(create_plan)
+        agent.tool(mark_step_done)
+        agent.tool(add_step)
+        agent.tool(remove_step)
+        agent.tool(read_file)
 
-    logger.debug("Router agent tools registered")
+        logger.debug("Router agent tools registered (single-tier mode: full tools)")
+
     logger.info(
         "Router agent created in %s mode",
         deps.router_mode.value.upper(),
@@ -173,10 +207,6 @@ async def run_router_agent(
         usage_limits = create_usage_limits()
 
         # Disable parallel tool calls for the Router agent.
-        # This prevents models like GPT-5.2 from calling multiple delegation tools
-        # simultaneously, which would run multiple sub-agents in parallel and
-        # cause race conditions with shared state (active_sub_agent, file_tracker).
-        # Sub-agents must run sequentially to maintain proper state management.
         router_model_settings: ModelSettings = {"parallel_tool_calls": False}
 
         result = await run_agent(
