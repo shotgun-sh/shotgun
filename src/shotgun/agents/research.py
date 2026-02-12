@@ -19,13 +19,7 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import (
-    AgentDeps,
-    AgentResponse,
-    AgentRuntimeOptions,
-    AgentType,
-    PromptTemplate,
-)
+from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 from .tools import get_available_web_search_tools
 from .tools.context7 import get_context7_mcp_server
 
@@ -66,7 +60,7 @@ async def create_research_agent(
         logger.info("Research agent configured with Context7 documentation lookup")
 
     # Use partial to create system prompt function for research agent
-    system_prompt_fn = partial(build_agent_system_prompt, PromptTemplate.RESEARCH)
+    system_prompt_fn = partial(build_agent_system_prompt, "research")
 
     agent, deps = await create_base_agent(
         system_prompt_fn,

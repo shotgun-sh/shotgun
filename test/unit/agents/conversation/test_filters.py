@@ -261,19 +261,25 @@ def test_is_tool_call_complete_with_none_args():
 
 def test_is_tool_call_complete_with_dict_args():
     """Tool call with dict args is considered complete."""
-    tc = ToolCallPart(tool_name="test", args={"key": "value"}, tool_call_id="tc1")
+    tc = ToolCallPart(
+        tool_name="test", args={"key": "value"}, tool_call_id="tc1"
+    )
     assert is_tool_call_complete(tc) is True
 
 
 def test_is_tool_call_complete_with_valid_json_string():
     """Tool call with valid JSON string args is considered complete."""
-    tc = ToolCallPart(tool_name="test", args='{"key": "value"}', tool_call_id="tc1")
+    tc = ToolCallPart(
+        tool_name="test", args='{"key": "value"}', tool_call_id="tc1"
+    )
     assert is_tool_call_complete(tc) is True
 
 
 def test_is_tool_call_complete_with_truncated_json():
     """Tool call with truncated JSON string is considered incomplete."""
-    tc = ToolCallPart(tool_name="test", args='{"key": "val', tool_call_id="tc1")
+    tc = ToolCallPart(
+        tool_name="test", args='{"key": "val', tool_call_id="tc1"
+    )
     assert is_tool_call_complete(tc) is False
 
 

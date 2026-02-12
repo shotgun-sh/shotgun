@@ -1,6 +1,5 @@
 """Common utilities for agent creation and management."""
 
-import traceback
 from collections.abc import AsyncIterable, Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -33,7 +32,6 @@ from shotgun.agents.models import (
     AgentResponse,
     AgentSystemPromptContext,
     AgentType,
-    PromptTemplate,
     ShotgunAgent,
 )
 from shotgun.logging_config import get_logger
@@ -66,15 +64,6 @@ logger = get_logger(__name__)
 
 # Global prompt loader instance
 prompt_loader = PromptLoader()
-
-
-class _CompactionContext:
-    """Minimal context object for the token_limit_compactor."""
-
-    def __init__(self, deps: AgentDeps):
-        self.deps = deps
-        self.usage = None
-
 
 # Web search tool names across all providers
 WEB_SEARCH_TOOL_NAMES: set[str] = {
@@ -312,7 +301,13 @@ async def create_base_agent(
             deps, filtered_messages, web_search_count=web_search_count
         )
 
-        ctx = _CompactionContext(deps)
+        # Create a minimal context for compaction
+        class ProcessorContext:
+            def __init__(self, deps: AgentDeps):
+                self.deps = deps
+                self.usage = None  # Will be estimated from messages
+
+        ctx = ProcessorContext(deps)
         return await token_limit_compactor(ctx, filtered_messages)
 
     agent = Agent(
@@ -550,14 +545,14 @@ def get_agent_existing_files(agent_mode: AgentType | None = None) -> list[str]:
 
 
 def build_agent_system_prompt(
-    agent_type: str | PromptTemplate,
+    agent_type: str,
     ctx: RunContext[AgentDeps],
     context_name: str | None = None,
 ) -> str:
     """Build system prompt for any agent type.
 
     Args:
-        agent_type: Type of agent ('research', 'plan', 'tasks') or PromptTemplate enum
+        agent_type: Type of agent ('research', 'plan', 'tasks')
         ctx: RunContext containing AgentDeps
         context_name: Optional context name for template rendering
 
@@ -721,76 +716,3 @@ async def run_agent(
         logger.info("📁 %s", summary)
 
     return result
-
-
-def create_history_processor(
-    deps: AgentDeps,
-) -> Callable[[list[ModelMessage]], Awaitable[list[ModelMessage]]]:
-    """Create a history processor that applies token limit compaction.
-
-    This is the standard history processor for agents that only need compaction
-    (no web search counting or system status updates). Used by Router, Planner,
-    and FileRead agents.
-
-    Args:
-        deps: Agent dependencies used for compaction context
-
-    Returns:
-        An async function suitable for use as a pydantic_ai history processor
-    """
-
-    async def _processor(messages: list[ModelMessage]) -> list[ModelMessage]:
-        ctx = _CompactionContext(deps)
-        return await token_limit_compactor(ctx, messages)
-
-    return _processor
-
-
-async def run_orchestrator_agent(
-    agent: Agent[Any, AgentResponse],
-    prompt: str,
-    deps: AgentDeps,
-    message_history: list[ModelMessage] | None = None,
-    agent_label: str = "Agent",
-) -> AgentRunResult[AgentResponse]:
-    """Run an orchestrator agent (Router or Planner) with standard setup.
-
-    Shared implementation for run_router_agent and run_planner_agent that handles:
-    - Adding system status messages
-    - Creating usage limits
-    - Disabling parallel tool calls
-    - Running the agent with error logging
-
-    Args:
-        agent: The configured orchestrator agent
-        prompt: User's request (or escalation prompt)
-        deps: Agent dependencies (RouterDeps or AgentDeps)
-        message_history: Optional existing message history
-        agent_label: Label for log messages (e.g., "Router", "Planner")
-
-    Returns:
-        Agent run result with response and any clarifying questions
-    """
-    logger.debug("Running %s agent with prompt: %s", agent_label, prompt[:100])
-
-    message_history = await add_system_status_message(deps, message_history)
-
-    try:
-        usage_limits = create_usage_limits()
-        model_settings: ModelSettings = {"parallel_tool_calls": False}
-
-        result = await run_agent(
-            agent=agent,
-            prompt=prompt,
-            deps=deps,
-            message_history=message_history,
-            usage_limits=usage_limits,
-            model_settings=model_settings,
-        )
-
-        logger.debug("%s agent completed successfully", agent_label)
-        return result
-
-    except Exception:
-        logger.error("%s agent error:\n%s", agent_label, traceback.format_exc())
-        raise

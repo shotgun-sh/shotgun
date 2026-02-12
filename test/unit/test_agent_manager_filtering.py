@@ -84,7 +84,6 @@ def mock_agent_deps():
 @patch("shotgun.agents.agent_manager.apply_persistent_compaction")
 @patch("shotgun.agents.agent_manager.add_system_prompt_message")
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -98,7 +97,6 @@ async def test_filters_system_prompts_from_other_agents(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_add_system_prompt,
     mock_apply_compaction,
@@ -116,7 +114,6 @@ async def test_filters_system_prompts_from_other_agents(
     mock_create_specify.side_effect = async_create_agent
     mock_create_export.side_effect = async_create_agent
     mock_create_router.side_effect = async_create_agent
-    mock_create_planner.side_effect = async_create_agent
 
     # Mock the system message functions to just return the messages as-is
     mock_add_system_status.side_effect = lambda deps, msgs: msgs
@@ -224,7 +221,6 @@ async def test_filters_system_prompts_from_other_agents(
 @patch("shotgun.agents.agent_manager.apply_persistent_compaction")
 @patch("shotgun.agents.agent_manager.add_system_prompt_message")
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -238,7 +234,6 @@ async def test_preserves_non_agent_system_prompts(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_add_system_prompt,
     mock_apply_compaction,
@@ -256,7 +251,6 @@ async def test_preserves_non_agent_system_prompts(
     mock_create_specify.side_effect = async_create_agent
     mock_create_export.side_effect = async_create_agent
     mock_create_router.side_effect = async_create_agent
-    mock_create_planner.side_effect = async_create_agent
 
     # Mock the system message functions
     mock_add_system_status.side_effect = lambda deps, msgs: (
@@ -346,7 +340,6 @@ async def test_preserves_non_agent_system_prompts(
 @patch("shotgun.agents.agent_manager.apply_persistent_compaction")
 @patch("shotgun.agents.agent_manager.add_system_prompt_message")
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -360,7 +353,6 @@ async def test_filters_mixed_agent_prompts(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_add_system_prompt,
     mock_apply_compaction,
@@ -378,7 +370,6 @@ async def test_filters_mixed_agent_prompts(
     mock_create_specify.side_effect = async_create_agent
     mock_create_export.side_effect = async_create_agent
     mock_create_router.side_effect = async_create_agent
-    mock_create_planner.side_effect = async_create_agent
 
     # Mock the system message functions
     mock_add_system_status.side_effect = lambda deps, msgs: msgs

@@ -1,9 +1,4 @@
-"""Tests for planner agent congruence checking rules (Stage 6).
-
-These rules live in the planner prompt (planner.j2) which is the full
-orchestrator prompt. In tiered mode, the Router uses a simplified triage
-prompt and escalates to the Planner for complex work.
-"""
+"""Tests for router agent congruence checking rules (Stage 6)."""
 
 from pathlib import Path
 
@@ -12,14 +7,14 @@ import pytest
 
 @pytest.fixture
 def router_prompt_content() -> str:
-    """Load the planner.j2 prompt template content (was router.j2 before tiering)."""
+    """Load the router.j2 prompt template content."""
     prompt_path = (
         Path(__file__).parents[4]
         / "src"
         / "shotgun"
         / "prompts"
         / "agents"
-        / "planner.j2"
+        / "router.j2"
     )
     return prompt_path.read_text()
 
