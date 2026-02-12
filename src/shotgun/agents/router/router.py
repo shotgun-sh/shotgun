@@ -143,7 +143,9 @@ async def create_router_agent(
         agent.tool(read_file)
         agent.tool(escalate_to_planner)
 
-        logger.debug("Router agent tools registered (tiered mode: read_file, escalate_to_planner)")
+        logger.debug(
+            "Router agent tools registered (tiered mode: read_file, escalate_to_planner)"
+        )
     else:
         # Single-tier mode: Router has full tool suite (original behavior)
         delegation_tools = [

@@ -112,7 +112,10 @@ async def test_router_agent_tiered_mode():
             "shotgun.agents.router.router.get_provider_model",
             side_effect=mock_get_provider_model,
         ),
-        patch("shotgun.agents.router.router.get_codebase_service", return_value=MagicMock(spec=CodebaseService)),
+        patch(
+            "shotgun.agents.router.router.get_codebase_service",
+            return_value=MagicMock(spec=CodebaseService),
+        ),
         patch("shotgun.agents.router.router.ensure_shotgun_directory_exists"),
     ):
         from shotgun.agents.router.router import create_router_agent
@@ -143,7 +146,10 @@ async def test_router_agent_single_tier_mode():
             "shotgun.agents.router.router.get_provider_model",
             side_effect=mock_get_provider_model,
         ),
-        patch("shotgun.agents.router.router.get_codebase_service", return_value=MagicMock(spec=CodebaseService)),
+        patch(
+            "shotgun.agents.router.router.get_codebase_service",
+            return_value=MagicMock(spec=CodebaseService),
+        ),
         patch("shotgun.agents.router.router.ensure_shotgun_directory_exists"),
     ):
         from shotgun.agents.router.router import create_router_agent
@@ -174,7 +180,10 @@ async def test_planner_agent_uses_expensive_model():
             "shotgun.agents.planner.planner.get_provider_model",
             side_effect=mock_get_provider_model,
         ),
-        patch("shotgun.agents.planner.planner.get_codebase_service", return_value=MagicMock(spec=CodebaseService)),
+        patch(
+            "shotgun.agents.planner.planner.get_codebase_service",
+            return_value=MagicMock(spec=CodebaseService),
+        ),
         patch("shotgun.agents.planner.planner.ensure_shotgun_directory_exists"),
     ):
         from shotgun.agents.planner.planner import create_planner_agent
