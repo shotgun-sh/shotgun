@@ -1,6 +1,7 @@
 """Anthropic web search tool implementation."""
 
 from opentelemetry import trace
+from pydantic_ai import RunUsage
 from pydantic_ai.messages import ModelMessage, ModelRequest, TextPart
 from pydantic_ai.settings import ModelSettings
 
@@ -9,6 +10,7 @@ from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
 from shotgun.agents.config.models import ModelName
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.tools.registry import ToolCategory, register_tool
+from shotgun.agents.usage_manager import get_session_usage_manager
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.utils.datetime_utils import get_datetime_context
@@ -88,6 +90,17 @@ async def anthropic_web_search_tool(query: str) -> str:
                 },
             ),
         )
+
+        # Track usage from the web search LLM call
+        try:
+            if response.usage:
+                usage = RunUsage()
+                usage += response.usage
+                await get_session_usage_manager().add_usage(
+                    usage, model_name=model_config.name, provider=model_config.provider
+                )
+        except Exception:
+            logger.debug("Failed to track Anthropic web search usage")
 
         # Extract text from response
         result_text = "No content returned from search"
