@@ -11,6 +11,8 @@ Look at the git diff of all changes made and check for:
 If you find any issues:
 1. Fix them directly
 2. Commit the fixes with message "fix: address review feedback for Stage {{ stage_number }}"
+{% if push_to_remote %}
 3. Push the changes
+{% endif %}
 
 Be thorough but practical - focus on real issues, not style nitpicks.

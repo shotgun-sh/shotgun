@@ -83,6 +83,7 @@ def render_review_code(
     tasks_file_path: str,
     stage_number: str | int,
     stage_name: str,
+    push_to_remote: bool = True,
 ) -> str:
     """Render the code review prompt.
 
@@ -90,6 +91,7 @@ def render_review_code(
         tasks_file_path: Path to the tasks.md file.
         stage_number: The stage number.
         stage_name: The stage name.
+        push_to_remote: Whether to instruct Claude to push changes.
 
     Returns:
         Rendered prompt string.
@@ -99,6 +101,7 @@ def render_review_code(
         tasks_file_path=tasks_file_path,
         stage_number=stage_number,
         stage_name=stage_name,
+        push_to_remote=push_to_remote,
     )
 
 

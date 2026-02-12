@@ -76,6 +76,10 @@ class AutopilotConfig(BaseModel):
         default=True,
         description="Use Claude Code Teams for parallel batch execution",
     )
+    push_to_remote: bool = Field(
+        default=False,
+        description="Whether to push changes to remote repo (cowboy mode only)",
+    )
 
 
 class AutopilotOrchestrator:
@@ -326,7 +330,7 @@ class AutopilotOrchestrator:
                 stage.status = StageStatus.FAILED
             return
 
-        # Cowboy mode: self-review but skip PR creation and human approval
+        # Cowboy mode: self-review but skip human approval
         if self.state.mode == AutopilotMode.COWBOY:
             # Self-review phase
             stage.phase = StagePhase.REVIEWING
@@ -341,13 +345,32 @@ class AutopilotOrchestrator:
                 if self._cancelled:
                     return
 
-            # Mark complete and move on (no PR, no human approval)
+            # Optionally push to remote and create PR
+            if self.config.push_to_remote:
+                stage.phase = StagePhase.CREATING_PR
+                logger.info("Cowboy mode: Pushing Stage %s to remote", stage.number)
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDOUT,
+                    content=f"📤 Pushing Stage {stage.number} to remote...",
+                )
+                async for output in self._create_pr(stage):
+                    yield output
+                    if self._cancelled:
+                        return
+
+            # Mark complete and move on (no human approval)
             stage.status = StageStatus.COMPLETED
             stage.phase = None
 
+            push_label = (
+                "pushed to remote"
+                if self.config.push_to_remote
+                else "no PR, no human review"
+            )
             logger.info(
-                "Stage %s complete (cowboy mode - no PR, no human review)",
+                "Stage %s complete (cowboy mode - %s)",
                 stage.number,
+                push_label,
             )
 
             # Track stage completion
@@ -356,8 +379,9 @@ class AutopilotOrchestrator:
                 {
                     "stage_number": stage.number,
                     "total_stages": len(self.state.stages),
-                    "has_pr": False,
+                    "has_pr": self.config.push_to_remote and stage.pr_url is not None,
                     "mode": self.state.mode.value,
+                    "push_to_remote": self.config.push_to_remote,
                 },
             )
 
@@ -660,10 +684,15 @@ class AutopilotOrchestrator:
         Yields:
             ClaudeOutput with review progress.
         """
+        # In cowboy mode with local-only, don't instruct Claude to push review fixes
+        push_in_review = not (
+            self.state.mode == AutopilotMode.COWBOY and not self.config.push_to_remote
+        )
         prompt = render_review_code(
             tasks_file_path=self.state.tasks_file_path,
             stage_number=stage.number,
             stage_name=stage.name,
+            push_to_remote=push_in_review,
         )
         async for output in self._run_claude(prompt):
             yield output
@@ -1136,7 +1165,7 @@ class AutopilotOrchestrator:
             ClaudeOutput as the workflow progresses.
         """
         if self.state.mode == AutopilotMode.COWBOY:
-            # Self-review only
+            # Self-review
             stage.phase = StagePhase.REVIEWING
             yield ClaudeOutput(
                 type=ClaudeOutputType.STDOUT,
@@ -1147,6 +1176,18 @@ class AutopilotOrchestrator:
                 if self._cancelled:
                     return
 
+            # Optionally push to remote
+            if self.config.push_to_remote:
+                stage.phase = StagePhase.CREATING_PR
+                yield ClaudeOutput(
+                    type=ClaudeOutputType.STDOUT,
+                    content=f"Pushing Stage {stage.number} to remote...",
+                )
+                async for output in self._create_pr(stage):
+                    yield output
+                    if self._cancelled:
+                        return
+
             stage.status = StageStatus.COMPLETED
             stage.phase = None
 
@@ -1155,9 +1196,10 @@ class AutopilotOrchestrator:
                 {
                     "stage_number": stage.number,
                     "total_stages": len(self.state.stages),
-                    "has_pr": False,
+                    "has_pr": self.config.push_to_remote and stage.pr_url is not None,
                     "mode": self.state.mode.value,
                     "parallel": True,
+                    "push_to_remote": self.config.push_to_remote,
                 },
             )
 

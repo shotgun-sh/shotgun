@@ -27,6 +27,10 @@ class AutopilotStartResult(BaseModel):
         default=True,
         description="Use Claude Code Teams for parallel stage execution",
     )
+    push_to_remote: bool = Field(
+        default=False,
+        description="Whether to push changes to remote repo (cowboy mode only)",
+    )
 
 
 class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
@@ -187,6 +191,27 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             margin-left: 3;
             color: $text-muted;
         }
+
+        AutopilotStartupScreen .push-section {
+            height: auto;
+            margin-bottom: 1;
+        }
+
+        AutopilotStartupScreen .push-label {
+            color: $text;
+        }
+
+        AutopilotStartupScreen #push-select {
+            height: auto;
+            margin-left: 1;
+        }
+
+        AutopilotStartupScreen .push-description {
+            height: auto;
+            margin-left: 3;
+            margin-bottom: 1;
+            color: $text-muted;
+        }
     """
 
     def __init__(
@@ -217,6 +242,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         self.show_teams = show_teams
         self.selected_mode = AutopilotMode.PAUSE_BETWEEN
         self.use_teams = show_teams
+        self.push_to_remote = False
 
     def compose(self) -> ComposeResult:
         """Compose the startup screen layout."""
@@ -282,6 +308,28 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                     yield Static(
                         "[dim]Full speed ahead! Claude builds each stage with self-review but no PRs and no human approval required. Maximum velocity, use with caution.[/]",
                         classes="mode-description",
+                    )
+
+            # Push option (only shown when cowboy mode is selected)
+            with Container(classes="push-section", id="push-section"):
+                yield Static("Remote:", classes="push-label")
+                with RadioSet(id="push-select"):
+                    yield RadioButton(
+                        "Keep changes local only",
+                        id="push-local",
+                        value=True,
+                    )
+                    yield Static(
+                        "[dim]Claude Code will commit changes locally but will not push to any remote repository.[/]",
+                        classes="push-description",
+                    )
+                    yield RadioButton(
+                        "Push changes to remote repo (caution)",
+                        id="push-remote",
+                    )
+                    yield Static(
+                        "[dim]Claude Code will push changes and create PRs as each stage completes. Use with caution — changes go live immediately.[/]",
+                        classes="push-description",
                     )
 
             # Teams toggle (only shown with --claude-teams flag)
@@ -354,7 +402,14 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             )
 
     def on_mount(self) -> None:
-        """Auto-focus the Start button on mount."""
+        """Auto-focus the Start button on mount and hide push section."""
+        # Hide push section by default (only shown for cowboy mode)
+        try:
+            push_section = self.query_one("#push-section", Container)
+            push_section.display = False
+        except NoMatches:
+            pass
+
         try:
             start_btn = self.query_one("#btn-start", Button)
             start_btn.focus()
@@ -438,6 +493,18 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
         elif event.pressed.id == "mode-cowboy":
             self.selected_mode = AutopilotMode.COWBOY
 
+        # Show/hide the push section based on cowboy mode
+        try:
+            push_section = self.query_one("#push-section", Container)
+            push_section.display = self.selected_mode == AutopilotMode.COWBOY
+        except NoMatches:
+            pass
+
+    @on(RadioSet.Changed, "#push-select")
+    def handle_push_change(self, event: RadioSet.Changed) -> None:
+        """Handle push option selection change."""
+        self.push_to_remote = event.pressed.id == "push-remote"
+
     @on(Button.Pressed, "#btn-start")
     def handle_start(self, event: Button.Pressed) -> None:
         """Handle Start button press."""
@@ -448,6 +515,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 mode=self.selected_mode,
                 stages=self.stages,
                 use_teams=self.use_teams,
+                push_to_remote=self.push_to_remote,
             )
         )
 
@@ -476,6 +544,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                         mode=self.selected_mode,
                         stages=self.stages,
                         use_teams=self.use_teams,
+                        push_to_remote=self.push_to_remote,
                     )
                 )
             else:
@@ -491,6 +560,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 radio.value = True
             except NoMatches:
                 pass
+            self._update_push_section_visibility()
             event.stop()
         elif event.key in ("a", "A"):
             self.selected_mode = AutopilotMode.AUTO_CONTINUE
@@ -499,6 +569,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 radio.value = True
             except NoMatches:
                 pass
+            self._update_push_section_visibility()
             event.stop()
         elif event.key in ("c", "C"):
             self.selected_mode = AutopilotMode.COWBOY
@@ -507,6 +578,7 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
                 radio.value = True
             except NoMatches:
                 pass
+            self._update_push_section_visibility()
             event.stop()
         elif event.key in ("t", "T") and self.show_teams:
             self.use_teams = not self.use_teams
@@ -516,3 +588,11 @@ class AutopilotStartupScreen(ModalScreen[AutopilotStartResult]):
             except NoMatches:
                 pass
             event.stop()
+
+    def _update_push_section_visibility(self) -> None:
+        """Show/hide the push section based on selected mode."""
+        try:
+            push_section = self.query_one("#push-section", Container)
+            push_section.display = self.selected_mode == AutopilotMode.COWBOY
+        except NoMatches:
+            pass

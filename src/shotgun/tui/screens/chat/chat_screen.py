@@ -3048,6 +3048,7 @@ class ChatScreen(Screen[None]):
                         "has_spec_file": not validation.spec_file.is_empty,
                         "has_plan_file": not validation.plan_file.is_empty,
                         "use_teams": result.use_teams,
+                        "push_to_remote": result.push_to_remote,
                     },
                 )
 
@@ -3056,7 +3057,10 @@ class ChatScreen(Screen[None]):
                     f"**{len(result.stages)}** stages"
                 )
                 self._run_autopilot_stage(
-                    result.mode, result.stages, use_teams=result.use_teams
+                    result.mode,
+                    result.stages,
+                    use_teams=result.use_teams,
+                    push_to_remote=result.push_to_remote,
                 )
             else:
                 logger.info("Autopilot: Cancelled by user")
@@ -3074,6 +3078,7 @@ class ChatScreen(Screen[None]):
         stages: "list[Stage]",
         feedback: str | None = None,
         use_teams: bool = True,
+        push_to_remote: bool = False,
     ) -> None:
         """Run the autopilot workflow for the current stage.
 
@@ -3089,17 +3094,20 @@ class ChatScreen(Screen[None]):
             stages: List of stages (with current state).
             feedback: Optional feedback from user rejection.
             use_teams: Whether to use Claude Code Teams for parallel execution.
+            push_to_remote: Whether to push changes to remote (cowboy mode).
         """
         # Create or reuse orchestrator
         if self._autopilot_orchestrator is None:
             config = AutopilotConfig(
                 working_directory=self.deps.working_directory,
                 use_teams=use_teams,
+                push_to_remote=push_to_remote,
             )
             self._autopilot_orchestrator = AutopilotOrchestrator(config)
             self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))
             self._autopilot_orchestrator.state.stages = stages
             self._autopilot_orchestrator.state.use_teams = use_teams
+            self._autopilot_orchestrator.state.push_to_remote = push_to_remote
             # Initialize state based on task completion - skip completed stages
             self._autopilot_orchestrator.state.initialize_from_tasks()
 
