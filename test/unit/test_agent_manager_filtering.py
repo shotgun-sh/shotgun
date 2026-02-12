@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic_ai.messages import (
@@ -41,7 +41,8 @@ def mock_agent_deps():
     deps.file_tracker = file_tracker_mock
 
     # Add additional fields needed by agent creation
-    deps.codebase_service = MagicMock()
+    deps.codebase_service = AsyncMock()
+    deps.codebase_service.list_graphs_for_directory = AsyncMock(return_value=[])
     deps.artifact_service = MagicMock()
     deps.system_prompt_fn = MagicMock(return_value="Test system prompt")
     deps.usage_manager = MagicMock(spec=SessionUsageManager)
