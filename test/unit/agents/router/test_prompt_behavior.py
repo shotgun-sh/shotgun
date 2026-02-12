@@ -1,4 +1,9 @@
-"""Tests for router agent prompt behavioral rules."""
+"""Tests for planner agent prompt behavioral rules.
+
+These rules live in the planner prompt (planner.j2) which is the full
+orchestrator prompt. In tiered mode, the Router uses a simplified triage
+prompt and escalates to the Planner for complex work.
+"""
 
 from pathlib import Path
 
@@ -7,14 +12,14 @@ import pytest
 
 @pytest.fixture
 def router_prompt_content() -> str:
-    """Load the router.j2 prompt template content."""
+    """Load the planner.j2 prompt template content (was router.j2 before tiering)."""
     prompt_path = (
         Path(__file__).parents[4]
         / "src"
         / "shotgun"
         / "prompts"
         / "agents"
-        / "router.j2"
+        / "planner.j2"
     )
     return prompt_path.read_text()
 

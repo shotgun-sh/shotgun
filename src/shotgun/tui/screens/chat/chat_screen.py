@@ -359,11 +359,15 @@ class ChatScreen(Screen[None]):
         self.agent_manager._tasks_agent = None
         self.agent_manager._specify_agent = None
         self.agent_manager._export_agent = None
+        self.agent_manager._router_agent = None
+        self.agent_manager._planner_agent = None
         self.agent_manager._research_deps = None
         self.agent_manager._plan_deps = None
         self.agent_manager._tasks_deps = None
         self.agent_manager._specify_deps = None
         self.agent_manager._export_deps = None
+        self.agent_manager._router_deps = None
+        self.agent_manager._planner_deps = None
 
     async def _validate_current_model(self) -> None:
         """Validate current model is still available, fall back if not.
