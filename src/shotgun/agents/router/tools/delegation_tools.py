@@ -7,11 +7,19 @@ Sub-agents run with isolated message histories to prevent context window bloat.
 """
 
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import aiofiles
 from pydantic_ai import RunContext
-from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ToolCallPart,
+    ToolReturnPart,
+)
 from pydantic_ai.tools import ToolDefinition
 
 from shotgun.agents.config.models import ProviderType
@@ -37,6 +45,7 @@ from shotgun.agents.tasks import create_tasks_agent, run_tasks_agent
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
+from shotgun.utils.file_system_utils import get_shotgun_base_path
 
 logger = get_logger(__name__)
 
@@ -217,11 +226,79 @@ def _build_sub_agent_context(deps: RouterDeps) -> SubAgentContext:
     )
 
 
+async def build_preloaded_history(
+    preload_files: list[str],
+) -> tuple[list[ModelMessage], list[str]]:
+    """Build synthetic read_file tool call/return pairs for preloading .shotgun/ files.
+
+    Creates message history entries that look like the sub-agent already called
+    read_file for each requested file, saving LLM round-trips on predictable reads.
+
+    Args:
+        preload_files: List of .shotgun/-relative file paths
+            (e.g., 'research.md', 'specification.md', 'contracts/auth.py').
+
+    Returns:
+        Tuple of (messages, loaded_paths) where messages is a list of
+        ModelMessage pairs (ModelResponse + ModelRequest) for each successfully
+        read file, and loaded_paths is the list of files that were loaded.
+    """
+    if not preload_files:
+        return [], []
+
+    base_path = get_shotgun_base_path()
+    messages: list[ModelMessage] = []
+    loaded_paths: list[str] = []
+
+    for file_path in preload_files:
+        full_path = base_path / file_path
+        try:
+            async with aiofiles.open(full_path) as f:
+                content = await f.read()
+        except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
+            logger.debug("Skipping preload for %s: file not readable", file_path)
+            continue
+
+        tool_call_id = f"preload-{uuid.uuid4().hex[:12]}"
+
+        # Synthetic ModelResponse with a ToolCallPart (as if the agent called read_file)
+        call_msg = ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="read_file",
+                    args={"filename": file_path, "reason": "Preloaded by router"},
+                    tool_call_id=tool_call_id,
+                )
+            ]
+        )
+
+        # Synthetic ModelRequest with a ToolReturnPart (as if read_file returned)
+        return_msg = ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="read_file",
+                    content=content,
+                    tool_call_id=tool_call_id,
+                )
+            ]
+        )
+
+        messages.append(call_msg)
+        messages.append(return_msg)
+        loaded_paths.append(file_path)
+
+    if loaded_paths:
+        logger.info("Preloaded %d files: %s", len(loaded_paths), loaded_paths)
+
+    return messages, loaded_paths
+
+
 async def _run_sub_agent(
     ctx: RunContext[RouterDeps],
     agent_type: AgentType,
     task: str,
     context_hint: str | None = None,
+    preload_files: list[str] | None = None,
 ) -> DelegationResult:
     """Run a sub-agent with the given task.
 
@@ -230,6 +307,7 @@ async def _run_sub_agent(
     - Getting or creating the sub-agent from cache
     - Setting up SubAgentContext
     - Managing active_sub_agent state for UI updates
+    - Preloading .shotgun/ files into the sub-agent's message history
     - Running the sub-agent with isolated message history
     - Extracting files_modified and handling errors with retries
 
@@ -238,6 +316,7 @@ async def _run_sub_agent(
         agent_type: The type of sub-agent to run.
         task: The task to delegate to the sub-agent.
         context_hint: Optional context to help the sub-agent.
+        preload_files: Optional list of .shotgun/-relative file paths to preload.
 
     Returns:
         DelegationResult with success/failure status, response, and files_modified.
@@ -277,6 +356,14 @@ async def _run_sub_agent(
     deps.active_sub_agent = agent_type
     logger.info("Delegating to %s agent: %s", agent_type.value, task[:100])
 
+    # Build preloaded message history if files requested
+    preloaded_history: list[ModelMessage] = []
+    files_preloaded: list[str] = []
+    if preload_files:
+        preloaded_history, files_preloaded = await build_preloaded_history(
+            preload_files
+        )
+
     # Track delegation start time and event
     start_time = time.time()
     track_event(
@@ -285,6 +372,7 @@ async def _run_sub_agent(
             "target_agent": agent_type.value,
             "task_length": len(task),
             "has_context_hint": context_hint is not None,
+            "preloaded_file_count": len(files_preloaded),
         },
     )
 
@@ -296,12 +384,12 @@ async def _run_sub_agent(
     retries_attempted = 0
     for attempt in range(MAX_RETRIES + 1):
         try:
-            # Run sub-agent with isolated message history and streaming support
+            # Run sub-agent with preloaded history (or empty) and streaming support
             result = await run_fn(
                 agent=agent,
                 prompt=prompt,
                 deps=sub_agent_deps,
-                message_history=[],  # Isolated context
+                message_history=preloaded_history,
                 event_stream_handler=deps.parent_stream_handler,  # Forward streaming
             )
 
@@ -370,6 +458,7 @@ async def _run_sub_agent(
                     "has_questions": has_questions,
                     "duration_seconds": round(time.time() - start_time, 2),
                     "tool_call_count": sum(tool_call_counts.values()),
+                    "preloaded_file_count": len(files_preloaded),
                 },
             )
 
@@ -384,6 +473,7 @@ async def _run_sub_agent(
                 has_questions=has_questions,
                 questions=questions,
                 tool_call_counts=tool_call_counts,
+                files_preloaded=files_preloaded,
             )
 
         except Exception as e:
@@ -471,6 +561,7 @@ async def delegate_to_research(
         AgentType.RESEARCH,
         input.task,
         input.context_hint,
+        input.preload_files,
     )
 
 
@@ -502,6 +593,7 @@ async def delegate_to_specification(
         AgentType.SPECIFY,
         input.task,
         input.context_hint,
+        input.preload_files,
     )
 
 
@@ -533,6 +625,7 @@ async def delegate_to_plan(
         AgentType.PLAN,
         input.task,
         input.context_hint,
+        input.preload_files,
     )
 
 
@@ -564,6 +657,7 @@ async def delegate_to_tasks(
         AgentType.TASKS,
         input.task,
         input.context_hint,
+        input.preload_files,
     )
 
 
@@ -595,4 +689,5 @@ async def delegate_to_export(
         AgentType.EXPORT,
         input.task,
         input.context_hint,
+        input.preload_files,
     )

@@ -534,7 +534,7 @@ async def test_delegate_to_research(mock_context, mock_agent_result):
         result = await delegate_to_research(mock_context, input_data)
 
     mock_run.assert_called_once_with(
-        mock_context, AgentType.RESEARCH, "Find OAuth docs", "Security"
+        mock_context, AgentType.RESEARCH, "Find OAuth docs", "Security", []
     )
     assert result.success is True
 
@@ -551,7 +551,7 @@ async def test_delegate_to_specification(mock_context, mock_agent_result):
         result = await delegate_to_specification(mock_context, input_data)
 
     mock_run.assert_called_once_with(
-        mock_context, AgentType.SPECIFY, "Write auth spec", None
+        mock_context, AgentType.SPECIFY, "Write auth spec", None, []
     )
     assert result.success is True
 
@@ -568,7 +568,7 @@ async def test_delegate_to_plan(mock_context, mock_agent_result):
         result = await delegate_to_plan(mock_context, input_data)
 
     mock_run.assert_called_once_with(
-        mock_context, AgentType.PLAN, "Create implementation plan", None
+        mock_context, AgentType.PLAN, "Create implementation plan", None, []
     )
     assert result.success is True
 
@@ -585,7 +585,7 @@ async def test_delegate_to_tasks(mock_context, mock_agent_result):
         result = await delegate_to_tasks(mock_context, input_data)
 
     mock_run.assert_called_once_with(
-        mock_context, AgentType.TASKS, "Generate task list", None
+        mock_context, AgentType.TASKS, "Generate task list", None, []
     )
     assert result.success is True
 
@@ -602,7 +602,7 @@ async def test_delegate_to_export(mock_context, mock_agent_result):
         result = await delegate_to_export(mock_context, input_data)
 
     mock_run.assert_called_once_with(
-        mock_context, AgentType.EXPORT, "Export deliverables", None
+        mock_context, AgentType.EXPORT, "Export deliverables", None, []
     )
     assert result.success is True
 
