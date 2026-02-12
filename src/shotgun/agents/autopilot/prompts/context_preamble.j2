@@ -20,23 +20,42 @@ ls -la .shotgun/
 
 ## CRITICAL RULES
 
-### 1. The .shotgun/ folder is TEMPORARY
+### 1. DO NOT DELETE, MOVE, OR OVERWRITE files in .shotgun/
 
-**ALL files in `.shotgun/` are temporary working documents and MUST NOT be committed to the codebase.**
+**The `.shotgun/` folder and ALL of its contents MUST remain intact throughout the entire session.**
 
-These files exist only to guide implementation. They are:
+The autopilot orchestrator depends on these files to monitor progress, coordinate stages, and resume work. If any files are deleted, the entire workflow breaks and cannot recover.
+
+**Forbidden actions on `.shotgun/`:**
+- DO NOT run `rm`, `rm -rf`, `git rm`, or any delete command on `.shotgun/` or any file within it
+- DO NOT move, rename, or relocate any `.shotgun/` files
+- DO NOT overwrite `.shotgun/` files with new content (except updating checkboxes in tasks.md as described below)
+- DO NOT use `git clean` in a way that removes `.shotgun/`
+- DO NOT add `.shotgun/` to any cleanup, build, or reset scripts
+
+**The ONLY permitted modification:** You may update `{{ tasks_file_path }}` by changing `- [ ]` to `- [x]` to mark tasks as complete. No other changes to tasks.md or any other `.shotgun/` file are allowed.
+
+### 2. Ensure .shotgun/ is in the project's .gitignore
+
+Before starting any work, check if `.shotgun/` is listed in the project's `.gitignore` file. If it is NOT present, add `.shotgun/` to `.gitignore` as your first action. The `.shotgun/` folder must never be committed to version control.
+
+### 3. .shotgun/ files are reference documents, not deliverables
+
+Files in `.shotgun/` exist only to guide your implementation. They are:
+- **Read-only reference material** (except task checkboxes)
 - NOT part of the final deliverable
-- NOT to be referenced by production code
+- NOT to be referenced or imported by production code
 - NOT to be checked into version control
 
-### 2. Contracts are specifications, not code
+### 4. Contracts and example code must be copied, not used directly
 
-Files in `.shotgun/contracts/` define interfaces and APIs but are **NOT to be used directly**.
+Files in `.shotgun/contracts/` and any code examples in `.shotgun/` are **specifications and reference implementations, not production code**.
 
 You MUST:
-- **Read** the contracts to understand the expected interfaces
-- **Write** the actual implementation code to the proper locations in the codebase
-- **Never** import from or reference `.shotgun/contracts/` in production code
+- **Read** the contracts and examples to understand the expected interfaces and patterns
+- **Write** your own implementation code to the proper locations in the codebase
+- **Copy** relevant patterns and adapt them to fit the project's conventions
+- **Never** import from, reference, or directly use files in `.shotgun/` from production code
 
 Example:
 - Contract at `.shotgun/contracts/user_service.py` defines the interface
