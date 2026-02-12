@@ -89,8 +89,14 @@ class AutopilotOrchestrator:
     5. Present to user for approval (Accept/Reject)
     """
 
-    MAX_STAGE_ITERATIONS = 30
-    """Safety cap on execution iterations per stage."""
+    MAX_STAGE_ITERATIONS = 10
+    """Safety cap on orchestrator iterations per stage.
+
+    Each iteration = one full Claude Code invocation (Claude runs autonomously,
+    makes many tool calls, then returns). The monitor agent evaluates the result
+    and decides whether to invoke Claude Code again. This is NOT the number of
+    tool calls within a single Claude Code session.
+    """
 
     def __init__(
         self,
@@ -465,10 +471,9 @@ class AutopilotOrchestrator:
 
         monitor = StageMonitor(working_directory=self.config.working_directory)
         next_prompt: str | None = None  # First iteration uses standard template
-        iteration = 0
+        completed_invocations = 0
 
-        while iteration < self.MAX_STAGE_ITERATIONS:
-            iteration += 1
+        while completed_invocations < self.MAX_STAGE_ITERATIONS:
             if self._cancelled:
                 trail_logger.info("CANCELLED stage=%s", stage.number)
                 return
@@ -493,9 +498,13 @@ class AutopilotOrchestrator:
                     self._last_claude_output = output.content
                     claude_text_output.append(output.content)
 
+            # Count iteration only after Claude Code returns
+            completed_invocations += 1
+
             trail_logger.info(
-                "CLAUDE_RESPONSE stage=%s summary=%s",
+                "CLAUDE_RESPONSE stage=%s invocation=%d summary=%s",
                 stage.number,
+                completed_invocations,
                 (claude_text_output[-1][:100] if claude_text_output else "empty"),
             )
 
@@ -599,9 +608,9 @@ class AutopilotOrchestrator:
 
         # Safety cap reached
         trail_logger.warning(
-            "MAX_ITERATIONS stage=%s iterations=%d",
+            "MAX_ITERATIONS stage=%s completed_invocations=%d",
             stage.number,
-            self.MAX_STAGE_ITERATIONS,
+            completed_invocations,
         )
         track_event(
             "autopilot_stage_failed",

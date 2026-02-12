@@ -334,6 +334,44 @@ class GenericAPIStatusException(UserActionableError):  # noqa: N818
         return f"⚠️  AI service error: {self.api_message}"
 
 
+class IncompleteToolCallError(UserActionableError):  # noqa: N818
+    """Raised when the model generates a tool call with truncated/incomplete JSON arguments.
+
+    This can happen when the model's output is cut off mid-stream (e.g., due to
+    token limits, network issues, or oversized arguments).
+    """
+
+    def __init__(self, tool_name: str | None = None):
+        """Initialize the exception.
+
+        Args:
+            tool_name: Optional name of the tool that had incomplete args
+        """
+        self.tool_name = tool_name
+        msg = "Tool call failed due to incomplete arguments"
+        if tool_name:
+            msg = f"Tool call '{tool_name}' failed due to incomplete arguments"
+        super().__init__(msg)
+
+    def to_markdown(self) -> str:
+        """Generate markdown-formatted error message for TUI."""
+        tool_info = f" (`{self.tool_name}`)" if self.tool_name else ""
+        return (
+            f"⚠️ **A tool call{tool_info} failed due to truncated arguments.**\n\n"
+            "The model's output was cut off before completing the tool call.\n\n"
+            "**Try again** — this is usually a transient issue."
+        )
+
+    def to_plain_text(self) -> str:
+        """Generate plain text error message for CLI."""
+        tool_info = f" ({self.tool_name})" if self.tool_name else ""
+        return (
+            f"⚠️  A tool call{tool_info} failed due to truncated arguments.\n\n"
+            "The model's output was cut off before completing the tool call.\n\n"
+            "Try again — this is usually a transient issue."
+        )
+
+
 class UnknownAgentException(UserActionableError):  # noqa: N818
     """Raised for unknown/unclassified agent errors."""
 

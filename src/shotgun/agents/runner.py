@@ -24,6 +24,7 @@ from shotgun.exceptions import (
     BYOKServiceOverloadException,
     ContextSizeLimitExceeded,
     GenericAPIStatusException,
+    IncompleteToolCallError,
     ShotgunRateLimitException,
     ShotgunServiceOverloadException,
     UnknownAgentException,
@@ -119,6 +120,10 @@ class AgentRunner:
                     "model_name": e.model_name,
                 },
             )
+            raise
+
+        except IncompleteToolCallError:
+            # Already a user-friendly exception with hint message added to history
             raise
 
         except Exception as e:
