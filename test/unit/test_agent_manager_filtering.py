@@ -117,15 +117,18 @@ async def test_filters_system_prompts_from_other_agents(
 
     # Mock the system message functions to just return the messages as-is
     mock_add_system_status.side_effect = lambda deps, msgs: msgs
-    mock_add_system_prompt.side_effect = lambda deps, msgs: msgs + [
-        ModelRequest(
-            parts=[
-                AgentSystemPrompt(
-                    content="Research agent prompt", agent_mode=AgentType.RESEARCH
-                )
-            ]
-        )
-    ]
+    mock_add_system_prompt.side_effect = lambda deps, msgs: (
+        msgs
+        + [
+            ModelRequest(
+                parts=[
+                    AgentSystemPrompt(
+                        content="Research agent prompt", agent_mode=AgentType.RESEARCH
+                    )
+                ]
+            )
+        ]
+    )
     mock_apply_compaction.side_effect = lambda msgs, deps: msgs
 
     manager = AgentManager(deps=mock_agent_deps)
@@ -250,9 +253,9 @@ async def test_preserves_non_agent_system_prompts(
     mock_create_router.side_effect = async_create_agent
 
     # Mock the system message functions
-    mock_add_system_status.side_effect = lambda deps, msgs: msgs + [
-        ModelRequest(parts=[SystemStatusPrompt(content="New status")])
-    ]
+    mock_add_system_status.side_effect = lambda deps, msgs: (
+        msgs + [ModelRequest(parts=[SystemStatusPrompt(content="New status")])]
+    )
     mock_add_system_prompt.side_effect = lambda deps, msgs: msgs
     mock_apply_compaction.side_effect = lambda msgs, deps: msgs
 
