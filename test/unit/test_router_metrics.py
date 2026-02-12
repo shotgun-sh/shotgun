@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic_ai import RunContext
 
+from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
 from shotgun.agents.models import (
     AgentDeps,
     AgentResponse,
@@ -264,6 +265,22 @@ def mock_delegation_deps():
     return deps
 
 
+def _create_mock_sub_deps():
+    """Create mock sub-agent deps with llm_model for usage tracking."""
+    mock_sub_deps = MagicMock(spec=AgentDeps)
+    mock_sub_deps.file_tracker = FileOperationTracker()
+    mock_sub_deps.sub_agent_context = None
+    mock_sub_deps.llm_model = ModelConfig(
+        name="claude-haiku-4-5",
+        provider=ProviderType.ANTHROPIC,
+        key_provider=KeyProvider.BYOK,
+        max_input_tokens=200000,
+        max_output_tokens=8192,
+        api_key="test-key",
+    )
+    return mock_sub_deps
+
+
 @pytest.mark.asyncio
 async def test_delegation_started_metric(mock_delegation_deps):
     """Test that delegation_started metric is tracked when delegating."""
@@ -276,14 +293,8 @@ async def test_delegation_started_metric(mock_delegation_deps):
         with patch(
             "shotgun.agents.router.tools.delegation_tools._get_or_create_sub_agent"
         ) as mock_get_agent:
-            # Create mock sub-agent and deps
             mock_agent = MagicMock()
-            mock_sub_deps = MagicMock(spec=AgentDeps)
-            mock_sub_deps.file_tracker = FileOperationTracker()
-            mock_sub_deps.sub_agent_context = None
-            mock_sub_deps.llm_model = MagicMock()
-            mock_sub_deps.llm_model.name = "test-model"
-            mock_sub_deps.llm_model.provider = "anthropic"
+            mock_sub_deps = _create_mock_sub_deps()
             mock_get_agent.return_value = (mock_agent, mock_sub_deps)
 
             with patch(
@@ -330,14 +341,8 @@ async def test_delegation_completed_metric(mock_delegation_deps):
         with patch(
             "shotgun.agents.router.tools.delegation_tools._get_or_create_sub_agent"
         ) as mock_get_agent:
-            # Create mock sub-agent and deps
             mock_agent = MagicMock()
-            mock_sub_deps = MagicMock(spec=AgentDeps)
-            mock_sub_deps.file_tracker = FileOperationTracker()
-            mock_sub_deps.sub_agent_context = None
-            mock_sub_deps.llm_model = MagicMock()
-            mock_sub_deps.llm_model.name = "test-model"
-            mock_sub_deps.llm_model.provider = "anthropic"
+            mock_sub_deps = _create_mock_sub_deps()
             mock_get_agent.return_value = (mock_agent, mock_sub_deps)
 
             with patch(
