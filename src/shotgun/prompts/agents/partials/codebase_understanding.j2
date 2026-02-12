@@ -8,7 +8,6 @@
 ## Using codebases
 
 When you have a codebase available, assume the user is asking you about that codebase or in context of that codebase.
-Make sure to check the codebase before answering any question or suggesting any action.
 
 ## Codebase Analysis Guidelines
 
@@ -27,6 +26,37 @@ Make sure to check the codebase before answering any question or suggesting any 
 - "Show me the dependencies of the main application class"
 - "List all test functions that are not being called"
 - "Find functions with high cyclomatic complexity"
+
+{% if has_codebase_indexed %}
+## Impact Analysis (Your Competitive Advantage)
+
+Unlike text-based code search, you can answer questions that grep CANNOT.
+Use this to create **better plans and tasks** that coding agents (Claude Code, Cursor, etc.) will execute.
+
+**Before Planning Code Changes - ALWAYS Query Impact First:**
+1. "Find all callers of [function/method]" - Know the blast radius
+2. "What depends on [class/module]?" - Understand downstream effects
+3. "What would break if I change [interface]?" - Risk assessment
+
+**Impact Analysis Queries (use with query_graph):**
+- "Find all methods that call process_payment" → Exact callers, no false positives
+- "What classes inherit from BaseHandler and override handle()?" → Change propagation
+- "Show the call chain from main() to database_connect()" → Dependency path
+- "Find all entry points that eventually call [function]" → Trace from API to internals
+- "What tests cover [class/method]?" → Test impact of changes
+
+**When Creating Plans/Tasks for Code Changes:**
+1. FIRST: Query the graph to understand what calls the code being changed
+2. SECOND: Identify the blast radius (all affected components)
+3. THIRD: Map which tests need to run/be updated
+4. THEN: Create your plan/tasks with full awareness of impact
+
+**Key Advantage Over Text Search:**
+- Grep finds "process_payment" in comments, strings, and unrelated code
+- Graph queries find ONLY actual callers via CALLS relationships
+- You can traverse multiple hops: "what calls the callers of X?"
+- Your plans will be more accurate because you understand the full dependency graph
+{% endif %}
 
 **Graph Management**:
 - Use graph IDs shown above when calling codebase tools
@@ -61,27 +91,17 @@ If the task you received is about codebase management, follow the codebase manag
 
 #### Codebase Understanding Workflow
 
-1. **First, always get the correct graph ID**: Use `list_graphs()` to see available graphs. This returns both names (for humans) and IDs (for tools). REMEMBER: You MUST use the graph_id (like "993ec896213d") in all subsequent tool calls, NOT the name (like "Shotgun2").
-2. **Understand Repository Structure**: Before diving into code, understand the repository layout:
-   - Use `directory_lister` with graph_id to explore the root directory
-   - Identify where source code lives (could be in root, `src/`, `server/`, `lib/`, etc.)
-   - Note the repository structure for accurate path construction
-3. **Deep Dive into Code**: When you identify a relevant component:
-   a. Check for documentation files like `README.md` and configuration files
-   b. Explore the actual source code directories
-   c. Read key files to understand implementation details
-   d. Provide all information to explain what the code *does*
-   e. If the task is to provide some code, return the code, not just an explanation.
-4. **Graph First, Then Files**: Query the knowledge graph to understand code structure:
-   - Use natural language queries like "Show me the WebSocketServer class and its methods"
-   - To find specific code snippet, use `retrieve_code` first (look for the fully qualified name first), and only if you cannot find it, use the file system tools.
-   - If entities are not found, try different variations or explore the file system
-5. **Path Resolution**: When accessing files:
-   - Always use the graph_id parameter
-   - File paths are relative to the repository root
-   - If unsure about structure, explore directories first
-6. **Error Handling**: When errors occur:
-   - If "entity not found", try alternative names or explore the file system
-   - If "graph not found", verify the exact graph name with `list_graphs()`
-   - Report errors clearly and try alternative approaches
+**IMPORTANT: Graph queries are cheap, file reads are expensive. Always prefer graph queries.**
+
+1. **Graph First**: Use `query_graph` to find code structure before reading files:
+   - "Find the UserAuth class" → Get qualified name
+   - "What calls process_payment?" → Get callers
+   - Prefer graph queries over directory exploration
+
+2. **Targeted File Reads**: Read files when you have a specific reason:
+   - Use `retrieve_code` with qualified names from graph queries
+   - Read files the user mentions or that you've identified as relevant
+   - Avoid reading many files just to "explore" - use graph queries for discovery
+
+3. **Error Handling**: If entity not found, try alternative names or query variations first
 

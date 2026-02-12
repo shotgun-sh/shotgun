@@ -123,6 +123,9 @@ async def add_system_status_message(
         await deps.codebase_service.list_graphs_for_directory()
     )
 
+    # Keep has_codebase_indexed in sync (reuses the graphs we already fetched)
+    deps.has_codebase_indexed = len(codebase_understanding_graphs) > 0
+
     # Get graphs currently being indexed
     indexing_graph_ids: set[str] = set()
     if deps.codebase_service:
@@ -587,6 +590,7 @@ def build_agent_system_prompt(
         supports_pdf=supports_pdf,
         supports_images=supports_images,
         has_context7=has_context7,
+        has_codebase_indexed=ctx.deps.has_codebase_indexed,
     )
 
     result = prompt_loader.render(
@@ -688,6 +692,11 @@ async def run_agent(
     # Clear file tracker for new run
     deps.file_tracker.clear()
     logger.debug("🔧 Cleared file tracker for new agent run")
+
+    # Determine if codebase is indexed before rendering prompts
+    if deps.codebase_service:
+        codebase_graphs = await deps.codebase_service.list_graphs_for_directory()
+        deps.has_codebase_indexed = len(codebase_graphs) > 0
 
     # Add system prompt as first message
     message_history = await add_system_prompt_message(deps, message_history)

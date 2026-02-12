@@ -901,6 +901,11 @@ class AgentManager(Widget):
         # Add a system status message so the agent knows whats going on
         message_history = await add_system_status_message(deps, message_history)
 
+        # Determine if codebase is indexed before rendering prompts
+        if deps.codebase_service:
+            codebase_graphs = await deps.codebase_service.list_graphs_for_directory()
+            deps.has_codebase_indexed = len(codebase_graphs) > 0
+
         # Check if the message history already has a system prompt from the same agent type
         has_system_prompt = False
         for message in message_history:

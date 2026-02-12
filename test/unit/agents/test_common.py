@@ -37,7 +37,8 @@ def mock_deps():
     deps.queue = AsyncMock()
     deps.tasks = []
     deps.is_tui_context = False
-    deps.agent_mode = None  # Add agent_mode attribute
+    deps.agent_mode = None
+    deps.has_codebase_indexed = False
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
@@ -210,6 +211,7 @@ def test_build_agent_system_prompt_research_agent():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -228,6 +230,7 @@ def test_build_agent_system_prompt_research_agent():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_codebase_indexed=False,
         )
 
 
@@ -243,6 +246,7 @@ def test_build_agent_system_prompt_custom_context():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -261,6 +265,7 @@ def test_build_agent_system_prompt_custom_context():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_codebase_indexed=True,
         )
 
 
@@ -276,6 +281,7 @@ def test_build_agent_system_prompt_unknown_agent_type():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
         mock_loader = MagicMock()
@@ -294,7 +300,43 @@ def test_build_agent_system_prompt_unknown_agent_type():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_codebase_indexed=False,
         )
+
+
+def test_build_agent_system_prompt_includes_impact_analysis_when_indexed():
+    """Test that impact analysis sections render when has_codebase_indexed=True."""
+    mock_context = MagicMock()
+    mock_context.deps = MagicMock(spec=AgentDeps)
+    mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = True
+
+    # Render actual templates (no mocking PromptLoader) to verify conditional blocks
+    result = build_agent_system_prompt("plan", mock_context)
+    assert "Impact Analysis" in result
+    assert "blast radius" in result.lower()
+
+
+def test_build_agent_system_prompt_excludes_impact_analysis_when_not_indexed():
+    """Test that impact analysis sections are excluded when has_codebase_indexed=False."""
+    mock_context = MagicMock()
+    mock_context.deps = MagicMock(spec=AgentDeps)
+    mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = False
+
+    result = build_agent_system_prompt("plan", mock_context)
+    assert "Impact Analysis" not in result
+    assert "DEPENDENCY-AWARE TASK ORDERING" not in result
 
 
 def test_create_usage_limits():
