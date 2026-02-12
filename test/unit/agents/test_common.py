@@ -38,7 +38,7 @@ def mock_deps():
     deps.tasks = []
     deps.is_tui_context = False
     deps.agent_mode = None
-    deps.has_codebase_indexed = False  # Will be set by add_system_prompt_message
+    deps.has_codebase_indexed = False
     # Add file_tracker mock
     file_tracker_mock = MagicMock()
     file_tracker_mock.clear = MagicMock()
