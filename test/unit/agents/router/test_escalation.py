@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic_ai.models.test import TestModel
 
 from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
 from shotgun.agents.models import AgentResponse, AgentRuntimeOptions, AgentType
@@ -11,8 +12,6 @@ from shotgun.codebase.service import CodebaseService
 
 def _make_model_config(name: str = "test-model") -> ModelConfig:
     """Create a ModelConfig with a test model_instance."""
-    from pydantic_ai.models.test import TestModel
-
     config = ModelConfig(
         name=name,
         provider=ProviderType.ANTHROPIC,

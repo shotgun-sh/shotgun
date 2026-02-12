@@ -17,7 +17,13 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
+from .models import (
+    AgentDeps,
+    AgentResponse,
+    AgentRuntimeOptions,
+    AgentType,
+    PromptTemplate,
+)
 
 logger = get_logger(__name__)
 
@@ -39,7 +45,7 @@ async def create_plan_agent(
     """
     logger.debug("Initializing plan agent")
     # Use partial to create system prompt function for plan agent
-    system_prompt_fn = partial(build_agent_system_prompt, "plan")
+    system_prompt_fn = partial(build_agent_system_prompt, PromptTemplate.PLAN)
 
     agent, deps = await create_base_agent(
         system_prompt_fn,
