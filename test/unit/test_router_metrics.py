@@ -250,17 +250,25 @@ async def test_plan_step_removed_metric(mock_ctx):
         )
 
 
-@pytest.mark.asyncio
-async def test_delegation_started_metric():
-    """Test that delegation_started metric is tracked when delegating."""
-    mock_deps = MagicMock(spec=RouterDeps)
-    mock_deps.current_plan = None
-    mock_deps.active_sub_agent = None
-    mock_deps.parent_stream_handler = None
-    mock_deps.cancellation_event = None
+@pytest.fixture
+def mock_delegation_deps():
+    """Create mock RouterDeps with all attributes needed for delegation tests."""
+    deps = MagicMock(spec=RouterDeps)
+    deps.current_plan = None
+    deps.active_sub_agent = None
+    deps.parent_stream_handler = None
+    deps.cancellation_event = None
+    deps.usage_manager = AsyncMock()
+    deps.sub_agent_cache = {}
+    deps.sub_agent_tool_calls = {}
+    return deps
 
+
+@pytest.mark.asyncio
+async def test_delegation_started_metric(mock_delegation_deps):
+    """Test that delegation_started metric is tracked when delegating."""
     mock_ctx = MagicMock(spec=RunContext)
-    mock_ctx.deps = mock_deps
+    mock_ctx.deps = mock_delegation_deps
 
     with patch(
         "shotgun.agents.router.tools.delegation_tools.track_event"
@@ -273,6 +281,9 @@ async def test_delegation_started_metric():
             mock_sub_deps = MagicMock(spec=AgentDeps)
             mock_sub_deps.file_tracker = FileOperationTracker()
             mock_sub_deps.sub_agent_context = None
+            mock_sub_deps.llm_model = MagicMock()
+            mock_sub_deps.llm_model.name = "test-model"
+            mock_sub_deps.llm_model.provider = "anthropic"
             mock_get_agent.return_value = (mock_agent, mock_sub_deps)
 
             with patch(
@@ -308,16 +319,10 @@ async def test_delegation_started_metric():
 
 
 @pytest.mark.asyncio
-async def test_delegation_completed_metric():
+async def test_delegation_completed_metric(mock_delegation_deps):
     """Test that delegation_completed metric is tracked on successful delegation."""
-    mock_deps = MagicMock(spec=RouterDeps)
-    mock_deps.current_plan = None
-    mock_deps.active_sub_agent = None
-    mock_deps.parent_stream_handler = None
-    mock_deps.cancellation_event = None
-
     mock_ctx = MagicMock(spec=RunContext)
-    mock_ctx.deps = mock_deps
+    mock_ctx.deps = mock_delegation_deps
 
     with patch(
         "shotgun.agents.router.tools.delegation_tools.track_event"
@@ -330,6 +335,9 @@ async def test_delegation_completed_metric():
             mock_sub_deps = MagicMock(spec=AgentDeps)
             mock_sub_deps.file_tracker = FileOperationTracker()
             mock_sub_deps.sub_agent_context = None
+            mock_sub_deps.llm_model = MagicMock()
+            mock_sub_deps.llm_model.name = "test-model"
+            mock_sub_deps.llm_model.provider = "anthropic"
             mock_get_agent.return_value = (mock_agent, mock_sub_deps)
 
             with patch(

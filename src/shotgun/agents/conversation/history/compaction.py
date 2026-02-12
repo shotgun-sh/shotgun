@@ -32,32 +32,10 @@ async def apply_persistent_compaction(
     Returns:
         Compacted message history that should be stored as conversation state
     """
-    from .file_content_deduplication import deduplicate_file_content
     from .history_processors import token_limit_compactor
 
     try:
-        # STEP 1: Deterministic pre-compaction (no LLM cost)
-        # Remove file content from tool returns - files are still accessible
-        # via retrieve_code (codebase) or read_file (.shotgun/ folder)
-        messages, tokens_saved = deduplicate_file_content(
-            messages,
-            retention_window=3,  # Keep last 3 messages' file content intact
-        )
-
-        if tokens_saved > 0:
-            logger.info(
-                f"Pre-compaction: removed ~{tokens_saved:,} tokens of file content"
-            )
-            track_event(
-                "file_content_deduplication",
-                {
-                    "tokens_saved_estimate": tokens_saved,
-                    "retention_window": 3,
-                    "model_name": deps.llm_model.name_str,
-                },
-            )
-
-        # STEP 2: Count tokens after pre-compaction
+        # Count tokens to decide if LLM-based compaction is needed
         estimated_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
 
         # Create minimal usage info for compaction check
