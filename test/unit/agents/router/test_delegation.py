@@ -9,7 +9,6 @@ from pydantic_ai import RunContext, RunUsage
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.tools import ToolDefinition
 
-from shotgun.agents.config.constants import SUB_AGENT_MAX_OUTPUT_TOKENS
 from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
 from shotgun.agents.models import (
     AgentResponse,
@@ -754,87 +753,3 @@ async def test_run_sub_agent_tracks_usage(mock_context, mock_agent_result):
         model_name="claude-haiku-4-5",
         provider=ProviderType.ANTHROPIC,
     )
-
-
-# =============================================================================
-# Tests for sub-agent output token limit
-# =============================================================================
-
-
-@pytest.mark.asyncio
-async def test_run_sub_agent_passes_model_settings_with_token_limit(
-    mock_context, mock_agent_result
-):
-    """Test that sub-agents receive model_settings with max_tokens limit."""
-    mock_agent = MagicMock()
-    mock_sub_deps = _create_mock_sub_agent_deps()
-    mock_context.deps.sub_agent_cache = {}
-
-    captured_kwargs = {}
-
-    async def capture_run_kwargs(*args, **kwargs):
-        captured_kwargs.update(kwargs)
-        return mock_agent_result
-
-    with patch.dict(
-        "shotgun.agents.router.tools.delegation_tools.AGENT_FACTORIES",
-        {
-            AgentType.RESEARCH: (
-                AsyncMock(return_value=(mock_agent, mock_sub_deps)),
-                capture_run_kwargs,
-            )
-        },
-    ):
-        await _run_sub_agent(mock_context, AgentType.RESEARCH, "Test task")
-
-    assert "model_settings" in captured_kwargs
-    assert (
-        captured_kwargs["model_settings"]["max_tokens"] == SUB_AGENT_MAX_OUTPUT_TOKENS
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "agent_type",
-    [
-        AgentType.RESEARCH,
-        AgentType.SPECIFY,
-        AgentType.PLAN,
-        AgentType.TASKS,
-        AgentType.EXPORT,
-    ],
-)
-async def test_all_sub_agents_receive_token_limit(
-    mock_context, mock_agent_result, agent_type
-):
-    """Test that all sub-agent types receive the output token limit."""
-    mock_agent = MagicMock()
-    mock_sub_deps = _create_mock_sub_agent_deps()
-    mock_context.deps.sub_agent_cache = {}
-
-    captured_kwargs = {}
-
-    async def capture_run_kwargs(*args, **kwargs):
-        captured_kwargs.update(kwargs)
-        return mock_agent_result
-
-    with patch.dict(
-        "shotgun.agents.router.tools.delegation_tools.AGENT_FACTORIES",
-        {
-            agent_type: (
-                AsyncMock(return_value=(mock_agent, mock_sub_deps)),
-                capture_run_kwargs,
-            )
-        },
-    ):
-        await _run_sub_agent(mock_context, agent_type, "Test task")
-
-    assert (
-        captured_kwargs["model_settings"]["max_tokens"] == SUB_AGENT_MAX_OUTPUT_TOKENS
-    )
-
-
-@pytest.mark.asyncio
-async def test_sub_agent_token_limit_is_4096():
-    """Test that the sub-agent token limit constant is 4096."""
-    assert SUB_AGENT_MAX_OUTPUT_TOKENS == 4096
