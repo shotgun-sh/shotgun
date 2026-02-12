@@ -581,6 +581,17 @@ CORRECT - Each agent updates only their own files.
 Delegation input - each delegation tool takes:
 - task: The task description to delegate (required)
 - context_hint: Optional context to help the sub-agent understand the task
+- preload_files: Optional list of .shotgun/ file paths to preload into the sub-agent's context
+
+Use preload_files to give the sub-agent instant access to existing .shotgun/ artifact files,
+saving round-trips that would otherwise be spent on read_file calls. Only preload files the
+sub-agent will definitely need based on pipeline order:
+
+- Specification agent: preload_files=["research.md"] (needs research context)
+- Plan agent: preload_files=["specification.md"] (needs spec to plan against)
+- Tasks agent: preload_files=["specification.md", "plan.md"] (needs spec + plan)
+
+Include contracts/ or research/ files when relevant to the task.
 
 Keep delegation prompts short. Do not write detailed requirements in the task field. Sub-agents will:
 1. Do the bare minimum based on your short prompt

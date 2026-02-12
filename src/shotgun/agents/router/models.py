@@ -194,6 +194,11 @@ class DelegationInput(BaseModel):
     context_hint: str | None = Field(
         default=None, description="Optional context to help the sub-agent"
     )
+    preload_files: list[str] = Field(
+        default_factory=list,
+        description=".shotgun/ file paths to preload into the sub-agent's context "
+        "(e.g., 'research.md', 'specification.md', 'contracts/auth.py').",
+    )
 
 
 # =============================================================================
@@ -230,6 +235,10 @@ class DelegationResult(BaseModel):
     tool_call_counts: dict[str, int] = Field(
         default_factory=dict,
         description="Count of each tool call made by sub-agent (tool_name -> count)",
+    )
+    files_preloaded: list[str] = Field(
+        default_factory=list,
+        description="Files successfully preloaded into the sub-agent's context",
     )
 
 
