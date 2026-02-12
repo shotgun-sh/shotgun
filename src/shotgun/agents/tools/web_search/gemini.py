@@ -9,6 +9,7 @@ from shotgun.agents.config.constants import MEDIUM_TEXT_8K_TOKENS
 from shotgun.agents.config.models import ModelName
 from shotgun.agents.llm import shotgun_model_request
 from shotgun.agents.tools.registry import ToolCategory, register_tool
+from shotgun.agents.tools.web_search.utils import track_usage
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
 from shotgun.utils.datetime_utils import get_datetime_context
@@ -79,6 +80,11 @@ async def gemini_web_search_tool(query: str) -> str:
                 # Enable Google Search grounding for Gemini
                 extra_body={"tools": [{"googleSearch": {}}]},
             ),
+        )
+
+        # Track usage from the web search LLM call
+        await track_usage(
+            response.usage, model_name=model_config.name, provider=model_config.provider
         )
 
         # Extract text from response

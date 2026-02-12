@@ -206,7 +206,7 @@ Decide what action to take next."""
                     provider=self._model_config.provider,
                 )
         except Exception:
-            logger.debug("Failed to track stage monitor usage")
+            logger.debug("Failed to track stage monitor usage", exc_info=True)
 
         logger.info(
             "Monitor decision for Stage %s: action=%s reasoning=%s",
