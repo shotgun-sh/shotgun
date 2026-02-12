@@ -944,15 +944,15 @@ wheels = [
 
 [[package]]
 name = "genai-prices"
-version = "0.0.52"
+version = "0.0.53"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/87/bdc11c1671e3a3fe701c3c4aaae4aa2bb7a84a6bb1812dfb5693c87d3872/genai_prices-0.0.52.tar.gz", hash = "sha256:0df7420b555fa3a48d09e5c7802ba35b5dfa9fd49b0c3bb2c150c59060d83f52", size = 58364, upload-time = "2026-01-28T12:07:49.386Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/95/f7d61df3b0c42dcad3e3ab9327aa466c556a2b24f9aea6b48e4fe4ab19ca/genai_prices-0.0.53.tar.gz", hash = "sha256:0afe7595d77dbcd80473ad168385c7500c7fbc6c2b370840ffdbfea9e0902544", size = 59235, upload-time = "2026-02-11T20:47:17.876Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/33/6316b4907a0bffc1bcc99074c7e2d01184fdfeee401c864146a40d55ad10/genai_prices-0.0.52-py3-none-any.whl", hash = "sha256:639e7a2ae7eddf5710febb9779b9c9e31ff5acf464b4eb1f6018798ea642e6d3", size = 60937, upload-time = "2026-01-28T12:07:47.921Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/1c/d544657381270fe21afc2a4dc560e1607e28d7115555cef148271cb25522/genai_prices-0.0.53-py3-none-any.whl", hash = "sha256:5a5dfd92089e9e8a174f7097a1521e36f4e75c74cfbdfb1ec56283bae3c0c96e", size = 61850, upload-time = "2026-02-11T20:47:16.774Z" },
 ]
 
 [[package]]
@@ -1385,11 +1385,15 @@ wheels = [
 
 [[package]]
 name = "lefthook"
-version = "2.0.15"
+version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7c/8f/e90724128f481c637b7e9343b6535622cfa136541959a49f8a3de0d0e7a5/lefthook-2.0.15.tar.gz", hash = "sha256:8a32c9f2d44f0ff0f3e3ab48f9802ca10f1222b491f3f14e03f577ec175b6649", size = 50175274, upload-time = "2026-01-13T10:02:58.76Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/d5/243d967f541d422a7252f92dbcc201cfd588bd404a66935baacc83be49c5/lefthook-2.0.15-py3-none-any.whl", hash = "sha256:54b174520f18a4fa2545ff1e5eae4c4d2515539fb25b8c4fe04b9224a2ff07ee", size = 50416709, upload-time = "2026-01-13T10:02:55.761Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/e9/d225ab94e29abe10c944c75afa7a111709bec869babfe396f20d3dfcaff9/lefthook-2.1.1-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:be9cc958dae69eb03f0f94483310968482bc54458ec398e54beb4f4ef2c04284", size = 5356709, upload-time = "2026-02-12T07:44:20.722Z" },
+    { url = "https://files.pythonhosted.org/packages/41/2d/1af7f504101542a07e0c7c2c7c5bd07ff04bebd849f3d248f53a913ff2f4/lefthook-2.1.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:bede8913802efc052920dcaec1b0047c6e991a81ccb240b434cb38a144f5e8af", size = 4911313, upload-time = "2026-02-12T07:44:23.823Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/2a/4355115841dfc5349e59f166e701100b960680147a70bea7cad51e25f1df/lefthook-2.1.1-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:5345b90e00dff0e0b0cb62156dde394f9e2265be94b74e8a0b7e12c5c15b7010", size = 4742236, upload-time = "2026-02-12T07:44:28.836Z" },
+    { url = "https://files.pythonhosted.org/packages/32/d7/d3f80278a3a7f4fccda99aad388038f680b6ef9bf5261e6439f56052d6c7/lefthook-2.1.1-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:0a3ea478a4b0454a9e4f0e622915087ee57480955d32a94c4a4593fac9e38bb8", size = 5286517, upload-time = "2026-02-12T07:44:26.966Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/fb/e79616166bdf695851adc02e95df8c20a6f27c74a8214a3babdc50f05d0e/lefthook-2.1.1-py3-none-win_amd64.whl", hash = "sha256:cc6981df68cb8a0c3518634151dd0f3b5994f2fdd75d7959a43e6544dab54da2", size = 5432471, upload-time = "2026-02-12T07:44:22.137Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/b0/a7ad888737e2a8b742f1f75d03c7bcf566d81fa44a52a9811892fd019d7d/lefthook-2.1.1-py3-none-win_arm64.whl", hash = "sha256:af29fb39a468284712bdd8b9cd6b8615a7ff367ac796960e731db43398fe5d77", size = 4816307, upload-time = "2026-02-12T07:44:25.169Z" },
 ]
 
 [[package]]
@@ -2038,7 +2042,7 @@ wheels = [
 
 [[package]]
 name = "posthog"
-version = "7.8.5"
+version = "7.8.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -2048,9 +2052,9 @@ dependencies = [
     { name = "six" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b0/10/8e74a5e997c8286f0b63c69da522e503b1ab11627217ab76a06c7b62d647/posthog-7.8.5.tar.gz", hash = "sha256:e4f3796ce18323d8e05139bf419a04d318ccc4ad77b210f4d9d7c7546aea4f35", size = 169117, upload-time = "2026-02-09T22:59:49.207Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/c9/a7c67c039f23f16a0b87d17561ba2a1c863b01f054a226c92437c539a7b6/posthog-7.8.6.tar.gz", hash = "sha256:6f67e18b5f19bf20d7ef2e1a80fa1ad879a5cd309ca13cfb300f45a8105968c4", size = 169304, upload-time = "2026-02-11T13:59:42.558Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/b3/59b61d4b90e2efd138abaa34d98c7a89a4a352850cc3a079a60a46780655/posthog-7.8.5-py3-none-any.whl", hash = "sha256:979d306f07e61a8e837746e5dc432aafc49827fecac91bd6c624dcf3a1967448", size = 194647, upload-time = "2026-02-09T22:59:47.744Z" },
+    { url = "https://files.pythonhosted.org/packages/56/c7/41664398a838f52ddfc89141e4c38b88eaa01b9e9a269c5ac184bd8586c6/posthog-7.8.6-py3-none-any.whl", hash = "sha256:21809f73e8e8f09d2bc273b09582f1a9f997b66f51fc626ef5bd3c5bdffd8bcd", size = 194801, upload-time = "2026-02-11T13:59:41.26Z" },
 ]
 
 [[package]]
@@ -3529,7 +3533,7 @@ wheels = [
 
 [[package]]
 name = "typer"
-version = "0.21.2"
+version = "0.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
@@ -3537,9 +3541,9 @@ dependencies = [
     { name = "rich" },
     { name = "shellingham" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/1e/a27cc02a0cd715118c71fa2aef2c687fdefc3c28d90fd0dd789c5118154c/typer-0.21.2.tar.gz", hash = "sha256:1abd95a3b675e17ff61b0838ac637fe9478d446d62ad17fa4bb81ea57cc54028", size = 120426, upload-time = "2026-02-10T19:33:46.182Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/e6/44e073787aa57cd71c151f44855232feb0f748428fd5242d7366e3c4ae8b/typer-0.23.0.tar.gz", hash = "sha256:d8378833e47ada5d3d093fa20c4c63427cc4e27127f6b349a6c359463087d8cc", size = 120181, upload-time = "2026-02-11T15:22:18.637Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/cc/d59f893fbdfb5f58770c05febfc4086a46875f1084453621c35605cec946/typer-0.21.2-py3-none-any.whl", hash = "sha256:c3d8de54d00347ef90b82131ca946274f017cffb46683ae3883c360fa958f55c", size = 56728, upload-time = "2026-02-10T19:33:48.01Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/ed/d6fca788b51d0d4640c4bc82d0e85bad4b49809bca36bf4af01b4dcb66a7/typer-0.23.0-py3-none-any.whl", hash = "sha256:79f4bc262b6c37872091072a3cb7cb6d7d79ee98c0c658b4364bdcde3c42c913", size = 56668, upload-time = "2026-02-11T15:22:21.075Z" },
 ]
 
 [[package]]
