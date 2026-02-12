@@ -9,7 +9,7 @@ from pydantic_ai import RunUsage
 from shotgun.agents.config import get_provider_model
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.tools.registry import ToolCategory, register_tool
-from shotgun.agents.usage_manager import get_session_usage_manager
+from shotgun.agents.tools.web_search.utils import track_usage
 from shotgun.llm_proxy import LITELLM_PROXY_OPENAI_BASE
 from shotgun.logging_config import get_logger
 from shotgun.prompts import PromptLoader
@@ -122,17 +122,16 @@ async def openai_web_search_tool(query: str) -> str:
             return error_msg
 
         # Track usage from the web search LLM call
-        try:
-            if response.usage:
-                usage = RunUsage(
-                    input_tokens=response.usage.input_tokens,
-                    output_tokens=response.usage.output_tokens,
-                )
-                await get_session_usage_manager().add_usage(
-                    usage, model_name=web_search_model, provider=model_config.provider
-                )
-        except Exception:
-            logger.debug("Failed to track OpenAI web search usage")
+        # OpenAI SDK usage is not a pydantic_ai RequestUsage, so convert first
+        openai_usage: RunUsage | None = None
+        if response.usage:
+            openai_usage = RunUsage(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+            )
+        await track_usage(
+            openai_usage, model_name=web_search_model, provider=model_config.provider
+        )
 
         result_text = response.output_text or "No content returned"
 
