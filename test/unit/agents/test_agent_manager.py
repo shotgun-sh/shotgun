@@ -111,7 +111,6 @@ def mock_agents():
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -125,7 +124,6 @@ async def test_agent_manager_init(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -142,7 +140,6 @@ async def test_agent_manager_init(
     )  # Reuse tasks_agent mock
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -171,7 +168,6 @@ def test_agent_manager_init_no_deps(
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -185,7 +181,6 @@ async def test_agent_manager_current_agent(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -198,7 +193,6 @@ async def test_agent_manager_current_agent(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -215,7 +209,6 @@ async def test_agent_manager_current_agent(
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -229,7 +222,6 @@ async def test_agent_manager_get_agent(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -242,7 +234,6 @@ async def test_agent_manager_get_agent(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps)
 
@@ -255,7 +246,6 @@ async def test_agent_manager_get_agent(
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -269,7 +259,6 @@ async def test_agent_manager_set_agent(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -282,7 +271,6 @@ async def test_agent_manager_set_agent(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -302,7 +290,6 @@ async def test_agent_manager_set_agent(
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -316,7 +303,6 @@ async def test_agent_manager_set_agent_invalid(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -329,7 +315,6 @@ async def test_agent_manager_set_agent_invalid(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps)
 
@@ -342,7 +327,6 @@ async def test_agent_manager_set_agent_invalid(
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
@@ -356,7 +340,6 @@ async def test_agent_manager_run(
     mock_create_research,
     mock_create_export,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_agent_deps,
     mock_agents,
@@ -380,7 +363,6 @@ async def test_agent_manager_run(
     mock_create_specify.return_value = (tasks_agent, tasks_deps)
     mock_create_export.return_value = (tasks_agent, tasks_deps)
     mock_create_router.return_value = (tasks_agent, tasks_deps)
-    mock_create_planner.return_value = (tasks_agent, tasks_deps)
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
@@ -441,7 +423,6 @@ async def test_agent_manager_run(
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
@@ -455,7 +436,6 @@ async def test_agent_manager_run_no_prompt(
     mock_create_research,
     mock_create_export,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_agent_deps,
     mock_agents,
@@ -479,7 +459,6 @@ async def test_agent_manager_run_no_prompt(
     mock_create_specify.return_value = (tasks_agent, tasks_deps)
     mock_create_export.return_value = (tasks_agent, tasks_deps)
     mock_create_router.return_value = (tasks_agent, tasks_deps)
-    mock_create_planner.return_value = (tasks_agent, tasks_deps)
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
@@ -513,7 +492,6 @@ async def test_agent_manager_run_no_prompt(
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -527,7 +505,6 @@ async def test_agent_manager_run_with_custom_deps(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_agent_deps,
     mock_agents,
@@ -541,7 +518,6 @@ async def test_agent_manager_run_with_custom_deps(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     # Mock the agent run method
     mock_result = MagicMock(spec=AgentRunResult)
@@ -589,7 +565,6 @@ async def test_agent_manager_run_with_custom_deps(
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
 @patch("shotgun.agents.agent_manager.create_plan_agent")
@@ -603,7 +578,6 @@ async def test_agent_manager_post_messages_updated(
     mock_create_plan,
     mock_create_research,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -616,7 +590,6 @@ async def test_agent_manager_post_messages_updated(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -698,7 +671,6 @@ def test_model_config_updated_no_old_model():
 
 
 @pytest.mark.asyncio
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
@@ -712,7 +684,6 @@ async def test_restore_conversation_state_filters_system_prompt(
     mock_create_research,
     mock_create_export,
     mock_create_router,
-    mock_create_planner,
     mock_agent_deps,
     mock_agents,
 ):
@@ -725,7 +696,6 @@ async def test_restore_conversation_state_filters_system_prompt(
     mock_create_specify.return_value = (tasks_agent, mock_agent_deps)
     mock_create_export.return_value = (tasks_agent, mock_agent_deps)
     mock_create_router.return_value = (tasks_agent, mock_agent_deps)
-    mock_create_planner.return_value = (tasks_agent, mock_agent_deps)
 
     manager = AgentManager(deps=mock_agent_deps, initial_type=AgentType.RESEARCH)
 
@@ -769,7 +739,6 @@ async def test_restore_conversation_state_filters_system_prompt(
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
@@ -783,7 +752,6 @@ async def test_qa_mode_hint_ordering_with_file_operations(
     mock_create_research,
     mock_create_export,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_agent_deps,
     mock_agents,
@@ -811,7 +779,6 @@ async def test_qa_mode_hint_ordering_with_file_operations(
     mock_create_specify.return_value = (tasks_agent, research_deps)
     mock_create_export.return_value = (tasks_agent, research_deps)
     mock_create_router.return_value = (tasks_agent, research_deps)
-    mock_create_planner.return_value = (tasks_agent, research_deps)
 
     # Mock the agent run method with clarifying questions
     mock_result = MagicMock(spec=AgentRunResult)
@@ -919,7 +886,6 @@ def test_partial_stream_state_token_tracking():
 
 @pytest.mark.asyncio
 @patch("shotgun.agents.agent_manager.add_system_status_message")
-@patch("shotgun.agents.agent_manager.create_planner_agent")
 @patch("shotgun.agents.agent_manager.create_router_agent")
 @patch("shotgun.agents.agent_manager.create_export_agent")
 @patch("shotgun.agents.agent_manager.create_research_agent")
@@ -933,7 +899,6 @@ async def test_user_prompt_deduplication_with_different_timestamps(
     mock_create_research,
     mock_create_export,
     mock_create_router,
-    mock_create_planner,
     mock_add_system_status,
     mock_agent_deps,
     mock_agents,
@@ -958,7 +923,6 @@ async def test_user_prompt_deduplication_with_different_timestamps(
     mock_create_specify.return_value = (tasks_agent, research_deps)
     mock_create_export.return_value = (tasks_agent, research_deps)
     mock_create_router.return_value = (tasks_agent, research_deps)
-    mock_create_planner.return_value = (tasks_agent, research_deps)
 
     # Create TWO different ModelRequest objects with the same content but different timestamps
     # This simulates what happens when:

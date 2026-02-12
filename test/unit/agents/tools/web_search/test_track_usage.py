@@ -51,7 +51,9 @@ async def test_track_usage_passes_run_usage_directly(
 
     run_usage = RunUsage(input_tokens=300, output_tokens=150)
 
-    await track_usage(run_usage, model_name="gpt-5-mini", provider=ProviderType.OPENAI)
+    await track_usage(
+        run_usage, model_name="gpt-5-mini", provider=ProviderType.OPENAI
+    )
 
     mock_manager.add_usage.assert_called_once()
     call_args = mock_manager.add_usage.call_args

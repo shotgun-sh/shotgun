@@ -26,9 +26,9 @@ from shotgun.utils import ensure_shotgun_directory_exists
 from .common import (
     EventStreamHandler,
     add_system_status_message,
-    create_history_processor,
     run_agent,
 )
+from .conversation.history import token_limit_compactor
 from .tools import directory_lister, file_read, read_file
 from .tools.file_read_tools import multimodal_file_read
 
@@ -88,6 +88,16 @@ async def create_file_read_agent(
         agent_mode=AgentType.FILE_READ,
     )
 
+    # History processor for context management
+    async def history_processor(messages: list[ModelMessage]) -> list[ModelMessage]:
+        class ProcessorContext:
+            def __init__(self, deps: AgentDeps):
+                self.deps = deps
+                self.usage = None
+
+        ctx = ProcessorContext(deps)
+        return await token_limit_compactor(ctx, messages)
+
     # Create agent with structured output
     model = model_config.model_instance
     agent: ShotgunAgent = Agent(
@@ -95,7 +105,7 @@ async def create_file_read_agent(
         output_type=AgentResponse,
         deps_type=AgentDeps,
         instrument=True,
-        history_processors=[create_history_processor(deps)],
+        history_processors=[history_processor],
         retries=3,
     )
 

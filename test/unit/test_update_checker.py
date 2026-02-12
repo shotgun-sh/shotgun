@@ -76,8 +76,8 @@ def test_detect_installation_method_uvx(mock_path, mock_run):
     """Test detection of uvx (ephemeral) execution."""
     # Mock executable path to look like uvx cache
     mock_executable = Mock()
-    mock_executable.__str__ = lambda x: (
-        "/home/user/.cache/uv/tools/shotgun-sh/bin/python"
+    mock_executable.__str__ = (
+        lambda x: "/home/user/.cache/uv/tools/shotgun-sh/bin/python"
     )
     mock_path.return_value = mock_executable
 

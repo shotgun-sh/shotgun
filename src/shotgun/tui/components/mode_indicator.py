@@ -84,8 +84,8 @@ class ModeIndicator(Widget):
                 "[$foreground-muted] (Answer the clarifying questions or ESC to cancel)[/]"
             )
 
-        # Router/Planner mode display (Planner shows same as Router - seamless UX)
-        if self.mode in (AgentType.ROUTER, AgentType.PLANNER):
+        # Router mode display
+        if self.mode == AgentType.ROUTER:
             return self._render_router_mode()
 
         # Legacy agent mode display

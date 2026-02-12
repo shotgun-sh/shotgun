@@ -95,7 +95,6 @@ from .export import create_export_agent
 from .messages import AgentSystemPrompt, InternalPromptPart
 from .models import AgentDeps, AgentRuntimeOptions
 from .plan import create_plan_agent
-from .planner import create_planner_agent
 from .research import create_research_agent
 from .router import create_router_agent
 from .router.models import RouterDeps, RouterMode
@@ -374,8 +373,6 @@ class AgentManager(Widget):
         self._export_deps: AgentDeps | None = None
         self._router_agent: RouterAgent | None = None
         self._router_deps: RouterDeps | None = None
-        self._planner_agent: RouterAgent | None = None
-        self._planner_deps: RouterDeps | None = None
         self._agents_initialized = False
 
         # Track current active agent
@@ -397,15 +394,6 @@ class AgentManager(Widget):
 
         # Sub-agent streaming responses to persist in UI history
         self._sub_agent_messages: list[ModelResponse] = []
-
-        # Router messages saved during escalation for persistence merging
-        self._escalation_router_messages: list[ModelMessage] = []
-
-        # The model config actually running the current agent (may differ from
-        # self.deps.llm_model which is the user-selected model for UI display).
-        # Set by _create_merged_deps for Router/Planner tiered mode.
-        # Lifetime: set on each agent run, cleared by reset_agents().
-        self._running_model_config: ModelConfig | None = None
 
     async def _ensure_agents_initialized(self) -> None:
         """Ensure all agents are initialized (lazy initialization)."""
@@ -431,32 +419,7 @@ class AgentManager(Widget):
         self._router_agent, self._router_deps = await create_router_agent(
             agent_runtime_options=self._agent_runtime_options
         )
-        self._planner_agent, self._planner_deps = await create_planner_agent(
-            agent_runtime_options=self._agent_runtime_options
-        )
         self._agents_initialized = True
-
-    def reset_agents(self) -> None:
-        """Reset all agent instances so they get recreated with a new model.
-
-        Called when the model configuration changes (e.g., via model picker
-        or when falling back due to API key removal).
-        """
-        self._agents_initialized = False
-        self._research_agent = None
-        self._plan_agent = None
-        self._tasks_agent = None
-        self._specify_agent = None
-        self._export_agent = None
-        self._router_agent = None
-        self._planner_agent = None
-        self._research_deps = None
-        self._plan_deps = None
-        self._tasks_deps = None
-        self._specify_deps = None
-        self._export_deps = None
-        self._router_deps = None
-        self._planner_deps = None
 
     @property
     def research_agent(self) -> ShotgunAgent:
@@ -565,24 +528,6 @@ class AgentManager(Widget):
                 "Agents not initialized. Call _ensure_agents_initialized() first."
             )
         return self._router_deps
-
-    @property
-    def planner_agent(self) -> RouterAgent:
-        """Get planner agent (must call _ensure_agents_initialized first)."""
-        if self._planner_agent is None:
-            raise RuntimeError(
-                "Agents not initialized. Call _ensure_agents_initialized() first."
-            )
-        return self._planner_agent
-
-    @property
-    def planner_deps(self) -> RouterDeps:
-        """Get planner deps (must call _ensure_agents_initialized first)."""
-        if self._planner_deps is None:
-            raise RuntimeError(
-                "Agents not initialized. Call _ensure_agents_initialized() first."
-            )
-        return self._planner_deps
 
     @property
     def current_agent(self) -> AnyAgent:
@@ -715,7 +660,6 @@ class AgentManager(Widget):
             AgentType.SPECIFY: self.specify_agent,
             AgentType.EXPORT: self.export_agent,
             AgentType.ROUTER: self.router_agent,
-            AgentType.PLANNER: self.planner_agent,
         }
         return agent_map[agent_type]
 
@@ -735,7 +679,6 @@ class AgentManager(Widget):
             AgentType.SPECIFY: self.specify_deps,
             AgentType.EXPORT: self.export_deps,
             AgentType.ROUTER: self.router_deps,
-            AgentType.PLANNER: self.planner_deps,
         }
         return deps_map[agent_type]
 
@@ -778,17 +721,11 @@ class AgentManager(Widget):
         if self.deps is None:
             raise ValueError("Shared deps is None - this should not happen")
 
-        # For Router and Planner, use shared deps directly so state mutations
-        # are visible to TUI (e.g., pending_approval, current_plan need to be
-        # seen by ChatScreen). Planner shares RouterDeps with the Router.
-        if agent_type in (AgentType.ROUTER, AgentType.PLANNER):
+        # For Router, use shared deps directly so state mutations are visible to TUI
+        # (e.g., pending_approval, current_plan need to be seen by ChatScreen)
+        if agent_type == AgentType.ROUTER:
             # Update system_prompt_fn on shared deps in place
             self.deps.system_prompt_fn = agent_deps.system_prompt_fn
-            # NOTE: Do NOT overwrite self.deps.llm_model here. The shared deps
-            # llm_model is the user-selected model shown in the TUI status bar.
-            # The agent-specific model (cheap Router vs expensive Planner) is
-            # tracked separately via _running_model_config for usage/telemetry.
-            self._running_model_config = agent_deps.llm_model
             return self.deps
 
         # For other agents, create a copy with agent-specific system_prompt_fn
@@ -899,15 +836,8 @@ class AgentManager(Widget):
 
         logger.info(f"Running agent {self._current_agent_type.value}")
         # Use merged deps (shared state + agent-specific system prompt) if not provided
-        # This also syncs llm_model from the agent-specific deps to the shared deps
-        # so telemetry, usage tracking, and TUI display reflect the actual model.
         if deps is None:
             deps = self._create_merged_deps(self._current_agent_type)
-            logger.info(
-                "Agent %s using model: %s",
-                self._current_agent_type.value,
-                deps.llm_model.name if deps.llm_model else "unknown",
-            )
 
         # Ensure deps is not None
         if deps is None:
@@ -930,8 +860,8 @@ class AgentManager(Widget):
 
         deps.agent_mode = self._current_agent_type
 
-        # For router/planner agents, set up the parent stream handler so sub-agents can stream
-        if self._current_agent_type in (AgentType.ROUTER, AgentType.PLANNER):
+        # For router agent, set up the parent stream handler so sub-agents can stream
+        if self._current_agent_type == AgentType.ROUTER:
             if isinstance(deps, RouterDeps):
                 deps.parent_stream_handler = self._handle_event_stream  # type: ignore[assignment]
 
@@ -1002,19 +932,14 @@ class AgentManager(Widget):
         model_name = ""
         supports_streaming = True  # Default to streaming enabled
 
-        # Use the actual running model for telemetry/usage (may be cheap Router
-        # model in tiered mode), but fall back to deps.llm_model for non-tiered.
-        effective_model = self._running_model_config or (
-            deps.llm_model if hasattr(deps, "llm_model") else None
-        )
-        if effective_model is not None:
-            model_name = effective_model.name
-            supports_streaming = effective_model.supports_streaming
+        if hasattr(deps, "llm_model") and deps.llm_model is not None:
+            model_name = deps.llm_model.name
+            supports_streaming = deps.llm_model.supports_streaming
 
             # Add hint message if streaming is disabled for BYOK GPT-5 models
             if (
                 not supports_streaming
-                and effective_model.key_provider == KeyProvider.BYOK
+                and deps.llm_model.key_provider == KeyProvider.BYOK
             ):
                 self.ui_message_history.append(
                     HintMessage(
@@ -1044,8 +969,8 @@ class AgentManager(Widget):
         # Add Tier 1 Anthropic flag for routing agent telemetry
         if (
             self._current_agent_type == AgentType.ROUTER
-            and effective_model is not None
-            and effective_model.provider == ProviderType.ANTHROPIC
+            and deps.llm_model is not None
+            and deps.llm_model.provider == ProviderType.ANTHROPIC
         ):
             anthropic_tier = await get_configured_anthropic_tier()
             if anthropic_tier is not None:
@@ -1177,68 +1102,6 @@ class AgentManager(Widget):
             raise
         finally:
             self._stream_state = None
-
-        # Check for escalation from Router to Planner via structured output
-        agent_response_for_escalation = result.output
-        if (
-            self._current_agent_type == AgentType.ROUTER
-            and isinstance(deps, RouterDeps)
-            and agent_response_for_escalation.escalation_requested
-        ):
-            escalation_reason = agent_response_for_escalation.escalation_reason or ""
-            escalation_synopsis = (
-                agent_response_for_escalation.escalation_synopsis or ""
-            )
-
-            logger.info(
-                "Escalation detected: Router → Planner (reason: %s)",
-                escalation_reason,
-            )
-
-            # Save Router's messages for persistence/UI continuity
-            router_messages = result.all_messages()
-            self._escalation_router_messages = router_messages
-            self.message_history = router_messages
-
-            # Switch to Planner agent
-            self._current_agent_type = AgentType.PLANNER
-            planner_deps = self._create_merged_deps(AgentType.PLANNER)
-
-            # Set up stream handler for planner
-            if isinstance(planner_deps, RouterDeps):
-                planner_deps.parent_stream_handler = self._handle_event_stream  # type: ignore[assignment]
-
-            planner_deps.agent_mode = AgentType.PLANNER
-
-            # Build escalation prompt from the Router's synopsis
-            # The Planner receives ONLY this synopsis, not the full conversation history
-            escalation_prompt = (
-                f"The Router has escalated this request to you.\n\n"
-                f"**Reason for escalation:** {escalation_reason}\n\n"
-                f"**Synopsis from Router:**\n{escalation_synopsis}"
-            )
-
-            # Re-run with Planner using EMPTY history (synopsis contains all context)
-            self._stream_state = _PartialStreamState()
-            try:
-                result = await self._run_agent_with_retry(
-                    agent=self._get_agent(AgentType.PLANNER),
-                    prompt=escalation_prompt,
-                    deps=planner_deps,
-                    usage_limits=usage_limits,
-                    message_history=[],
-                    event_stream_handler=self._handle_event_stream
-                    if supports_streaming
-                    else None,
-                )
-            finally:
-                self._stream_state = None
-
-            # Auto-de-escalate: next user message goes back to Router
-            self._current_agent_type = AgentType.ROUTER
-
-            # Update deps reference for the rest of the method
-            deps = planner_deps
 
         # Agent ALWAYS returns AgentResponse with structured output
         agent_response = result.output
@@ -1478,13 +1341,6 @@ class AgentManager(Widget):
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
-
-        # If escalation occurred, prepend the Router's messages so they're
-        # preserved in persistent history (the Planner ran with empty history)
-        if self._escalation_router_messages:
-            all_messages = self._escalation_router_messages + all_messages
-            self._escalation_router_messages = []
-
         messages_before_compaction = len(all_messages)
         compaction_occurred = False
 
@@ -1534,14 +1390,9 @@ class AgentManager(Widget):
         )
 
         usage = result.usage()
-        # Use the effective model (actual model that ran) for usage tracking,
-        # not deps.llm_model which is the user-selected model for UI display.
-        usage_model = self._running_model_config or (
-            deps.llm_model if hasattr(deps, "llm_model") else None
-        )
-        if usage_model is not None:
+        if hasattr(deps, "llm_model") and deps.llm_model is not None:
             await deps.usage_manager.add_usage(
-                usage, model_name=usage_model.name, provider=usage_model.provider
+                usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
             )
         else:
             logger.warning(
@@ -1916,7 +1767,7 @@ class AgentManager(Widget):
             in_qa_mode: If True, skip the "Shall I continue?" prompt since user
                        needs to answer Q&A questions first.
         """
-        if self._current_agent_type not in (AgentType.ROUTER, AgentType.PLANNER):
+        if self._current_agent_type != AgentType.ROUTER:
             return
 
         if not isinstance(deps, RouterDeps):

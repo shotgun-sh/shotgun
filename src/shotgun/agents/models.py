@@ -123,18 +123,6 @@ file content in the next prompt.
 Use this for PDFs, images, or text files (.md, .txt, .json, etc.) you need to analyze.
 """,
     )
-    escalation_requested: bool = Field(
-        default=False,
-        description="Whether the Router wants to escalate to the Planner. Only used by tiered Router.",
-    )
-    escalation_reason: str | None = Field(
-        default=None,
-        description="Why this request needs the Planner (e.g., 'needs multi-step plan', 'requires delegation').",
-    )
-    escalation_synopsis: str | None = Field(
-        default=None,
-        description="Detailed synopsis of the conversation for the Planner. The Planner will ONLY see this synopsis, not the conversation history.",
-    )
 
 
 class AgentType(StrEnum):
@@ -146,21 +134,7 @@ class AgentType(StrEnum):
     TASKS = "tasks"
     EXPORT = "export"
     ROUTER = "router"
-    PLANNER = "planner"
     FILE_READ = "file_read"
-
-
-class PromptTemplate(StrEnum):
-    """Valid prompt template names for agent system prompts."""
-
-    EXPORT = "export"
-    FILE_READ = "file_read"
-    SPECIFY = "specify"
-    PLANNER = "planner"
-    RESEARCH = "research"
-    PLAN = "plan"
-    TASKS = "tasks"
-    ROUTER = "router"
 
 
 class PipelineConfigEntry(BaseModel):

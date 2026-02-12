@@ -17,13 +17,7 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import (
-    AgentDeps,
-    AgentResponse,
-    AgentRuntimeOptions,
-    AgentType,
-    PromptTemplate,
-)
+from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 
 logger = get_logger(__name__)
 
@@ -45,7 +39,7 @@ async def create_specify_agent(
     """
     logger.debug("Initializing specify agent")
     # Use partial to create system prompt function for specify agent
-    system_prompt_fn = partial(build_agent_system_prompt, PromptTemplate.SPECIFY)
+    system_prompt_fn = partial(build_agent_system_prompt, "specify")
 
     agent, deps = await create_base_agent(
         system_prompt_fn,
