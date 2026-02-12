@@ -17,7 +17,13 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
+from .models import (
+    AgentDeps,
+    AgentResponse,
+    AgentRuntimeOptions,
+    AgentType,
+    PromptTemplate,
+)
 
 logger = get_logger(__name__)
 
@@ -39,7 +45,7 @@ async def create_export_agent(
     """
     logger.debug("Initializing export agent")
     # Use partial to create system prompt function for export agent
-    system_prompt_fn = partial(build_agent_system_prompt, "export")
+    system_prompt_fn = partial(build_agent_system_prompt, PromptTemplate.EXPORT)
 
     agent, deps = await create_base_agent(
         system_prompt_fn,

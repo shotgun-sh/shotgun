@@ -404,6 +404,7 @@ class AgentManager(Widget):
         # The model config actually running the current agent (may differ from
         # self.deps.llm_model which is the user-selected model for UI display).
         # Set by _create_merged_deps for Router/Planner tiered mode.
+        # Lifetime: set on each agent run, cleared by reset_agents().
         self._running_model_config: ModelConfig | None = None
 
     async def _ensure_agents_initialized(self) -> None:
@@ -434,6 +435,28 @@ class AgentManager(Widget):
             agent_runtime_options=self._agent_runtime_options
         )
         self._agents_initialized = True
+
+    def reset_agents(self) -> None:
+        """Reset all agent instances so they get recreated with a new model.
+
+        Called when the model configuration changes (e.g., via model picker
+        or when falling back due to API key removal).
+        """
+        self._agents_initialized = False
+        self._research_agent = None
+        self._plan_agent = None
+        self._tasks_agent = None
+        self._specify_agent = None
+        self._export_agent = None
+        self._router_agent = None
+        self._planner_agent = None
+        self._research_deps = None
+        self._plan_deps = None
+        self._tasks_deps = None
+        self._specify_deps = None
+        self._export_deps = None
+        self._router_deps = None
+        self._planner_deps = None
 
     @property
     def research_agent(self) -> ShotgunAgent:

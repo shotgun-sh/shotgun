@@ -150,6 +150,19 @@ class AgentType(StrEnum):
     FILE_READ = "file_read"
 
 
+class PromptTemplate(StrEnum):
+    """Valid prompt template names for agent system prompts."""
+
+    EXPORT = "export"
+    FILE_READ = "file_read"
+    SPECIFY = "specify"
+    PLANNER = "planner"
+    RESEARCH = "research"
+    PLAN = "plan"
+    TASKS = "tasks"
+    ROUTER = "router"
+
+
 class PipelineConfigEntry(BaseModel):
     """Configuration for each agent in the pipeline.
 

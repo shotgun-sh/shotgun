@@ -17,7 +17,13 @@ from .common import (
     create_usage_limits,
     run_agent,
 )
-from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
+from .models import (
+    AgentDeps,
+    AgentResponse,
+    AgentRuntimeOptions,
+    AgentType,
+    PromptTemplate,
+)
 
 logger = get_logger(__name__)
 
@@ -39,7 +45,7 @@ async def create_tasks_agent(
     """
     logger.debug("Initializing tasks agent")
     # Use partial to create system prompt function for tasks agent
-    system_prompt_fn = partial(build_agent_system_prompt, "tasks")
+    system_prompt_fn = partial(build_agent_system_prompt, PromptTemplate.TASKS)
 
     agent, deps = await create_base_agent(
         system_prompt_fn,
