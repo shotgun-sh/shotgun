@@ -13,6 +13,8 @@ If you find any issues:
 2. Commit the fixes with message "fix: address review feedback for Stage {{ stage_number }}"
 {% if push_to_remote %}
 3. Push the changes
+{% else %}
+3. **Keep all changes local. Under no circumstances should you push code to a remote repo.** Do not run `git push`, do not create pull requests, do not use `gh pr create`.
 {% endif %}
 
 Be thorough but practical - focus on real issues, not style nitpicks.

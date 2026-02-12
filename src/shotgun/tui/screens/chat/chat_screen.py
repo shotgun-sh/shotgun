@@ -3107,7 +3107,6 @@ class ChatScreen(Screen[None]):
             self._autopilot_orchestrator.set_mode(AutopilotMode(mode.value))
             self._autopilot_orchestrator.state.stages = stages
             self._autopilot_orchestrator.state.use_teams = use_teams
-            self._autopilot_orchestrator.state.push_to_remote = push_to_remote
             # Initialize state based on task completion - skip completed stages
             self._autopilot_orchestrator.state.initialize_from_tasks()
 

@@ -232,10 +232,6 @@ class AutopilotState(BaseModel):
         default=True,
         description="Use Claude Code Teams for parallel stage execution",
     )
-    push_to_remote: bool = Field(
-        default=False,
-        description="Whether to push changes to remote repo (cowboy mode only)",
-    )
 
     @property
     def current_stage(self) -> Stage | None:

@@ -6,9 +6,10 @@ from shotgun.agents.autopilot.autopilot_orchestrator import (
 )
 from shotgun.agents.autopilot.models import (
     AutopilotMode,
-    AutopilotState,
+    Stage,
+    Task,
 )
-from shotgun.agents.autopilot.prompts import render_review_code
+from shotgun.agents.autopilot.prompts import render_execute_stage, render_review_code
 from shotgun.tui.screens.autopilot_startup import AutopilotStartResult
 
 
@@ -22,18 +23,6 @@ def test_autopilot_start_result_push_to_remote_true():
     """AutopilotStartResult.push_to_remote can be set to True."""
     result = AutopilotStartResult(started=True, push_to_remote=True)
     assert result.push_to_remote is True
-
-
-def test_autopilot_state_push_to_remote_defaults_false():
-    """AutopilotState.push_to_remote defaults to False."""
-    state = AutopilotState()
-    assert state.push_to_remote is False
-
-
-def test_autopilot_state_push_to_remote_true():
-    """AutopilotState.push_to_remote can be set to True."""
-    state = AutopilotState(push_to_remote=True)
-    assert state.push_to_remote is True
 
 
 def test_autopilot_config_push_to_remote_defaults_false():
@@ -68,6 +57,9 @@ def test_orchestrator_cowboy_mode_push_enabled():
     assert orchestrator.state.mode == AutopilotMode.COWBOY
 
 
+# --- Review code prompt tests ---
+
+
 def test_render_review_code_with_push():
     """Review code prompt includes push instruction when push_to_remote=True."""
     prompt = render_review_code(
@@ -77,10 +69,11 @@ def test_render_review_code_with_push():
         push_to_remote=True,
     )
     assert "Push the changes" in prompt
+    assert "Under no circumstances" not in prompt
 
 
 def test_render_review_code_without_push():
-    """Review code prompt omits push instruction when push_to_remote=False."""
+    """Review code prompt includes keep-local instruction when push_to_remote=False."""
     prompt = render_review_code(
         tasks_file_path=".shotgun/tasks.md",
         stage_number="1",
@@ -88,6 +81,9 @@ def test_render_review_code_without_push():
         push_to_remote=False,
     )
     assert "Push the changes" not in prompt
+    assert "Under no circumstances should you push code to a remote repo" in prompt
+    assert "git push" in prompt
+    assert "gh pr create" in prompt
 
 
 def test_render_review_code_defaults_to_push():
@@ -98,3 +94,103 @@ def test_render_review_code_defaults_to_push():
         stage_name="Auth",
     )
     assert "Push the changes" in prompt
+
+
+# --- Execute stage prompt tests ---
+
+
+def test_render_execute_stage_with_push():
+    """Execute stage prompt does not include keep-local warning when push_to_remote=True."""
+    prompt = render_execute_stage(
+        tasks_file_path=".shotgun/tasks.md",
+        stage_number="1",
+        stage_name="Auth",
+        pending_tasks=["Add login form"],
+        branch_name="autopilot/stage-1",
+        base_branch="main",
+        push_to_remote=True,
+    )
+    assert "Under no circumstances" not in prompt
+
+
+def test_render_execute_stage_without_push():
+    """Execute stage prompt includes keep-local warning when push_to_remote=False."""
+    prompt = render_execute_stage(
+        tasks_file_path=".shotgun/tasks.md",
+        stage_number="1",
+        stage_name="Auth",
+        pending_tasks=["Add login form"],
+        branch_name="autopilot/stage-1",
+        base_branch="main",
+        push_to_remote=False,
+    )
+    assert "Under no circumstances should you push code to a remote repo" in prompt
+    assert "git push" in prompt
+    assert "gh pr create" in prompt
+
+
+def test_render_execute_stage_defaults_to_push():
+    """Execute stage prompt defaults to allowing push (no local-only warning)."""
+    prompt = render_execute_stage(
+        tasks_file_path=".shotgun/tasks.md",
+        stage_number="1",
+        stage_name="Auth",
+        pending_tasks=["Add login form"],
+        branch_name="autopilot/stage-1",
+        base_branch="main",
+    )
+    assert "Under no circumstances" not in prompt
+
+
+# --- Orchestrator prompt integration tests ---
+
+
+def test_build_execution_prompt_cowboy_local_includes_keep_local():
+    """Cowboy mode with local-only includes keep-local instruction in execution prompt."""
+    config = AutopilotConfig(push_to_remote=False)
+    orchestrator = AutopilotOrchestrator(config)
+    orchestrator.set_mode(AutopilotMode.COWBOY)
+
+    stage = Stage(
+        number="1",
+        name="Auth",
+        tasks=[Task(text="Add login", completed=False, line_number=1)],
+    )
+    orchestrator.state.stages = [stage]
+
+    prompt = orchestrator._build_execution_prompt(stage)
+    assert "Under no circumstances should you push code to a remote repo" in prompt
+
+
+def test_build_execution_prompt_cowboy_push_no_keep_local():
+    """Cowboy mode with push enabled does not include keep-local instruction."""
+    config = AutopilotConfig(push_to_remote=True)
+    orchestrator = AutopilotOrchestrator(config)
+    orchestrator.set_mode(AutopilotMode.COWBOY)
+
+    stage = Stage(
+        number="1",
+        name="Auth",
+        tasks=[Task(text="Add login", completed=False, line_number=1)],
+    )
+    orchestrator.state.stages = [stage]
+
+    prompt = orchestrator._build_execution_prompt(stage)
+    assert "Under no circumstances" not in prompt
+
+
+def test_build_execution_prompt_non_cowboy_no_keep_local():
+    """Non-cowboy modes do not include keep-local instruction."""
+    config = AutopilotConfig(push_to_remote=False)
+    orchestrator = AutopilotOrchestrator(config)
+    orchestrator.set_mode(AutopilotMode.PAUSE_BETWEEN)
+
+    stage = Stage(
+        number="1",
+        name="Auth",
+        tasks=[Task(text="Add login", completed=False, line_number=1)],
+    )
+    orchestrator.state.stages = [stage]
+
+    prompt = orchestrator._build_execution_prompt(stage)
+    assert "Under no circumstances" not in prompt
