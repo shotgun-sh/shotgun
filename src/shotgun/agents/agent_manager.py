@@ -401,6 +401,11 @@ class AgentManager(Widget):
         # Router messages saved during escalation for persistence merging
         self._escalation_router_messages: list[ModelMessage] = []
 
+        # The model config actually running the current agent (may differ from
+        # self.deps.llm_model which is the user-selected model for UI display).
+        # Set by _create_merged_deps for Router/Planner tiered mode.
+        self._running_model_config: ModelConfig | None = None
+
     async def _ensure_agents_initialized(self) -> None:
         """Ensure all agents are initialized (lazy initialization)."""
         if self._agents_initialized:
@@ -756,11 +761,11 @@ class AgentManager(Widget):
         if agent_type in (AgentType.ROUTER, AgentType.PLANNER):
             # Update system_prompt_fn on shared deps in place
             self.deps.system_prompt_fn = agent_deps.system_prompt_fn
-            # Sync llm_model from agent-specific deps so logging, telemetry,
-            # usage tracking, and context indicators reflect the model that
-            # will actually handle the request (e.g., Haiku for Router in
-            # tiered mode, Opus for Planner).
-            self.deps.llm_model = agent_deps.llm_model
+            # NOTE: Do NOT overwrite self.deps.llm_model here. The shared deps
+            # llm_model is the user-selected model shown in the TUI status bar.
+            # The agent-specific model (cheap Router vs expensive Planner) is
+            # tracked separately via _running_model_config for usage/telemetry.
+            self._running_model_config = agent_deps.llm_model
             return self.deps
 
         # For other agents, create a copy with agent-specific system_prompt_fn
@@ -969,14 +974,19 @@ class AgentManager(Widget):
         model_name = ""
         supports_streaming = True  # Default to streaming enabled
 
-        if hasattr(deps, "llm_model") and deps.llm_model is not None:
-            model_name = deps.llm_model.name
-            supports_streaming = deps.llm_model.supports_streaming
+        # Use the actual running model for telemetry/usage (may be cheap Router
+        # model in tiered mode), but fall back to deps.llm_model for non-tiered.
+        effective_model = self._running_model_config or (
+            deps.llm_model if hasattr(deps, "llm_model") else None
+        )
+        if effective_model is not None:
+            model_name = effective_model.name
+            supports_streaming = effective_model.supports_streaming
 
             # Add hint message if streaming is disabled for BYOK GPT-5 models
             if (
                 not supports_streaming
-                and deps.llm_model.key_provider == KeyProvider.BYOK
+                and effective_model.key_provider == KeyProvider.BYOK
             ):
                 self.ui_message_history.append(
                     HintMessage(
@@ -1006,8 +1016,8 @@ class AgentManager(Widget):
         # Add Tier 1 Anthropic flag for routing agent telemetry
         if (
             self._current_agent_type == AgentType.ROUTER
-            and deps.llm_model is not None
-            and deps.llm_model.provider == ProviderType.ANTHROPIC
+            and effective_model is not None
+            and effective_model.provider == ProviderType.ANTHROPIC
         ):
             anthropic_tier = await get_configured_anthropic_tier()
             if anthropic_tier is not None:
@@ -1496,9 +1506,14 @@ class AgentManager(Widget):
         )
 
         usage = result.usage()
-        if hasattr(deps, "llm_model") and deps.llm_model is not None:
+        # Use the effective model (actual model that ran) for usage tracking,
+        # not deps.llm_model which is the user-selected model for UI display.
+        usage_model = self._running_model_config or (
+            deps.llm_model if hasattr(deps, "llm_model") else None
+        )
+        if usage_model is not None:
             await deps.usage_manager.add_usage(
-                usage, model_name=deps.llm_model.name, provider=deps.llm_model.provider
+                usage, model_name=usage_model.name, provider=usage_model.provider
             )
         else:
             logger.warning(
