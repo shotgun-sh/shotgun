@@ -27,7 +27,7 @@ from shotgun.agents.config.constants import (
     WEB_SEARCH_STOP_THRESHOLD,
     WEB_SEARCH_WARNING_THRESHOLD,
 )
-from shotgun.agents.config.models import ANTHROPIC_CACHE_MODEL_SETTINGS
+from shotgun.agents.config.models import ANTHROPIC_SUB_AGENT_CACHE_SETTINGS
 from shotgun.agents.models import (
     AgentResponse,
     AgentSystemPromptContext,
@@ -265,8 +265,9 @@ async def create_base_agent(
         """History processor with access to deps via closure.
 
         This processor runs before each turn and:
-        1. Updates web search count in the system status message
-        2. Applies token limit compaction
+        1. Counts web searches to update the system status message
+        2. Appends a fresh SystemStatusPrompt (old ones stay in place for caching)
+        3. Applies token limit compaction
         """
         # Count current web searches to update the status message
         web_search_count = count_web_searches(messages)
@@ -276,29 +277,9 @@ async def create_base_agent(
                 web_search_count,
             )
 
-        # Remove existing SystemStatusPrompt messages and re-add with updated count
-        # This ensures the agent sees accurate web search warnings on each turn
-        filtered_messages: list[ModelMessage] = []
-        for msg in messages:
-            if isinstance(msg, ModelRequest):
-                # Filter out SystemStatusPrompt parts
-                new_parts = [
-                    part
-                    for part in msg.parts
-                    if not isinstance(part, SystemStatusPrompt)
-                ]
-                if new_parts:
-                    filtered_messages.append(
-                        ModelRequest(parts=new_parts, instructions=msg.instructions)
-                    )
-            else:
-                filtered_messages.append(msg)
-
-        # Re-add system status with updated web search count
-        # Note: add_system_status_message will count from filtered_messages,
-        # but we already counted from original messages, so pass the count
-        filtered_messages = await add_system_status_message(
-            deps, filtered_messages, web_search_count=web_search_count
+        # Append fresh system status at the end (preserves cached message prefix)
+        messages = await add_system_status_message(
+            deps, messages, web_search_count=web_search_count
         )
 
         # Create a minimal context for compaction
@@ -308,7 +289,7 @@ async def create_base_agent(
                 self.usage = None  # Will be estimated from messages
 
         ctx = ProcessorContext(deps)
-        return await token_limit_compactor(ctx, filtered_messages)
+        return await token_limit_compactor(ctx, messages)
 
     agent = Agent(
         model,
@@ -318,7 +299,7 @@ async def create_base_agent(
         history_processors=[history_processor],
         retries=3,  # Default retry count for tool calls and output validation
         toolsets=mcp_servers or None,
-        model_settings=ANTHROPIC_CACHE_MODEL_SETTINGS,
+        model_settings=ANTHROPIC_SUB_AGENT_CACHE_SETTINGS,
     )
 
     # System prompt function is stored in deps and will be called manually in run_agent

@@ -15,7 +15,7 @@ from pydantic_ai.messages import (
 
 from shotgun.agents.conversation.filters import filter_orphaned_tool_responses
 from shotgun.agents.llm import shotgun_model_request
-from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
+from shotgun.agents.messages import AgentSystemPrompt
 from shotgun.agents.models import AgentDeps
 from shotgun.exceptions import ContextSizeLimitExceeded
 from shotgun.logging_config import get_logger
@@ -28,7 +28,6 @@ from .history_building import ensure_ends_with_model_request
 from .message_utils import (
     get_agent_system_prompt,
     get_first_user_request,
-    get_latest_system_status,
 )
 from .token_estimation import (
     calculate_max_summarization_tokens as _calculate_max_summarization_tokens,
@@ -376,7 +375,6 @@ async def token_limit_compactor(
 
         # Extract essential context from messages before the last summary (if any)
         agent_prompt = ""
-        system_status = ""
         first_user_prompt = ""
         if last_summary_index > 0:
             # Get agent system prompt and first user from original conversation
@@ -384,9 +382,6 @@ async def token_limit_compactor(
             first_user_prompt = (
                 get_first_user_request(messages[:last_summary_index]) or ""
             )
-
-        # Get the latest system status from all messages
-        system_status = get_latest_system_status(messages) or ""
 
         # Create the updated summary message
         updated_summary_message = ModelResponse(parts=[new_summary_part])
@@ -400,8 +395,6 @@ async def token_limit_compactor(
         parts: list[ModelRequestPart] = []
         if agent_prompt:
             parts.append(AgentSystemPrompt(content=agent_prompt))
-        if system_status:
-            parts.append(SystemStatusPrompt(content=system_status))
         if first_user_prompt:
             parts.append(UserPromptPart(content=first_user_prompt))
 
@@ -568,7 +561,6 @@ async def _full_compaction(
 
     # Build compacted history structure
     agent_prompt = get_agent_system_prompt(messages) or ""
-    system_status = get_latest_system_status(messages) or ""
     user_prompt = get_first_user_request(messages) or ""
 
     # Build parts for the initial request
@@ -577,8 +569,6 @@ async def _full_compaction(
     parts: list[ModelRequestPart] = []
     if agent_prompt:
         parts.append(AgentSystemPrompt(content=agent_prompt))
-    if system_status:
-        parts.append(SystemStatusPrompt(content=system_status))
     if user_prompt:
         parts.append(UserPromptPart(content=user_prompt))
 
@@ -816,7 +806,6 @@ def _build_chunked_compaction_result(
 
     # Extract system context from original messages
     agent_prompt = get_agent_system_prompt(original_messages) or ""
-    system_status = get_latest_system_status(original_messages) or ""
     first_user = get_first_user_request(original_messages) or ""
 
     # Create marked summary
@@ -830,8 +819,6 @@ def _build_chunked_compaction_result(
     parts: list[ModelRequestPart] = []
     if agent_prompt:
         parts.append(AgentSystemPrompt(content=agent_prompt))
-    if system_status:
-        parts.append(SystemStatusPrompt(content=system_status))
     if first_user:
         parts.append(UserPromptPart(content=first_user))
 

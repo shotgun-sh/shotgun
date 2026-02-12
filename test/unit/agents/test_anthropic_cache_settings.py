@@ -48,14 +48,14 @@ def mock_codebase_service():
 @patch("shotgun.agents.common.get_codebase_service")
 @patch("shotgun.agents.common.get_provider_model", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_sub_agent_caches_only_tool_definitions(
+async def test_sub_agent_caches_messages_at_5m(
     mock_get_model,
     mock_get_codebase,
     mock_model_config,
     mock_runtime_options,
     mock_codebase_service,
 ):
-    """Sub-agents should only cache tool definitions at 1h TTL."""
+    """Sub-agents should cache messages at 5m TTL for short task-scoped conversations."""
     mock_get_model.return_value = mock_model_config
     mock_get_codebase.return_value = mock_codebase_service
 
@@ -70,20 +70,20 @@ async def test_sub_agent_caches_only_tool_definitions(
     assert settings is not None
     assert settings.get("anthropic_cache_tool_definitions") == "1h"
     assert settings.get("anthropic_cache_instructions") == "1h"
-    assert "anthropic_cache_messages" not in settings
+    assert settings.get("anthropic_cache_messages") == "5m"
 
 
 @patch("shotgun.agents.router.router.get_codebase_service")
 @patch("shotgun.agents.router.router.get_provider_model", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_router_agent_caches_tools_and_instructions(
+async def test_router_agent_caches_messages_at_1h(
     mock_get_model,
     mock_get_codebase,
     mock_model_config,
     mock_runtime_options,
     mock_codebase_service,
 ):
-    """Router agent should cache tool definitions and instructions at 1h TTL."""
+    """Router agent should cache messages at 1h TTL for long-lived conversations."""
     mock_get_model.return_value = mock_model_config
     mock_get_codebase.return_value = mock_codebase_service
 
@@ -93,7 +93,7 @@ async def test_router_agent_caches_tools_and_instructions(
     assert settings is not None
     assert settings.get("anthropic_cache_tool_definitions") == "1h"
     assert settings.get("anthropic_cache_instructions") == "1h"
-    assert "anthropic_cache_messages" not in settings
+    assert settings.get("anthropic_cache_messages") == "1h"
 
 
 @patch("shotgun.agents.router.router.get_codebase_service")
@@ -121,14 +121,14 @@ async def test_router_cache_settings_do_not_include_parallel_tool_calls(
 @patch("shotgun.agents.common.get_codebase_service")
 @patch("shotgun.agents.common.get_provider_model", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_router_and_sub_agents_share_same_cache_settings(
+async def test_router_and_sub_agents_have_different_message_cache_ttls(
     mock_get_model,
     mock_get_codebase,
     mock_model_config,
     mock_runtime_options,
     mock_codebase_service,
 ):
-    """Router and sub-agents should have identical cache settings."""
+    """Router uses 1h message caching, sub-agents use 5m."""
     mock_get_model.return_value = mock_model_config
     mock_get_codebase.return_value = mock_codebase_service
 
@@ -139,4 +139,4 @@ async def test_router_and_sub_agents_share_same_cache_settings(
     assert sub_settings is not None
     assert sub_settings.get("anthropic_cache_tool_definitions") == "1h"
     assert sub_settings.get("anthropic_cache_instructions") == "1h"
-    assert "anthropic_cache_messages" not in sub_settings
+    assert sub_settings.get("anthropic_cache_messages") == "5m"

@@ -25,9 +25,16 @@ class KeyProvider(StrEnum):
     SHOTGUN = "shotgun"  # Shotgun Account (unified LiteLLM proxy)
 
 
-ANTHROPIC_CACHE_MODEL_SETTINGS = AnthropicModelSettings(
+ANTHROPIC_ROUTER_CACHE_SETTINGS = AnthropicModelSettings(
     anthropic_cache_tool_definitions="1h",
     anthropic_cache_instructions="1h",
+    anthropic_cache_messages="1h",
+)
+
+ANTHROPIC_SUB_AGENT_CACHE_SETTINGS = AnthropicModelSettings(
+    anthropic_cache_tool_definitions="1h",
+    anthropic_cache_instructions="1h",
+    anthropic_cache_messages="5m",
 )
 
 
