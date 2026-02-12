@@ -71,6 +71,10 @@ from shotgun.agents.context_analyzer import (
     ContextCompositionTelemetry,
     ContextFormatter,
 )
+from shotgun.agents.conversation.filters import (
+    filter_incomplete_messages,
+    filter_orphaned_tool_responses,
+)
 from shotgun.agents.models import (
     AgentResponse,
     AgentType,
@@ -81,6 +85,7 @@ from shotgun.agents.models import (
     ShotgunAgent,
 )
 from shotgun.attachments import FileAttachment
+from shotgun.exceptions import IncompleteToolCallError
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.utils.source_detection import detect_source
@@ -888,6 +893,11 @@ class AgentManager(Widget):
 
         message_history = filtered_history
 
+        # Sanitize message history: remove incomplete tool calls and orphaned returns.
+        # This prevents ValueError crashes from stale/loaded history with truncated JSON.
+        message_history = filter_incomplete_messages(message_history)
+        message_history = filter_orphaned_tool_responses(message_history)
+
         # Add a system status message so the agent knows whats going on
         message_history = await add_system_status_message(deps, message_history)
 
@@ -1027,12 +1037,23 @@ class AgentManager(Widget):
             if "EOF while parsing" in error_str or (
                 "JSON" in error_str and "parsing" in error_str
             ):
+                # Try to extract the tool name from the stream state
+                failed_tool_name: str | None = None
+                if self._stream_state and self._stream_state.current_response:
+                    for response_part in reversed(
+                        self._stream_state.current_response.parts
+                    ):
+                        if isinstance(response_part, ToolCallPart):
+                            failed_tool_name = response_part.tool_name
+                            break
+
                 logger.error(
                     "Tool call with truncated/incomplete JSON arguments detected",
                     extra={
                         "agent_mode": self._current_agent_type.value,
                         "model_name": model_name,
                         "error": error_str,
+                        "tool_name": failed_tool_name,
                     },
                 )
                 logfire.error(
@@ -1040,16 +1061,25 @@ class AgentManager(Widget):
                     agent_mode=self._current_agent_type.value,
                     model_name=model_name,
                     error=error_str,
+                    tool_name=failed_tool_name,
                 )
-                # Add helpful hint message for the user
+                # Add hint message so the failure shows in conversation history
+                tool_info = (
+                    f" (`{failed_tool_name}`)" if failed_tool_name else ""
+                )
                 self.ui_message_history.append(
                     HintMessage(
-                        message="⚠️ The agent attempted an operation with arguments that were too large (truncated JSON). "
-                        "Try breaking your request into smaller steps or more focused contracts."
+                        message=f"⚠️ A tool call{tool_info} failed — the model's output "
+                        "was cut off before completing the tool arguments. "
+                        "Try again — this is usually a transient issue."
                     )
                 )
                 self._post_messages_updated()
-            # Re-raise to maintain error visibility
+                # Raise user-friendly exception instead of raw ValueError
+                raise IncompleteToolCallError(
+                    tool_name=failed_tool_name
+                ) from e
+            # Re-raise non-JSON ValueErrors as-is
             raise
         except Exception as e:
             # Log the error with full stack trace to shotgun.log and Logfire

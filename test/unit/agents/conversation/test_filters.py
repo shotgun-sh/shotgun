@@ -7,6 +7,8 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     TextPart,
+    ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 
@@ -15,6 +17,9 @@ from shotgun.agents.conversation.filters import (
     _extract_file_path,
     _filter_content_parts,
     filter_binary_content,
+    filter_incomplete_messages,
+    filter_orphaned_tool_responses,
+    is_tool_call_complete,
 )
 
 
@@ -243,3 +248,202 @@ def test_filter_binary_content_multiple_requests():
     assert isinstance(req2, ModelRequest)
     content2 = req2.parts[0].content
     assert content2[1]["file_path"] == "/second.png"
+
+
+# --- Tests for is_tool_call_complete ---
+
+
+def test_is_tool_call_complete_with_none_args():
+    """Tool call with None args is considered complete."""
+    tc = ToolCallPart(tool_name="test", args=None, tool_call_id="tc1")
+    assert is_tool_call_complete(tc) is True
+
+
+def test_is_tool_call_complete_with_dict_args():
+    """Tool call with dict args is considered complete."""
+    tc = ToolCallPart(
+        tool_name="test", args={"key": "value"}, tool_call_id="tc1"
+    )
+    assert is_tool_call_complete(tc) is True
+
+
+def test_is_tool_call_complete_with_valid_json_string():
+    """Tool call with valid JSON string args is considered complete."""
+    tc = ToolCallPart(
+        tool_name="test", args='{"key": "value"}', tool_call_id="tc1"
+    )
+    assert is_tool_call_complete(tc) is True
+
+
+def test_is_tool_call_complete_with_truncated_json():
+    """Tool call with truncated JSON string is considered incomplete."""
+    tc = ToolCallPart(
+        tool_name="test", args='{"key": "val', tool_call_id="tc1"
+    )
+    assert is_tool_call_complete(tc) is False
+
+
+def test_is_tool_call_complete_with_empty_string():
+    """Tool call with empty string args is considered incomplete."""
+    tc = ToolCallPart(tool_name="test", args="", tool_call_id="tc1")
+    assert is_tool_call_complete(tc) is False
+
+
+# --- Tests for filter_incomplete_messages ---
+
+
+def test_filter_incomplete_messages_removes_incomplete():
+    """Messages with incomplete tool calls should be filtered out."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Hello")]),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="web_search",
+                    args='{"query": "test',  # truncated
+                    tool_call_id="tc1",
+                ),
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="web_search",
+                    content="result",
+                    tool_call_id="tc1",
+                )
+            ]
+        ),
+    ]
+
+    result = filter_incomplete_messages(messages)
+
+    # The ModelResponse with incomplete tool call should be removed
+    assert len(result) == 2
+    assert isinstance(result[0], ModelRequest)
+    assert isinstance(result[1], ModelRequest)
+
+
+def test_filter_incomplete_messages_keeps_complete():
+    """Messages with complete tool calls should be kept."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Hello")]),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="web_search",
+                    args='{"query": "test"}',
+                    tool_call_id="tc1",
+                ),
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="web_search",
+                    content="result",
+                    tool_call_id="tc1",
+                )
+            ]
+        ),
+    ]
+
+    result = filter_incomplete_messages(messages)
+
+    assert len(result) == 3
+
+
+def test_filter_incomplete_messages_empty_list():
+    """Empty message list should return empty."""
+    assert filter_incomplete_messages([]) == []
+
+
+# --- Tests for filter_orphaned_tool_responses ---
+
+
+def test_filter_orphaned_tool_responses_removes_orphans():
+    """Tool returns without matching tool calls should be removed."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Hello")]),
+        # No ModelResponse with tool call for tc1
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="web_search",
+                    content="result",
+                    tool_call_id="orphan_tc1",
+                )
+            ]
+        ),
+    ]
+
+    result = filter_orphaned_tool_responses(messages)
+
+    # The orphaned ToolReturnPart's ModelRequest should be removed (no parts left)
+    assert len(result) == 1
+    assert isinstance(result[0], ModelRequest)
+
+
+def test_filter_orphaned_tool_responses_keeps_matched():
+    """Tool returns with matching tool calls should be kept."""
+    messages = [
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="web_search",
+                    args='{"query": "test"}',
+                    tool_call_id="tc1",
+                ),
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="web_search",
+                    content="result",
+                    tool_call_id="tc1",
+                )
+            ]
+        ),
+    ]
+
+    result = filter_orphaned_tool_responses(messages)
+
+    assert len(result) == 2
+
+
+def test_filter_incomplete_then_orphaned_cleans_history():
+    """Applying both filters should produce a clean history.
+
+    When an incomplete tool call is removed, its corresponding tool return
+    becomes orphaned and should also be removed.
+    """
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Hello")]),
+        ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="web_search",
+                    args='{"query": "test',  # truncated JSON
+                    tool_call_id="tc1",
+                ),
+            ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(
+                    tool_name="web_search",
+                    content="result",
+                    tool_call_id="tc1",
+                )
+            ]
+        ),
+    ]
+
+    # Apply both filters in sequence (same order as agent_manager.py)
+    result = filter_incomplete_messages(messages)
+    result = filter_orphaned_tool_responses(result)
+
+    # Only the original user prompt should remain
+    assert len(result) == 1
+    assert isinstance(result[0], ModelRequest)

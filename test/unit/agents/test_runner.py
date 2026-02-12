@@ -11,6 +11,7 @@ from shotgun.exceptions import (
     AgentCancelledException,
     BudgetExceededException,
     ContextSizeLimitExceeded,
+    IncompleteToolCallError,
     UnknownAgentException,
 )
 
@@ -114,6 +115,19 @@ async def test_runner_generic_exception():
         await runner.run("test prompt")
 
     assert exc_info.value.original_exception == exc
+
+
+@pytest.mark.asyncio
+async def test_runner_incomplete_tool_call_error():
+    """Test that IncompleteToolCallError is re-raised as-is."""
+    exc = IncompleteToolCallError(tool_name="web_search")
+    mock_manager = create_mock_agent_manager(exc)
+    runner = AgentRunner(mock_manager)
+
+    with pytest.raises(IncompleteToolCallError) as exc_info:
+        await runner.run("test prompt")
+
+    assert exc_info.value.tool_name == "web_search"
 
 
 @pytest.mark.asyncio
