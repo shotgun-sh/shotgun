@@ -788,7 +788,9 @@ async def test_run_sub_agent_passes_model_settings_with_token_limit(
         await _run_sub_agent(mock_context, AgentType.RESEARCH, "Test task")
 
     assert "model_settings" in captured_kwargs
-    assert captured_kwargs["model_settings"]["max_tokens"] == SUB_AGENT_MAX_OUTPUT_TOKENS
+    assert (
+        captured_kwargs["model_settings"]["max_tokens"] == SUB_AGENT_MAX_OUTPUT_TOKENS
+    )
 
 
 @pytest.mark.asyncio
@@ -827,7 +829,9 @@ async def test_all_sub_agents_receive_token_limit(
     ):
         await _run_sub_agent(mock_context, agent_type, "Test task")
 
-    assert captured_kwargs["model_settings"]["max_tokens"] == SUB_AGENT_MAX_OUTPUT_TOKENS
+    assert (
+        captured_kwargs["model_settings"]["max_tokens"] == SUB_AGENT_MAX_OUTPUT_TOKENS
+    )
 
 
 @pytest.mark.asyncio
