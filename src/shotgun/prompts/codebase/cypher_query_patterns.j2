@@ -224,11 +224,14 @@ RETURN target.name AS name, target.qualified_name AS qualified_name, 'Function' 
 
 ## IMPACT ANALYSIS PATTERNS (For Change Planning)
 
+**PERFORMANCE NOTE**: Variable-length path queries (`*1..N`) can be expensive on large graphs.
+Always include a `LIMIT` clause to cap results and keep queries responsive.
+
 **Pattern: Find ALL Callers of a Function (Transitive - Multi-hop)**
 ```cypher
 // "What is the full blast radius of changing function X?"
 // "Find everything that directly or indirectly calls process_order"
-// This traverses up to 5 hops of call relationships
+// Traverses up to 5 hops - use fewer hops on large codebases
 MATCH path = (caller)-[:CALLS*1..5]->(target:Function)
 WHERE target.name = 'process_order'
 UNWIND nodes(path) AS node
@@ -236,6 +239,7 @@ WITH DISTINCT node
 WHERE node:Function OR node:Method
 RETURN node.name AS name, node.qualified_name AS qualified_name,
        CASE WHEN node:Function THEN 'Function' ELSE 'Method' END AS type
+LIMIT 50
 ```
 
 **Pattern: Find All Downstream Dependencies (What Could Break)**
@@ -251,17 +255,20 @@ RETURN DISTINCT
     WHEN child IS NOT NULL THEN 'Inheriting Class'
     ELSE 'Caller'
   END AS relationship_type
+LIMIT 50
 ```
 
 **Pattern: Entry Points to Internal Function (Trace API to Core)**
 ```cypher
 // "What API endpoints eventually call the database layer?"
 // Find paths from entry points (functions with specific decorators) to target
-MATCH (entry:Function)-[:CALLS*1..10]->(target:Function)
+// WARNING: *1..10 can be slow on large graphs - reduce hops or add LIMIT
+MATCH (entry:Function)-[:CALLS*1..6]->(target:Function)
 WHERE ANY(d IN entry.decorators WHERE d IN ['route', 'endpoint', 'api', 'get', 'post'])
   AND target.qualified_name CONTAINS 'database'
 RETURN entry.name AS entry_point, entry.qualified_name AS entry_path,
        target.name AS target_function
+LIMIT 30
 ```
 
 **Pattern: Find Overriding Methods That Would Be Affected**
@@ -271,6 +278,7 @@ MATCH (base:Class {name: 'BaseClass'})-[:DEFINES_METHOD]->(baseMethod:Method {na
 MATCH (child:Class)-[:INHERITS*1..5]->(base)
 MATCH (child)-[:DEFINES_METHOD]->(override:Method {name: 'process'})
 RETURN child.name AS class_name, override.qualified_name AS override_location
+LIMIT 50
 ```
 
 **Pattern: Modules with High Coupling (Risk Assessment)**
@@ -291,4 +299,5 @@ MATCH (f:Function)
 WHERE NOT EXISTS { MATCH ()-[:CALLS]->(f) }
   AND NOT ANY(d IN f.decorators WHERE d IN ['route', 'endpoint', 'main', 'test', 'fixture'])
 RETURN f.name AS name, f.qualified_name AS path, 'Unused Function' AS status
+LIMIT 50
 ```

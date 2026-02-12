@@ -123,6 +123,9 @@ async def add_system_status_message(
         await deps.codebase_service.list_graphs_for_directory()
     )
 
+    # Keep has_codebase_indexed in sync (reuses the graphs we already fetched)
+    deps.has_codebase_indexed = len(codebase_understanding_graphs) > 0
+
     # Get graphs currently being indexed
     indexing_graph_ids: set[str] = set()
     if deps.codebase_service:
@@ -631,12 +634,6 @@ async def add_system_prompt_message(
     """
     message_history = message_history or []
 
-    # Check if any codebase graphs are indexed before rendering prompt
-    # This allows prompts to conditionally include codebase-specific guidance
-    if deps.codebase_service:
-        codebase_graphs = await deps.codebase_service.list_graphs_for_directory()
-        deps.has_codebase_indexed = len(codebase_graphs) > 0
-
     # Create a minimal RunContext to call the system prompt function
     # We'll pass None for model and usage since they're not used
     # by our system prompt functions
@@ -695,6 +692,11 @@ async def run_agent(
     # Clear file tracker for new run
     deps.file_tracker.clear()
     logger.debug("🔧 Cleared file tracker for new agent run")
+
+    # Determine if codebase is indexed before rendering prompts
+    if deps.codebase_service:
+        codebase_graphs = await deps.codebase_service.list_graphs_for_directory()
+        deps.has_codebase_indexed = len(codebase_graphs) > 0
 
     # Add system prompt as first message
     message_history = await add_system_prompt_message(deps, message_history)

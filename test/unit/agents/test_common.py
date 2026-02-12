@@ -304,6 +304,41 @@ def test_build_agent_system_prompt_unknown_agent_type():
         )
 
 
+def test_build_agent_system_prompt_includes_impact_analysis_when_indexed():
+    """Test that impact analysis sections render when has_codebase_indexed=True."""
+    mock_context = MagicMock()
+    mock_context.deps = MagicMock(spec=AgentDeps)
+    mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = True
+
+    # Render actual templates (no mocking PromptLoader) to verify conditional blocks
+    result = build_agent_system_prompt("plan", mock_context)
+    assert "Impact Analysis" in result
+    assert "blast radius" in result.lower()
+
+
+def test_build_agent_system_prompt_excludes_impact_analysis_when_not_indexed():
+    """Test that impact analysis sections are excluded when has_codebase_indexed=False."""
+    mock_context = MagicMock()
+    mock_context.deps = MagicMock(spec=AgentDeps)
+    mock_context.deps.interactive_mode = True
+    mock_context.deps.sub_agent_context = None
+    mock_context.deps.llm_model = MagicMock()
+    mock_context.deps.llm_model.supports_pdf = True
+    mock_context.deps.llm_model.supports_images = True
+    mock_context.deps.has_context7 = False
+    mock_context.deps.has_codebase_indexed = False
+
+    result = build_agent_system_prompt("plan", mock_context)
+    assert "Impact Analysis" not in result
+    assert "DEPENDENCY-AWARE TASK ORDERING" not in result
+
+
 def test_create_usage_limits():
     """Test create_usage_limits function."""
     from shotgun.agents.common import create_usage_limits
