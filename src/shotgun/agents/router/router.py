@@ -39,7 +39,6 @@ from shotgun.agents.router.tools.delegation_tools import (
     delegate_to_tasks,
     prepare_delegation_tool,
 )
-from shotgun.agents.router.tools.escalation_tool import escalate_to_planner
 from shotgun.agents.tools import read_file
 from shotgun.logging_config import get_logger
 from shotgun.sdk.services import get_codebase_service
@@ -56,8 +55,8 @@ async def create_router_agent(
 
     In tiered mode (cheap != expensive model), the Router:
     - Runs on the cheap model (for_sub_agent=True)
-    - Has only read_file + escalate_to_planner tools
-    - Handles simple questions directly, escalates complex work
+    - Has only read_file tool
+    - Handles simple questions directly, escalates complex work via AgentResponse
 
     In single-tier mode (cheap == expensive model), the Router:
     - Uses the full tool suite (delegation, plan management, read_file)
@@ -128,7 +127,7 @@ async def create_router_agent(
         return await token_limit_compactor(ctx, messages)  # type: ignore[arg-type]
 
     if is_tiered:
-        # Tiered mode: Router has only read_file + escalate_to_planner
+        # Tiered mode: Router has only read_file (escalation via structured output)
         agent: Agent[RouterDeps, AgentResponse] = Agent(
             model,
             output_type=AgentResponse,
@@ -139,13 +138,10 @@ async def create_router_agent(
             model_settings=ANTHROPIC_CACHE_MODEL_SETTINGS,
         )
 
-        # Triage tools only
+        # Triage tools only - escalation is via AgentResponse.escalation_requested
         agent.tool(read_file)
-        agent.tool(escalate_to_planner)
 
-        logger.debug(
-            "Router agent tools registered (tiered mode: read_file, escalate_to_planner)"
-        )
+        logger.debug("Router agent tools registered (tiered mode: read_file only)")
     else:
         # Single-tier mode: Router has full tool suite (original behavior)
         delegation_tools = [

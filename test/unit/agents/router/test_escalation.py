@@ -1,19 +1,11 @@
 """Tests for the tiered Router → Planner escalation architecture."""
 
-from asyncio import Queue
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic_ai import RunContext
 
 from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
-from shotgun.agents.models import AgentRuntimeOptions, AgentType, FileOperationTracker
-from shotgun.agents.router.models import RouterDeps, RouterMode
-from shotgun.agents.router.tools.escalation_tool import (
-    EscalationInput,
-    escalate_to_planner,
-)
+from shotgun.agents.models import AgentResponse, AgentRuntimeOptions, AgentType
 from shotgun.codebase.service import CodebaseService
 
 
@@ -34,61 +26,37 @@ def _make_model_config(name: str = "test-model") -> ModelConfig:
     return config
 
 
-@pytest.fixture
-def mock_router_deps():
-    """Create mock RouterDeps for escalation testing."""
-    deps = MagicMock(spec=RouterDeps)
-    deps.router_mode = RouterMode.PLANNING
-    deps.current_plan = None
-    deps.file_tracker = FileOperationTracker()
-    deps.active_sub_agent = None
-    deps.sub_agent_cache = {}
-    deps.interactive_mode = True
-    deps.working_directory = Path("/test/dir")
-    deps.is_tui_context = True
-    deps.max_iterations = 100
-    deps.queue = Queue()
-    deps.tasks = []
-    deps.parent_stream_handler = None
-    deps.pending_approval = None
-    deps.cancellation_event = None
-    deps.usage_manager = MagicMock()
-    deps.usage_manager.add_usage = AsyncMock()
-    deps.escalation_requested = False
-    deps.escalation_reason = ""
-    deps.llm_model = _make_model_config()
-    return deps
+def test_agent_response_escalation_fields_default():
+    """Test that AgentResponse escalation fields default to False/None."""
+    response = AgentResponse(response="Hello")
+    assert response.escalation_requested is False
+    assert response.escalation_reason is None
+    assert response.escalation_synopsis is None
 
 
-@pytest.fixture
-def mock_context(mock_router_deps):
-    """Create mock run context for testing."""
-    ctx = MagicMock(spec=RunContext)
-    ctx.deps = mock_router_deps
-    return ctx
+def test_agent_response_escalation_fields_set():
+    """Test that AgentResponse escalation fields can be set."""
+    response = AgentResponse(
+        response="Escalating to Planner.",
+        escalation_requested=True,
+        escalation_reason="needs multi-step plan creation",
+        escalation_synopsis="User wants OAuth2. They need Google + GitHub providers.",
+    )
+    assert response.escalation_requested is True
+    assert response.escalation_reason == "needs multi-step plan creation"
+    assert "OAuth2" in response.escalation_synopsis
 
 
-@pytest.mark.asyncio
-async def test_escalate_to_planner_sets_flag(mock_context):
-    """Test that escalate_to_planner sets the escalation_requested flag."""
-    input_data = EscalationInput(reason="needs multi-step plan creation")
-
-    result = await escalate_to_planner(mock_context, input_data)
-
-    assert result.success is True
-    assert mock_context.deps.escalation_requested is True
-    assert mock_context.deps.escalation_reason == "needs multi-step plan creation"
-
-
-@pytest.mark.asyncio
-async def test_escalate_to_planner_returns_confirmation(mock_context):
-    """Test that escalate_to_planner returns a confirmation message."""
-    input_data = EscalationInput(reason="requires delegation to sub-agents")
-
-    result = await escalate_to_planner(mock_context, input_data)
-
-    assert result.success is True
-    assert "Escalating" in result.message
+def test_agent_response_escalation_invisible_to_non_router():
+    """Test that non-escalation responses are unaffected by escalation fields."""
+    response = AgentResponse(
+        response="Here's the research summary.",
+        clarifying_questions=["What framework?"],
+    )
+    assert response.escalation_requested is False
+    assert response.escalation_reason is None
+    assert response.escalation_synopsis is None
+    assert response.clarifying_questions == ["What framework?"]
 
 
 @pytest.mark.asyncio
@@ -126,9 +94,10 @@ async def test_router_agent_tiered_mode():
         # In tiered mode, Router uses cheap model
         assert deps.llm_model.name == "haiku-model"
 
-        # Verify agent has escalation tool but not delegation tools
+        # Verify agent has read_file but NOT escalation tool or delegation tools
         tool_names = list(agent._function_toolset.tools.keys())
-        assert "escalate_to_planner" in tool_names
+        assert "read_file" in tool_names
+        assert "escalate_to_planner" not in tool_names
         assert "delegate_to_research" not in tool_names
         assert "create_plan" not in tool_names
 
@@ -201,3 +170,12 @@ async def test_planner_agent_uses_expensive_model():
         assert "read_file" in tool_names
         # No escalation tool on Planner
         assert "escalate_to_planner" not in tool_names
+
+
+def test_router_deps_no_escalation_fields():
+    """Test that RouterDeps no longer has escalation fields."""
+    from shotgun.agents.router.models import RouterDeps
+
+    field_names = set(RouterDeps.model_fields.keys())
+    assert "escalation_requested" not in field_names
+    assert "escalation_reason" not in field_names

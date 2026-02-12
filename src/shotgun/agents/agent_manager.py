@@ -398,6 +398,9 @@ class AgentManager(Widget):
         # Sub-agent streaming responses to persist in UI history
         self._sub_agent_messages: list[ModelResponse] = []
 
+        # Router messages saved during escalation for persistence merging
+        self._escalation_router_messages: list[ModelMessage] = []
+
     async def _ensure_agents_initialized(self) -> None:
         """Ensure all agents are initialized (lazy initialization)."""
         if self._agents_initialized:
@@ -1137,24 +1140,26 @@ class AgentManager(Widget):
         finally:
             self._stream_state = None
 
-        # Check for escalation from Router to Planner
+        # Check for escalation from Router to Planner via structured output
+        agent_response_for_escalation = result.output
         if (
             self._current_agent_type == AgentType.ROUTER
             and isinstance(deps, RouterDeps)
-            and deps.escalation_requested
+            and agent_response_for_escalation.escalation_requested
         ):
-            logger.info(
-                "Escalation detected: Router → Planner (reason: %s)",
-                deps.escalation_reason,
+            escalation_reason = agent_response_for_escalation.escalation_reason or ""
+            escalation_synopsis = (
+                agent_response_for_escalation.escalation_synopsis or ""
             )
 
-            # Clear escalation flag
-            escalation_reason = deps.escalation_reason
-            deps.escalation_requested = False
-            deps.escalation_reason = ""
+            logger.info(
+                "Escalation detected: Router → Planner (reason: %s)",
+                escalation_reason,
+            )
 
-            # Merge Router's messages into history before re-running
+            # Save Router's messages for persistence/UI continuity
             router_messages = result.all_messages()
+            self._escalation_router_messages = router_messages
             self.message_history = router_messages
 
             # Switch to Planner agent
@@ -1167,13 +1172,15 @@ class AgentManager(Widget):
 
             planner_deps.agent_mode = AgentType.PLANNER
 
-            # Build escalation prompt for the Planner
+            # Build escalation prompt from the Router's synopsis
+            # The Planner receives ONLY this synopsis, not the full conversation history
             escalation_prompt = (
-                f"Continue with the user's request. "
-                f"Reason for escalation: {escalation_reason}"
+                f"The Router has escalated this request to you.\n\n"
+                f"**Reason for escalation:** {escalation_reason}\n\n"
+                f"**Synopsis from Router:**\n{escalation_synopsis}"
             )
 
-            # Re-run with Planner using the existing message history
+            # Re-run with Planner using EMPTY history (synopsis contains all context)
             self._stream_state = _PartialStreamState()
             try:
                 result = await self._run_agent_with_retry(
@@ -1181,7 +1188,7 @@ class AgentManager(Widget):
                     prompt=escalation_prompt,
                     deps=planner_deps,
                     usage_limits=usage_limits,
-                    message_history=self.message_history,
+                    message_history=[],
                     event_stream_handler=self._handle_event_stream
                     if supports_streaming
                     else None,
@@ -1433,6 +1440,13 @@ class AgentManager(Widget):
 
         # Apply compaction to persistent message history to prevent cascading growth
         all_messages = result.all_messages()
+
+        # If escalation occurred, prepend the Router's messages so they're
+        # preserved in persistent history (the Planner ran with empty history)
+        if self._escalation_router_messages:
+            all_messages = self._escalation_router_messages + all_messages
+            self._escalation_router_messages = []
+
         messages_before_compaction = len(all_messages)
         compaction_occurred = False
 
