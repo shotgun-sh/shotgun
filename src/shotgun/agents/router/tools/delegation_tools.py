@@ -12,8 +12,10 @@ from typing import Any
 
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import ToolDefinition
 
+from shotgun.agents.config.constants import SUB_AGENT_MAX_OUTPUT_TOKENS
 from shotgun.agents.config.models import ProviderType
 from shotgun.agents.export import create_export_agent, run_export_agent
 from shotgun.agents.models import (
@@ -291,6 +293,11 @@ async def _run_sub_agent(
     # Get the run function for this agent type
     _, run_fn = AGENT_FACTORIES[agent_type]
 
+    # Enforce output token limit for sub-agents to encourage file tool usage
+    sub_agent_model_settings: ModelSettings = {
+        "max_tokens": SUB_AGENT_MAX_OUTPUT_TOKENS,
+    }
+
     # Retry loop for transient errors
     last_error: BaseException | None = None
     retries_attempted = 0
@@ -303,6 +310,7 @@ async def _run_sub_agent(
                 deps=sub_agent_deps,
                 message_history=[],  # Isolated context
                 event_stream_handler=deps.parent_stream_handler,  # Forward streaming
+                model_settings=sub_agent_model_settings,
             )
 
             # Track sub-agent usage

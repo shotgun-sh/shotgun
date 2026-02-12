@@ -4,6 +4,7 @@ from functools import partial
 
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
+from pydantic_ai.settings import ModelSettings
 
 from shotgun.agents.config import ProviderType
 from shotgun.agents.models import ShotgunAgent
@@ -59,6 +60,7 @@ async def run_specify_agent(
     deps: AgentDeps,
     message_history: list[ModelMessage] | None = None,
     event_stream_handler: EventStreamHandler | None = None,
+    model_settings: ModelSettings | None = None,
 ) -> AgentRunResult[AgentResponse]:
     """Create or update specifications based on the given prompt.
 
@@ -87,6 +89,7 @@ async def run_specify_agent(
             message_history=message_history,
             usage_limits=usage_limits,
             event_stream_handler=event_stream_handler,
+            model_settings=model_settings,
         )
 
         logger.debug("✅ Specification completed successfully")
