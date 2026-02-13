@@ -6,13 +6,15 @@ Provides web search capabilities for multiple LLM providers:
 - Gemini: Uses grounding with Google Search via Pydantic AI
 - OpenAI-compatible: Uses Responses API via custom endpoint (e.g., LiteLLM proxy)
 
-Web search uses the provider matching the user's selected model for consistency.
+For BYOK users, Gemini Flash web search is preferred when a Google API key is available,
+as it provides the most reliable grounded search results. Falls back to other providers
+if Google is not configured.
 """
 
 from collections.abc import Awaitable, Callable
 
 from shotgun.agents.config.manager import get_config_manager
-from shotgun.agents.config.models import MODEL_SPECS, ModelName, ProviderType
+from shotgun.agents.config.models import ProviderType
 from shotgun.logging_config import get_logger
 from shotgun.settings import settings
 
@@ -37,11 +39,11 @@ _PROVIDER_WEB_SEARCH_TOOLS: dict[ProviderType, WebSearchTool] = {
 
 
 async def get_available_web_search_tools() -> list[WebSearchTool]:
-    """Get web search tool matching the user's selected provider.
+    """Get the best available web search tool.
 
-    For Shotgun Account users, always uses Gemini web search (more reliable).
-    For BYOK users, prefers the web search tool from their selected model's provider.
-    Falls back to other available providers if the preferred one isn't available.
+    For Shotgun Account users, always uses Gemini web search.
+    For BYOK users, prefers Gemini Flash web search when a Google API key is available.
+    Falls back to other available providers if Google is not configured.
 
     Returns:
         List containing the preferred web search tool, or empty if none available
@@ -53,7 +55,6 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
         logger.info("Using OpenAI-compatible web search (openai_compat mode enabled)")
         return [openai_compatible_web_search_tool]
 
-    # Get user's selected model to determine preferred provider
     config_manager = get_config_manager()
     config = await config_manager.load(force_reload=False)
 
@@ -62,33 +63,16 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
         logger.info("Using Gemini web search (Shotgun Account)")
         return [gemini_web_search_tool]
 
-    # For BYOK users, match their selected model's provider
-    preferred_provider: ProviderType | None = None
-    # Only check MODEL_SPECS for ModelName enums (not Ollama string models)
-    if (
-        config.selected_model
-        and isinstance(config.selected_model, ModelName)
-        and config.selected_model in MODEL_SPECS
-    ):
-        preferred_provider = MODEL_SPECS[config.selected_model].provider
-        logger.debug(
-            "User selected model %s, preferring %s web search",
-            config.selected_model.value,
-            preferred_provider.value,
-        )
+    # Priority 2: For BYOK users, prefer Gemini web search when available
+    # Gemini Flash grounded search is the most reliable web search option
+    if await is_provider_available(ProviderType.GOOGLE):
+        logger.info("Using Gemini web search (preferred for BYOK)")
+        return [gemini_web_search_tool]
 
-    # Try preferred provider first
-    if preferred_provider and await is_provider_available(preferred_provider):
-        tool = _PROVIDER_WEB_SEARCH_TOOLS[preferred_provider]
-        logger.info(
-            "Using %s web search (matches selected model)", preferred_provider.value
-        )
-        return [tool]
-
-    # Fall back to any available provider
+    # Fall back to other available providers
     for provider in ProviderType:
-        if provider == ProviderType.OPENAI_COMPATIBLE:
-            # Skip OPENAI_COMPATIBLE in fallback - it's handled above
+        if provider in (ProviderType.OPENAI_COMPATIBLE, ProviderType.GOOGLE):
+            # OPENAI_COMPATIBLE handled above, GOOGLE already checked
             continue
         if await is_provider_available(provider):
             tool = _PROVIDER_WEB_SEARCH_TOOLS[provider]
