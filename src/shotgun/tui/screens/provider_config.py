@@ -357,7 +357,7 @@ class ProviderConfigScreen(Screen[None]):
         else:
             self.remove_class("compact")
 
-    def on_screenresume(self) -> None:
+    def on_screen_resume(self) -> None:
         """Refresh provider status when screen is resumed.
 
         This ensures the UI reflects any provider changes made elsewhere.

@@ -404,13 +404,13 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         logger.debug("ModelPickerScreen.on_show() called")
         self.run_worker(self._rebuild_model_list(), exclusive=True)
 
-    def on_screenresume(self) -> None:
+    def on_screen_resume(self) -> None:
         """Rebuild model list when screen is resumed (subsequent visits).
 
         This is called when returning to the screen after it was suspended,
         ensuring the model list reflects any config changes made while away.
         """
-        logger.debug("ModelPickerScreen.on_screenresume() called")
+        logger.debug("ModelPickerScreen.on_screen_resume() called")
         self.run_worker(self._rebuild_model_list(), exclusive=True)
 
     def action_done(self) -> None:

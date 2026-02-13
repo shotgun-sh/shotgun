@@ -338,7 +338,7 @@ class ChatScreen(Screen[None]):
         # Check for updates in background (after other startup tasks)
         self.call_later(self.check_for_updates)
 
-    def on_screenresume(self) -> None:
+    def on_screen_resume(self) -> None:
         """Handle screen resume after returning from other screens.
 
         This validates that the current model is still available (e.g., API keys
@@ -349,39 +349,26 @@ class ChatScreen(Screen[None]):
         self.run_worker(self._refresh_welcome_widget())
 
     async def _refresh_welcome_widget(self) -> None:
-        """Rebuild welcome state and replace the WelcomeMessage in history.
+        """Rebuild the WelcomeWidget in-place with fresh config state.
 
-        This finds the existing WelcomeMessage in ui_message_history,
-        replaces it with a fresh one, then forces the chat history to
-        do a full re-render so the updated checklist is displayed.
+        Finds the WelcomeWidget in the DOM, updates its state, and
+        calls recompose() to rebuild the checklist items.
         """
-        # Check if there's a WelcomeMessage in the history
-        has_welcome = any(
-            isinstance(msg, WelcomeMessage)
-            for msg in self.agent_manager.ui_message_history
-        )
-        if not has_welcome:
-            return
-
         new_state = await build_welcome_state()
 
-        # Replace the WelcomeMessage in-place
+        # Update the data model in ui_message_history
         for i, msg in enumerate(self.agent_manager.ui_message_history):
             if isinstance(msg, WelcomeMessage):
                 self.agent_manager.ui_message_history[i] = new_state
                 break
+        else:
+            return  # No WelcomeMessage in history
 
-        # Force ChatHistory to do a full rebuild on next update.
-        # Setting _rendered_count higher than filtered count triggers the
-        # "remove all widgets and rebuild" path in update_messages().
-        try:
-            chat_history = self.query_one("ChatHistory")
-            chat_history._rendered_count = 999999  # type: ignore[attr-defined]
-        except Exception:
-            logger.debug("ChatHistory not found for welcome refresh")
-
-        # Trigger message update
-        self.agent_manager._post_messages_updated()
+        # Find the live WelcomeWidget in the DOM and recompose it
+        for widget in self.query(WelcomeWidget):
+            widget.state = new_state
+            await widget.recompose()
+            break
 
     def _reset_agents_for_model_change(self) -> None:
         """Reset agent instances so they get recreated with the new model.
@@ -1147,11 +1134,16 @@ class ChatScreen(Screen[None]):
         self.agent_manager.add_hint_message(hint)
 
     @on(WelcomeWidget.WelcomeAction)
-    def _handle_welcome_action(self, event: WelcomeWidget.WelcomeAction) -> None:
+    async def _handle_welcome_action(self, event: WelcomeWidget.WelcomeAction) -> None:
         """Handle actions from the welcome widget buttons."""
         import webbrowser
 
         if event.action == "index":
+            # Show "in progress" state immediately before starting indexing
+            for widget in self.query(WelcomeWidget):
+                widget.state = widget.state.model_copy(update={"is_indexing": True})
+                await widget.recompose()
+                break
             self.index_codebase_command()
         elif event.action == "context7":
             from shotgun.tui.screens.provider_config import ProviderConfigScreen
@@ -2231,6 +2223,8 @@ class ChatScreen(Screen[None]):
             label.update("")
             label.refresh()
             await self.codebase_sdk.service.indexing.complete(graph_id)
+            # Refresh welcome checklist to show indexing is done
+            await self._refresh_welcome_widget()
 
     @work
     async def run_agent(
