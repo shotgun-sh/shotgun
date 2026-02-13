@@ -343,8 +343,45 @@ class ChatScreen(Screen[None]):
 
         This validates that the current model is still available (e.g., API keys
         may have been removed in Provider Setup) and falls back if necessary.
+        Also refreshes the welcome widget checklist to reflect any config changes.
         """
         self.run_worker(self._validate_current_model(), exclusive=True)
+        self.run_worker(self._refresh_welcome_widget())
+
+    async def _refresh_welcome_widget(self) -> None:
+        """Rebuild welcome state and replace the WelcomeMessage in history.
+
+        This finds the existing WelcomeMessage in ui_message_history,
+        replaces it with a fresh one, then forces the chat history to
+        do a full re-render so the updated checklist is displayed.
+        """
+        # Check if there's a WelcomeMessage in the history
+        has_welcome = any(
+            isinstance(msg, WelcomeMessage)
+            for msg in self.agent_manager.ui_message_history
+        )
+        if not has_welcome:
+            return
+
+        new_state = await build_welcome_state()
+
+        # Replace the WelcomeMessage in-place
+        for i, msg in enumerate(self.agent_manager.ui_message_history):
+            if isinstance(msg, WelcomeMessage):
+                self.agent_manager.ui_message_history[i] = new_state
+                break
+
+        # Force ChatHistory to do a full rebuild on next update.
+        # Setting _rendered_count higher than filtered count triggers the
+        # "remove all widgets and rebuild" path in update_messages().
+        try:
+            chat_history = self.query_one("ChatHistory")
+            chat_history._rendered_count = 999999  # type: ignore[attr-defined]
+        except Exception:
+            logger.debug("ChatHistory not found for welcome refresh")
+
+        # Trigger message update
+        self.agent_manager._post_messages_updated()
 
     def _reset_agents_for_model_change(self) -> None:
         """Reset agent instances so they get recreated with the new model.
@@ -1140,6 +1177,7 @@ class ChatScreen(Screen[None]):
 
         config_manager = get_config_manager()
         await config_manager.update_selected_model(model_name)
+        await self._refresh_welcome_widget()
 
     def _show_spec_dir_hint(self) -> None:
         """Show hint when --spec-dir override is active."""
