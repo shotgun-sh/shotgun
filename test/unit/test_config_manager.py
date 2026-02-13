@@ -315,7 +315,7 @@ async def test_get_provider_model_anthropic_with_config_key(mock_get_config_mana
         model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-sonnet-4-5"
+        assert model.name == "claude-opus-4-5"
         assert model.api_key == "test-anthropic-key"
 
 
@@ -418,7 +418,7 @@ async def test_get_provider_model_none_finds_first_available(mock_get_config_man
         model = await get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-sonnet-4-5"
+        assert model.name == "claude-opus-4-5"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -885,7 +885,7 @@ async def test_update_provider_sets_selected_model_when_first_key():
 
         # Verify selected_model is now set to Anthropic's default
         config = await manager.load()
-        assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
+        assert config.selected_model == ModelName.CLAUDE_OPUS_4_5
         assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
 
@@ -977,7 +977,7 @@ async def test_load_updates_selected_model_when_provider_has_no_key(mock_logger)
             config = await manager.load()
 
             # selected_model should now be Anthropic's default since OpenAI has no key
-            assert config.selected_model == ModelName.CLAUDE_SONNET_4_5
+            assert config.selected_model == ModelName.CLAUDE_OPUS_4_5
             assert isinstance(config.anthropic.api_key, SecretStr)
             assert config.anthropic.api_key.get_secret_value() == "test-anthropic-key"
 
