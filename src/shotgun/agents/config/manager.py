@@ -454,7 +454,9 @@ class ConfigManager:
                     for provider in ProviderType:
                         if await self.has_provider_key(provider):
                             if provider in DEFAULT_PROVIDER_MODELS:
-                                self._config.selected_model = DEFAULT_PROVIDER_MODELS[provider]
+                                self._config.selected_model = DEFAULT_PROVIDER_MODELS[
+                                    provider
+                                ]
                                 should_save = True
                                 break
 
