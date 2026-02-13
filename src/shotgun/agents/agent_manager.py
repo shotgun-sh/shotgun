@@ -88,6 +88,7 @@ from shotgun.attachments import FileAttachment
 from shotgun.exceptions import IncompleteToolCallError
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
 from shotgun.utils.source_detection import detect_source
 
 from .conversation.history.compaction import apply_persistent_compaction
@@ -141,7 +142,7 @@ class MessageHistoryUpdated(Message):
 
     def __init__(
         self,
-        messages: list[ModelMessage | HintMessage],
+        messages: list[ModelMessage | HintMessage | WelcomeMessage],
         agent_type: AgentType,
         file_operations: list[FileOperation] | None = None,
     ) -> None:
@@ -379,7 +380,7 @@ class AgentManager(Widget):
         self._current_agent_type: AgentType = initial_type
 
         # Maintain shared message history
-        self.ui_message_history: list[ModelMessage | HintMessage] = []
+        self.ui_message_history: list[ModelMessage | HintMessage | WelcomeMessage] = []
         self.message_history: list[ModelMessage] = []
         self.recently_change_files: list[FileOperation] = []
         self._stream_state: _PartialStreamState | None = None
@@ -1150,7 +1151,9 @@ class AgentManager(Widget):
                         return text_parts[0] if text_parts else None
             return None
 
-        deduplicated_new_messages = []
+        deduplicated_new_messages: list[
+            ModelMessage | HintMessage | WelcomeMessage
+        ] = []
         for msg in new_messages:
             # Check if this is a user prompt that's already in original_messages
             if isinstance(msg, ModelRequest) and any(
@@ -1807,8 +1810,8 @@ class AgentManager(Widget):
 
     def _mark_as_internal_prompts(
         self,
-        messages: list[ModelRequest | ModelResponse | HintMessage],
-    ) -> list[ModelRequest | ModelResponse | HintMessage]:
+        messages: list[ModelMessage | HintMessage | WelcomeMessage],
+    ) -> list[ModelMessage | HintMessage | WelcomeMessage]:
         """Mark UserPromptPart as InternalPromptPart for system-generated prompts.
 
         Used when file_contents is provided - the resume prompt is system-generated,
@@ -1820,7 +1823,7 @@ class AgentManager(Widget):
         Returns:
             List of messages with UserPromptPart converted to InternalPromptPart
         """
-        result: list[ModelRequest | ModelResponse | HintMessage] = []
+        result: list[ModelMessage | HintMessage | WelcomeMessage] = []
         for msg in messages:
             if isinstance(msg, ModelRequest):
                 new_parts: list[ModelRequestPart] = []
@@ -1843,8 +1846,8 @@ class AgentManager(Widget):
         return result
 
     def _filter_system_prompts(
-        self, messages: list[ModelMessage | HintMessage]
-    ) -> list[ModelMessage | HintMessage]:
+        self, messages: list[ModelMessage | HintMessage | WelcomeMessage]
+    ) -> list[ModelMessage | HintMessage | WelcomeMessage]:
         """Filter out system prompts from messages for UI display.
 
         Args:
@@ -1853,9 +1856,9 @@ class AgentManager(Widget):
         Returns:
             List of messages without system prompt parts
         """
-        filtered_messages: list[ModelMessage | HintMessage] = []
+        filtered_messages: list[ModelMessage | HintMessage | WelcomeMessage] = []
         for msg in messages:
-            if isinstance(msg, HintMessage):
+            if isinstance(msg, (HintMessage, WelcomeMessage)):
                 filtered_messages.append(msg)
                 continue
 
@@ -1975,7 +1978,7 @@ class AgentManager(Widget):
 
         # Filter out system prompts for UI display while keeping hints
         ui_source = state.ui_messages or cast(
-            list[ModelMessage | HintMessage], state.agent_messages
+            list[ModelMessage | HintMessage | WelcomeMessage], state.agent_messages
         )
         self.ui_message_history = self._filter_system_prompts(ui_source)
 
@@ -1985,7 +1988,7 @@ class AgentManager(Widget):
         # Notify listeners about the restored messages
         self._post_messages_updated()
 
-    def add_hint_message(self, message: HintMessage) -> None:
+    def add_hint_message(self, message: HintMessage | WelcomeMessage) -> None:
         self.ui_message_history.append(message)
         self._post_messages_updated()
 

@@ -13,6 +13,7 @@ from pydantic_ai.messages import (
 from pydantic_core import to_jsonable_python
 
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
 
 from .filters import (
     filter_binary_content,
@@ -44,7 +45,9 @@ class ConversationState(BaseModel):
     """Represents the complete state of a conversation in memory."""
 
     agent_messages: list[ModelMessage]
-    ui_messages: list[ModelMessage | HintMessage] = Field(default_factory=list)
+    ui_messages: list[ModelMessage | HintMessage | WelcomeMessage] = Field(
+        default_factory=list
+    )
     agent_type: str  # Will store AgentType.value
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -87,16 +90,18 @@ class ConversationHistory(BaseModel):
             filtered_messages, fallback=lambda x: str(x), exclude_none=True
         )
 
-    def set_ui_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
+    def set_ui_messages(
+        self, messages: list[ModelMessage | HintMessage | WelcomeMessage]
+    ) -> None:
         """Set ui_history from a list of UI messages."""
         # First pass: apply binary content filter to ModelMessages only
         # This preserves message count and order (just modifies content)
-        binary_filtered: list[ModelMessage | HintMessage] = []
+        binary_filtered: list[ModelMessage | HintMessage | WelcomeMessage] = []
         model_messages_for_filter: list[ModelMessage] = []
         model_indices: list[int] = []
 
         for i, msg in enumerate(messages):
-            if isinstance(msg, HintMessage):
+            if isinstance(msg, (HintMessage, WelcomeMessage)):
                 binary_filtered.append(msg)
             else:
                 model_messages_for_filter.append(msg)
@@ -111,9 +116,9 @@ class ConversationHistory(BaseModel):
                 binary_filtered[idx] = filtered_msg
 
         # Second pass: filter out ModelMessages with incomplete tool calls
-        filtered_messages: list[ModelMessage | HintMessage] = []
+        filtered_messages: list[ModelMessage | HintMessage | WelcomeMessage] = []
         for msg in binary_filtered:
-            if isinstance(msg, HintMessage):
+            if isinstance(msg, (HintMessage, WelcomeMessage)):
                 filtered_messages.append(msg)
             elif isinstance(msg, ModelResponse):
                 has_incomplete = False
@@ -129,8 +134,12 @@ class ConversationHistory(BaseModel):
                 filtered_messages.append(msg)
 
         def _serialize_message(
-            message: ModelMessage | HintMessage,
+            message: ModelMessage | HintMessage | WelcomeMessage,
         ) -> Any:
+            if isinstance(message, WelcomeMessage):
+                data = message.model_dump()
+                data["message_type"] = "welcome"
+                return data
             if isinstance(message, HintMessage):
                 data = message.model_dump()
                 data["message_type"] = "hint"
@@ -156,16 +165,22 @@ class ConversationHistory(BaseModel):
         # Deserialize from JSON format back to ModelMessage objects
         return ModelMessagesTypeAdapter.validate_python(self.agent_history)
 
-    def get_ui_messages(self) -> list[ModelMessage | HintMessage]:
-        """Get ui_history as a list of Model or hint messages."""
+    def get_ui_messages(self) -> list[ModelMessage | HintMessage | WelcomeMessage]:
+        """Get ui_history as a list of Model, hint, or welcome messages."""
 
         if not self.ui_history:
             # Fallback for older conversation files without UI history
-            return cast(list[ModelMessage | HintMessage], self.get_agent_messages())
+            return cast(
+                list[ModelMessage | HintMessage | WelcomeMessage],
+                self.get_agent_messages(),
+            )
 
-        messages: list[ModelMessage | HintMessage] = []
+        messages: list[ModelMessage | HintMessage | WelcomeMessage] = []
         for item in self.ui_history:
             message_type = item.get("message_type") if isinstance(item, dict) else None
+            if message_type == "welcome":
+                messages.append(WelcomeMessage.model_validate(item))
+                continue
             if message_type == "hint":
                 messages.append(HintMessage.model_validate(item))
                 continue

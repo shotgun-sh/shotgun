@@ -18,6 +18,10 @@ from shotgun.agents.messages import InternalPromptPart
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.vertical_tail import VerticalTail
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage, HintMessageWidget
+from shotgun.tui.screens.chat_screen.welcome_message import (
+    WelcomeMessage,
+    WelcomeWidget,
+)
 
 from .agent_response import AgentResponseWidget
 from .partial_response import PartialResponseWidget
@@ -51,7 +55,7 @@ class ChatHistory(Widget):
 
     def __init__(self) -> None:
         super().__init__()
-        self.items: Sequence[ModelMessage | HintMessage] = []
+        self.items: Sequence[ModelMessage | HintMessage | WelcomeMessage] = []
         self.vertical_tail: VerticalTail | None = None
         self._rendered_count = 0  # Track how many messages have been mounted
 
@@ -64,6 +68,8 @@ class ChatHistory(Widget):
             for item in filtered:
                 if isinstance(item, ModelRequest):
                     yield UserQuestionWidget(item)
+                elif isinstance(item, WelcomeMessage):
+                    yield WelcomeWidget(item)
                 elif isinstance(item, HintMessage):
                     yield HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):
@@ -76,7 +82,9 @@ class ChatHistory(Widget):
         # Track how many messages were rendered during initial compose
         self._rendered_count = len(filtered)
 
-    def filtered_items(self) -> Generator[ModelMessage | HintMessage, None, None]:
+    def filtered_items(
+        self,
+    ) -> Generator[ModelMessage | HintMessage | WelcomeMessage, None, None]:
         """Filter and yield items for display."""
         for item in self.items:
             # Skip ModelRequest messages without visible user content
@@ -93,7 +101,9 @@ class ChatHistory(Widget):
 
             yield item
 
-    def update_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
+    def update_messages(
+        self, messages: list[ModelMessage | HintMessage | WelcomeMessage]
+    ) -> None:
         """Update the displayed messages using incremental mounting."""
         if not self.vertical_tail:
             logger.debug(
@@ -133,6 +143,8 @@ class ChatHistory(Widget):
                 widget: Widget
                 if isinstance(item, ModelRequest):
                     widget = UserQuestionWidget(item)
+                elif isinstance(item, WelcomeMessage):
+                    widget = WelcomeWidget(item)
                 elif isinstance(item, HintMessage):
                     widget = HintMessageWidget(item)
                 elif isinstance(item, ModelResponse):

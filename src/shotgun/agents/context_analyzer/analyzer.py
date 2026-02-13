@@ -24,6 +24,7 @@ from shotgun.agents.conversation.history.token_estimation import (
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
 
 from .constants import ToolCategory, get_tool_category
 from .models import ContextAnalysis, MessageTypeStats, TokenAllocation
@@ -255,7 +256,7 @@ class ContextAnalyzer:
     async def analyze_conversation(
         self,
         message_history: list[ModelMessage],
-        ui_message_history: list[ModelMessage | HintMessage],
+        ui_message_history: list[ModelMessage | HintMessage | WelcomeMessage],
     ) -> ContextAnalysis:
         """Analyze the conversation to determine message type composition.
 
