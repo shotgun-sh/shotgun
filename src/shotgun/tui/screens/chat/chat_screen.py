@@ -616,6 +616,10 @@ class ChatScreen(Screen[None]):
 
     @work
     async def check_if_codebase_is_indexed(self) -> None:
+        # Always show the welcome checklist on startup
+        welcome_state = await build_welcome_state()
+        self.agent_manager.add_hint_message(welcome_state)
+
         # Handle any pending database issues from startup first
         should_continue = await self._handle_pending_database_issues()
         if not should_continue:
@@ -644,10 +648,6 @@ class ChatScreen(Screen[None]):
                     logger.warning(
                         f"Failed to delete graph {graph.graph_id} during force reindex: {e}"
                     )
-
-        # Build welcome state and show the welcome widget
-        welcome_state = await build_welcome_state()
-        self.agent_manager.add_hint_message(welcome_state)
 
     def watch_mode(self, new_mode: AgentType) -> None:
         """React to mode changes by updating the agent manager."""
