@@ -152,7 +152,6 @@ class WelcomeWidget(Widget):
 
         WelcomeWidget .welcome-intro {
             height: auto;
-            offset-x: -1;
             padding: 0;
             margin: 0;
         }
@@ -231,13 +230,18 @@ class WelcomeWidget(Widget):
         # Checklist #1: Index
         if s.is_home_directory:
             yield Static(
-                "~~1. Index this folder~~ (start in a project directory, not home)",
+                "[dim]☐ [strike]Index this folder[/strike] (start in a project directory, not home)[/dim]",
                 classes="checklist-item",
+                markup=True,
             )
         elif s.is_indexed:
-            yield Static("1. ~~Index this folder~~ ✓", classes="checklist-item")
+            yield Static(
+                "[green]✔[/green] [dim strike]Index this folder[/dim strike]",
+                classes="checklist-item",
+                markup=True,
+            )
         else:
-            yield Static("1. Index this folder", classes="checklist-item")
+            yield Static("☐ Index this folder", classes="checklist-item", markup=True)
             yield Static(
                 "The codebase index lives on your computer, it costs nothing.",
                 classes="checklist-note",
@@ -252,9 +256,13 @@ class WelcomeWidget(Widget):
 
         # Checklist #2: Context7
         if s.has_context7_key:
-            yield Static("2. ~~Set up Context7~~ ✓", classes="checklist-item")
+            yield Static(
+                "[green]✔[/green] [dim strike]Set up Context7[/dim strike]",
+                classes="checklist-item",
+                markup=True,
+            )
         else:
-            yield Static("2. Set up Context7", classes="checklist-item")
+            yield Static("☐ Set up Context7", classes="checklist-item", markup=True)
             with Horizontal(classes="action-row"):
                 yield Button(
                     "Set up Context7",
@@ -267,10 +275,16 @@ class WelcomeWidget(Widget):
         if not s.is_ollama:
             if s.is_frontier_model:
                 yield Static(
-                    "3. ~~Select a frontier model~~ ✓", classes="checklist-item"
+                    "[green]✔[/green] [dim strike]Select a frontier model[/dim strike]",
+                    classes="checklist-item",
+                    markup=True,
                 )
             elif s.frontier_model_label:
-                yield Static("3. Select a frontier model", classes="checklist-item")
+                yield Static(
+                    "☐ Select a frontier model",
+                    classes="checklist-item",
+                    markup=True,
+                )
                 with Horizontal(classes="action-row"):
                     yield Button(
                         s.frontier_model_label,
@@ -281,16 +295,17 @@ class WelcomeWidget(Widget):
 
         # Checklist #4: Gemini (BYOK only)
         if s.is_byok:
-            item_num = "4" if not s.is_ollama else "3"
             if s.has_gemini_key:
                 yield Static(
-                    f"{item_num}. ~~Set up Gemini key for web search~~ ✓",
+                    "[green]✔[/green] [dim strike]Set up Gemini key for web search[/dim strike]",
                     classes="checklist-item",
+                    markup=True,
                 )
             else:
                 yield Static(
-                    f"{item_num}. Set up Gemini key for web search",
+                    "☐ Set up Gemini key for web search",
                     classes="checklist-item",
+                    markup=True,
                 )
                 with Horizontal(classes="action-row"):
                     yield Button(
