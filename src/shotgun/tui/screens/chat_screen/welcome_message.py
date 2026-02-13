@@ -144,23 +144,27 @@ class ActionLink(Static):
     DEFAULT_CSS = """
         ActionLink {
             width: auto;
-            height: 1;
+            height: auto;
             padding: 0 1;
             color: $text;
             background: $primary;
             text-style: bold;
+            border: tall $primary;
         }
 
         ActionLink:hover {
             background: $primary-lighten-1;
+            border: tall $primary-lighten-1;
         }
 
         ActionLink.-success {
             background: $success;
+            border: tall $success;
         }
 
         ActionLink.-success:hover {
             background: $success-lighten-1;
+            border: tall $success-lighten-1;
         }
     """
 
@@ -380,14 +384,14 @@ class WelcomeWidget(Widget):
                 if s.has_gemini_key:
                     with Horizontal(classes="checklist-row"):
                         yield Static(
-                            "[green]✔[/green] [dim strike]Set up Gemini key for web search[/dim strike]",
+                            "[green]✔[/green] [dim strike]Set up Gemini for better/faster web search[/dim strike]",
                             classes="checklist-label",
                             markup=True,
                         )
                 else:
                     with Horizontal(classes="checklist-row"):
                         yield Static(
-                            "☐ Set up Gemini key for web search",
+                            "☐ Set up Gemini for better/faster web search",
                             classes="checklist-label",
                             markup=True,
                         )
