@@ -560,7 +560,7 @@ class ProviderConfigScreen(Screen[None]):
         if provider_id == "shotgun":
             # Check shotgun key directly
             config = await self.config_manager.load()
-            return self.config_manager._provider_has_api_key(config.shotgun)
+            return self.config_manager.provider_has_api_key(config.shotgun)
         else:
             # Check LLM provider key
             try:

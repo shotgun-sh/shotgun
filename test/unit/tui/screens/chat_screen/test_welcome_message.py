@@ -18,6 +18,7 @@ def test_welcome_message_defaults():
     assert msg.kind == "welcome"
     assert msg.is_home_directory is False
     assert msg.is_indexed is False
+    assert msg.is_indexing is False
     assert msg.has_context7_key is False
     assert msg.is_frontier_model is False
     assert msg.frontier_model_label == ""
@@ -103,7 +104,7 @@ async def test_build_welcome_state_byok_anthropic_frontier():
     config = _make_config(anthropic_key="sk-ant-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -139,7 +140,7 @@ async def test_build_welcome_state_byok_openai_frontier():
     config = _make_config(openai_key="sk-openai-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -172,7 +173,7 @@ async def test_build_welcome_state_byok_google_frontier():
     config = _make_config(google_key="google-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -206,7 +207,7 @@ async def test_build_welcome_state_shotgun_account():
     config = _make_config(shotgun_key="shotgun-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=True)
+    mock_cm.provider_has_api_key = MagicMock(return_value=True)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -240,7 +241,7 @@ async def test_build_welcome_state_ollama_hides_model():
     config = _make_config(ollama_enabled=True)
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -274,7 +275,7 @@ async def test_build_welcome_state_home_directory():
     config = _make_config()
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     with (
         patch(
@@ -298,7 +299,7 @@ async def test_build_welcome_state_indexed_codebase():
     config = _make_config(anthropic_key="sk-ant-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -330,7 +331,7 @@ async def test_build_welcome_state_context7_key():
     config = _make_config(anthropic_key="sk-ant-test", context7_key="ctx7-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -362,7 +363,7 @@ async def test_build_welcome_state_already_frontier():
     config = _make_config(anthropic_key="sk-ant-test", selected_model="claude-opus-4-5")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -394,7 +395,7 @@ async def test_build_welcome_state_byok_shows_gemini():
     config = _make_config(anthropic_key="sk-ant-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()
@@ -428,7 +429,7 @@ async def test_build_welcome_state_frontier_priority():
     config = _make_config(anthropic_key="sk-ant-test", openai_key="sk-openai-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
-    mock_cm._provider_has_api_key = MagicMock(return_value=False)
+    mock_cm.provider_has_api_key = MagicMock(return_value=False)
 
     mock_sdk_instance = AsyncMock()
     mock_result = MagicMock()

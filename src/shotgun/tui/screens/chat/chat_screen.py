@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -50,6 +51,7 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
+from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
 from shotgun.agents.config.provider import get_provider_model
 from shotgun.agents.conversation import ConversationManager
@@ -139,6 +141,7 @@ from shotgun.tui.screens.chat_screen.messages import (
     SubAgentStarted,
 )
 from shotgun.tui.screens.chat_screen.welcome_message import (
+    WelcomeActionType,
     WelcomeMessage,
     WelcomeWidget,
     build_welcome_state,
@@ -148,6 +151,7 @@ from shotgun.tui.screens.database_locked_dialog import DatabaseLockedDialog
 from shotgun.tui.screens.database_timeout_dialog import DatabaseTimeoutDialog
 from shotgun.tui.screens.kuzu_error_dialog import KuzuErrorDialog
 from shotgun.tui.screens.models import LockedDialogAction
+from shotgun.tui.screens.provider_config import ProviderConfigScreen
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
     ShareSpecsAction,
@@ -1136,37 +1140,29 @@ class ChatScreen(Screen[None]):
     @on(WelcomeWidget.WelcomeAction)
     async def _handle_welcome_action(self, event: WelcomeWidget.WelcomeAction) -> None:
         """Handle actions from the welcome widget buttons."""
-        import webbrowser
-
-        if event.action == "index":
+        if event.action == WelcomeActionType.INDEX:
             # Show "in progress" state immediately before starting indexing
             for widget in self.query(WelcomeWidget):
                 widget.state = widget.state.model_copy(update={"is_indexing": True})
                 await widget.recompose()
                 break
             self.index_codebase_command()
-        elif event.action == "context7":
-            from shotgun.tui.screens.provider_config import ProviderConfigScreen
-
+        elif event.action == WelcomeActionType.CONTEXT7:
             self.app.push_screen(ProviderConfigScreen(initial_tab="context7-tab"))
-        elif event.action == "select_model":
+        elif event.action == WelcomeActionType.SELECT_MODEL:
             if event.model_name:
                 self.run_worker(self._apply_frontier_model(event.model_name))
-        elif event.action == "gemini_setup":
-            from shotgun.tui.screens.provider_config import ProviderConfigScreen
-
+        elif event.action == WelcomeActionType.GEMINI_SETUP:
             self.app.push_screen(
                 ProviderConfigScreen(
                     initial_tab="api-providers-tab", initial_provider="google"
                 )
             )
-        elif event.action == "getting_started":
+        elif event.action == WelcomeActionType.GETTING_STARTED:
             webbrowser.open(GETTING_STARTED_LINK)
 
     async def _apply_frontier_model(self, model_name: str) -> None:
         """Auto-select a frontier model from the welcome widget."""
-        from shotgun.agents.config import get_config_manager
-
         config_manager = get_config_manager()
         await config_manager.update_selected_model(model_name)
         await self._refresh_welcome_widget()

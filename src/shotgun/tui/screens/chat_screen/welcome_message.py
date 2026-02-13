@@ -1,10 +1,11 @@
 """Welcome message widget for onboarding checklist."""
 
 import os
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -17,12 +18,28 @@ from shotgun.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+class WelcomeActionType(StrEnum):
+    """Action types for welcome widget buttons."""
+
+    INDEX = "index"
+    CONTEXT7 = "context7"
+    SELECT_MODEL = "select_model"
+    GEMINI_SETUP = "gemini_setup"
+    GETTING_STARTED = "getting_started"
+
+
+def _has_secret_key(secret: SecretStr | None) -> bool:
+    """Return True if the secret contains a non-empty value."""
+    return bool(secret and secret.get_secret_value())
+
+
 class WelcomeMessage(BaseModel):
     """Data model capturing the welcome state snapshot."""
 
     kind: Literal["welcome"] = "welcome"
     is_home_directory: bool = False
     is_indexed: bool = False
+    is_indexing: bool = False
     has_context7_key: bool = False
     is_frontier_model: bool = False
     frontier_model_label: str = ""
@@ -62,34 +79,16 @@ async def build_welcome_state() -> WelcomeMessage:
             logger.debug("Failed to check codebase index status", exc_info=True)
 
     # Context7 key
-    has_context7_key = (
-        config.context7.api_key is not None
-        and len(config.context7.api_key.get_secret_value()) > 0
-    )
+    has_context7_key = _has_secret_key(config.context7.api_key)
 
     # Determine account type
-    is_shotgun_account = config_manager._provider_has_api_key(config.shotgun)
+    is_shotgun_account = config_manager.provider_has_api_key(config.shotgun)
     is_ollama = config.ollama.enabled
 
     # Check BYOK provider keys
-    has_anthropic = (
-        config.anthropic.api_key is not None
-        and len(config.anthropic.api_key.get_secret_value()) > 0
-        if config.anthropic.api_key
-        else False
-    )
-    has_openai = (
-        config.openai.api_key is not None
-        and len(config.openai.api_key.get_secret_value()) > 0
-        if config.openai.api_key
-        else False
-    )
-    has_google = (
-        config.google.api_key is not None
-        and len(config.google.api_key.get_secret_value()) > 0
-        if config.google.api_key
-        else False
-    )
+    has_anthropic = _has_secret_key(config.anthropic.api_key)
+    has_openai = _has_secret_key(config.openai.api_key)
+    has_google = _has_secret_key(config.google.api_key)
 
     is_byok = has_anthropic or has_openai or has_google
 
@@ -265,7 +264,7 @@ class WelcomeWidget(Widget):
     class WelcomeAction(Message):
         """Posted when a welcome button is clicked."""
 
-        def __init__(self, action: str, model_name: str = "") -> None:
+        def __init__(self, action: WelcomeActionType, model_name: str = "") -> None:
             super().__init__()
             self.action = action
             self.model_name = model_name
@@ -315,6 +314,13 @@ class WelcomeWidget(Widget):
                 with Horizontal(classes="checklist-row"):
                     yield Static(
                         "[green]✔[/green] [dim strike]Index this folder[/dim strike]",
+                        classes="checklist-label",
+                        markup=True,
+                    )
+            elif s.is_indexing:
+                with Horizontal(classes="checklist-row"):
+                    yield Static(
+                        "⏳ Indexing in progress…",
                         classes="checklist-label",
                         markup=True,
                     )
@@ -408,24 +414,25 @@ class WelcomeWidget(Widget):
 
     @on(ActionLink.Clicked, "#welcome-getting-started")
     def _on_getting_started(self) -> None:
-        self.post_message(self.WelcomeAction("getting_started"))
+        self.post_message(self.WelcomeAction(WelcomeActionType.GETTING_STARTED))
 
     @on(ActionLink.Clicked, "#welcome-index")
     def _on_index(self) -> None:
-        self.post_message(self.WelcomeAction("index"))
+        self.post_message(self.WelcomeAction(WelcomeActionType.INDEX))
 
     @on(ActionLink.Clicked, "#welcome-context7")
     def _on_context7(self) -> None:
-        self.post_message(self.WelcomeAction("context7"))
+        self.post_message(self.WelcomeAction(WelcomeActionType.CONTEXT7))
 
     @on(ActionLink.Clicked, "#welcome-select-model")
     def _on_select_model(self) -> None:
         self.post_message(
             self.WelcomeAction(
-                "select_model", model_name=self.state.frontier_model_name
+                WelcomeActionType.SELECT_MODEL,
+                model_name=self.state.frontier_model_name,
             )
         )
 
     @on(ActionLink.Clicked, "#welcome-gemini")
     def _on_gemini(self) -> None:
-        self.post_message(self.WelcomeAction("gemini_setup"))
+        self.post_message(self.WelcomeAction(WelcomeActionType.GEMINI_SETUP))

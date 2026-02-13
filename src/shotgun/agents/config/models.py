@@ -206,6 +206,13 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
     ),
 }
 
+# Default model for each provider (used when auto-selecting models)
+DEFAULT_PROVIDER_MODELS: dict[ProviderType, ModelName] = {
+    ProviderType.OPENAI: ModelName.GPT_5_2,
+    ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_5,
+    ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
+}
+
 # Sub-agent model mappings for cost optimization
 # Maps expensive models to cheaper alternatives from the same provider
 SUB_AGENT_MODEL_MAPPINGS: dict[ModelName, ModelName] = {
