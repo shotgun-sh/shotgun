@@ -232,19 +232,19 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
 
         # Check if any cloud provider keys are configured
         has_cloud_keys = (
-            config_manager._provider_has_api_key(config.openai)
-            or config_manager._provider_has_api_key(config.anthropic)
-            or config_manager._provider_has_api_key(config.google)
-            or config_manager._provider_has_api_key(config.shotgun)
+            config_manager.provider_has_api_key(config.openai)
+            or config_manager.provider_has_api_key(config.anthropic)
+            or config_manager.provider_has_api_key(config.google)
+            or config_manager.provider_has_api_key(config.shotgun)
         )
 
         # Log provider key status
         logger.debug(
             "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s, has_any=%s",
-            config_manager._provider_has_api_key(config.openai),
-            config_manager._provider_has_api_key(config.anthropic),
-            config_manager._provider_has_api_key(config.google),
-            config_manager._provider_has_api_key(config.shotgun),
+            config_manager.provider_has_api_key(config.openai),
+            config_manager.provider_has_api_key(config.anthropic),
+            config_manager.provider_has_api_key(config.google),
+            config_manager.provider_has_api_key(config.shotgun),
             has_cloud_keys,
         )
 
@@ -404,13 +404,13 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         logger.debug("ModelPickerScreen.on_show() called")
         self.run_worker(self._rebuild_model_list(), exclusive=True)
 
-    def on_screenresume(self) -> None:
+    def on_screen_resume(self) -> None:
         """Rebuild model list when screen is resumed (subsequent visits).
 
         This is called when returning to the screen after it was suspended,
         ensuring the model list reflects any config changes made while away.
         """
-        logger.debug("ModelPickerScreen.on_screenresume() called")
+        logger.debug("ModelPickerScreen.on_screen_resume() called")
         self.run_worker(self._rebuild_model_list(), exclusive=True)
 
     def action_done(self) -> None:
@@ -570,7 +570,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             True if the model can be used, False otherwise
         """
         # If Shotgun Account is configured, all models are available
-        if self.config_manager._provider_has_api_key(config.shotgun):
+        if self.config_manager.provider_has_api_key(config.shotgun):
             logger.debug("Model %s available (Shotgun Account configured)", model_name)
             return True
 
@@ -584,7 +584,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         provider_config = self.config_manager._get_provider_config(
             config, spec.provider
         )
-        has_key = self.config_manager._provider_has_api_key(provider_config)
+        has_key = self.config_manager.provider_has_api_key(provider_config)
         logger.debug(
             "Model %s available=%s (provider=%s, has_key=%s)",
             model_name,

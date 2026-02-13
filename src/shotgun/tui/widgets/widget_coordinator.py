@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from shotgun.attachments import FileAttachment
     from shotgun.tui.screens.chat import ChatScreen
     from shotgun.tui.screens.chat_screen.hint_message import HintMessage
+    from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
     from shotgun.utils.update_checker import UpdateInfo
 
 logger = logging.getLogger(__name__)
@@ -139,7 +140,9 @@ class WidgetCoordinator:
         except Exception as e:
             logger.exception(f"Failed to update mode indicator for Q&A: {e}")
 
-    def update_messages(self, messages: list[ModelMessage | "HintMessage"]) -> None:
+    def update_messages(
+        self, messages: list[ModelMessage | "HintMessage" | "WelcomeMessage"]
+    ) -> None:
         """Update chat history with new messages.
 
         Args:
@@ -155,7 +158,9 @@ class WidgetCoordinator:
             logger.exception(f"Failed to update messages: {e}")
 
     def set_partial_response(
-        self, message: ModelMessage | None, messages: list[ModelMessage | "HintMessage"]
+        self,
+        message: ModelMessage | None,
+        messages: list[ModelMessage | "HintMessage" | "WelcomeMessage"],
     ) -> None:
         """Update chat history with partial streaming response.
 

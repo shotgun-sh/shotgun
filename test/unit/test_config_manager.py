@@ -666,7 +666,7 @@ async def test_clear_provider_key_shotgun():
 
         # Verify both are set by checking config directly
         config = await manager.load(force_reload=True)
-        assert manager._provider_has_api_key(config.shotgun)
+        assert manager.provider_has_api_key(config.shotgun)
         assert config.shotgun.supabase_jwt is not None
         assert config.shotgun.supabase_jwt.get_secret_value() == "test-jwt-token"
 
@@ -675,7 +675,7 @@ async def test_clear_provider_key_shotgun():
 
         # Verify both api_key and supabase_jwt are cleared
         config = await manager.load(force_reload=True)
-        assert not manager._provider_has_api_key(config.shotgun)
+        assert not manager.provider_has_api_key(config.shotgun)
         assert config.shotgun.supabase_jwt is None
 
         # Verify config file was updated

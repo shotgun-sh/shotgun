@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -50,6 +51,7 @@ from shotgun.agents.agent_manager import (
     ToolExecutionStartedMessage,
     ToolStreamingProgressMessage,
 )
+from shotgun.agents.config import get_config_manager
 from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
 from shotgun.agents.config.provider import get_provider_model
 from shotgun.agents.conversation import ConversationManager
@@ -105,15 +107,9 @@ from shotgun.tui.components.status_bar import StatusBar
 from shotgun.tui.components.update_indicator import UpdateIndicator
 
 # TUIErrorHandler removed - exceptions now caught directly
-from shotgun.tui.screens.chat.codebase_index_prompt_screen import (
-    CodebaseIndexPromptScreen,
-)
 from shotgun.tui.screens.chat.codebase_index_selection import CodebaseIndexSelection
 from shotgun.tui.screens.chat.help_text import (
     GETTING_STARTED_LINK,
-    GETTING_STARTED_LINK_TEXT,
-    help_text_empty_dir,
-    help_text_with_codebase,
 )
 from shotgun.tui.screens.chat.prompt_history import PromptHistory
 from shotgun.tui.screens.chat_screen.command_providers import (
@@ -144,11 +140,18 @@ from shotgun.tui.screens.chat_screen.messages import (
     SubAgentCompleted,
     SubAgentStarted,
 )
+from shotgun.tui.screens.chat_screen.welcome_message import (
+    WelcomeActionType,
+    WelcomeMessage,
+    WelcomeWidget,
+    build_welcome_state,
+)
 from shotgun.tui.screens.confirmation_dialog import ConfirmationDialog
 from shotgun.tui.screens.database_locked_dialog import DatabaseLockedDialog
 from shotgun.tui.screens.database_timeout_dialog import DatabaseTimeoutDialog
 from shotgun.tui.screens.kuzu_error_dialog import KuzuErrorDialog
 from shotgun.tui.screens.models import LockedDialogAction
+from shotgun.tui.screens.provider_config import ProviderConfigScreen
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
     ShareSpecsAction,
@@ -214,7 +217,7 @@ class ChatScreen(Screen[None]):
     value = reactive("")
     mode = reactive(AgentType.RESEARCH)
     history: PromptHistory = PromptHistory()
-    messages = reactive(list[ModelMessage | HintMessage]())
+    messages = reactive(list[ModelMessage | HintMessage | WelcomeMessage]())
     indexing_job: reactive[CodebaseIndexSelection | None] = reactive(None)
 
     # Q&A mode state (for structured output clarifying questions)
@@ -339,13 +342,37 @@ class ChatScreen(Screen[None]):
         # Check for updates in background (after other startup tasks)
         self.call_later(self.check_for_updates)
 
-    def on_screenresume(self) -> None:
+    def on_screen_resume(self) -> None:
         """Handle screen resume after returning from other screens.
 
         This validates that the current model is still available (e.g., API keys
         may have been removed in Provider Setup) and falls back if necessary.
+        Also refreshes the welcome widget checklist to reflect any config changes.
         """
         self.run_worker(self._validate_current_model(), exclusive=True)
+        self.run_worker(self._refresh_welcome_widget())
+
+    async def _refresh_welcome_widget(self) -> None:
+        """Rebuild the WelcomeWidget in-place with fresh config state.
+
+        Finds the WelcomeWidget in the DOM, updates its state, and
+        calls recompose() to rebuild the checklist items.
+        """
+        new_state = await build_welcome_state()
+
+        # Update the data model in ui_message_history
+        for i, msg in enumerate(self.agent_manager.ui_message_history):
+            if isinstance(msg, WelcomeMessage):
+                self.agent_manager.ui_message_history[i] = new_state
+                break
+        else:
+            return  # No WelcomeMessage in history
+
+        # Find the live WelcomeWidget in the DOM and recompose it
+        for widget in self.query(WelcomeWidget):
+            widget.state = new_state
+            await widget.recompose()
+            break
 
     def _reset_agents_for_model_change(self) -> None:
         """Reset agent instances so they get recreated with the new model.
@@ -618,38 +645,9 @@ class ChatScreen(Screen[None]):
                         f"Failed to delete graph {graph.graph_id} during force reindex: {e}"
                     )
 
-        # Check if the current directory has any accessible codebases
-        accessible_graphs = (
-            await self.codebase_sdk.list_codebases_for_directory()
-        ).graphs
-        if accessible_graphs:
-            self.mount_hint(
-                help_text_with_codebase(already_indexed=True),
-                link=GETTING_STARTED_LINK,
-                link_text=GETTING_STARTED_LINK_TEXT,
-            )
-            return
-
-        # Ask user if they want to index the current directory
-        should_index = await self.app.push_screen_wait(CodebaseIndexPromptScreen())
-        if not should_index:
-            self.mount_hint(
-                help_text_empty_dir(),
-                link=GETTING_STARTED_LINK,
-                link_text=GETTING_STARTED_LINK_TEXT,
-            )
-            return
-
-        self.mount_hint(
-            help_text_with_codebase(already_indexed=False),
-            link=GETTING_STARTED_LINK,
-            link_text=GETTING_STARTED_LINK_TEXT,
-        )
-
-        # Auto-index the current directory with its name
-        cwd_name = cur_dir.name
-        selection = CodebaseIndexSelection(repo_path=cur_dir, name=cwd_name)
-        self.call_later(lambda: self.index_codebase(selection))
+        # Build welcome state and show the welcome widget
+        welcome_state = await build_welcome_state()
+        self.agent_manager.add_hint_message(welcome_state)
 
     def watch_mode(self, new_mode: AgentType) -> None:
         """React to mode changes by updating the agent manager."""
@@ -672,7 +670,9 @@ class ChatScreen(Screen[None]):
             # Use widget coordinator for all widget updates
             self.widget_coordinator.update_for_qa_mode(qa_mode_active)
 
-    def watch_messages(self, messages: list[ModelMessage | HintMessage]) -> None:
+    def watch_messages(
+        self, messages: list[ModelMessage | HintMessage | WelcomeMessage]
+    ) -> None:
         """Update the chat history when messages change."""
         if self.is_mounted:
             # Use widget coordinator for all widget updates
@@ -1077,7 +1077,7 @@ class ChatScreen(Screen[None]):
     async def update_context_indicator_with_messages(
         self,
         agent_messages: list[ModelMessage],
-        ui_messages: list[ModelMessage | HintMessage],
+        ui_messages: list[ModelMessage | HintMessage | WelcomeMessage],
     ) -> None:
         """Update the context indicator with specific message sets (for streaming updates).
 
@@ -1136,6 +1136,36 @@ class ChatScreen(Screen[None]):
     ) -> None:
         hint = HintMessage(message=markdown, link=link, link_text=link_text)
         self.agent_manager.add_hint_message(hint)
+
+    @on(WelcomeWidget.WelcomeAction)
+    async def _handle_welcome_action(self, event: WelcomeWidget.WelcomeAction) -> None:
+        """Handle actions from the welcome widget buttons."""
+        if event.action == WelcomeActionType.INDEX:
+            # Show "in progress" state immediately before starting indexing
+            for widget in self.query(WelcomeWidget):
+                widget.state = widget.state.model_copy(update={"is_indexing": True})
+                await widget.recompose()
+                break
+            self.index_codebase_command()
+        elif event.action == WelcomeActionType.CONTEXT7:
+            self.app.push_screen(ProviderConfigScreen(initial_tab="context7-tab"))
+        elif event.action == WelcomeActionType.SELECT_MODEL:
+            if event.model_name:
+                self.run_worker(self._apply_frontier_model(event.model_name))
+        elif event.action == WelcomeActionType.GEMINI_SETUP:
+            self.app.push_screen(
+                ProviderConfigScreen(
+                    initial_tab="api-providers-tab", initial_provider="google"
+                )
+            )
+        elif event.action == WelcomeActionType.GETTING_STARTED:
+            webbrowser.open(GETTING_STARTED_LINK)
+
+    async def _apply_frontier_model(self, model_name: str) -> None:
+        """Auto-select a frontier model from the welcome widget."""
+        config_manager = get_config_manager()
+        await config_manager.update_selected_model(model_name)
+        await self._refresh_welcome_widget()
 
     def _show_spec_dir_hint(self) -> None:
         """Show hint when --spec-dir override is active."""
@@ -1310,7 +1340,7 @@ class ChatScreen(Screen[None]):
 
         # Build new message list combining existing messages with new streaming content
         new_message_list = self.messages + cast(
-            list[ModelMessage | HintMessage], filtered_event_messages
+            list[ModelMessage | HintMessage | WelcomeMessage], filtered_event_messages
         )
 
         # Use widget coordinator to set partial response
@@ -2189,6 +2219,8 @@ class ChatScreen(Screen[None]):
             label.update("")
             label.refresh()
             await self.codebase_sdk.service.indexing.complete(graph_id)
+            # Refresh welcome checklist to show indexing is done
+            await self._refresh_welcome_widget()
 
     @work
     async def run_agent(

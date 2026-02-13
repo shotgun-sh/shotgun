@@ -139,6 +139,25 @@ class ProviderConfigScreen(Screen[None]):
             color: $text-muted;
         }
 
+        /* Context7 tab styling */
+        #context7-status {
+            height: auto;
+            padding: 0 1;
+            min-height: 1;
+        }
+
+        #context7-status.error {
+            color: $error;
+        }
+
+        #context7-actions {
+            padding: 0;
+        }
+
+        #context7-actions > * {
+            margin-right: 2;
+        }
+
         /* Ollama enable section */
         #ollama-enable-container {
             padding: 0;
@@ -201,14 +220,20 @@ class ProviderConfigScreen(Screen[None]):
     selected_provider: reactive[str] = reactive("openai")
     ollama_status: reactive[OllamaStatus | None] = reactive(None)
 
-    def __init__(self, initial_tab: str = "api-providers-tab") -> None:
+    def __init__(
+        self,
+        initial_tab: str = "api-providers-tab",
+        initial_provider: str | None = None,
+    ) -> None:
         """Initialize the provider config screen.
 
         Args:
-            initial_tab: ID of the tab to show initially ("api-providers-tab" or "ollama-tab")
+            initial_tab: ID of the tab to show initially ("api-providers-tab", "ollama-tab", or "context7-tab")
+            initial_provider: Provider to pre-select in the API Providers list (e.g. "google")
         """
         super().__init__()
         self._initial_tab = initial_tab
+        self._initial_provider = initial_provider
 
     def compose(self) -> ComposeResult:
         with Vertical(id="titlebox"):
@@ -255,6 +280,32 @@ class ProviderConfigScreen(Screen[None]):
                     )
                     yield Static("Experimental", id="ollama-experimental-label")
 
+            with TabPane("Context7", id="context7-tab"):
+                yield Markdown(
+                    "Context7 provides up-to-date documentation for libraries as MCP tools. "
+                    "Get a free API key to enable documentation-aware specs.",
+                    id="context7-info",
+                )
+                with Horizontal(id="context7-link-actions"):
+                    yield Button(
+                        "Get API Key",
+                        id="context7-get-key",
+                        variant="primary",
+                    )
+                    yield Button(
+                        "Copy link",
+                        id="context7-copy-link",
+                    )
+                yield Input(
+                    placeholder="Context7 API key",
+                    password=True,
+                    id="context7-api-key",
+                )
+                yield Label("", id="context7-status")
+                with Horizontal(id="context7-actions"):
+                    yield Button("Save key", variant="primary", id="context7-save")
+                    yield Button("Clear key", id="context7-clear", variant="warning")
+
         with Horizontal(id="done-container"):
             yield Button("Back \\[ESC]", id="done", variant="primary")
 
@@ -274,11 +325,22 @@ class ProviderConfigScreen(Screen[None]):
         else:
             self.set_focus(self.query_one("#api-key", Input))
 
+        # Pre-select provider if specified
+        if self._initial_provider:
+            providers = get_configurable_providers()
+            if self._initial_provider in providers:
+                idx = providers.index(self._initial_provider)
+                list_view.index = idx
+                self.selected_provider = self._initial_provider
+
         # Refresh UI asynchronously
         self.run_worker(self._refresh_ui(), exclusive=False)
 
         # Load Ollama status (exclusive to prevent duplicate widget IDs on concurrent refresh)
         self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
+
+        # Load Context7 key status
+        self.run_worker(self._refresh_context7_status(), exclusive=False)
 
         # Apply layout based on terminal height
         self._apply_layout_for_height(self.app.size.height)
@@ -295,13 +357,14 @@ class ProviderConfigScreen(Screen[None]):
         else:
             self.remove_class("compact")
 
-    def on_screenresume(self) -> None:
+    def on_screen_resume(self) -> None:
         """Refresh provider status when screen is resumed.
 
         This ensures the UI reflects any provider changes made elsewhere.
         """
         self.run_worker(self._refresh_ui(), exclusive=False)
         self.run_worker(self._refresh_ollama_status(), exclusive=True, group="ollama")
+        self.run_worker(self._refresh_context7_status(), exclusive=False)
 
     async def _refresh_ui(self) -> None:
         """Refresh provider status and button visibility."""
@@ -497,7 +560,7 @@ class ProviderConfigScreen(Screen[None]):
         if provider_id == "shotgun":
             # Check shotgun key directly
             config = await self.config_manager.load()
-            return self.config_manager._provider_has_api_key(config.shotgun)
+            return self.config_manager.provider_has_api_key(config.shotgun)
         else:
             # Check LLM provider key
             try:
@@ -614,6 +677,78 @@ class ProviderConfigScreen(Screen[None]):
             f"✓ Cleared API key for {self._provider_display_name(self.selected_provider)}."
         )
         status_label.remove_class("error")
+
+    @on(Button.Pressed, "#context7-get-key")
+    def _on_context7_get_key(self) -> None:
+        """Open Context7 website to get an API key."""
+        webbrowser.open("https://context7.com")
+
+    @on(Button.Pressed, "#context7-copy-link")
+    def _on_context7_copy_link(self) -> None:
+        """Copy Context7 URL to clipboard."""
+        status_label = self.query_one("#context7-status", Label)
+        try:
+            import pyperclip  # type: ignore[import-untyped]
+
+            pyperclip.copy("https://context7.com")
+            status_label.update("Copied to clipboard!")
+            status_label.remove_class("error")
+        except ImportError:
+            status_label.update("Clipboard unavailable. Visit https://context7.com")
+            status_label.remove_class("error")
+        except Exception as e:
+            status_label.update(f"Copy failed: {e}")
+            status_label.add_class("error")
+
+    @on(Button.Pressed, "#context7-save")
+    def _on_context7_save(self) -> None:
+        self.run_worker(self._do_save_context7_key(), exclusive=True)
+
+    @on(Button.Pressed, "#context7-clear")
+    def _on_context7_clear(self) -> None:
+        self.run_worker(self._do_clear_context7_key(), exclusive=True)
+
+    async def _do_save_context7_key(self) -> None:
+        """Save Context7 API key."""
+        input_widget = self.query_one("#context7-api-key", Input)
+        status_label = self.query_one("#context7-status", Label)
+        api_key = input_widget.value.strip()
+
+        if not api_key:
+            status_label.update("Enter an API key before saving.")
+            status_label.add_class("error")
+            return
+
+        try:
+            await self.config_manager.update_context7(api_key)
+            input_widget.value = ""
+            status_label.update("Saved Context7 API key.")
+            status_label.remove_class("error")
+        except Exception as exc:
+            status_label.update(f"Failed to save key: {exc}")
+            status_label.add_class("error")
+
+    async def _do_clear_context7_key(self) -> None:
+        """Clear Context7 API key."""
+        status_label = self.query_one("#context7-status", Label)
+        try:
+            await self.config_manager.update_context7(None)
+            self.query_one("#context7-api-key", Input).value = ""
+            status_label.update("Cleared Context7 API key.")
+            status_label.remove_class("error")
+        except Exception as exc:
+            status_label.update(f"Failed to clear key: {exc}")
+            status_label.add_class("error")
+
+    async def _refresh_context7_status(self) -> None:
+        """Load existing Context7 key status on mount."""
+        config = await self.config_manager.load()
+        status_label = self.query_one("#context7-status", Label)
+        if config.context7.api_key and config.context7.api_key.get_secret_value():
+            status_label.update("Context7 API key is configured.")
+            status_label.remove_class("error")
+        else:
+            status_label.update("")
 
     async def _start_shotgun_auth(self) -> None:
         """Launch Shotgun Account authentication flow."""

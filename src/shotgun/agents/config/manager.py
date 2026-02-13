@@ -21,6 +21,7 @@ from .constants import (
     ConfigSection,
 )
 from .models import (
+    DEFAULT_PROVIDER_MODELS,
     MODEL_SPECS,
     AnthropicConfig,
     GoogleConfig,
@@ -430,7 +431,7 @@ class ConfigManager:
                 should_save = True
 
             # Validate selected_model for BYOK mode - verify provider has a key
-            if not self._provider_has_api_key(self._config.shotgun):
+            if not self.provider_has_api_key(self._config.shotgun):
                 # If selected_model is set, verify its provider has a key
                 # (Skip validation for Ollama models which don't need API keys)
                 if self._config.selected_model and not is_ollama_model(
@@ -452,15 +453,10 @@ class ConfigManager:
                 if not self._config.selected_model:
                     for provider in ProviderType:
                         if await self.has_provider_key(provider):
-                            # Find default model for this provider
-                            provider_models = {
-                                ProviderType.OPENAI: ModelName.GPT_5_2,
-                                ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_5,
-                                ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
-                            }
-
-                            if provider in provider_models:
-                                self._config.selected_model = provider_models[provider]
+                            if provider in DEFAULT_PROVIDER_MODELS:
+                                self._config.selected_model = DEFAULT_PROVIDER_MODELS[
+                                    provider
+                                ]
                                 should_save = True
                                 break
 
@@ -608,20 +604,13 @@ class ConfigManager:
                 raise RuntimeError("Provider enum should not be None for LLM providers")
             other_providers = [p for p in ProviderType if p != provider_enum]
             has_other_keys = any(
-                self._provider_has_api_key(self._get_provider_config(config, p))
+                self.provider_has_api_key(self._get_provider_config(config, p))
                 for p in other_providers
             )
             if not has_other_keys:
                 # Set selected_model to this provider's default model
-                from .models import ModelName
-
-                provider_models = {
-                    ProviderType.OPENAI: ModelName.GPT_5_2,
-                    ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_5,
-                    ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
-                }
-                if provider_enum in provider_models:
-                    config.selected_model = provider_models[provider_enum]
+                if provider_enum in DEFAULT_PROVIDER_MODELS:
+                    config.selected_model = DEFAULT_PROVIDER_MODELS[provider_enum]
 
             # Mark welcome screen as shown when BYOK provider is configured
             # This prevents the welcome screen from showing again after user has made their choice
@@ -678,7 +667,7 @@ class ConfigManager:
         provider_enum = self._ensure_provider_enum(provider)
         provider_config = self._get_provider_config(config, provider_enum)
 
-        return self._provider_has_api_key(provider_config)
+        return self.provider_has_api_key(provider_config)
 
     async def has_any_provider_key(self) -> bool:
         """Determine whether any provider has a configured API key."""
@@ -686,7 +675,7 @@ class ConfigManager:
         config = await self.load(force_reload=False)
         # Check LLM provider keys (BYOK)
         has_llm_key = any(
-            self._provider_has_api_key(self._get_provider_config(config, provider))
+            self.provider_has_api_key(self._get_provider_config(config, provider))
             for provider in (
                 ProviderType.OPENAI,
                 ProviderType.ANTHROPIC,
@@ -694,7 +683,7 @@ class ConfigManager:
             )
         )
         # Also check Shotgun Account key
-        has_shotgun_key = self._provider_has_api_key(config.shotgun)
+        has_shotgun_key = self.provider_has_api_key(config.shotgun)
         return has_llm_key or has_shotgun_key
 
     async def initialize(self) -> ShotgunConfig:
@@ -806,7 +795,7 @@ class ConfigManager:
             return None
         raise ValueError(f"Unsupported provider: {provider}")
 
-    def _provider_has_api_key(self, provider_config: Any) -> bool:
+    def provider_has_api_key(self, provider_config: Any) -> bool:
         """Return True if the provider config contains a usable API key."""
         if provider_config is None:
             return False
