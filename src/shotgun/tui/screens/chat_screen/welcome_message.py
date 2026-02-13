@@ -7,10 +7,10 @@ from typing import Literal
 from pydantic import BaseModel
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Button, Markdown, Static
+from textual.widgets import Markdown, Static
 
 from shotgun.logging_config import get_logger
 
@@ -138,6 +138,55 @@ async def build_welcome_state() -> WelcomeMessage:
     )
 
 
+class ActionLink(Static):
+    """A thin clickable link-style button (1 line tall)."""
+
+    DEFAULT_CSS = """
+        ActionLink {
+            width: auto;
+            height: 1;
+            padding: 0 1;
+            color: $text;
+            background: $primary;
+            text-style: bold;
+        }
+
+        ActionLink:hover {
+            background: $primary-lighten-1;
+        }
+
+        ActionLink.-success {
+            background: $success;
+        }
+
+        ActionLink.-success:hover {
+            background: $success-lighten-1;
+        }
+    """
+
+    can_focus = True
+
+    class Clicked(Message):
+        """Posted when the link is clicked."""
+
+        def __init__(self, link: "ActionLink") -> None:
+            super().__init__()
+            self.link = link
+
+        @property
+        def control(self) -> "ActionLink":
+            """The ActionLink that was clicked."""
+            return self.link
+
+    def __init__(
+        self, label: str, *, id: str | None = None, classes: str | None = None
+    ) -> None:
+        super().__init__(label, id=id, classes=classes, markup=False)
+
+    def on_click(self) -> None:
+        self.post_message(self.Clicked(self))
+
+
 class WelcomeWidget(Widget):
     """Interactive onboarding checklist widget."""
 
@@ -147,51 +196,65 @@ class WelcomeWidget(Widget):
             height: auto;
             margin: 1;
             margin-left: 1;
-            padding: 1;
+            padding: 1 2;
         }
 
         WelcomeWidget .welcome-intro {
             height: auto;
             padding: 0;
-            margin: 0;
-        }
-
-        WelcomeWidget .checklist-item {
-            height: auto;
-            padding: 0;
-            margin: 0 0 0 2;
-        }
-
-        WelcomeWidget .checklist-note {
-            height: auto;
-            padding: 0;
-            margin: 0 0 0 4;
-            color: $text-muted;
-        }
-
-        WelcomeWidget .action-row {
-            height: auto;
-            width: auto;
-            margin: 0 0 0 4;
-        }
-
-        WelcomeWidget .action-btn {
-            width: auto;
-            min-width: 16;
-            margin: 0 1 0 0;
-        }
-
-        WelcomeWidget .welcome-footer {
-            height: auto;
-            padding: 1 0 0 0;
-            margin: 0;
-            color: $text-muted;
+            margin: 0 0 1 0;
         }
 
         WelcomeWidget .getting-started-row {
             height: auto;
             width: auto;
+            margin: 0 0 0 0;
+        }
+
+        WelcomeWidget .section-header {
+            height: auto;
+            padding: 0;
+            margin: 1 0 0 0;
+            color: $text;
+        }
+
+        WelcomeWidget .checklist-group {
+            height: auto;
             margin: 0 0 1 0;
+        }
+
+        WelcomeWidget .checklist-row {
+            height: auto;
+            width: 100%;
+            margin: 0 0 0 1;
+        }
+
+        WelcomeWidget .checklist-label {
+            height: auto;
+            width: auto;
+            padding: 0;
+        }
+
+        WelcomeWidget .checklist-note {
+            height: auto;
+            padding: 0;
+            margin: 0 0 0 5;
+            color: $text-muted;
+        }
+
+        WelcomeWidget ActionLink {
+            margin: 0 0 0 2;
+        }
+
+        WelcomeWidget .getting-started-link {
+            margin: 0 0 0 0;
+        }
+
+        WelcomeWidget .welcome-footer {
+            height: auto;
+            padding: 0;
+            margin: 0;
+            color: $text-muted;
         }
     """
 
@@ -220,102 +283,118 @@ class WelcomeWidget(Widget):
         )
         yield Markdown(intro, classes="welcome-intro")
 
-        # Getting started button
+        # Getting started link
         with Horizontal(classes="getting-started-row"):
-            yield Button(
+            yield ActionLink(
                 "Getting started guide",
                 id="welcome-getting-started",
-                classes="action-btn",
-                variant="default",
+                classes="getting-started-link -success",
             )
 
+        # Section header
+        yield Static(
+            "[bold]Get the most out of Shotgun:[/bold]",
+            classes="section-header",
+            markup=True,
+        )
+
         # Checklist #1: Index
-        if s.is_home_directory:
-            yield Static(
-                "[dim]☐ [strike]Index this folder[/strike] (start in a project directory, not home)[/dim]",
-                classes="checklist-item",
-                markup=True,
-            )
-        elif s.is_indexed:
-            yield Static(
-                "[green]✔[/green] [dim strike]Index this folder[/dim strike]",
-                classes="checklist-item",
-                markup=True,
-            )
-        else:
-            yield Static("☐ Index this folder", classes="checklist-item", markup=True)
-            yield Static(
-                "The codebase index lives on your computer, it costs nothing.",
-                classes="checklist-note",
-            )
-            with Horizontal(classes="action-row"):
-                yield Button(
-                    "Index this folder",
-                    id="welcome-index",
-                    classes="action-btn",
-                    variant="primary",
+        with Vertical(classes="checklist-group"):
+            if s.is_home_directory:
+                with Horizontal(classes="checklist-row"):
+                    yield Static(
+                        "[dim]☐ [strike]Index this folder[/strike] (start in a project directory, not home)[/dim]",
+                        classes="checklist-label",
+                        markup=True,
+                    )
+            elif s.is_indexed:
+                with Horizontal(classes="checklist-row"):
+                    yield Static(
+                        "[green]✔[/green] [dim strike]Index this folder[/dim strike]",
+                        classes="checklist-label",
+                        markup=True,
+                    )
+            else:
+                with Horizontal(classes="checklist-row"):
+                    yield Static(
+                        "☐ Index this folder",
+                        classes="checklist-label",
+                        markup=True,
+                    )
+                    yield ActionLink(
+                        "Index this folder",
+                        id="welcome-index",
+                        classes="-success",
+                    )
+                yield Static(
+                    "The codebase index lives on your computer, it costs nothing.",
+                    classes="checklist-note",
                 )
 
         # Checklist #2: Context7
-        if s.has_context7_key:
-            yield Static(
-                "[green]✔[/green] [dim strike]Set up Context7[/dim strike]",
-                classes="checklist-item",
-                markup=True,
-            )
-        else:
-            yield Static("☐ Set up Context7", classes="checklist-item", markup=True)
-            with Horizontal(classes="action-row"):
-                yield Button(
-                    "Set up Context7",
-                    id="welcome-context7",
-                    classes="action-btn",
-                    variant="default",
-                )
+        with Vertical(classes="checklist-group"):
+            if s.has_context7_key:
+                with Horizontal(classes="checklist-row"):
+                    yield Static(
+                        "[green]✔[/green] [dim strike]Set up Context7[/dim strike]",
+                        classes="checklist-label",
+                        markup=True,
+                    )
+            else:
+                with Horizontal(classes="checklist-row"):
+                    yield Static(
+                        "☐ Set up Context7",
+                        classes="checklist-label",
+                        markup=True,
+                    )
+                    yield ActionLink(
+                        "Set up Context7",
+                        id="welcome-context7",
+                    )
 
         # Checklist #3: Frontier model (hidden for Ollama)
         if not s.is_ollama:
-            if s.is_frontier_model:
-                yield Static(
-                    "[green]✔[/green] [dim strike]Select a frontier model[/dim strike]",
-                    classes="checklist-item",
-                    markup=True,
-                )
-            elif s.frontier_model_label:
-                yield Static(
-                    "☐ Select a frontier model",
-                    classes="checklist-item",
-                    markup=True,
-                )
-                with Horizontal(classes="action-row"):
-                    yield Button(
-                        s.frontier_model_label,
-                        id="welcome-select-model",
-                        classes="action-btn",
-                        variant="default",
-                    )
+            with Vertical(classes="checklist-group"):
+                if s.is_frontier_model:
+                    with Horizontal(classes="checklist-row"):
+                        yield Static(
+                            "[green]✔[/green] [dim strike]Select a frontier model[/dim strike]",
+                            classes="checklist-label",
+                            markup=True,
+                        )
+                elif s.frontier_model_label:
+                    with Horizontal(classes="checklist-row"):
+                        yield Static(
+                            "☐ Select a frontier model",
+                            classes="checklist-label",
+                            markup=True,
+                        )
+                        yield ActionLink(
+                            s.frontier_model_label,
+                            id="welcome-select-model",
+                        )
 
         # Checklist #4: Gemini (BYOK only)
         if s.is_byok:
-            if s.has_gemini_key:
-                yield Static(
-                    "[green]✔[/green] [dim strike]Set up Gemini key for web search[/dim strike]",
-                    classes="checklist-item",
-                    markup=True,
-                )
-            else:
-                yield Static(
-                    "☐ Set up Gemini key for web search",
-                    classes="checklist-item",
-                    markup=True,
-                )
-                with Horizontal(classes="action-row"):
-                    yield Button(
-                        "Set up Gemini key",
-                        id="welcome-gemini",
-                        classes="action-btn",
-                        variant="default",
-                    )
+            with Vertical(classes="checklist-group"):
+                if s.has_gemini_key:
+                    with Horizontal(classes="checklist-row"):
+                        yield Static(
+                            "[green]✔[/green] [dim strike]Set up Gemini key for web search[/dim strike]",
+                            classes="checklist-label",
+                            markup=True,
+                        )
+                else:
+                    with Horizontal(classes="checklist-row"):
+                        yield Static(
+                            "☐ Set up Gemini key for web search",
+                            classes="checklist-label",
+                            markup=True,
+                        )
+                        yield ActionLink(
+                            "Set up Gemini key",
+                            id="welcome-gemini",
+                        )
 
         # Footer
         yield Static(
@@ -323,19 +402,19 @@ class WelcomeWidget(Widget):
             classes="welcome-footer",
         )
 
-    @on(Button.Pressed, "#welcome-getting-started")
+    @on(ActionLink.Clicked, "#welcome-getting-started")
     def _on_getting_started(self) -> None:
         self.post_message(self.WelcomeAction("getting_started"))
 
-    @on(Button.Pressed, "#welcome-index")
+    @on(ActionLink.Clicked, "#welcome-index")
     def _on_index(self) -> None:
         self.post_message(self.WelcomeAction("index"))
 
-    @on(Button.Pressed, "#welcome-context7")
+    @on(ActionLink.Clicked, "#welcome-context7")
     def _on_context7(self) -> None:
         self.post_message(self.WelcomeAction("context7"))
 
-    @on(Button.Pressed, "#welcome-select-model")
+    @on(ActionLink.Clicked, "#welcome-select-model")
     def _on_select_model(self) -> None:
         self.post_message(
             self.WelcomeAction(
@@ -343,6 +422,6 @@ class WelcomeWidget(Widget):
             )
         )
 
-    @on(Button.Pressed, "#welcome-gemini")
+    @on(ActionLink.Clicked, "#welcome-gemini")
     def _on_gemini(self) -> None:
         self.post_message(self.WelcomeAction("gemini_setup"))
