@@ -12,8 +12,8 @@ from pydantic_ai.models.anthropic import AnthropicModelSettings
 class ProviderType(StrEnum):
     """Provider types for AI services."""
 
-    OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    OPENAI = "openai"
     GOOGLE = "google"
     OPENAI_COMPATIBLE = "openai_compatible"
 
