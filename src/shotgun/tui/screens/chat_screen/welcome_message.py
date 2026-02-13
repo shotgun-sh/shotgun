@@ -213,8 +213,8 @@ class WelcomeWidget(Widget):
         # Intro
         intro = (
             "**Welcome to Shotgun** - Spec Driven Development for Developers and AI Agents.\n\n"
-            "Shotgun writes codebase-aware specs for your AI coding agents so they don't derail.\n"
-            'It will guide you to doing codebase research -> building a spec -> an implementation plan -> a task list.\n'
+            "Shotgun writes codebase-aware specs for your AI coding agents so they don't derail.\n\n"
+            "It will guide you to doing codebase research -> building a spec -> an implementation plan -> a task list.\n\n"
             'Once you have all of that you can either use Shotgun Autopilot ("/" + autopilot) to automate implementing '
             "with Claude Code or just prompt your AI Coding Agent directly."
         )
