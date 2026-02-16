@@ -374,23 +374,13 @@ class ChatScreen(Screen[None]):
             await widget.recompose()
             break
 
-    def _reset_agents_for_model_change(self) -> None:
+    async def _reset_agents_for_model_change(self) -> None:
         """Reset agent instances so they get recreated with the new model.
 
         This is called when the model configuration changes (either via model picker
         or when falling back due to API key removal).
         """
-        self.agent_manager._agents_initialized = False
-        self.agent_manager._research_agent = None
-        self.agent_manager._plan_agent = None
-        self.agent_manager._tasks_agent = None
-        self.agent_manager._specify_agent = None
-        self.agent_manager._export_agent = None
-        self.agent_manager._research_deps = None
-        self.agent_manager._plan_deps = None
-        self.agent_manager._tasks_deps = None
-        self.agent_manager._specify_deps = None
-        self.agent_manager._export_deps = None
+        await self.agent_manager.cleanup_agents()
 
     async def _validate_current_model(self) -> None:
         """Validate current model is still available, fall back if not.
@@ -424,7 +414,7 @@ class ChatScreen(Screen[None]):
                 self.agent_manager.deps.llm_model = valid_model
 
                 # Reset agents so they get recreated with new model
-                self._reset_agents_for_model_change()
+                await self._reset_agents_for_model_change()
 
                 # Get display name for new model
                 new_model_display = valid_model_name
@@ -1606,7 +1596,7 @@ class ChatScreen(Screen[None]):
             self.agent_manager.deps.llm_model = result.model_config
 
             # Reset agents so they get recreated with new model
-            self._reset_agents_for_model_change()
+            await self._reset_agents_for_model_change()
 
             # Get current analysis and update context indicator via coordinator
             analysis = await self.agent_manager.get_context_analysis()
