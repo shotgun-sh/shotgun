@@ -92,6 +92,7 @@ from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
 from shotgun.utils.source_detection import detect_source
 
 from .conversation.history.compaction import apply_persistent_compaction
+from .conversation.history.constants import MAX_UI_HINT_MESSAGES
 from .export import create_export_agent
 from .messages import AgentSystemPrompt, InternalPromptPart
 from .models import AgentDeps, AgentRuntimeOptions
@@ -1403,6 +1404,9 @@ class AgentManager(Widget):
                 extra={"agent_mode": self._current_agent_type.value},
             )
 
+        # Prune old hint/welcome messages to prevent unbounded UI history growth
+        self._prune_ui_message_history()
+
         # Post final UI update after compaction completes
         # This ensures widgets that depend on message_history (like context indicator)
         # receive the updated history after compaction
@@ -1663,6 +1667,11 @@ class AgentManager(Widget):
                 # Mark as sub-agent response for rendering with ↳ prefix
                 final_message._shotgun_is_sub_agent = True  # type: ignore[attr-defined]
                 self._sub_agent_messages.append(final_message)
+                if len(self._sub_agent_messages) > 200:
+                    logger.warning(
+                        "_sub_agent_messages exceeded 200 entries, truncating to most recent 100"
+                    )
+                    self._sub_agent_messages = self._sub_agent_messages[-100:]
 
         state.current_response = None
 
@@ -1695,6 +1704,36 @@ class AgentManager(Widget):
         for j, msg in enumerate(self._sub_agent_messages):
             self.ui_message_history.insert(insert_idx + j, msg)
         self._sub_agent_messages = []
+
+    def _prune_ui_message_history(self) -> None:
+        """Remove oldest HintMessage/WelcomeMessage entries when over the limit.
+
+        Preserves all ModelMessage entries (which mirror the already-compacted
+        message_history) and keeps the most recent hint messages for context.
+        """
+        hint_indices = [
+            i
+            for i, msg in enumerate(self.ui_message_history)
+            if isinstance(msg, (HintMessage, WelcomeMessage))
+        ]
+        if len(hint_indices) <= MAX_UI_HINT_MESSAGES:
+            return
+
+        indices_to_remove = set(
+            hint_indices[: len(hint_indices) - MAX_UI_HINT_MESSAGES]
+        )
+        self.ui_message_history = [
+            msg
+            for i, msg in enumerate(self.ui_message_history)
+            if i not in indices_to_remove
+        ]
+        logger.debug(
+            "Pruned ui_message_history",
+            extra={
+                "removed_hints": len(indices_to_remove),
+                "remaining_total": len(self.ui_message_history),
+            },
+        )
 
     def _build_partial_response(
         self, parts: list[ModelResponsePart | ToolCallPartDelta]
