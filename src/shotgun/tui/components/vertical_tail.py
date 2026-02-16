@@ -1,5 +1,3 @@
-from typing import Any
-
 from textual.containers import VerticalScroll
 from textual.geometry import Size
 from textual.reactive import reactive
@@ -9,10 +7,7 @@ class VerticalTail(VerticalScroll):
     """A vertical scroll container that automatically scrolls to the bottom when content is added."""
 
     auto_scroll = reactive(True, layout=False)
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._scroll_pending = False
+    _scroll_pending = False
 
     def watch_auto_scroll(self, value: bool) -> None:
         """Handle auto_scroll property changes."""
