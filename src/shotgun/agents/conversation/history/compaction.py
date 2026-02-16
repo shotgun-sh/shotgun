@@ -55,10 +55,16 @@ async def apply_persistent_compaction(
         api_tokens = _get_last_api_token_count(messages)
         if api_tokens > 0:
             estimated_tokens = api_tokens
-            logger.debug(f"Using API usage data for compaction check: {estimated_tokens} tokens")
+            logger.debug(
+                f"Using API usage data for compaction check: {estimated_tokens} tokens"
+            )
         else:
-            estimated_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
-            logger.debug(f"Using text estimation for compaction check: {estimated_tokens} tokens (no API usage data)")
+            estimated_tokens = await estimate_tokens_from_messages(
+                messages, deps.llm_model
+            )
+            logger.debug(
+                f"Using text estimation for compaction check: {estimated_tokens} tokens (no API usage data)"
+            )
 
         # Create minimal usage info for compaction check
         usage = RequestUsage(

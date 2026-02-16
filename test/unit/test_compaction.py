@@ -40,7 +40,9 @@ def test_get_last_api_token_count_with_usage():
         ModelRequest(parts=[UserPromptPart(content="more")]),
         ModelResponse(
             parts=[TextPart(content="sure")],
-            usage=RequestUsage(input_tokens=5000, output_tokens=100, cache_read_tokens=2000),
+            usage=RequestUsage(
+                input_tokens=5000, output_tokens=100, cache_read_tokens=2000
+            ),
         ),
     ]
     # Should return the LAST response's usage: 5000 + 2000
@@ -77,7 +79,9 @@ def test_get_last_api_token_count_cache_read_included():
     messages = [
         ModelResponse(
             parts=[TextPart(content="hi")],
-            usage=RequestUsage(input_tokens=3000, output_tokens=100, cache_read_tokens=7000),
+            usage=RequestUsage(
+                input_tokens=3000, output_tokens=100, cache_read_tokens=7000
+            ),
         ),
     ]
     assert _get_last_api_token_count(messages) == 10000
@@ -90,7 +94,9 @@ async def test_apply_persistent_compaction_uses_api_tokens(mock_deps):
         ModelRequest(parts=[UserPromptPart(content="hello")]),
         ModelResponse(
             parts=[TextPart(content="hi")],
-            usage=RequestUsage(input_tokens=50000, output_tokens=100, cache_read_tokens=10000),
+            usage=RequestUsage(
+                input_tokens=50000, output_tokens=100, cache_read_tokens=10000
+            ),
         ),
     ]
 
