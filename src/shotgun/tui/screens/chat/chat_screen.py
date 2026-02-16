@@ -154,9 +154,12 @@ from shotgun.tui.screens.models import LockedDialogAction
 from shotgun.tui.screens.provider_config import ProviderConfigScreen
 from shotgun.tui.screens.shared_specs import (
     CreateSpecDialog,
+    CreateSpecResult,
     ShareSpecsAction,
     ShareSpecsDialog,
+    ShareSpecsResult,
     UploadProgressScreen,
+    UploadScreenResult,
 )
 from shotgun.tui.services.conversation_service import ConversationService
 from shotgun.tui.state.processing_state import ProcessingStateManager
@@ -307,6 +310,7 @@ class ChatScreen(Screen[None]):
         self.force_reindex = force_reindex
         self.show_pull_hint = show_pull_hint
         self.claude_teams = claude_teams
+        self._share_specs_workspace_id: str = ""
 
         # Initialize mode from agent_manager before compose() runs
         # This ensures ModeIndicator shows correct mode on first render
@@ -1863,20 +1867,21 @@ class ChatScreen(Screen[None]):
         )
 
     def share_specs_command(self) -> None:
-        """Launch the share specs workflow."""
-        self.call_later(lambda: self._start_share_specs_flow())
+        """Launch the share specs workflow.
 
-    @work
-    async def _start_share_specs_flow(self) -> None:
-        """Main workflow for sharing specs to workspace."""
-        # 1. Check preconditions (instant check, no API call)
+        Uses push_screen with callbacks instead of push_screen_wait to avoid
+        CancelledError when modal screens dismiss and their workers are cleaned up.
+        """
+        # Check preconditions (instant check, no API call)
         shotgun_dir = Path.cwd() / ".shotgun"
         if not shotgun_dir.exists():
             self.mount_hint("No .shotgun/ directory found in current directory")
             return
 
-        # 2. Show spec selection dialog (handles workspace fetch, permissions, and spec loading)
-        result = await self.app.push_screen_wait(ShareSpecsDialog())
+        self.app.push_screen(ShareSpecsDialog(), callback=self._on_share_specs_result)
+
+    def _on_share_specs_result(self, result: ShareSpecsResult | None) -> None:
+        """Handle result from ShareSpecsDialog."""
         if result is None or result.action is None:
             return  # User cancelled or error
 
@@ -1885,37 +1890,41 @@ class ChatScreen(Screen[None]):
             self.mount_hint("Failed to get workspace")
             return
 
-        # 3. Handle create vs add version
         if result.action == ShareSpecsAction.CREATE:
-            # Show create spec dialog
-            create_result = await self.app.push_screen_wait(CreateSpecDialog())
-            if create_result is None:
-                return  # User cancelled
-
-            # Pass spec creation info to UploadProgressScreen
-            # It will create the spec/version and then upload
-            upload_result = await self.app.push_screen_wait(
-                UploadProgressScreen(
-                    workspace_id,
-                    spec_name=create_result.name,
-                    spec_description=create_result.description,
-                    spec_is_public=create_result.is_public,
-                )
+            # Store workspace_id for the next callback
+            self._share_specs_workspace_id = workspace_id
+            self.app.push_screen(
+                CreateSpecDialog(), callback=self._on_create_spec_result
             )
-
-        else:  # add_version
+        else:  # ADD_VERSION
             spec_id = result.spec_id
             if not spec_id:
                 self.mount_hint("No spec selected")
                 return
 
-            # Pass spec_id to UploadProgressScreen
-            # It will create the version and then upload
-            upload_result = await self.app.push_screen_wait(
-                UploadProgressScreen(workspace_id, spec_id=spec_id)
+            self.app.push_screen(
+                UploadProgressScreen(workspace_id, spec_id=spec_id),
+                callback=self._on_upload_result,
             )
 
-        # 7. Show result
+    def _on_create_spec_result(self, create_result: CreateSpecResult | None) -> None:
+        """Handle result from CreateSpecDialog."""
+        if create_result is None:
+            return  # User cancelled
+
+        workspace_id = self._share_specs_workspace_id
+        self.app.push_screen(
+            UploadProgressScreen(
+                workspace_id,
+                spec_name=create_result.name,
+                spec_description=create_result.description,
+                spec_is_public=create_result.is_public,
+            ),
+            callback=self._on_upload_result,
+        )
+
+    def _on_upload_result(self, upload_result: UploadScreenResult | None) -> None:
+        """Handle result from UploadProgressScreen."""
         if upload_result and upload_result.success:
             if upload_result.web_url:
                 self.mount_hint(
@@ -1925,7 +1934,6 @@ class ChatScreen(Screen[None]):
                 self.mount_hint("Specs shared successfully!")
         elif upload_result and upload_result.cancelled:
             self.mount_hint("Upload cancelled")
-        # Error case is handled by the upload screen
 
     def delete_codebase_from_palette(self, graph_id: str) -> None:
         stack = getattr(self.app, "screen_stack", None)
