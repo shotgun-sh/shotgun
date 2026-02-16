@@ -123,7 +123,10 @@ class HintMessageWidget(Widget):
         if self.message.compact:
             yield Static(self.message.message)
         else:
-            yield Markdown(markdown=f"{self.message.message}", parser_factory=create_markdown_parser)
+            yield Markdown(
+                markdown=f"{self.message.message}",
+                parser_factory=create_markdown_parser,
+            )
 
         # Optional email copy section
         if self.message.email:
@@ -137,7 +140,9 @@ class HintMessageWidget(Widget):
 
             # Optional markdown after email
             if self.message.markdown_after:
-                yield Markdown(self.message.markdown_after, parser_factory=create_markdown_parser)
+                yield Markdown(
+                    self.message.markdown_after, parser_factory=create_markdown_parser
+                )
 
         # Optional link section
         if self.message.link:

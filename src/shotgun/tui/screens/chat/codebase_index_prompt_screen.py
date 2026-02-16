@@ -186,7 +186,11 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
                 )
                 # Full mode: show detailed content
                 with VerticalScroll(id="index-prompt-content"):
-                    yield Markdown(content, id="index-prompt-info", parser_factory=create_markdown_parser)
+                    yield Markdown(
+                        content,
+                        id="index-prompt-info",
+                        parser_factory=create_markdown_parser,
+                    )
                 with Container(id="index-prompt-buttons"):
                     yield Button(
                         "Not now",

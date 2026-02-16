@@ -285,7 +285,9 @@ class WelcomeWidget(Widget):
             'Once you have all of that you can either use Shotgun Autopilot ("/" + autopilot) to automate implementing '
             "with Claude Code or just prompt your AI Coding Agent directly."
         )
-        yield Markdown(intro, classes="welcome-intro", parser_factory=create_markdown_parser)
+        yield Markdown(
+            intro, classes="welcome-intro", parser_factory=create_markdown_parser
+        )
 
         # Getting started link
         with Horizontal(classes="getting-started-row"):

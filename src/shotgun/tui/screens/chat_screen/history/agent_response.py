@@ -51,7 +51,9 @@ class AgentResponseWidget(Widget):
         if self.item is None:
             yield Markdown(markdown="", parser_factory=create_markdown_parser)
         else:
-            yield Markdown(markdown=self.compute_output(), parser_factory=create_markdown_parser)
+            yield Markdown(
+                markdown=self.compute_output(), parser_factory=create_markdown_parser
+            )
 
     def compute_output(self) -> str:
         """Compute the markdown output for the agent response."""
