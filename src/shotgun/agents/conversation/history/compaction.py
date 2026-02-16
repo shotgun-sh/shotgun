@@ -1,6 +1,6 @@
 """Conversation compaction utilities."""
 
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.usage import RequestUsage
 
 from shotgun.agents.models import AgentDeps
@@ -10,6 +10,21 @@ from shotgun.posthog_telemetry import track_event
 from .token_estimation import estimate_tokens_from_messages
 
 logger = get_logger(__name__)
+
+
+def _get_last_api_token_count(messages: list[ModelMessage]) -> int:
+    """Extract token count from the last ModelResponse's usage data.
+
+    This mirrors the approach in context_analyzer/analyzer.py and gives an accurate
+    count that includes message framing, tool schemas, and system prompts — unlike
+    text-based estimation which significantly undercounts.
+
+    Returns 0 if no usage data is available.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ModelResponse) and msg.usage:
+            return msg.usage.input_tokens + msg.usage.cache_read_tokens
+    return 0
 
 
 async def apply_persistent_compaction(
@@ -36,7 +51,14 @@ async def apply_persistent_compaction(
 
     try:
         # Count tokens to decide if LLM-based compaction is needed
-        estimated_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
+        # Prefer API usage data (accurate) over text-based estimation (undercounts)
+        api_tokens = _get_last_api_token_count(messages)
+        if api_tokens > 0:
+            estimated_tokens = api_tokens
+            logger.debug(f"Using API usage data for compaction check: {estimated_tokens} tokens")
+        else:
+            estimated_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)
+            logger.debug(f"Using text estimation for compaction check: {estimated_tokens} tokens (no API usage data)")
 
         # Create minimal usage info for compaction check
         usage = RequestUsage(
