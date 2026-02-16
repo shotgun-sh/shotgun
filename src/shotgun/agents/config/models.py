@@ -7,6 +7,8 @@ from typing import TypeGuard
 from pydantic import BaseModel, Field, PrivateAttr, SecretStr
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModelSettings
+from pydantic_ai.models.openai import OpenAIChatModelSettings
+from pydantic_ai.settings import ModelSettings
 
 
 class ProviderType(StrEnum):
@@ -25,6 +27,7 @@ class KeyProvider(StrEnum):
     SHOTGUN = "shotgun"  # Shotgun Account (unified LiteLLM proxy)
 
 
+# Anthropic cache settings - uses Anthropic-specific cache control headers
 ANTHROPIC_ROUTER_CACHE_SETTINGS = AnthropicModelSettings(
     anthropic_cache_tool_definitions="1h",
     anthropic_cache_instructions="1h",
@@ -36,6 +39,28 @@ ANTHROPIC_SUB_AGENT_CACHE_SETTINGS = AnthropicModelSettings(
     anthropic_cache_instructions="1h",
     anthropic_cache_messages="5m",
 )
+
+# OpenAI cache settings - relies on OpenAI's automatic in-memory prompt caching
+# See: https://platform.openai.com/docs/guides/prompt-caching
+OPENAI_CACHE_SETTINGS = OpenAIChatModelSettings()
+
+
+def get_cache_settings(provider: "ProviderType", is_router: bool = False) -> ModelSettings:
+    """Get the appropriate cache settings for the given provider.
+
+    Args:
+        provider: The LLM provider type.
+        is_router: Whether this is for the router agent (longer cache TTL).
+
+    Returns:
+        Provider-appropriate model settings with caching configured.
+    """
+    if provider == ProviderType.ANTHROPIC:
+        return ANTHROPIC_ROUTER_CACHE_SETTINGS if is_router else ANTHROPIC_SUB_AGENT_CACHE_SETTINGS
+    elif provider == ProviderType.OPENAI:
+        return OPENAI_CACHE_SETTINGS
+    else:
+        return ModelSettings()
 
 
 class ModelName(StrEnum):

@@ -1,12 +1,16 @@
 """Tests for agents.config.models module."""
 
 from shotgun.agents.config.models import (
+    ANTHROPIC_ROUTER_CACHE_SETTINGS,
+    ANTHROPIC_SUB_AGENT_CACHE_SETTINGS,
     MODEL_SPECS,
+    OPENAI_CACHE_SETTINGS,
     KeyProvider,
     ModelConfig,
     ModelName,
     OllamaConfig,
     ProviderType,
+    get_cache_settings,
 )
 
 
@@ -105,3 +109,42 @@ def test_model_config_with_base_url():
     assert config.base_url == "http://localhost:11434/v1"
     assert config.name == "qwen3:32b"
     assert config.provider == ProviderType.OPENAI_COMPATIBLE
+
+
+def test_get_cache_settings_anthropic_router():
+    """Test that Anthropic router gets 1h message cache settings."""
+    settings = get_cache_settings(ProviderType.ANTHROPIC, is_router=True)
+    assert settings is ANTHROPIC_ROUTER_CACHE_SETTINGS
+    assert settings["anthropic_cache_messages"] == "1h"
+
+
+def test_get_cache_settings_anthropic_sub_agent():
+    """Test that Anthropic sub-agents get 5m message cache settings."""
+    settings = get_cache_settings(ProviderType.ANTHROPIC, is_router=False)
+    assert settings is ANTHROPIC_SUB_AGENT_CACHE_SETTINGS
+    assert settings["anthropic_cache_messages"] == "5m"
+
+
+def test_get_cache_settings_openai():
+    """Test that OpenAI models get OpenAI-specific cache settings."""
+    settings = get_cache_settings(ProviderType.OPENAI, is_router=True)
+    assert settings is OPENAI_CACHE_SETTINGS
+
+
+def test_get_cache_settings_openai_same_for_router_and_sub_agent():
+    """Test that OpenAI cache settings are the same regardless of is_router."""
+    router_settings = get_cache_settings(ProviderType.OPENAI, is_router=True)
+    sub_agent_settings = get_cache_settings(ProviderType.OPENAI, is_router=False)
+    assert router_settings == sub_agent_settings
+
+
+def test_get_cache_settings_google_returns_empty():
+    """Test that Google provider returns empty model settings."""
+    settings = get_cache_settings(ProviderType.GOOGLE)
+    assert settings == {}
+
+
+def test_get_cache_settings_openai_compatible_returns_empty():
+    """Test that OpenAI-compatible provider returns empty model settings."""
+    settings = get_cache_settings(ProviderType.OPENAI_COMPATIBLE)
+    assert settings == {}
