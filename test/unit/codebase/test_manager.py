@@ -826,6 +826,95 @@ async def test_error_handling_in_build():
                     await manager.build_graph("/path/to/repo", "Test Graph")
 
 
+@pytest.mark.asyncio
+async def test_stop_all_watchers():
+    """Test stopping all file watchers at once."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        storage_dir = Path(tmp_dir)
+
+        with (
+            patch("shotgun.codebase.core.manager.Path.mkdir"),
+            patch("shotgun.codebase.core.manager.logger"),
+        ):
+            CodebaseGraphManager(storage_dir)
+
+            # Set up multiple mock watchers
+            mock_watcher1 = Mock()
+            mock_watcher2 = Mock()
+            mock_handler1 = Mock()
+            mock_handler2 = Mock()
+
+            CodebaseGraphManager._watchers["graph-1"] = mock_watcher1
+            CodebaseGraphManager._watchers["graph-2"] = mock_watcher2
+            CodebaseGraphManager._handlers["graph-1"] = mock_handler1
+            CodebaseGraphManager._handlers["graph-2"] = mock_handler2
+
+            await CodebaseGraphManager.stop_all_watchers()
+
+            # All watchers should be stopped and joined
+            mock_watcher1.stop.assert_called_once()
+            mock_watcher1.join.assert_called_once_with(timeout=5)
+            mock_watcher2.stop.assert_called_once()
+            mock_watcher2.join.assert_called_once_with(timeout=5)
+
+            # Dicts should be cleared
+            assert len(CodebaseGraphManager._watchers) == 0
+            assert len(CodebaseGraphManager._handlers) == 0
+
+
+@pytest.mark.asyncio
+async def test_stop_all_watchers_handles_errors():
+    """Test that stop_all_watchers handles errors gracefully."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        storage_dir = Path(tmp_dir)
+
+        with (
+            patch("shotgun.codebase.core.manager.Path.mkdir"),
+            patch("shotgun.codebase.core.manager.logger"),
+        ):
+            CodebaseGraphManager(storage_dir)
+
+            # Set up a watcher that raises on stop
+            mock_watcher_bad = Mock()
+            mock_watcher_bad.stop.side_effect = RuntimeError("stop failed")
+            mock_watcher_good = Mock()
+
+            CodebaseGraphManager._watchers["bad"] = mock_watcher_bad
+            CodebaseGraphManager._watchers["good"] = mock_watcher_good
+            CodebaseGraphManager._handlers["bad"] = Mock()
+            CodebaseGraphManager._handlers["good"] = Mock()
+
+            await CodebaseGraphManager.stop_all_watchers()
+
+            # Good watcher should still be stopped despite bad one failing
+            mock_watcher_good.stop.assert_called_once()
+
+            # Dicts should be cleared regardless of errors
+            assert len(CodebaseGraphManager._watchers) == 0
+            assert len(CodebaseGraphManager._handlers) == 0
+
+
+def test_stop_all_watchers_sync():
+    """Test synchronous version of stop_all_watchers."""
+    mock_watcher1 = Mock()
+    mock_watcher2 = Mock()
+
+    CodebaseGraphManager._watchers["graph-1"] = mock_watcher1
+    CodebaseGraphManager._watchers["graph-2"] = mock_watcher2
+    CodebaseGraphManager._handlers["graph-1"] = Mock()
+    CodebaseGraphManager._handlers["graph-2"] = Mock()
+
+    CodebaseGraphManager.stop_all_watchers_sync()
+
+    mock_watcher1.stop.assert_called_once()
+    mock_watcher1.join.assert_called_once_with(timeout=5)
+    mock_watcher2.stop.assert_called_once()
+    mock_watcher2.join.assert_called_once_with(timeout=5)
+
+    assert len(CodebaseGraphManager._watchers) == 0
+    assert len(CodebaseGraphManager._handlers) == 0
+
+
 def test_ignore_patterns_logic():
     """Test ignore patterns logic in file handler."""
     callback = Mock()
