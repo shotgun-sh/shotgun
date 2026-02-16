@@ -15,8 +15,12 @@ if TYPE_CHECKING:
 
     from shotgun.agents.models import AgentDeps
 
+from shotgun.logging_config import get_logger
+
 from .constants import INPUT_BUFFER_TOKENS, MIN_SUMMARY_TOKENS
 from .token_counting import count_tokens_from_messages as _count_tokens_from_messages
+
+logger = get_logger(__name__)
 
 
 def get_last_api_token_count(messages: list[ModelMessage]) -> int:
@@ -54,6 +58,54 @@ async def estimate_tokens_from_messages(
         RuntimeError: If token counting fails
     """
     return await _count_tokens_from_messages(messages, model_config)
+
+
+async def estimate_tokens_hybrid(
+    messages: list[ModelMessage], model_config: ModelConfig
+) -> int:
+    """Estimate total tokens using API usage data plus delta counting.
+
+    This is more efficient than counting all messages from scratch. It uses the
+    last ModelResponse's usage data (which includes framing, schemas, etc.) as
+    the base count, then only counts the new messages added since that response.
+
+    Falls back to full counting when no API usage data is available (e.g. first turn).
+
+    Args:
+        messages: List of messages to count tokens for
+        model_config: Model configuration with provider info
+
+    Returns:
+        Estimated token count
+    """
+    api_count = get_last_api_token_count(messages)
+
+    if api_count == 0:
+        # First turn or no usage data — fall back to full counting
+        return await estimate_tokens_from_messages(messages, model_config)
+
+    # Find messages after the last ModelResponse (the delta)
+    last_response_idx = None
+    for i in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[i], ModelResponse):
+            last_response_idx = i
+            break
+
+    delta_messages = (
+        messages[last_response_idx + 1 :] if last_response_idx is not None else []
+    )
+
+    if not delta_messages:
+        return api_count
+
+    delta_count = await estimate_tokens_from_messages(delta_messages, model_config)
+
+    logger.debug(
+        f"Hybrid token estimate: api_count={api_count}, delta_count={delta_count}, "
+        f"delta_messages={len(delta_messages)}, total={api_count + delta_count}"
+    )
+
+    return api_count + delta_count
 
 
 async def estimate_post_summary_tokens(

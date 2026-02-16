@@ -35,6 +35,7 @@ from .token_estimation import (
 from .token_estimation import (
     estimate_post_summary_tokens,
     estimate_tokens_from_messages,
+    estimate_tokens_hybrid,
 )
 
 if TYPE_CHECKING:
@@ -453,7 +454,7 @@ async def token_limit_compactor(
     else:
         # Check if total conversation exceeds threshold for full compaction
         total_tokens = await _safe_token_estimation(
-            estimate_tokens_from_messages,
+            estimate_tokens_hybrid,
             deps.llm_model.name,
             model_max_tokens,
             messages,

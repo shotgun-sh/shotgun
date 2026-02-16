@@ -16,6 +16,7 @@ from shotgun.agents.conversation.history.compaction import (
     apply_persistent_compaction,
 )
 from shotgun.agents.conversation.history.token_estimation import (
+    estimate_tokens_hybrid,
     get_last_api_token_count,
 )
 
@@ -147,3 +148,85 @@ async def test_apply_persistent_compaction_falls_back_to_estimation(mock_deps):
         # Verify compactor was called with estimated tokens
         ctx = mock_compactor.call_args[0][0]
         assert ctx.usage.input_tokens == 5000
+
+
+@pytest.mark.anyio
+async def test_estimate_tokens_hybrid_uses_api_plus_delta():
+    """Hybrid estimation uses API count plus delta counting for new messages."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="hello")]),
+        ModelResponse(
+            parts=[TextPart(content="hi")],
+            usage=RequestUsage(
+                input_tokens=5000, output_tokens=100, cache_read_tokens=2000
+            ),
+        ),
+        ModelRequest(parts=[UserPromptPart(content="follow up question")]),
+    ]
+
+    model_config = MagicMock()
+
+    with patch(
+        "shotgun.agents.conversation.history.token_estimation.estimate_tokens_from_messages",
+        new_callable=AsyncMock,
+        return_value=500,
+    ) as mock_estimate:
+        result = await estimate_tokens_hybrid(messages, model_config)
+
+        # API count: 5000 + 2000 = 7000, delta: 500
+        assert result == 7500
+
+        # Should only count the delta (message after last response)
+        mock_estimate.assert_called_once()
+        delta_messages = mock_estimate.call_args[0][0]
+        assert len(delta_messages) == 1
+        assert isinstance(delta_messages[0], ModelRequest)
+
+
+@pytest.mark.anyio
+async def test_estimate_tokens_hybrid_falls_back_when_no_usage():
+    """Falls back to full counting when no API usage data is available."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="hello")]),
+        ModelResponse(
+            parts=[TextPart(content="hi")],
+            usage=RequestUsage(input_tokens=0, output_tokens=0),
+        ),
+    ]
+
+    model_config = MagicMock()
+
+    with patch(
+        "shotgun.agents.conversation.history.token_estimation.estimate_tokens_from_messages",
+        new_callable=AsyncMock,
+        return_value=3000,
+    ) as mock_estimate:
+        result = await estimate_tokens_hybrid(messages, model_config)
+
+        assert result == 3000
+        # Should count all messages (full fallback)
+        mock_estimate.assert_called_once_with(messages, model_config)
+
+
+@pytest.mark.anyio
+async def test_estimate_tokens_hybrid_no_delta_messages():
+    """Returns just the API count when there are no messages after last response."""
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="hello")]),
+        ModelResponse(
+            parts=[TextPart(content="hi")],
+            usage=RequestUsage(input_tokens=5000, output_tokens=100),
+        ),
+    ]
+
+    model_config = MagicMock()
+
+    with patch(
+        "shotgun.agents.conversation.history.token_estimation.estimate_tokens_from_messages",
+        new_callable=AsyncMock,
+    ) as mock_estimate:
+        result = await estimate_tokens_hybrid(messages, model_config)
+
+        assert result == 5000
+        # Should NOT call estimate since there's no delta
+        mock_estimate.assert_not_called()
