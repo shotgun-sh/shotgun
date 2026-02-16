@@ -80,11 +80,11 @@ async def estimate_tokens_hybrid(
     """
     # Single backward pass to find the last ModelResponse with usage data
     api_count = 0
-    last_response_idx = None
+    last_response_idx = -1
     for i in range(len(messages) - 1, -1, -1):
-        if isinstance(messages[i], ModelResponse) and messages[i].usage:
-            usage = messages[i].usage
-            api_count = usage.input_tokens + usage.cache_read_tokens
+        msg = messages[i]
+        if isinstance(msg, ModelResponse) and msg.usage:
+            api_count = msg.usage.input_tokens + msg.usage.cache_read_tokens
             if api_count > 0:
                 last_response_idx = i
                 break
