@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import hashlib
 import json
 import shutil
@@ -174,12 +175,14 @@ class CodebaseFileHandler(FileSystemEventHandler):
 class CodebaseGraphManager:
     """Manages Kuzu code knowledge graphs with class-level connection pooling."""
 
+    _CLOSE_TIMEOUT_SECONDS: ClassVar[float] = 5.0
+
     # Class-level storage to ensure single connection per graph
     _connections: ClassVar[dict[str, kuzu.Connection]] = {}
     _databases: ClassVar[dict[str, kuzu.Database]] = {}
     _watchers: ClassVar[dict[str, Any]] = {}
     _handlers: ClassVar[dict[str, CodebaseFileHandler]] = {}
-    _lock: ClassVar[anyio.Lock | None] = None
+    _lock: ClassVar[anyio.Lock] = anyio.Lock()
 
     # Operation tracking for async operations
     _operations: ClassVar[dict[str, asyncio.Task[Any]]] = {}
@@ -195,10 +198,25 @@ class CodebaseGraphManager:
 
     @classmethod
     async def _get_lock(cls) -> anyio.Lock:
-        """Get or create the class-level lock."""
-        if cls._lock is None:
-            cls._lock = anyio.Lock()
+        """Get the class-level lock."""
         return cls._lock
+
+    @staticmethod
+    async def _close_resource(resource: Any, label: str, timeout: float = 5.0) -> None:
+        """Close a database resource with a timeout.
+
+        Args:
+            resource: The resource (connection or database) to close.
+            label: Human-readable label for log messages.
+            timeout: Maximum seconds to wait for close to complete.
+        """
+        try:
+            await asyncio.wait_for(
+                anyio.to_thread.run_sync(resource.close),
+                timeout=timeout,
+            )
+        except Exception:
+            logger.warning(f"Timeout/error closing {label}", exc_info=True)
 
     @classmethod
     def generate_graph_id(cls, repo_path: str) -> str:
@@ -406,10 +424,16 @@ class CodebaseGraphManager:
             if graph_id in self._databases:
                 # Close existing connections
                 if graph_id in self._connections:
-                    self._connections[graph_id].close()
-                    del self._connections[graph_id]
-                self._databases[graph_id].close()
-                del self._databases[graph_id]
+                    await self._close_resource(
+                        self._connections.pop(graph_id),
+                        f"connection for {graph_id}",
+                        self._CLOSE_TIMEOUT_SECONDS,
+                    )
+                await self._close_resource(
+                    self._databases.pop(graph_id),
+                    f"database for {graph_id}",
+                    self._CLOSE_TIMEOUT_SECONDS,
+                )
 
         # Build using the local ingestor
         ingestor = CodebaseIngestor(
@@ -1034,6 +1058,54 @@ class CodebaseGraphManager:
                 pass
         cls._watchers.clear()
         cls._handlers.clear()
+
+    @classmethod
+    async def close_all_databases(cls, timeout_seconds: float | None = None) -> None:
+        """Close all database connections and databases. Call on app shutdown."""
+        timeout = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else cls._CLOSE_TIMEOUT_SECONDS
+        )
+        lock = await cls._get_lock()
+        async with lock:
+            for graph_id, conn in list(cls._connections.items()):
+                await cls._close_resource(conn, f"connection for {graph_id}", timeout)
+            cls._connections.clear()
+
+            for graph_id, db in list(cls._databases.items()):
+                await cls._close_resource(db, f"database for {graph_id}", timeout)
+            cls._databases.clear()
+
+    @classmethod
+    def close_all_databases_sync(cls, timeout_seconds: float | None = None) -> None:
+        """Close all database connections and databases synchronously.
+
+        For use in atexit/signal handlers. No lock (safe for signal handlers).
+        """
+        timeout = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else cls._CLOSE_TIMEOUT_SECONDS
+        )
+
+        for _graph_id, conn in list(cls._connections.items()):
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(conn.close)
+                    future.result(timeout=timeout)
+            except Exception:  # noqa: S110
+                pass
+        cls._connections.clear()
+
+        for _graph_id, db in list(cls._databases.items()):
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(db.close)
+                    future.result(timeout=timeout)
+            except Exception:  # noqa: S110
+                pass
+        cls._databases.clear()
 
     async def stop_watcher(self, graph_id: str) -> int:
         """Stop watching repository.
@@ -1672,11 +1744,17 @@ class CodebaseGraphManager:
         lock = await self._get_lock()
         async with lock:
             if graph_id in self._connections:
-                self._connections[graph_id].close()
-                del self._connections[graph_id]
+                await self._close_resource(
+                    self._connections.pop(graph_id),
+                    f"connection for {graph_id}",
+                    self._CLOSE_TIMEOUT_SECONDS,
+                )
             if graph_id in self._databases:
-                self._databases[graph_id].close()
-                del self._databases[graph_id]
+                await self._close_resource(
+                    self._databases.pop(graph_id),
+                    f"database for {graph_id}",
+                    self._CLOSE_TIMEOUT_SECONDS,
+                )
 
         # Delete database (files in v0.11.2, directories in newer versions)
         graph_path = self.storage_dir / f"{graph_id}.kuzu"

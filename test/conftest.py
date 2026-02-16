@@ -20,6 +20,7 @@ import uuid
 from collections.abc import Generator
 from pathlib import Path
 
+import anyio
 import pytest
 import pytest_asyncio
 
@@ -51,7 +52,7 @@ def cleanup_before_tests():
     CodebaseGraphManager._watchers.clear()
     CodebaseGraphManager._handlers.clear()
     CodebaseGraphManager._operations.clear()
-    CodebaseGraphManager._lock = None
+    CodebaseGraphManager._lock = anyio.Lock()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -136,7 +137,7 @@ async def cleanup_kuzu_state():
         CodebaseGraphManager._operations.clear()
 
         # 7. Reset the class-level lock
-        CodebaseGraphManager._lock = None
+        CodebaseGraphManager._lock = anyio.Lock()
 
         # 8. Force garbage collection to ensure cleanup
         gc.collect()
@@ -149,7 +150,7 @@ async def cleanup_kuzu_state():
         CodebaseGraphManager._watchers.clear()
         CodebaseGraphManager._handlers.clear()
         CodebaseGraphManager._operations.clear()
-        CodebaseGraphManager._lock = None
+        CodebaseGraphManager._lock = anyio.Lock()
 
 
 @pytest.fixture
