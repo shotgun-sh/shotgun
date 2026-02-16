@@ -6,7 +6,7 @@ and libraries, replacing the old character-based estimation approach.
 
 from typing import TYPE_CHECKING, Union
 
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelResponse
 
 from shotgun.agents.config.models import ModelConfig
 
@@ -15,8 +15,27 @@ if TYPE_CHECKING:
 
     from shotgun.agents.models import AgentDeps
 
+from shotgun.logging_config import get_logger
+
 from .constants import INPUT_BUFFER_TOKENS, MIN_SUMMARY_TOKENS
 from .token_counting import count_tokens_from_messages as _count_tokens_from_messages
+
+logger = get_logger(__name__)
+
+
+def get_last_api_token_count(messages: list[ModelMessage]) -> int:
+    """Extract the total input token count from the last ModelResponse's usage data.
+
+    API usage data is the most accurate source for token counts because it includes
+    message framing, tool schemas, system prompts, and binary content that text-based
+    estimation misses.
+
+    Returns 0 if no ModelResponse with nonzero usage data is found.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ModelResponse) and msg.usage:
+            return msg.usage.input_tokens + msg.usage.cache_read_tokens
+    return 0
 
 
 async def estimate_tokens_from_messages(
@@ -39,6 +58,54 @@ async def estimate_tokens_from_messages(
         RuntimeError: If token counting fails
     """
     return await _count_tokens_from_messages(messages, model_config)
+
+
+async def estimate_tokens_hybrid(
+    messages: list[ModelMessage], model_config: ModelConfig
+) -> int:
+    """Estimate total tokens using API usage data plus delta counting.
+
+    This is more efficient than counting all messages from scratch. It uses the
+    last ModelResponse's usage data (which includes framing, schemas, etc.) as
+    the base count, then only counts the new messages added since that response.
+
+    Falls back to full counting when no API usage data is available (e.g. first turn).
+
+    Args:
+        messages: List of messages to count tokens for
+        model_config: Model configuration with provider info
+
+    Returns:
+        Estimated token count
+    """
+    # Single backward pass to find the last ModelResponse with usage data
+    api_count = 0
+    last_response_idx = -1
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if isinstance(msg, ModelResponse) and msg.usage:
+            api_count = msg.usage.input_tokens + msg.usage.cache_read_tokens
+            if api_count > 0:
+                last_response_idx = i
+                break
+
+    if api_count == 0:
+        # First turn or no usage data — fall back to full counting
+        return await estimate_tokens_from_messages(messages, model_config)
+
+    delta_messages = messages[last_response_idx + 1 :]
+
+    if not delta_messages:
+        return api_count
+
+    delta_count = await estimate_tokens_from_messages(delta_messages, model_config)
+
+    logger.debug(
+        f"Hybrid token estimate: api_count={api_count}, delta_count={delta_count}, "
+        f"delta_messages={len(delta_messages)}, total={api_count + delta_count}"
+    )
+
+    return api_count + delta_count
 
 
 async def estimate_post_summary_tokens(

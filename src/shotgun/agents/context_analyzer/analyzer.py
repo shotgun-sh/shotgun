@@ -20,6 +20,7 @@ from shotgun.agents.conversation.history.token_counting.utils import (
 )
 from shotgun.agents.conversation.history.token_estimation import (
     estimate_tokens_from_messages,
+    get_last_api_token_count,
 )
 from shotgun.agents.messages import AgentSystemPrompt, SystemStatusPrompt
 from shotgun.logging_config import get_logger
@@ -66,13 +67,8 @@ class ContextAnalyzer:
             TokenAllocation with token counts by message/tool type
         """
         # Step 1: Find the last response's usage data (ground truth for input tokens)
-        last_input_tokens = 0
+        last_input_tokens = get_last_api_token_count(message_history)
         total_output_tokens = 0
-
-        for msg in reversed(message_history):
-            if isinstance(msg, ModelResponse) and msg.usage:
-                last_input_tokens = msg.usage.input_tokens + msg.usage.cache_read_tokens
-                break
 
         if last_input_tokens == 0:
             # Fallback to token estimation (no logging to reduce verbosity)
