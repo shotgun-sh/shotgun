@@ -86,6 +86,7 @@ from shotgun.agents.models import (
 )
 from shotgun.attachments import FileAttachment
 from shotgun.exceptions import IncompleteToolCallError
+from shotgun.posthog_telemetry import flush as flush_telemetry
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.screens.chat_screen.hint_message import HintMessage
 from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
@@ -1104,6 +1105,9 @@ class AgentManager(Widget):
             raise
         finally:
             self._stream_state = None
+            # Flush PostHog events between agent runs to prevent
+            # unbounded queue growth during long-running sessions
+            flush_telemetry()
 
         # Agent ALWAYS returns AgentResponse with structured output
         agent_response = result.output

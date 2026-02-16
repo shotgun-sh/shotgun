@@ -273,6 +273,20 @@ def capture_exception(
         logger.warning("Failed to capture exception in PostHog: %s", e)
 
 
+def flush() -> None:
+    """Flush any pending PostHog events without shutting down the client.
+
+    Call this between agent runs to prevent unbounded queue growth
+    during long-running sessions.
+    """
+    if _posthog_client is not None:
+        try:
+            _posthog_client.flush()  # type: ignore[no-untyped-call]
+            logger.debug("PostHog events flushed")
+        except Exception as e:
+            logger.warning("Error flushing PostHog events: %s", e)
+
+
 def shutdown() -> None:
     """Shutdown PostHog client and flush any pending events."""
     global _posthog_client

@@ -230,6 +230,45 @@ def test_capture_exception_sends_regular_exceptions():
         posthog_telemetry._shotgun_instance_id = original_instance_id
 
 
+def test_flush_not_initialized():
+    """Test flush when PostHog is not initialized."""
+    original_client = posthog_telemetry._posthog_client
+    posthog_telemetry._posthog_client = None
+
+    try:
+        # Should not raise any exception
+        posthog_telemetry.flush()
+    finally:
+        posthog_telemetry._posthog_client = original_client
+
+
+def test_flush_initialized():
+    """Test flush when PostHog is initialized."""
+    mock_client = MagicMock()
+    original_client = posthog_telemetry._posthog_client
+    posthog_telemetry._posthog_client = mock_client
+
+    try:
+        posthog_telemetry.flush()
+        mock_client.flush.assert_called_once()
+    finally:
+        posthog_telemetry._posthog_client = original_client
+
+
+def test_flush_exception_handling():
+    """Test flush handles exceptions gracefully."""
+    mock_client = MagicMock()
+    mock_client.flush.side_effect = Exception("Flush error")
+    original_client = posthog_telemetry._posthog_client
+    posthog_telemetry._posthog_client = mock_client
+
+    try:
+        # Should not raise exception
+        posthog_telemetry.flush()
+    finally:
+        posthog_telemetry._posthog_client = original_client
+
+
 def test_shutdown_not_initialized():
     """Test shutdown when PostHog is not initialized."""
     original_client = posthog_telemetry._posthog_client
