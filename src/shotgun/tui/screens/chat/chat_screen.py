@@ -796,8 +796,8 @@ class ChatScreen(Screen[None]):
                 from shotgun.llm_proxy import LiteLLMProxyClient
 
                 logger.debug("Fetching budget info for Shotgun Account")
-                client = LiteLLMProxyClient(self.deps.llm_model.api_key)
-                budget_info = await client.get_budget_info()
+                async with LiteLLMProxyClient(self.deps.llm_model.api_key) as client:
+                    budget_info = await client.get_budget_info()
 
                 # Format budget section
                 source_label = "Key" if budget_info.source == "key" else "Team"
@@ -2319,8 +2319,8 @@ class ChatScreen(Screen[None]):
         try:
             from shotgun.llm_proxy import LiteLLMProxyClient
 
-            client = LiteLLMProxyClient(self.deps.llm_model.api_key)
-            budget_info = await client.get_budget_info()
+            async with LiteLLMProxyClient(self.deps.llm_model.api_key) as client:
+                budget_info = await client.get_budget_info()
 
             # Show warning if remaining balance is $2.50 or less
             if budget_info.remaining <= 2.50:

@@ -145,8 +145,6 @@ def test_welcome_messages_count_toward_limit(agent_manager):
     assert hint_welcome_count == MAX_UI_HINT_MESSAGES
     # The oldest messages (the welcome messages) should be removed
     welcome_count = sum(
-        1
-        for msg in agent_manager.ui_message_history
-        if isinstance(msg, WelcomeMessage)
+        1 for msg in agent_manager.ui_message_history if isinstance(msg, WelcomeMessage)
     )
     assert welcome_count == 0

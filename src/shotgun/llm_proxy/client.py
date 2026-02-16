@@ -101,6 +101,12 @@ class LiteLLMProxyClient:
         response.raise_for_status()
         return response
 
+    async def __aenter__(self) -> "LiteLLMProxyClient":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.aclose()
+
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
         await self._client.aclose()
@@ -215,8 +221,5 @@ async def get_budget_info(api_key: str, base_url: str | None = None) -> BudgetIn
     Returns:
         Budget information
     """
-    client = LiteLLMProxyClient(api_key, base_url=base_url)
-    try:
+    async with LiteLLMProxyClient(api_key, base_url=base_url) as client:
         return await client.get_budget_info()
-    finally:
-        await client.aclose()
