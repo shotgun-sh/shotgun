@@ -16,7 +16,9 @@ CHUNK_SAFE_RATIO = 0.70  # Max safe ratio before triggering chunked compaction
 RETENTION_WINDOW_MESSAGES = 5  # Keep last N message groups outside compaction
 
 # UI history pruning constants
-MAX_UI_HINT_MESSAGES = 50  # Max HintMessage/WelcomeMessage items kept in ui_message_history
+MAX_UI_HINT_MESSAGES = (
+    50  # Max HintMessage/WelcomeMessage items kept in ui_message_history
+)
 
 
 class SummaryType(Enum):

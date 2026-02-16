@@ -1719,7 +1719,9 @@ class AgentManager(Widget):
         if len(hint_indices) <= MAX_UI_HINT_MESSAGES:
             return
 
-        indices_to_remove = set(hint_indices[: len(hint_indices) - MAX_UI_HINT_MESSAGES])
+        indices_to_remove = set(
+            hint_indices[: len(hint_indices) - MAX_UI_HINT_MESSAGES]
+        )
         self.ui_message_history = [
             msg
             for i, msg in enumerate(self.ui_message_history)
