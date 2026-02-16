@@ -5,6 +5,8 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Markdown
 
+from shotgun.tui.markdown import create_markdown_parser
+
 
 class Tier1WarningModal(ModalScreen[bool]):
     """Warning modal shown when Tier 1 API key is detected."""
@@ -62,6 +64,7 @@ Shotgun's multi-agent workflow will hit these limits almost immediately, resulti
 2. **Upgrade your Anthropic account** to Tier 2 or higher
 """,
                 id="message",
+                parser_factory=create_markdown_parser,
             )
             with Vertical(id="button-container"):
                 yield Button("I Understand", variant="primary", id="understand-button")

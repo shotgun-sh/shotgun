@@ -11,6 +11,7 @@ from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Markdown, Static
 
+from shotgun.tui.markdown import create_markdown_parser
 from shotgun.utils.file_system_utils import get_shotgun_home
 
 # Use a higher threshold than the global default since this dialog has more content
@@ -185,7 +186,7 @@ We take your privacy seriously. You can read our full [privacy policy](https://a
                 )
                 # Full mode: show detailed content
                 with VerticalScroll(id="index-prompt-content"):
-                    yield Markdown(content, id="index-prompt-info")
+                    yield Markdown(content, id="index-prompt-info", parser_factory=create_markdown_parser)
                 with Container(id="index-prompt-buttons"):
                     yield Button(
                         "Not now",

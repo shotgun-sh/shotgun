@@ -13,6 +13,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Markdown, Static
 
 from shotgun.tui.layout import TINY_HEIGHT_THRESHOLD
+from shotgun.tui.markdown import create_markdown_parser
 from shotgun.tui.services.ollama import has_ollama_models_available
 
 if TYPE_CHECKING:
@@ -201,7 +202,7 @@ class WelcomeScreen(Screen[None]):
                     if config.migration_backup_path:
                         backup_msg += f"\n\nYour old configuration (including API keys) has been backed up to:\n{config.migration_backup_path}"
                     backup_msg += "\n\nYou'll need to reconfigure Shotgun by choosing an option below."
-                    yield Markdown(backup_msg)
+                    yield Markdown(backup_msg, parser_factory=create_markdown_parser)
 
         with Container(id="options-container"):
             with Horizontal(id="options"):
@@ -214,6 +215,7 @@ class WelcomeScreen(Screen[None]):
                         "• We'll pick the optimal models to give you the best "
                         "experience for things like web search, codebase indexing",
                         classes="option-benefits",
+                        parser_factory=create_markdown_parser,
                     )
                     yield Button(
                         "Sign Up for/Use your Shotgun Account",
@@ -230,6 +232,7 @@ class WelcomeScreen(Screen[None]):
                         "• 100% Supported\n"
                         "• Use your existing API keys from OpenAI, Anthropic, or Google",
                         classes="option-benefits",
+                        parser_factory=create_markdown_parser,
                     )
                     yield Button(
                         "Configure API Keys",
@@ -247,6 +250,7 @@ class WelcomeScreen(Screen[None]):
                         "• Private - data stays on your computer\n"
                         "• Drafting mode only",
                         classes="option-benefits",
+                        parser_factory=create_markdown_parser,
                     )
                     yield Button(
                         "Set Up Ollama",

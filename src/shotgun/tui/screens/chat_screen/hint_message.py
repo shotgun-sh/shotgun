@@ -9,6 +9,7 @@ from textual.widget import Widget
 from textual.widgets import Button, Label, Markdown, Static
 
 from shotgun.logging_config import get_logger
+from shotgun.tui.markdown import create_markdown_parser
 
 logger = get_logger(__name__)
 
@@ -122,7 +123,7 @@ class HintMessageWidget(Widget):
         if self.message.compact:
             yield Static(self.message.message)
         else:
-            yield Markdown(markdown=f"{self.message.message}")
+            yield Markdown(markdown=f"{self.message.message}", parser_factory=create_markdown_parser)
 
         # Optional email copy section
         if self.message.email:
@@ -136,7 +137,7 @@ class HintMessageWidget(Widget):
 
             # Optional markdown after email
             if self.message.markdown_after:
-                yield Markdown(self.message.markdown_after)
+                yield Markdown(self.message.markdown_after, parser_factory=create_markdown_parser)
 
         # Optional link section
         if self.message.link:

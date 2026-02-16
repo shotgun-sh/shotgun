@@ -14,6 +14,8 @@ from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Markdown
 
+from shotgun.tui.markdown import create_markdown_parser
+
 from .formatters import ToolFormatter
 
 # Regex to match <think>...</think> blocks (including partial/unclosed tags during streaming)
@@ -47,9 +49,9 @@ class AgentResponseWidget(Widget):
     def compose(self) -> ComposeResult:
         self.display = self.item is not None
         if self.item is None:
-            yield Markdown(markdown="")
+            yield Markdown(markdown="", parser_factory=create_markdown_parser)
         else:
-            yield Markdown(markdown=self.compute_output())
+            yield Markdown(markdown=self.compute_output(), parser_factory=create_markdown_parser)
 
     def compute_output(self) -> str:
         """Compute the markdown output for the agent response."""

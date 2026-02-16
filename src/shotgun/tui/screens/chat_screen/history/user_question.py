@@ -13,6 +13,7 @@ from textual.widget import Widget
 from textual.widgets import Markdown
 
 from shotgun.agents.messages import InternalPromptPart
+from shotgun.tui.markdown import create_markdown_parser
 
 
 class UserQuestionWidget(Widget):
@@ -25,10 +26,10 @@ class UserQuestionWidget(Widget):
     def compose(self) -> ComposeResult:
         self.display = self.item is not None
         if self.item is None:
-            yield Markdown(markdown="")
+            yield Markdown(markdown="", parser_factory=create_markdown_parser)
         else:
             prompt = self.format_prompt_parts(self.item.parts)
-            yield Markdown(markdown=prompt)
+            yield Markdown(markdown=prompt, parser_factory=create_markdown_parser)
 
     def format_prompt_parts(self, parts: Sequence[ModelRequestPart]) -> str:
         """Format user prompt parts into markdown."""
