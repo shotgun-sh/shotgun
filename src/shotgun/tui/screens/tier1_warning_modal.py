@@ -3,7 +3,9 @@
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown
+from textual.widgets import Button, Label
+
+from shotgun.tui.markdown import Markdown
 
 
 class Tier1WarningModal(ModalScreen[bool]):

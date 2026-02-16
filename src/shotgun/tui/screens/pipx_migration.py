@@ -9,9 +9,10 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.events import Resize
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown
+from textual.widgets import Button, Label
 
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.markdown import Markdown
 
 if TYPE_CHECKING:
     pass

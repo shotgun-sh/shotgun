@@ -6,7 +6,9 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
+
+from shotgun.tui.markdown import Markdown
 
 
 class GitHubIssueScreen(ModalScreen[None]):

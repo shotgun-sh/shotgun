@@ -11,9 +11,10 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Markdown, Static
+from textual.widgets import Static
 
 from shotgun.logging_config import get_logger
+from shotgun.tui.markdown import Markdown
 
 logger = get_logger(__name__)
 

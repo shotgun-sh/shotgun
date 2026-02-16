@@ -12,7 +12,8 @@ from pydantic_ai.messages import (
 )
 from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import Markdown
+
+from shotgun.tui.markdown import Markdown
 
 from .formatters import ToolFormatter
 

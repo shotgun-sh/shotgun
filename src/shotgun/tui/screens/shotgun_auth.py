@@ -11,7 +11,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.events import Resize
 from textual.screen import Screen
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
 from textual.worker import Worker, WorkerState
 
 from shotgun.agents.config import ConfigManager
@@ -23,6 +23,7 @@ from shotgun.shotgun_web import (
 )
 from shotgun.shotgun_web.constants import DEFAULT_POLL_INTERVAL_SECONDS
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.markdown import Markdown
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp

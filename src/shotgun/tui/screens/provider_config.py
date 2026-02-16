@@ -18,7 +18,6 @@ from textual.widgets import (
     Label,
     ListItem,
     ListView,
-    Markdown,
     Static,
     TabbedContent,
     TabPane,
@@ -29,6 +28,7 @@ from shotgun.agents.config.tier_detection import AnthropicTier, detect_anthropic
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
+from shotgun.tui.markdown import Markdown
 from shotgun.tui.services.ollama import (
     OLLAMA_DOWNLOAD_URL,
     OllamaStatus,

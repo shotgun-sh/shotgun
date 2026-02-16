@@ -10,9 +10,9 @@ from pydantic_ai.messages import (
 )
 from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import Markdown
 
 from shotgun.agents.messages import InternalPromptPart
+from shotgun.tui.markdown import Markdown
 
 
 class UserQuestionWidget(Widget):

@@ -9,8 +9,9 @@ from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.events import Resize
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
 
+from shotgun.tui.markdown import Markdown
 from shotgun.utils.file_system_utils import get_shotgun_home
 
 # Use a higher threshold than the global default since this dialog has more content

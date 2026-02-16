@@ -10,9 +10,10 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.events import Resize
 from textual.screen import Screen
-from textual.widgets import Button, Markdown, Static
+from textual.widgets import Button, Static
 
 from shotgun.tui.layout import TINY_HEIGHT_THRESHOLD
+from shotgun.tui.markdown import Markdown
 from shotgun.tui.services.ollama import has_ollama_models_available
 
 if TYPE_CHECKING:

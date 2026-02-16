@@ -6,9 +6,10 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widget import Widget
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
 
 from shotgun.logging_config import get_logger
+from shotgun.tui.markdown import Markdown
 
 logger = get_logger(__name__)
 
