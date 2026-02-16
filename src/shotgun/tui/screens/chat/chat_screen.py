@@ -3237,8 +3237,6 @@ Then confirm what you changed.
         finally:
             self.processing_state.stop_processing()
 
-    _MAX_HINT_MESSAGES = 50
-
     @on(AutopilotOutputReceived)
     def handle_autopilot_output(self, event: AutopilotOutputReceived) -> None:
         """Handle output from Claude Code subprocess."""
@@ -3250,9 +3248,6 @@ Then confirm what you changed.
 
         # Always log to file regardless of UI display
         logger.info("[autopilot-output] [%s] %s", output.type.value, content)
-
-        # Trim old hint messages to keep UI performant
-        self._trim_old_hint_messages()
 
         # Format based on output type
         if output.type == ClaudeOutputType.STDOUT:
@@ -3286,39 +3281,6 @@ Then confirm what you changed.
                         source="autopilot",
                     )
                 )
-
-    def _trim_old_hint_messages(self) -> None:
-        """Remove oldest hint messages when over the visible limit.
-
-        Keeps only the last _MAX_HINT_MESSAGES hint messages in UI history,
-        removing oldest first (compact/tool-call messages prioritized for removal).
-        Rebuilds the list to avoid in-place index mutation.
-        """
-        history = self.agent_manager.ui_message_history
-        hint_indices = [
-            i for i, msg in enumerate(history) if isinstance(msg, HintMessage)
-        ]
-
-        excess = len(hint_indices) - self._MAX_HINT_MESSAGES
-        if excess <= 0:
-            return
-
-        # Pick indices to remove: prefer compact (tool-call noise) first
-        compact_indices = [
-            i
-            for i in hint_indices
-            if isinstance(history[i], HintMessage) and history[i].compact  # type: ignore[union-attr]
-        ]
-        non_compact_indices = [i for i in hint_indices if i not in compact_indices]
-
-        to_remove = set(compact_indices[:excess])
-        if len(to_remove) < excess:
-            to_remove.update(non_compact_indices[: excess - len(to_remove)])
-
-        # Rebuild list, skipping removed indices
-        self.agent_manager.ui_message_history = [
-            msg for i, msg in enumerate(history) if i not in to_remove
-        ]
 
     @on(AutopilotApprovalRequired)
     def handle_autopilot_approval_required(

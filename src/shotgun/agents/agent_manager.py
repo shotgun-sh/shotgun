@@ -92,7 +92,7 @@ from shotgun.tui.screens.chat_screen.welcome_message import WelcomeMessage
 from shotgun.utils.source_detection import detect_source
 
 from .conversation.history.compaction import apply_persistent_compaction
-from .conversation.history.constants import MAX_UI_HINT_MESSAGES
+from .conversation.history.constants import MAX_UI_HISTORY_MESSAGES
 from .export import create_export_agent
 from .messages import AgentSystemPrompt, InternalPromptPart
 from .models import AgentDeps, AgentRuntimeOptions
@@ -1706,34 +1706,14 @@ class AgentManager(Widget):
         self._sub_agent_messages = []
 
     def _prune_ui_message_history(self) -> None:
-        """Remove oldest HintMessage/WelcomeMessage entries when over the limit.
+        """Keep only the last MAX_UI_HISTORY_MESSAGES items in ui_message_history.
 
-        Preserves all ModelMessage entries (which mirror the already-compacted
-        message_history) and keeps the most recent hint messages for context.
+        Acts as a circular buffer — oldest messages of any type are dropped.
         """
-        hint_indices = [
-            i
-            for i, msg in enumerate(self.ui_message_history)
-            if isinstance(msg, (HintMessage, WelcomeMessage))
-        ]
-        if len(hint_indices) <= MAX_UI_HINT_MESSAGES:
+        if len(self.ui_message_history) <= MAX_UI_HISTORY_MESSAGES:
             return
 
-        indices_to_remove = set(
-            hint_indices[: len(hint_indices) - MAX_UI_HINT_MESSAGES]
-        )
-        self.ui_message_history = [
-            msg
-            for i, msg in enumerate(self.ui_message_history)
-            if i not in indices_to_remove
-        ]
-        logger.debug(
-            "Pruned ui_message_history",
-            extra={
-                "removed_hints": len(indices_to_remove),
-                "remaining_total": len(self.ui_message_history),
-            },
-        )
+        self.ui_message_history = self.ui_message_history[-MAX_UI_HISTORY_MESSAGES:]
 
     def _build_partial_response(
         self, parts: list[ModelResponsePart | ToolCallPartDelta]
