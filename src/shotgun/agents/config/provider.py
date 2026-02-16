@@ -1,6 +1,7 @@
 """Provider management for LLM configuration."""
 
 from copy import deepcopy
+from functools import lru_cache
 
 from pydantic import SecretStr
 from pydantic_ai._json_schema import JsonSchema, JsonSchemaTransformer
@@ -105,10 +106,9 @@ class OllamaCompatibleJsonSchemaTransformer(JsonSchemaTransformer):
         return schema
 
 
-# Global cache for Model instances (singleton pattern)
-_model_cache: dict[
-    tuple[ProviderType, KeyProvider, ModelName | str, str, str | None], Model
-] = {}
+# Max number of cached Model instances (LRU eviction)
+_MAX_MODEL_CACHE_SIZE = 8
+
 
 # Module-level model override for OpenAI-compatible mode (set via --model CLI flag)
 _openai_compat_model_override: str | None = None
@@ -226,6 +226,7 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     return ModelName.CLAUDE_OPUS_4_5
 
 
+@lru_cache(maxsize=_MAX_MODEL_CACHE_SIZE)
 def get_or_create_model(
     provider: ProviderType,
     key_provider: "KeyProvider",
@@ -234,6 +235,8 @@ def get_or_create_model(
     base_url: str | None = None,
 ) -> Model:
     """Get or create a singleton Model instance.
+
+    Bounded by ``functools.lru_cache`` (maxsize=8) with automatic LRU eviction.
 
     Args:
         provider: Actual LLM provider (openai, anthropic, google)
@@ -248,111 +251,90 @@ def get_or_create_model(
     Raises:
         ValueError: If provider is not supported
     """
-    cache_key = (provider, key_provider, model_name, api_key, base_url)
+    logger.debug(
+        "Creating new %s model instance via %s: %s",
+        provider.value,
+        key_provider.value,
+        model_name,
+    )
 
-    if cache_key not in _model_cache:
-        logger.debug(
-            "Creating new %s model instance via %s: %s",
-            provider.value,
-            key_provider.value,
-            model_name,
+    # Get max_tokens from MODEL_SPECS (only for known models)
+    if isinstance(model_name, ModelName) and model_name in MODEL_SPECS:
+        max_tokens = MODEL_SPECS[model_name].max_output_tokens
+    else:
+        max_tokens = {
+            ProviderType.OPENAI: 16_000,
+            ProviderType.ANTHROPIC: 32_000,
+            ProviderType.GOOGLE: 64_000,
+            ProviderType.OPENAI_COMPATIBLE: 16_000,
+        }.get(provider, 16_000)
+
+    # Handle OpenAI-compatible endpoints (uses provided base_url or settings)
+    if provider == ProviderType.OPENAI_COMPATIBLE:
+        return _create_openai_compat_model(
+            api_key, str(model_name), max_tokens, base_url
         )
 
-        # Get max_tokens from MODEL_SPECS (only for known models)
-        if isinstance(model_name, ModelName) and model_name in MODEL_SPECS:
-            max_tokens = MODEL_SPECS[model_name].max_output_tokens
+    # At this point, model_name must be a ModelName (string handled above via OPENAI_COMPATIBLE)
+    if not isinstance(model_name, ModelName):
+        raise ValueError(
+            f"Unknown model name: {model_name}. "
+            "For custom models, set SHOTGUN_OPENAI_COMPAT_BASE_URL."
+        )
+
+    if key_provider == KeyProvider.SHOTGUN:
+        # Shotgun Account uses LiteLLM proxy with native model types where possible
+        if model_name in MODEL_SPECS:
+            litellm_model_name = MODEL_SPECS[model_name].litellm_proxy_model_name
         else:
-            # Fallback defaults based on provider
-            max_tokens = {
-                ProviderType.OPENAI: 16_000,
-                ProviderType.ANTHROPIC: 32_000,
-                ProviderType.GOOGLE: 64_000,
-                ProviderType.OPENAI_COMPATIBLE: 16_000,
-            }.get(provider, 16_000)
+            litellm_model_name = f"openai/{model_name.value}"
 
-        # Handle OpenAI-compatible endpoints (uses provided base_url or settings)
-        if provider == ProviderType.OPENAI_COMPATIBLE:
-            _model_cache[cache_key] = _create_openai_compat_model(
-                api_key, str(model_name), max_tokens, base_url
+        if provider == ProviderType.ANTHROPIC:
+            anthropic_provider = create_anthropic_proxy_provider(api_key)
+            return AnthropicModel(
+                model_name.value,
+                provider=anthropic_provider,
+                settings=AnthropicModelSettings(
+                    max_tokens=max_tokens,
+                    timeout=600,
+                ),
             )
-            return _model_cache[cache_key]
-
-        # Use LiteLLM proxy for Shotgun Account, native providers for BYOK
-        # At this point, model_name must be a ModelName (string handled above via OPENAI_COMPATIBLE)
-        if not isinstance(model_name, ModelName):
-            raise ValueError(
-                f"Unknown model name: {model_name}. "
-                "For custom models, set SHOTGUN_OPENAI_COMPAT_BASE_URL."
-            )
-
-        if key_provider == KeyProvider.SHOTGUN:
-            # Shotgun Account uses LiteLLM proxy with native model types where possible
-            if model_name in MODEL_SPECS:
-                litellm_model_name = MODEL_SPECS[model_name].litellm_proxy_model_name
-            else:
-                # Fallback for unmapped models
-                litellm_model_name = f"openai/{model_name.value}"
-
-            # Use native provider types to preserve API formats and features
-            if provider == ProviderType.ANTHROPIC:
-                # Anthropic: Use native AnthropicProvider with /anthropic endpoint
-                # This preserves Anthropic-specific features like tool_choice
-                # Note: Web search for Shotgun Account uses Gemini only (not Anthropic)
-                # Note: Anthropic API expects model name without prefix (e.g., "claude-sonnet-4-5")
-                anthropic_provider = create_anthropic_proxy_provider(api_key)
-                _model_cache[cache_key] = AnthropicModel(
-                    model_name.value,  # Use model name without "anthropic/" prefix
-                    provider=anthropic_provider,
-                    settings=AnthropicModelSettings(
-                        max_tokens=max_tokens,
-                        timeout=600,  # 10 minutes timeout for large responses
-                    ),
-                )
-            else:
-                # OpenAI and Google: Use LiteLLMProvider (OpenAI-compatible format)
-                # Google's GoogleProvider doesn't support base_url, so use LiteLLM
-                # Note: Use OpenAIChatModel (not OpenAIResponsesModel) because LiteLLM's
-                # streaming Responses API doesn't return tool calls properly for Gemini 3
-                litellm_provider = create_litellm_provider(api_key)
-                _model_cache[cache_key] = OpenAIChatModel(
-                    litellm_model_name,
-                    provider=litellm_provider,
-                    settings=ModelSettings(max_tokens=max_tokens),
-                )
-        elif key_provider == KeyProvider.BYOK:
-            # Use native provider implementations with user's API keys
-            if provider == ProviderType.OPENAI:
-                openai_provider = OpenAIProvider(api_key=api_key)
-                _model_cache[cache_key] = OpenAIResponsesModel(
-                    model_name,
-                    provider=openai_provider,
-                    settings=ModelSettings(max_tokens=max_tokens),
-                )
-            elif provider == ProviderType.ANTHROPIC:
-                anthropic_provider = AnthropicProvider(api_key=api_key)
-                _model_cache[cache_key] = AnthropicModel(
-                    model_name,
-                    provider=anthropic_provider,
-                    settings=AnthropicModelSettings(
-                        max_tokens=max_tokens,
-                        timeout=600,  # 10 minutes timeout for large responses
-                    ),
-                )
-            elif provider == ProviderType.GOOGLE:
-                google_provider = GoogleProvider(api_key=api_key)
-                _model_cache[cache_key] = GoogleModel(
-                    model_name,
-                    provider=google_provider,
-                    settings=ModelSettings(max_tokens=max_tokens),
-                )
-            else:
-                raise ValueError(f"Unsupported provider: {provider}")
         else:
-            raise ValueError(f"Unsupported key provider: {key_provider}")
+            litellm_provider = create_litellm_provider(api_key)
+            return OpenAIChatModel(
+                litellm_model_name,
+                provider=litellm_provider,
+                settings=ModelSettings(max_tokens=max_tokens),
+            )
+    elif key_provider == KeyProvider.BYOK:
+        if provider == ProviderType.OPENAI:
+            openai_provider = OpenAIProvider(api_key=api_key)
+            return OpenAIResponsesModel(
+                model_name,
+                provider=openai_provider,
+                settings=ModelSettings(max_tokens=max_tokens),
+            )
+        elif provider == ProviderType.ANTHROPIC:
+            anthropic_provider = AnthropicProvider(api_key=api_key)
+            return AnthropicModel(
+                model_name,
+                provider=anthropic_provider,
+                settings=AnthropicModelSettings(
+                    max_tokens=max_tokens,
+                    timeout=600,
+                ),
+            )
+        elif provider == ProviderType.GOOGLE:
+            google_provider = GoogleProvider(api_key=api_key)
+            return GoogleModel(
+                model_name,
+                provider=google_provider,
+                settings=ModelSettings(max_tokens=max_tokens),
+            )
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
     else:
-        logger.debug("Reusing cached %s model instance: %s", provider.value, model_name)
-
-    return _model_cache[cache_key]
+        raise ValueError(f"Unsupported key provider: {key_provider}")
 
 
 async def get_provider_model(
