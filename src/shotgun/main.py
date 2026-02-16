@@ -256,7 +256,7 @@ def main(
                 shutdown()
         raise typer.Exit()
 
-    # For CLI commands, register PostHog shutdown handler
+    # For CLI commands, register shutdown handlers
     if not ctx.resilient_parsing and ctx.invoked_subcommand is not None:
         import atexit
 
@@ -267,6 +267,17 @@ def main(
             shutdown()
 
         atexit.register(shutdown_posthog)
+
+    # Register file watcher cleanup as atexit safety net for all modes
+    if not ctx.resilient_parsing:
+        import atexit
+
+        def shutdown_watchers() -> None:
+            from shotgun.codebase.core.manager import CodebaseGraphManager
+
+            CodebaseGraphManager.stop_all_watchers_sync()
+
+        atexit.register(shutdown_watchers)
 
 
 if __name__ == "__main__":

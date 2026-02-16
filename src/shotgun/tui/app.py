@@ -328,6 +328,11 @@ class ShotgunApp(App[None]):
 
     async def action_quit(self) -> None:
         """Quit the application."""
+        # Stop all file watchers to prevent resource leaks
+        from shotgun.codebase.core.manager import CodebaseGraphManager
+
+        await CodebaseGraphManager.stop_all_watchers()
+
         # Shut down PostHog client to prevent threading errors
         from shotgun.posthog_telemetry import shutdown
 
@@ -542,9 +547,12 @@ def serve(
 
     def signal_handler(_signum: int, _frame: Any) -> None:
         """Handle shutdown signals gracefully."""
+        from shotgun.codebase.core.manager import CodebaseGraphManager
         from shotgun.posthog_telemetry import shutdown
 
         logger.info("Received shutdown signal, cleaning up...")
+        # Stop all file watchers to prevent resource leaks
+        CodebaseGraphManager.stop_all_watchers_sync()
         # Restore stdout/stderr before shutting down
         sys.stdout = original_stdout
         sys.stderr = original_stderr

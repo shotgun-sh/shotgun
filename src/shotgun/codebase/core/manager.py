@@ -1007,6 +1007,34 @@ class CodebaseGraphManager:
             f"Started file watcher - graph_id: {graph_id}, repo_path: {graph.repo_path}"
         )
 
+    @classmethod
+    async def stop_all_watchers(cls) -> None:
+        """Stop all running file watchers. Call on app shutdown."""
+        lock = await cls._get_lock()
+        async with lock:
+            for graph_id, observer in list(cls._watchers.items()):
+                try:
+                    observer.stop()
+                    observer.join(timeout=5)
+                except Exception:
+                    logger.warning(
+                        f"Failed to stop watcher for {graph_id}", exc_info=True
+                    )
+            cls._watchers.clear()
+            cls._handlers.clear()
+
+    @classmethod
+    def stop_all_watchers_sync(cls) -> None:
+        """Stop all running file watchers synchronously. For use in atexit/signal handlers."""
+        for _graph_id, observer in list(cls._watchers.items()):
+            try:
+                observer.stop()
+                observer.join(timeout=5)
+            except Exception:  # noqa: S110
+                pass
+        cls._watchers.clear()
+        cls._handlers.clear()
+
     async def stop_watcher(self, graph_id: str) -> int:
         """Stop watching repository.
 
