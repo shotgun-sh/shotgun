@@ -51,7 +51,6 @@ def cleanup_before_tests():
     CodebaseGraphManager._watchers.clear()
     CodebaseGraphManager._handlers.clear()
     CodebaseGraphManager._operations.clear()
-    CodebaseGraphManager._operation_stats.clear()
     CodebaseGraphManager._lock = None
 
 
@@ -135,7 +134,6 @@ async def cleanup_kuzu_state():
         CodebaseGraphManager._watchers.clear()
         CodebaseGraphManager._handlers.clear()
         CodebaseGraphManager._operations.clear()
-        CodebaseGraphManager._operation_stats.clear()
 
         # 7. Reset the class-level lock
         CodebaseGraphManager._lock = None
@@ -151,7 +149,6 @@ async def cleanup_kuzu_state():
         CodebaseGraphManager._watchers.clear()
         CodebaseGraphManager._handlers.clear()
         CodebaseGraphManager._operations.clear()
-        CodebaseGraphManager._operation_stats.clear()
         CodebaseGraphManager._lock = None
 
 
