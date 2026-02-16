@@ -140,6 +140,25 @@ class ProviderConfigScreen(Screen[None]):
         }
 
         /* Context7 tab styling */
+        #context7-info {
+            padding: 0;
+            margin: 0 0 1 0;
+        }
+
+        #context7-link-actions {
+            padding: 0;
+            margin: 0 0 1 0;
+        }
+
+        #context7-link-actions > * {
+            margin-right: 2;
+        }
+
+        #context7-api-key {
+            border: round $accent;
+            margin: 0 0 1 0;
+        }
+
         #context7-status {
             height: auto;
             padding: 0 1;
@@ -286,25 +305,29 @@ class ProviderConfigScreen(Screen[None]):
                     "Get a free API key to enable documentation-aware specs.",
                     id="context7-info",
                 )
-                with Horizontal(id="context7-link-actions"):
-                    yield Button(
-                        "Get API Key",
-                        id="context7-get-key",
-                        variant="primary",
-                    )
-                    yield Button(
-                        "Copy link",
-                        id="context7-copy-link",
-                    )
                 yield Input(
-                    placeholder="Context7 API key",
+                    placeholder="Enter your Context7 API key",
                     password=True,
                     id="context7-api-key",
                 )
                 yield Label("", id="context7-status")
                 with Horizontal(id="context7-actions"):
-                    yield Button("Save key", variant="primary", id="context7-save")
+                    yield Button(
+                        "Save key \\[ENTER]",
+                        variant="primary",
+                        id="context7-save",
+                    )
                     yield Button("Clear key", id="context7-clear", variant="warning")
+                with Horizontal(id="context7-link-actions"):
+                    yield Button(
+                        "Get API Key",
+                        id="context7-get-key",
+                        variant="success",
+                    )
+                    yield Button(
+                        "Copy link",
+                        id="context7-copy-link",
+                    )
 
         with Horizontal(id="done-container"):
             yield Button("Back \\[ESC]", id="done", variant="primary")
@@ -322,6 +345,8 @@ class ProviderConfigScreen(Screen[None]):
         if self._initial_tab != "api-providers-tab":
             tabs = self.query_one("#provider-tabs", TabbedContent)
             tabs.active = self._initial_tab
+            if self._initial_tab == "context7-tab":
+                self.set_focus(self.query_one("#context7-api-key", Input))
         else:
             self.set_focus(self.query_one("#api-key", Input))
 
@@ -344,6 +369,14 @@ class ProviderConfigScreen(Screen[None]):
 
         # Apply layout based on terminal height
         self._apply_layout_for_height(self.app.size.height)
+
+    @on(TabbedContent.TabActivated)
+    def _on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """Focus the appropriate input when switching tabs."""
+        if event.pane.id == "context7-tab":
+            self.set_focus(self.query_one("#context7-api-key", Input))
+        elif event.pane.id == "api-providers-tab":
+            self.set_focus(self.query_one("#api-key", Input))
 
     @on(Resize)
     def handle_resize(self, event: Resize) -> None:
@@ -467,6 +500,11 @@ class ProviderConfigScreen(Screen[None]):
     def _on_input_submitted(self, event: Input.Submitted) -> None:
         del event  # unused
         self._save_api_key()
+
+    @on(Input.Submitted, "#context7-api-key")
+    def _on_context7_input_submitted(self, event: Input.Submitted) -> None:
+        del event  # unused
+        self.run_worker(self._do_save_context7_key(), exclusive=True)
 
     def watch_selected_provider(self, provider: ProviderType) -> None:
         if not self.is_mounted:
