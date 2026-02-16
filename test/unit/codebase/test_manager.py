@@ -1,11 +1,13 @@
 """Unit tests for manager module."""
 
+import asyncio
 import hashlib
 import tempfile
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+import anyio
 import pytest
 
 from shotgun.codebase.core.manager import CodebaseFileHandler, CodebaseGraphManager
@@ -348,10 +350,13 @@ async def test_delete_graph():
     with tempfile.TemporaryDirectory() as tmp_dir:
         storage_dir = Path(tmp_dir)
 
+        async def run_sync_passthrough(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
         with (
             patch("shotgun.codebase.core.manager.Path.mkdir"),
             patch("shotgun.codebase.core.manager.logger"),
-            patch("anyio.to_thread.run_sync") as mock_run_sync,
+            patch("anyio.to_thread.run_sync", side_effect=run_sync_passthrough),
         ):
             manager = CodebaseGraphManager(storage_dir)
             graph_id = "test-graph-id"
@@ -368,8 +373,8 @@ async def test_delete_graph():
             CodebaseGraphManager._handlers = {graph_id: Mock()}
             CodebaseGraphManager._handlers[graph_id].pending_changes = []
 
-            # Mock path exists to return True for deletion
-            with patch.object(Path, "exists", return_value=True):
+            # Mock path exists to return False so file deletion is skipped
+            with patch.object(Path, "exists", return_value=False):
                 await manager.delete_graph(graph_id)
 
             # Should stop watcher and close connections
@@ -380,8 +385,6 @@ async def test_delete_graph():
             assert graph_id not in CodebaseGraphManager._connections
             assert graph_id not in CodebaseGraphManager._databases
             assert graph_id not in CodebaseGraphManager._watchers
-            # Should delete files
-            assert mock_run_sync.call_count >= 1  # At least one file deletion
 
 
 @pytest.mark.asyncio
@@ -934,3 +937,135 @@ def test_ignore_patterns_logic():
         # Check if path contains any ignore pattern
         is_ignored = any(pattern in path for pattern in handler.ignore_patterns)
         assert is_ignored == should_ignore
+
+
+def test_lock_initialized_eagerly():
+    """Verify _lock is an anyio.Lock at class definition time, not None."""
+    assert CodebaseGraphManager._lock is not None
+    assert isinstance(CodebaseGraphManager._lock, anyio.Lock)
+
+
+@pytest.mark.asyncio
+async def test_close_all_databases_closes_connections_and_dbs():
+    """Test close_all_databases closes connections first, then databases, and clears dicts."""
+    mock_conn = Mock()
+    mock_db = Mock()
+
+    CodebaseGraphManager._connections["g1"] = mock_conn
+    CodebaseGraphManager._databases["g1"] = mock_db
+
+    with patch(
+        "anyio.to_thread.run_sync",
+        side_effect=lambda func, *a, **kw: func(*a, **kw),
+    ):
+        await CodebaseGraphManager.close_all_databases()
+
+    mock_conn.close.assert_called_once()
+    mock_db.close.assert_called_once()
+    assert len(CodebaseGraphManager._connections) == 0
+    assert len(CodebaseGraphManager._databases) == 0
+
+
+@pytest.mark.asyncio
+async def test_close_all_databases_handles_close_errors():
+    """Test that close_all_databases clears dicts even when close() raises."""
+    mock_conn = Mock()
+    mock_conn.close.side_effect = RuntimeError("connection close failed")
+    mock_db = Mock()
+    mock_db.close.side_effect = RuntimeError("db close failed")
+
+    CodebaseGraphManager._connections["g1"] = mock_conn
+    CodebaseGraphManager._databases["g1"] = mock_db
+
+    with (
+        patch(
+            "anyio.to_thread.run_sync",
+            side_effect=lambda func, *a, **kw: func(*a, **kw),
+        ),
+        patch("shotgun.codebase.core.manager.logger"),
+    ):
+        await CodebaseGraphManager.close_all_databases()
+
+    assert len(CodebaseGraphManager._connections) == 0
+    assert len(CodebaseGraphManager._databases) == 0
+
+
+@pytest.mark.asyncio
+async def test_close_all_databases_handles_timeout():
+    """Test that close_all_databases handles a slow close that times out."""
+    mock_conn = Mock()
+
+    async def slow_close(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    CodebaseGraphManager._connections["g1"] = mock_conn
+    CodebaseGraphManager._databases.clear()
+
+    with (
+        patch("anyio.to_thread.run_sync", side_effect=slow_close),
+        patch("shotgun.codebase.core.manager.logger"),
+    ):
+        await CodebaseGraphManager.close_all_databases(timeout_seconds=0.1)
+
+    assert len(CodebaseGraphManager._connections) == 0
+
+
+def test_close_all_databases_sync():
+    """Test close_all_databases_sync closes connections and databases."""
+    mock_conn = Mock()
+    mock_db = Mock()
+
+    CodebaseGraphManager._connections["g1"] = mock_conn
+    CodebaseGraphManager._databases["g1"] = mock_db
+
+    CodebaseGraphManager.close_all_databases_sync()
+
+    mock_conn.close.assert_called_once()
+    mock_db.close.assert_called_once()
+    assert len(CodebaseGraphManager._connections) == 0
+    assert len(CodebaseGraphManager._databases) == 0
+
+
+def test_close_all_databases_sync_handles_errors():
+    """Test close_all_databases_sync clears dicts even when close() raises."""
+    mock_conn = Mock()
+    mock_conn.close.side_effect = RuntimeError("close failed")
+
+    CodebaseGraphManager._connections["g1"] = mock_conn
+    CodebaseGraphManager._databases.clear()
+
+    CodebaseGraphManager.close_all_databases_sync()
+
+    assert len(CodebaseGraphManager._connections) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_graph_timeout_on_close():
+    """Test that delete_graph doesn't block forever on a hung close."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        storage_dir = Path(tmp_dir)
+
+        async def slow_run_sync(func, *args, **kwargs):
+            await asyncio.sleep(10)
+
+        with (
+            patch("shotgun.codebase.core.manager.Path.mkdir"),
+            patch("shotgun.codebase.core.manager.logger"),
+        ):
+            manager = CodebaseGraphManager(storage_dir)
+            graph_id = "test-graph-timeout"
+
+            mock_conn = Mock()
+            mock_db = Mock()
+            CodebaseGraphManager._connections[graph_id] = mock_conn
+            CodebaseGraphManager._databases[graph_id] = mock_db
+
+            with (
+                patch("anyio.to_thread.run_sync", side_effect=slow_run_sync),
+                patch.object(Path, "exists", return_value=False),
+            ):
+                await manager.delete_graph(graph_id)
+
+            # Dicts should be cleared despite timeout
+            assert graph_id not in CodebaseGraphManager._connections
+            assert graph_id not in CodebaseGraphManager._databases

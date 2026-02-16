@@ -332,6 +332,7 @@ class ShotgunApp(App[None]):
         from shotgun.codebase.core.manager import CodebaseGraphManager
 
         await CodebaseGraphManager.stop_all_watchers()
+        await CodebaseGraphManager.close_all_databases()
 
         # Shut down PostHog client to prevent threading errors
         from shotgun.posthog_telemetry import shutdown
@@ -553,6 +554,7 @@ def serve(
         logger.info("Received shutdown signal, cleaning up...")
         # Stop all file watchers to prevent resource leaks
         CodebaseGraphManager.stop_all_watchers_sync()
+        CodebaseGraphManager.close_all_databases_sync()
         # Restore stdout/stderr before shutting down
         sys.stdout = original_stdout
         sys.stderr = original_stderr

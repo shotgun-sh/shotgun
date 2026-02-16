@@ -276,6 +276,7 @@ def main(
             from shotgun.codebase.core.manager import CodebaseGraphManager
 
             CodebaseGraphManager.stop_all_watchers_sync()
+            CodebaseGraphManager.close_all_databases_sync()
 
         atexit.register(shutdown_watchers)
 
