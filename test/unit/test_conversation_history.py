@@ -258,6 +258,75 @@ def test_conversation_history_ui_messages_with_hints():
     assert isinstance(retrieved[2], HintMessage)
 
 
+def test_get_agent_messages_with_custom_part_kinds():
+    """Test that custom part_kind values (system-status, internal-prompt) are handled."""
+    history = ConversationHistory()
+    # Manually set agent_history with a system-status part_kind
+    # (as saved by SystemStatusPrompt)
+    history.agent_history = [
+        {
+            "parts": [
+                {"content": "Hello", "part_kind": "user-prompt"},
+                {
+                    "content": "Status info",
+                    "part_kind": "system-status",
+                    "prompt_type": "status",
+                },
+            ],
+            "kind": "request",
+        },
+        {
+            "parts": [{"content": "Response", "part_kind": "text"}],
+            "kind": "response",
+        },
+    ]
+
+    messages = history.get_agent_messages()
+    assert len(messages) == 2
+    assert isinstance(messages[0], ModelRequest)
+    assert isinstance(messages[1], ModelResponse)
+
+
+def test_get_agent_messages_with_internal_prompt_part_kind():
+    """Test that internal-prompt part_kind is remapped to user-prompt."""
+    history = ConversationHistory()
+    history.agent_history = [
+        {
+            "parts": [
+                {"content": "Internal continuation", "part_kind": "internal-prompt"},
+            ],
+            "kind": "request",
+        },
+    ]
+
+    messages = history.get_agent_messages()
+    assert len(messages) == 1
+    assert isinstance(messages[0], ModelRequest)
+
+
+def test_get_ui_messages_with_custom_part_kinds():
+    """Test that custom part_kind values are handled in UI messages."""
+    history = ConversationHistory()
+    history.ui_history = [
+        {
+            "parts": [
+                {"content": "Hello", "part_kind": "user-prompt"},
+                {
+                    "content": "Status",
+                    "part_kind": "system-status",
+                    "prompt_type": "status",
+                },
+            ],
+            "kind": "request",
+            "message_type": "model",
+        },
+    ]
+
+    messages = history.get_ui_messages()
+    assert len(messages) == 1
+    assert isinstance(messages[0], ModelRequest)
+
+
 def test_filter_orphaned_tool_responses_removes_orphans():
     """Test that orphaned tool responses are filtered out."""
     # Create messages with orphaned tool response (no matching tool call)

@@ -24,6 +24,38 @@ from .filters import (
 
 SerializedMessage = dict[str, Any]
 
+# Mapping of custom part_kind values to their pydantic-ai base part_kind.
+# Custom subclasses (e.g. SystemStatusPrompt, InternalPromptPart) override
+# part_kind with values that ModelMessagesTypeAdapter doesn't recognise,
+# causing deserialization to fail. Remapping before validation fixes this.
+_CUSTOM_PART_KIND_MAP: dict[str, str] = {
+    "system-status": "user-prompt",  # SystemStatusPrompt -> UserPromptPart
+    "internal-prompt": "user-prompt",  # InternalPromptPart -> UserPromptPart
+}
+
+
+def _sanitize_parts(messages: list[SerializedMessage]) -> list[SerializedMessage]:
+    """Remap custom part_kind values so ModelMessagesTypeAdapter can deserialize them."""
+    sanitized: list[SerializedMessage] = []
+    for msg in messages:
+        parts = msg.get("parts")
+        if not parts:
+            sanitized.append(msg)
+            continue
+        new_parts = []
+        changed = False
+        for part in parts:
+            pk = part.get("part_kind")
+            if pk in _CUSTOM_PART_KIND_MAP:
+                part = {**part, "part_kind": _CUSTOM_PART_KIND_MAP[pk]}
+                changed = True
+            new_parts.append(part)
+        if changed:
+            sanitized.append({**msg, "parts": new_parts})
+        else:
+            sanitized.append(msg)
+    return sanitized
+
 
 class FileReference(BaseModel):
     """Placeholder for binary content that was loaded from a file.
@@ -162,8 +194,9 @@ class ConversationHistory(BaseModel):
         if not self.agent_history:
             return []
 
-        # Deserialize from JSON format back to ModelMessage objects
-        return ModelMessagesTypeAdapter.validate_python(self.agent_history)
+        # Sanitize custom part_kind values before deserialization
+        sanitized = _sanitize_parts(self.agent_history)
+        return ModelMessagesTypeAdapter.validate_python(sanitized)
 
     def get_ui_messages(self) -> list[ModelMessage | HintMessage | WelcomeMessage]:
         """Get ui_history as a list of Model, hint, or welcome messages."""
@@ -189,7 +222,9 @@ class ConversationHistory(BaseModel):
             payload = item
             if isinstance(payload, dict):
                 payload = {k: v for k, v in payload.items() if k != "message_type"}
-            deserialized = ModelMessagesTypeAdapter.validate_python([payload])
+            deserialized = ModelMessagesTypeAdapter.validate_python(
+                _sanitize_parts([payload])
+            )
             messages.append(deserialized[0])
 
         return messages
