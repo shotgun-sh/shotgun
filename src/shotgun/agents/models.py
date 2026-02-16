@@ -83,6 +83,26 @@ class AgentSystemPromptContext(BaseModel):
     )
 
 
+class ResponseChoice(BaseModel):
+    """A single choice option that can be presented to the user.
+
+    When an agent returns choices, the TUI hides the text input and shows
+    a numbered selector. The user can press Enter to select the default
+    (first) choice, or pick another option by number/click.
+    """
+
+    label: str = Field(
+        description="Short display label for this choice (e.g., 'Continue with plan', 'Talk about it first')",
+    )
+    value: str = Field(
+        description="The text sent back to the agent when this choice is selected",
+    )
+    is_default: bool = Field(
+        default=False,
+        description="Whether this is the default choice (selected on Enter). Only one choice should be default.",
+    )
+
+
 class AgentResponse(BaseModel):
     """Structured response from an agent with optional clarifying questions.
 
@@ -121,6 +141,16 @@ When set, the agent loop exits, files are loaded (as BinaryContent for
 PDFs/images or as strings for text files), and the loop resumes with
 file content in the next prompt.
 Use this for PDFs, images, or text files (.md, .txt, .json, etc.) you need to analyze.
+""",
+    )
+    choices: list[ResponseChoice] | None = Field(
+        default=None,
+        description="""
+Optional list of choices to present to the user as a selector.
+When set, the TUI hides the text input and shows a numbered choice selector.
+The user can press Enter to select the default choice, or pick another option.
+The selected choice's value is sent back as the next user message.
+Use this instead of asking the user to type specific words like 'continue'.
 """,
     )
 

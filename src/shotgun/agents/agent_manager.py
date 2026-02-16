@@ -81,6 +81,7 @@ from shotgun.agents.models import (
     AnyAgent,
     FileOperation,
     FileOperationTracker,
+    ResponseChoice,
     RouterAgent,
     ShotgunAgent,
 )
@@ -193,6 +194,19 @@ class ClarifyingQuestionsMessage(Message):
         """
         super().__init__()
         self.questions = questions
+        self.response_text = response_text
+
+
+class ChoiceSelectorMessage(Message):
+    """Event posted when agent returns choices for the user to select from."""
+
+    def __init__(
+        self,
+        choices: list["ResponseChoice"],
+        response_text: str,
+    ) -> None:
+        super().__init__()
+        self.choices = choices
         self.response_text = response_text
 
 
@@ -1270,8 +1284,35 @@ class AgentManager(Widget):
                 agent_response.file_requests,
             )
 
+        # Check if there are choices for the user to select from
+        if agent_response.choices:
+            logger.info(
+                f"Agent returned {len(agent_response.choices)} choices for user"
+            )
+
+            # Add agent's response first if present
+            if agent_response.response and agent_response.response.strip():
+                self.ui_message_history.append(
+                    HintMessage(message=agent_response.response)
+                )
+
+            # Add file operation hints
+            if file_operations:
+                file_hint = self._create_file_operation_hint(file_operations)
+                if file_hint:
+                    self.ui_message_history.append(HintMessage(message=file_hint))
+
+            # Post event to TUI to show choice selector
+            self.post_message(
+                ChoiceSelectorMessage(
+                    choices=agent_response.choices,
+                    response_text=agent_response.response,
+                )
+            )
+
+            self._post_messages_updated([])
         # Check if there are clarifying questions
-        if agent_response.clarifying_questions:
+        elif agent_response.clarifying_questions:
             logger.info(
                 f"Agent has {len(agent_response.clarifying_questions)} clarifying questions"
             )
@@ -2045,6 +2086,7 @@ class AgentManager(Widget):
 __all__ = [
     "AgentManager",
     "AgentType",
+    "ChoiceSelectorMessage",
     "ClarifyingQuestionsMessage",
     "CompactionCompletedMessage",
     "CompactionStartedMessage",
