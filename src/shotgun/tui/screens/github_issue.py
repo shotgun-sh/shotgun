@@ -6,9 +6,9 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
 
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown
 
 
 class GitHubIssueScreen(ModalScreen[None]):
@@ -92,7 +92,6 @@ We review all issues and will respond as soon as possible!
 - Be specific about what you'd like for feature requests
                     """,
                     id="issue-markdown",
-                    parser_factory=create_markdown_parser,
                 )
             with Vertical(id="issue-buttons"):
                 yield Label("", id="issue-status")

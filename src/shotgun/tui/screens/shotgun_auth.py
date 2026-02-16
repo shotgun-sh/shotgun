@@ -11,7 +11,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.events import Resize
 from textual.screen import Screen
-from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets import Button, Label, Static
 from textual.worker import Worker, WorkerState
 
 from shotgun.agents.config import ConfigManager
@@ -23,7 +23,7 @@ from shotgun.shotgun_web import (
 )
 from shotgun.shotgun_web.constants import DEFAULT_POLL_INTERVAL_SECONDS
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown
 
 if TYPE_CHECKING:
     from ..app import ShotgunApp
@@ -130,7 +130,7 @@ class ShotgunAuthScreen(Screen[bool]):
 
         with Vertical(id="content"):
             yield Label("Initializing...", id="status")
-            yield Markdown("", id="auth-url", parser_factory=create_markdown_parser)
+            yield Markdown("", id="auth-url")
             yield Markdown(
                 "**Instructions:**\n"
                 "1. A browser window will open automatically\n"
@@ -138,7 +138,6 @@ class ShotgunAuthScreen(Screen[bool]):
                 "3. Complete payment if required\n"
                 "4. This window will automatically detect completion",
                 id="instructions",
-                parser_factory=create_markdown_parser,
             )
 
         with Vertical(id="actions"):

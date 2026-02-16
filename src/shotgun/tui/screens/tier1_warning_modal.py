@@ -3,9 +3,9 @@
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown
+from textual.widgets import Button, Label
 
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown
 
 
 class Tier1WarningModal(ModalScreen[bool]):
@@ -64,7 +64,6 @@ Shotgun's multi-agent workflow will hit these limits almost immediately, resulti
 2. **Upgrade your Anthropic account** to Tier 2 or higher
 """,
                 id="message",
-                parser_factory=create_markdown_parser,
             )
             with Vertical(id="button-container"):
                 yield Button("I Understand", variant="primary", id="understand-button")

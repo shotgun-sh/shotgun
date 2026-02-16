@@ -1,13 +1,13 @@
-"""Tests for the custom markdown parser factory."""
+"""Tests for the custom Markdown widget with disabled fuzzy linking."""
 
 import pytest
 
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown, _create_markdown_parser
 
 
 def test_filenames_not_linkified():
     """Filenames like specification.md should not be converted to links."""
-    parser = create_markdown_parser()
+    parser = _create_markdown_parser()
     tokens = parser.parse("Check specification.md for details")
     inline_tokens = [t for t in tokens if t.children]
     for token in inline_tokens:
@@ -19,7 +19,7 @@ def test_filenames_not_linkified():
 
 def test_various_filenames_not_linkified():
     """Common filenames with TLD-like extensions should not be linkified."""
-    parser = create_markdown_parser()
+    parser = _create_markdown_parser()
     filenames = ["tasks.md", "README.md", "config.py", "index.js", "style.css"]
     for filename in filenames:
         tokens = parser.parse(f"Updated {filename} with changes")
@@ -33,7 +33,7 @@ def test_various_filenames_not_linkified():
 
 def test_explicit_https_urls_still_linkified():
     """Explicit https:// URLs should still be converted to links."""
-    parser = create_markdown_parser()
+    parser = _create_markdown_parser()
     tokens = parser.parse("Visit https://example.com for details")
     inline_tokens = [t for t in tokens if t.children]
     linkify_found = any(
@@ -46,7 +46,7 @@ def test_explicit_https_urls_still_linkified():
 
 def test_explicit_http_urls_still_linkified():
     """Explicit http:// URLs should still be converted to links."""
-    parser = create_markdown_parser()
+    parser = _create_markdown_parser()
     tokens = parser.parse("Visit http://example.com for details")
     inline_tokens = [t for t in tokens if t.children]
     linkify_found = any(
@@ -59,7 +59,7 @@ def test_explicit_http_urls_still_linkified():
 
 def test_markdown_links_still_work():
     """Standard markdown [text](url) links should still be parsed."""
-    parser = create_markdown_parser()
+    parser = _create_markdown_parser()
     tokens = parser.parse("See [docs](https://example.com) for details")
     inline_tokens = [t for t in tokens if t.children]
     link_found = any(
@@ -81,7 +81,7 @@ def test_markdown_links_still_work():
 )
 def test_bare_domain_like_names_not_linkified(text: str):
     """Bare words with TLD-like extensions should not be linkified."""
-    parser = create_markdown_parser()
+    parser = _create_markdown_parser()
     tokens = parser.parse(f"See {text} for details")
     inline_tokens = [t for t in tokens if t.children]
     for token in inline_tokens:
@@ -89,3 +89,10 @@ def test_bare_domain_like_names_not_linkified(text: str):
             assert child.markup != "linkify", (
                 f"'{text}' was incorrectly linkified"
             )
+
+
+def test_markdown_subclass_is_drop_in_replacement():
+    """Our Markdown subclass should be a proper subclass of Textual's Markdown."""
+    from textual.widgets import Markdown as TextualMarkdown
+
+    assert issubclass(Markdown, TextualMarkdown)

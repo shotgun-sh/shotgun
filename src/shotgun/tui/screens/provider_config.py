@@ -18,7 +18,6 @@ from textual.widgets import (
     Label,
     ListItem,
     ListView,
-    Markdown,
     Static,
     TabbedContent,
     TabPane,
@@ -29,7 +28,7 @@ from shotgun.agents.config.tier_detection import AnthropicTier, detect_anthropic
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown
 from shotgun.tui.services.ollama import (
     OLLAMA_DOWNLOAD_URL,
     OllamaStatus,
@@ -249,7 +248,6 @@ class ProviderConfigScreen(Screen[None]):
                 yield Markdown(
                     "Don't have an API Key? Use these links to get one: [OpenAI](https://platform.openai.com/api-keys) | [Anthropic](https://console.anthropic.com) | [Google Gemini](https://aistudio.google.com)",
                     id="provider-links",
-                    parser_factory=create_markdown_parser,
                 )
                 yield ListView(*self._build_provider_items_sync(), id="provider-list")
                 yield Input(
@@ -287,7 +285,6 @@ class ProviderConfigScreen(Screen[None]):
                     "Context7 provides up-to-date documentation for libraries as MCP tools. "
                     "Get a free API key to enable documentation-aware specs.",
                     id="context7-info",
-                    parser_factory=create_markdown_parser,
                 )
                 with Horizontal(id="context7-link-actions"):
                     yield Button(

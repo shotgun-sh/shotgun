@@ -10,10 +10,9 @@ from pydantic_ai.messages import (
 )
 from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import Markdown
 
 from shotgun.agents.messages import InternalPromptPart
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown
 
 
 class UserQuestionWidget(Widget):
@@ -26,10 +25,10 @@ class UserQuestionWidget(Widget):
     def compose(self) -> ComposeResult:
         self.display = self.item is not None
         if self.item is None:
-            yield Markdown(markdown="", parser_factory=create_markdown_parser)
+            yield Markdown(markdown="")
         else:
             prompt = self.format_prompt_parts(self.item.parts)
-            yield Markdown(markdown=prompt, parser_factory=create_markdown_parser)
+            yield Markdown(markdown=prompt)
 
     def format_prompt_parts(self, parts: Sequence[ModelRequestPart]) -> str:
         """Format user prompt parts into markdown."""

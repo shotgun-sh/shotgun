@@ -9,10 +9,10 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.events import Resize
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Markdown
+from textual.widgets import Button, Label
 
 from shotgun.tui.layout import COMPACT_HEIGHT_THRESHOLD
-from shotgun.tui.markdown import create_markdown_parser
+from shotgun.tui.markdown import Markdown
 
 if TYPE_CHECKING:
     pass
@@ -131,8 +131,7 @@ Or install permanently: `uv tool install shotgun-sh`
 **Discord:** https://discord.gg/5RmY6J2N7s
 
 **Full Migration Guide:** https://github.com/shotgun-sh/shotgun/blob/main/docs/PIPX_MIGRATION.md
-""",
-                    parser_factory=create_markdown_parser,
+"""
                 )
 
                 with Container(id="buttons-container"):
