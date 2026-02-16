@@ -78,22 +78,22 @@ async def estimate_tokens_hybrid(
     Returns:
         Estimated token count
     """
-    api_count = get_last_api_token_count(messages)
+    # Single backward pass to find the last ModelResponse with usage data
+    api_count = 0
+    last_response_idx = None
+    for i in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[i], ModelResponse) and messages[i].usage:
+            usage = messages[i].usage
+            api_count = usage.input_tokens + usage.cache_read_tokens
+            if api_count > 0:
+                last_response_idx = i
+                break
 
     if api_count == 0:
         # First turn or no usage data — fall back to full counting
         return await estimate_tokens_from_messages(messages, model_config)
 
-    # Find messages after the last ModelResponse (the delta)
-    last_response_idx = None
-    for i in range(len(messages) - 1, -1, -1):
-        if isinstance(messages[i], ModelResponse):
-            last_response_idx = i
-            break
-
-    delta_messages = (
-        messages[last_response_idx + 1 :] if last_response_idx is not None else []
-    )
+    delta_messages = messages[last_response_idx + 1 :]
 
     if not delta_messages:
         return api_count
