@@ -183,7 +183,6 @@ class CodebaseGraphManager:
 
     # Operation tracking for async operations
     _operations: ClassVar[dict[str, asyncio.Task[Any]]] = {}
-    _operation_stats: ClassVar[dict[str, OperationStats]] = {}
 
     def __init__(self, storage_dir: Path):
         """Initialize graph manager.
@@ -256,8 +255,6 @@ class CodebaseGraphManager:
                 """,
                 {"graph_id": graph_id, "stats": stats.model_dump_json()},
             )
-            # Also store in memory for quick access
-            self._operation_stats[graph_id] = stats
         except Exception as e:
             logger.error(f"Failed to store operation stats: {e} - graph_id: {graph_id}")
 
