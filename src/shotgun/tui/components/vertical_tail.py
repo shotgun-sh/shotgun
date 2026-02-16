@@ -7,6 +7,7 @@ class VerticalTail(VerticalScroll):
     """A vertical scroll container that automatically scrolls to the bottom when content is added."""
 
     auto_scroll = reactive(True, layout=False)
+    _scroll_pending = False
 
     def watch_auto_scroll(self, value: bool) -> None:
         """Handle auto_scroll property changes."""
@@ -15,5 +16,11 @@ class VerticalTail(VerticalScroll):
 
     def watch_virtual_size(self, value: Size) -> None:
         """Handle virtual_size property changes."""
+        if not self.auto_scroll or self._scroll_pending:
+            return
+        self._scroll_pending = True
+        self.call_later(self._deferred_scroll_end)
 
-        self.call_later(self.scroll_end, animate=False)
+    def _deferred_scroll_end(self) -> None:
+        self._scroll_pending = False
+        self.scroll_end(animate=False)
