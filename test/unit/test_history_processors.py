@@ -1243,9 +1243,9 @@ class TestMaxTokensCalculation:
             ModelResponse(parts=[TextPart(content="Test response")]),
         ]
 
-        # Mock estimate_tokens_from_messages to raise an exception
+        # Mock estimate_tokens_hybrid (used in no-summary path) to raise an exception
         with patch(
-            "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+            "shotgun.agents.conversation.history.history_processors.estimate_tokens_hybrid",
             side_effect=RuntimeError("Token counting API failed"),
         ):
             with pytest.raises(ContextSizeLimitExceeded) as exc_info:
@@ -1311,9 +1311,9 @@ class TestMaxTokensCalculation:
             )
             mock_error.status_code = 413
 
-            # Mock estimate_tokens_from_messages to raise the 413 error
+            # Mock estimate_tokens_hybrid (used in no-summary path) to raise the 413 error
             with patch(
-                "shotgun.agents.conversation.history.history_processors.estimate_tokens_from_messages",
+                "shotgun.agents.conversation.history.history_processors.estimate_tokens_hybrid",
                 side_effect=mock_error,
             ):
                 with pytest.raises(ContextSizeLimitExceeded) as exc_info:
