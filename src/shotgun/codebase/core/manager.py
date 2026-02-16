@@ -1020,7 +1020,9 @@ class CodebaseGraphManager:
                     observer.stop()
                     observer.join(timeout=5)
                 except Exception:
-                    logger.warning(f"Failed to stop watcher for {graph_id}", exc_info=True)
+                    logger.warning(
+                        f"Failed to stop watcher for {graph_id}", exc_info=True
+                    )
             cls._watchers.clear()
             cls._handlers.clear()
 
