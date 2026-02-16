@@ -16,10 +16,7 @@ def mock_httpx_async_client():
     with patch("httpx.AsyncClient") as mock_client_class:
         # Create a mock instance that will be returned by AsyncClient()
         mock_instance = MagicMock()
-
-        # Mock the async context manager protocol
-        mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
-        mock_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_instance.aclose = AsyncMock()
 
         # Make AsyncClient() return our mock instance
         mock_client_class.return_value = mock_instance

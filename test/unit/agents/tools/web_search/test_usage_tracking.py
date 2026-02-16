@@ -187,6 +187,8 @@ async def test_openai_web_search_tracks_usage(
 
     mock_client = AsyncMock()
     mock_client.responses.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
     mock_openai_cls.return_value = mock_client
 
     result = await openai_web_search_tool("test query")
@@ -223,6 +225,8 @@ async def test_openai_web_search_no_usage_when_none(
 
     mock_client = AsyncMock()
     mock_client.responses.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
     mock_openai_cls.return_value = mock_client
 
     await openai_web_search_tool("test query")

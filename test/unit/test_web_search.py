@@ -1,10 +1,18 @@
 """Unit tests for agents.tools.web_search module."""
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
 from shotgun.agents.tools.web_search import openai_web_search_tool
+
+
+def _make_async_ctx_mock(**kwargs):
+    """Create a Mock that supports async context manager protocol."""
+    mock = MagicMock(**kwargs)
+    mock.__aenter__ = AsyncMock(return_value=mock)
+    mock.__aexit__ = AsyncMock(return_value=None)
+    return mock
 
 
 class TestWebSearchTool:
@@ -16,7 +24,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = "Search results about Python programming"
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -40,7 +48,7 @@ class TestWebSearchTool:
             assert result == "Search results about Python programming"
             mock_client.responses.create.assert_called_once()
             mock_span.set_attribute.assert_called()
-            mock_openai.assert_called_once_with(api_key="test-api-key")
+            mock_openai.assert_called_once_with(api_key="test-api-key", base_url=None)
 
     @pytest.mark.asyncio
     async def test_empty_search_results(self):
@@ -48,7 +56,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = None
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -78,7 +86,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = ""
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -104,7 +112,7 @@ class TestWebSearchTool:
     @pytest.mark.asyncio
     async def test_openai_api_error(self):
         """Test handling of OpenAI API errors."""
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(
             side_effect=Exception("API rate limit exceeded")
         )
@@ -161,7 +169,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = "Results"
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -230,7 +238,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = "Search results"
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -264,7 +272,7 @@ class TestWebSearchTool:
     @pytest.mark.asyncio
     async def test_error_telemetry(self):
         """Test error telemetry."""
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         error_message = "Connection timeout"
         mock_client.responses.create = AsyncMock(side_effect=Exception(error_message))
 
@@ -299,7 +307,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = "Generic results"
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -367,7 +375,7 @@ class TestWebSearchTool:
         mock_response = Mock()
         mock_response.output_text = long_result
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -410,7 +418,7 @@ class TestIntegrationScenarios:
         These are the most popular options as of 2024.
         """
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
@@ -478,7 +486,7 @@ class TestIntegrationScenarios:
         mock_model_config.is_shotgun_account = False
 
         for exception, expected_error_text in error_scenarios:
-            mock_client = Mock()
+            mock_client = _make_async_ctx_mock()
             mock_client.responses.create = AsyncMock(side_effect=exception)
 
             with (
@@ -507,7 +515,7 @@ class TestIntegrationScenarios:
         mock_model_config.api_key = "test-api-key"
         mock_model_config.is_shotgun_account = False
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(side_effect=TimeoutError("timeout"))
 
         with (
@@ -532,7 +540,7 @@ class TestIntegrationScenarios:
         mock_response = Mock()
         mock_response.output_text = "Search results"
 
-        mock_client = Mock()
+        mock_client = _make_async_ctx_mock()
         mock_client.responses.create = AsyncMock(return_value=mock_response)
 
         mock_model_config = Mock()
