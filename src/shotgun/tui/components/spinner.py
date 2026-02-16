@@ -62,6 +62,12 @@ class Spinner(Widget):
         """Set up the animation timer when mounted."""
         self._timer = self.set_interval(0.1, self._advance_frame)
 
+    def on_unmount(self) -> None:
+        """Stop the animation timer when unmounted."""
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
+
     def _advance_frame(self) -> None:
         """Advance to the next animation frame."""
         self._frame_index = (self._frame_index + 1) % len(self.FRAMES)
