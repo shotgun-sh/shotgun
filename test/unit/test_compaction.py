@@ -13,8 +13,10 @@ from pydantic_ai.messages import (
 from pydantic_ai.usage import RequestUsage
 
 from shotgun.agents.conversation.history.compaction import (
-    _get_last_api_token_count,
     apply_persistent_compaction,
+)
+from shotgun.agents.conversation.history.token_estimation import (
+    get_last_api_token_count,
 )
 
 
@@ -29,7 +31,7 @@ def mock_deps() -> MagicMock:
     return deps
 
 
-def test_get_last_api_token_count_with_usage():
+def testget_last_api_token_count_with_usage():
     """API usage data is extracted from the last ModelResponse."""
     messages = [
         ModelRequest(parts=[UserPromptPart(content="hello")]),
@@ -46,10 +48,10 @@ def test_get_last_api_token_count_with_usage():
         ),
     ]
     # Should return the LAST response's usage: 5000 + 2000
-    assert _get_last_api_token_count(messages) == 7000
+    assert get_last_api_token_count(messages) == 7000
 
 
-def test_get_last_api_token_count_no_usage():
+def testget_last_api_token_count_no_usage():
     """Returns 0 when no ModelResponse has usage data with nonzero tokens."""
     messages = [
         ModelRequest(parts=[UserPromptPart(content="hello")]),
@@ -58,23 +60,23 @@ def test_get_last_api_token_count_no_usage():
             usage=RequestUsage(input_tokens=0, output_tokens=0),
         ),
     ]
-    assert _get_last_api_token_count(messages) == 0
+    assert get_last_api_token_count(messages) == 0
 
 
-def test_get_last_api_token_count_empty_messages():
+def testget_last_api_token_count_empty_messages():
     """Returns 0 for empty message list."""
-    assert _get_last_api_token_count([]) == 0
+    assert get_last_api_token_count([]) == 0
 
 
-def test_get_last_api_token_count_only_requests():
+def testget_last_api_token_count_only_requests():
     """Returns 0 when there are no ModelResponse messages."""
     messages = [
         ModelRequest(parts=[UserPromptPart(content="hello")]),
     ]
-    assert _get_last_api_token_count(messages) == 0
+    assert get_last_api_token_count(messages) == 0
 
 
-def test_get_last_api_token_count_cache_read_included():
+def testget_last_api_token_count_cache_read_included():
     """cache_read_tokens are added to input_tokens."""
     messages = [
         ModelResponse(
@@ -84,7 +86,7 @@ def test_get_last_api_token_count_cache_read_included():
             ),
         ),
     ]
-    assert _get_last_api_token_count(messages) == 10000
+    assert get_last_api_token_count(messages) == 10000
 
 
 @pytest.mark.anyio

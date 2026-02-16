@@ -6,7 +6,7 @@ and libraries, replacing the old character-based estimation approach.
 
 from typing import TYPE_CHECKING, Union
 
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelResponse
 
 from shotgun.agents.config.models import ModelConfig
 
@@ -17,6 +17,21 @@ if TYPE_CHECKING:
 
 from .constants import INPUT_BUFFER_TOKENS, MIN_SUMMARY_TOKENS
 from .token_counting import count_tokens_from_messages as _count_tokens_from_messages
+
+
+def get_last_api_token_count(messages: list[ModelMessage]) -> int:
+    """Extract the total input token count from the last ModelResponse's usage data.
+
+    API usage data is the most accurate source for token counts because it includes
+    message framing, tool schemas, system prompts, and binary content that text-based
+    estimation misses.
+
+    Returns 0 if no ModelResponse with nonzero usage data is found.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ModelResponse) and msg.usage:
+            return msg.usage.input_tokens + msg.usage.cache_read_tokens
+    return 0
 
 
 async def estimate_tokens_from_messages(
