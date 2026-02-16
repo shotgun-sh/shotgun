@@ -75,51 +75,52 @@ async def openai_web_search_tool(query: str) -> str:
         # Use proxy for Shotgun Account, direct API for BYOK
         if model_config.is_shotgun_account:
             logger.debug("🔑 Using Shotgun Account proxy for OpenAI web search")
-            client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_PROXY_OPENAI_BASE)
+            base_url: str | None = LITELLM_PROXY_OPENAI_BASE
             # Use gpt-5.2 for web search on Shotgun Account
             # The proxy requires openai/ prefix for LiteLLM routing
             web_search_model = "openai/gpt-5.2"
         else:
-            client = AsyncOpenAI(api_key=api_key)
+            base_url = None
             # BYOK users can use gpt-5-mini directly
             web_search_model = "gpt-5-mini"
 
         # Wrap API call with timeout to prevent indefinite hangs
-        try:
-            response = await asyncio.wait_for(
-                client.responses.create(
-                    model=web_search_model,
-                    input=[
-                        {
-                            "role": "user",
-                            "content": [{"type": "input_text", "text": prompt}],
-                        }
-                    ],
-                    text={
-                        "format": {"type": "text"},
-                        "verbosity": "high",
-                    },
-                    reasoning={"effort": "medium", "summary": "auto"},
-                    tools=[
-                        {
-                            "type": "web_search",
-                            "user_location": {"type": "approximate"},
-                            "search_context_size": "high",
-                        }
-                    ],
-                    store=False,
-                    include=[
-                        "reasoning.encrypted_content",
-                        "web_search_call.action.sources",  # pyright: ignore[reportArgumentType]
-                    ],
-                ),
-                timeout=WEB_SEARCH_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            error_msg = f"Web search timed out after {WEB_SEARCH_TIMEOUT} seconds"
-            logger.warning("⏱️ %s", error_msg)
-            span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
-            return error_msg
+        async with AsyncOpenAI(api_key=api_key, base_url=base_url) as client:
+            try:
+                response = await asyncio.wait_for(
+                    client.responses.create(
+                        model=web_search_model,
+                        input=[
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": prompt}],
+                            }
+                        ],
+                        text={
+                            "format": {"type": "text"},
+                            "verbosity": "high",
+                        },
+                        reasoning={"effort": "medium", "summary": "auto"},
+                        tools=[
+                            {
+                                "type": "web_search",
+                                "user_location": {"type": "approximate"},
+                                "search_context_size": "high",
+                            }
+                        ],
+                        store=False,
+                        include=[
+                            "reasoning.encrypted_content",
+                            "web_search_call.action.sources",  # pyright: ignore[reportArgumentType]
+                        ],
+                    ),
+                    timeout=WEB_SEARCH_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                error_msg = f"Web search timed out after {WEB_SEARCH_TIMEOUT} seconds"
+                logger.warning("⏱️ %s", error_msg)
+                span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
+                return error_msg
 
         # Track usage from the web search LLM call
         # OpenAI SDK usage is not a pydantic_ai RequestUsage, so convert first

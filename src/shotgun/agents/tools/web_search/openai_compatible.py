@@ -78,44 +78,43 @@ async def openai_compatible_web_search_tool(query: str) -> str:
             web_search_model,
         )
 
-        client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-
         # Wrap API call with timeout to prevent indefinite hangs
-        try:
-            response = await asyncio.wait_for(
-                client.responses.create(
-                    model=web_search_model,
-                    input=[
-                        {
-                            "role": "user",
-                            "content": [{"type": "input_text", "text": prompt}],
-                        }
-                    ],
-                    text={
-                        "format": {"type": "text"},
-                        "verbosity": "high",
-                    },
-                    reasoning={"effort": "medium", "summary": "auto"},
-                    tools=[
-                        {
-                            "type": "web_search",
-                            "user_location": {"type": "approximate"},
-                            "search_context_size": "high",
-                        }
-                    ],
-                    store=False,
-                    include=[
-                        "reasoning.encrypted_content",
-                        "web_search_call.action.sources",  # pyright: ignore[reportArgumentType]
-                    ],
-                ),
-                timeout=WEB_SEARCH_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            error_msg = f"Web search timed out after {WEB_SEARCH_TIMEOUT} seconds"
-            logger.warning(error_msg)
-            span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
-            return error_msg
+        async with AsyncOpenAI(api_key=api_key, base_url=base_url) as client:
+            try:
+                response = await asyncio.wait_for(
+                    client.responses.create(
+                        model=web_search_model,
+                        input=[
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": prompt}],
+                            }
+                        ],
+                        text={
+                            "format": {"type": "text"},
+                            "verbosity": "high",
+                        },
+                        reasoning={"effort": "medium", "summary": "auto"},
+                        tools=[
+                            {
+                                "type": "web_search",
+                                "user_location": {"type": "approximate"},
+                                "search_context_size": "high",
+                            }
+                        ],
+                        store=False,
+                        include=[
+                            "reasoning.encrypted_content",
+                            "web_search_call.action.sources",  # pyright: ignore[reportArgumentType]
+                        ],
+                    ),
+                    timeout=WEB_SEARCH_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                error_msg = f"Web search timed out after {WEB_SEARCH_TIMEOUT} seconds"
+                logger.warning(error_msg)
+                span.set_attribute("output.value", f"**Error:**\n {error_msg}\n")
+                return error_msg
 
         result_text = response.output_text or "No content returned"
 

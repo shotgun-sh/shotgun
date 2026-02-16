@@ -65,6 +65,7 @@ class LiteLLMProxyClient:
         self.api_key = api_key
         self.base_url = base_url or LITELLM_PROXY_BASE_URL
         self.timeout = timeout
+        self._client = httpx.AsyncClient(timeout=self.timeout)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -96,10 +97,13 @@ class LiteLLMProxyClient:
         Raises:
             httpx.HTTPError: If request fails after all retries
         """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.request(method, url, **kwargs)
-            response.raise_for_status()
-            return response
+        response = await self._client.request(method, url, **kwargs)
+        response.raise_for_status()
+        return response
+
+    async def aclose(self) -> None:
+        """Close the underlying HTTP client."""
+        await self._client.aclose()
 
     async def get_key_info(self) -> KeyInfoResponse:
         """Get key information from LiteLLM proxy.
@@ -212,4 +216,7 @@ async def get_budget_info(api_key: str, base_url: str | None = None) -> BudgetIn
         Budget information
     """
     client = LiteLLMProxyClient(api_key, base_url=base_url)
-    return await client.get_budget_info()
+    try:
+        return await client.get_budget_info()
+    finally:
+        await client.aclose()
