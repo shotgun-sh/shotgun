@@ -328,6 +328,10 @@ class ShotgunApp(App[None]):
 
     async def action_quit(self) -> None:
         """Quit the application."""
+        # Clean up agent instances to release tool contexts and model instances
+        if isinstance(self.screen, ChatScreen):
+            await self.screen.agent_manager.cleanup_agents()
+
         # Stop all file watchers to prevent resource leaks
         from shotgun.codebase.core.manager import CodebaseGraphManager
 

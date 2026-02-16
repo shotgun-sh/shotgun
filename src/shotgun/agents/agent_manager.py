@@ -423,6 +423,27 @@ class AgentManager(Widget):
         )
         self._agents_initialized = True
 
+    async def cleanup_agents(self) -> None:
+        """Release all agent instances and their held resources."""
+        if self._router_deps is not None:
+            self._router_deps.sub_agent_cache.clear()
+            self._router_deps.parent_stream_handler = None
+            self._router_deps.on_plan_changed = None
+
+        self._research_agent = None
+        self._research_deps = None
+        self._plan_agent = None
+        self._plan_deps = None
+        self._tasks_agent = None
+        self._tasks_deps = None
+        self._specify_agent = None
+        self._specify_deps = None
+        self._export_agent = None
+        self._export_deps = None
+        self._router_agent = None
+        self._router_deps = None
+        self._agents_initialized = False
+
     @property
     def research_agent(self) -> ShotgunAgent:
         """Get research agent (must call _ensure_agents_initialized first)."""
