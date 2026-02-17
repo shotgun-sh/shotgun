@@ -14,8 +14,11 @@ from shotgun.agents.autopilot import (
     ClaudeOutputType,
 )
 from shotgun.agents.autopilot.lightweight_parser import LightweightTasksParser
-from shotgun.agents.autopilot.models import AutopilotMode, Stage
-from shotgun.tui.screens.autopilot_startup import AutopilotStartupScreen
+from shotgun.agents.autopilot.models import AutopilotMode, PrerequisiteValidation, Stage
+from shotgun.tui.screens.autopilot_startup import (
+    AutopilotStartResult,
+    AutopilotStartupScreen,
+)
 
 if TYPE_CHECKING:
     from shotgun.agents.constants import FileContent
@@ -252,6 +255,7 @@ class ChatScreen(Screen[None]):
     _autopilot_approval_widget: StageApprovalWidget | None = None
     _autopilot_orchestrator: "AutopilotOrchestrator | None" = None
     _autopilot_rejection_mode: bool = False  # True when waiting for rejection feedback
+    _autopilot_validation: "PrerequisiteValidation | None" = None
 
     def __init__(
         self,
@@ -2978,7 +2982,11 @@ class ChatScreen(Screen[None]):
 
     @work(exclusive=True)
     async def _async_parse_and_show_autopilot(self) -> None:
-        """Async worker to parse tasks.md using LLM parser and show startup screen."""
+        """Async worker to parse tasks.md and then show startup screen.
+
+        Uses push_screen with callback instead of push_screen_wait to avoid
+        CancelledError when modal screens dismiss and their workers are cleaned up.
+        """
         try:
             # Step 1: Validate prerequisites before doing any LLM parsing
             config = AutopilotConfig(working_directory=self.deps.working_directory)
@@ -3008,10 +3016,14 @@ class ChatScreen(Screen[None]):
                 screen = AutopilotStartupScreen(
                     [], error_msg, show_teams=self.claude_teams
                 )
-                result = await self.app.push_screen_wait(screen)
-                if not result.started:
-                    self.widget_coordinator.update_prompt_input(focus=True)
+                # Use push_screen with callback to avoid CancelledError
+                self.app.push_screen(screen, callback=self._on_autopilot_startup_result)
+                # Store validation for the callback (not needed for error case)
+                self._autopilot_validation = None
                 return
+
+            # Store validation for use in the callback
+            self._autopilot_validation = validation
 
             # Log warnings for missing recommended files
             if validation.missing_recommended:
@@ -3052,54 +3064,81 @@ class ChatScreen(Screen[None]):
                     [], error_msg, is_warning=False, show_teams=self.claude_teams
                 )
 
-            result = await self.app.push_screen_wait(screen)
+            # Use push_screen with callback instead of push_screen_wait
+            # to avoid CancelledError when modal dismisses and workers are cleaned up.
+            logger.info("Autopilot: Pushing startup screen with callback")
+            self.app.push_screen(screen, callback=self._on_autopilot_startup_result)
 
-            # Handle result
-            if result.started and result.mode and result.stages:
-                logger.info(
-                    "Autopilot: Starting with mode=%s, stages=%d",
-                    result.mode.value,
-                    len(result.stages),
-                )
-
-                # Track autopilot started (no PII - just counts and mode)
-                total_tasks = sum(len(s.tasks) for s in result.stages)
-                completed_tasks = sum(len(s.completed_tasks) for s in result.stages)
-                # Count stages that are fully complete (all tasks done)
-                completed_stages = sum(1 for s in result.stages if s.is_complete)
-                track_event(
-                    "autopilot_started",
-                    {
-                        "mode": result.mode.value,
-                        "total_stages": len(result.stages),
-                        "completed_stages": completed_stages,
-                        "total_tasks": total_tasks,
-                        "completed_tasks": completed_tasks,
-                        "has_spec_file": not validation.spec_file.is_empty,
-                        "has_plan_file": not validation.plan_file.is_empty,
-                        "use_teams": result.use_teams,
-                        "push_to_remote": result.push_to_remote,
-                    },
-                )
-
-                self.mount_hint(
-                    f"Starting Autopilot in **{result.mode.value}** mode with "
-                    f"**{len(result.stages)}** stages"
-                )
-                self._run_autopilot_stage(
-                    result.mode,
-                    result.stages,
-                    use_teams=result.use_teams,
-                    push_to_remote=result.push_to_remote,
-                )
-            else:
-                logger.info("Autopilot: Cancelled by user")
-                self.mount_hint("Autopilot cancelled")
-                self.widget_coordinator.update_prompt_input(focus=True)
-
+        except asyncio.CancelledError:
+            logger.warning("Autopilot: Parse worker was cancelled (CancelledError)")
+            self.processing_state.stop_processing()
         except Exception as e:
             logger.exception("Autopilot: Error parsing tasks.md")
+            self.processing_state.stop_processing()
             self.mount_hint(f"[red]Autopilot error:[/] {e}")
+
+    def _on_autopilot_startup_result(self, result: AutopilotStartResult | None) -> None:
+        """Handle result from AutopilotStartupScreen callback.
+
+        This runs on the main event loop (not in a worker), avoiding the
+        CancelledError issue that occurs with push_screen_wait inside @work.
+        """
+        if result is None:
+            logger.info("Autopilot: Modal dismissed with no result")
+            self.widget_coordinator.update_prompt_input(focus=True)
+            return
+
+        if result.started and result.mode and result.stages:
+            logger.info(
+                "Autopilot: Starting with mode=%s, stages=%d, use_teams=%s, push_to_remote=%s",
+                result.mode.value,
+                len(result.stages),
+                result.use_teams,
+                result.push_to_remote,
+            )
+
+            # Track autopilot started (no PII - just counts and mode)
+            total_tasks = sum(len(s.tasks) for s in result.stages)
+            completed_tasks = sum(len(s.completed_tasks) for s in result.stages)
+            completed_stages = sum(1 for s in result.stages if s.is_complete)
+            validation = self._autopilot_validation
+            track_event(
+                "autopilot_started",
+                {
+                    "mode": result.mode.value,
+                    "total_stages": len(result.stages),
+                    "completed_stages": completed_stages,
+                    "total_tasks": total_tasks,
+                    "completed_tasks": completed_tasks,
+                    "has_spec_file": (
+                        not validation.spec_file.is_empty if validation else False
+                    ),
+                    "has_plan_file": (
+                        not validation.plan_file.is_empty if validation else False
+                    ),
+                    "use_teams": result.use_teams,
+                    "push_to_remote": result.push_to_remote,
+                },
+            )
+
+            self.mount_hint(
+                f"Starting Autopilot in **{result.mode.value}** mode with "
+                f"**{len(result.stages)}** stages"
+            )
+            # Use call_later to schedule the @work method on the next event loop
+            # iteration. Spawning @work workers directly from a push_screen callback
+            # can result in the worker being created but never actually executed.
+            self.call_later(
+                self._run_autopilot_stage,
+                result.mode,
+                result.stages,
+                use_teams=result.use_teams,
+                push_to_remote=result.push_to_remote,
+            )
+        else:
+            logger.info("Autopilot: Cancelled by user")
+            self.mount_hint("Autopilot cancelled")
+            self.widget_coordinator.update_prompt_input(focus=True)
 
     @work(exclusive=True)
     async def _run_autopilot_stage(
@@ -3126,6 +3165,13 @@ class ChatScreen(Screen[None]):
             use_teams: Whether to use Claude Code Teams for parallel execution.
             push_to_remote: Whether to push changes to remote (cowboy mode).
         """
+        logger.info(
+            "Autopilot: _run_autopilot_stage entered - mode=%s, stages=%d, use_teams=%s",
+            mode.value if hasattr(mode, "value") else mode,
+            len(stages),
+            use_teams,
+        )
+
         # Create or reuse orchestrator
         if self._autopilot_orchestrator is None:
             config = AutopilotConfig(
@@ -3190,6 +3236,11 @@ Then confirm what you changed.
 
         current_stage = orchestrator.state.current_stage
         if current_stage is None:
+            logger.warning(
+                "Autopilot: No current stage found (current_stage_index=%d, total_stages=%d)",
+                orchestrator.state.current_stage_index,
+                len(orchestrator.state.stages),
+            )
             self.mount_hint("[yellow]No current stage[/]")
             return
 
@@ -3226,10 +3277,11 @@ Then confirm what you changed.
                 return
 
         except asyncio.CancelledError:
+            logger.warning("Autopilot: Worker was cancelled (CancelledError)")
             self.mount_hint("Autopilot was cancelled")
             self.widget_coordinator.set_autopilot_input_locked(False)
         except Exception as e:
-            logger.exception("Autopilot error")
+            logger.exception("Autopilot: Unhandled error in _run_autopilot_stage")
             self.mount_hint(f"[red]Autopilot error:[/] {e}")
             self.widget_coordinator.set_autopilot_input_locked(False)
         finally:
