@@ -57,9 +57,10 @@ ModeIndicator.mode-drafting {
   height: 1;
 }
 
-#context-indicator {
+#model-indicator {
   text-align: end;
   height: 1;
+  width: auto;
 }
 
 #indexing-job-display {

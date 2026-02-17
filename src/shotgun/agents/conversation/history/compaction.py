@@ -102,8 +102,11 @@ async def apply_persistent_compaction(
         return compacted_messages
 
     except Exception as e:
-        # If compaction fails, return original messages
-        # This ensures the system remains functional even if compaction has issues
+        if force:
+            # When force=True (manual compaction), propagate the error so the user
+            # gets a clear error message instead of silent "0% reduction"
+            raise
+        # For auto-compaction, return original messages to keep the system functional
         logger.warning(f"Persistent compaction failed, using original history: {e}")
         return messages
 

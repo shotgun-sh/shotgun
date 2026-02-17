@@ -12,10 +12,10 @@ import logging
 from typing import TYPE_CHECKING
 
 from pydantic_ai.messages import ModelMessage
+from textual.widgets import Static
 
-from shotgun.agents.config.models import ModelName
+from shotgun.agents.config.models import ModelName, get_model_display_name
 from shotgun.agents.models import AgentType
-from shotgun.tui.components.context_indicator import ContextIndicator
 from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
@@ -183,20 +183,15 @@ class WidgetCoordinator:
     def update_context_indicator(
         self, analysis: "ContextAnalysis | None", model_name: ModelName | str | None
     ) -> None:
-        """Update context indicator with new analysis.
-
-        Args:
-            analysis: The context analysis results.
-            model_name: The current model name (ModelName enum or string for custom models).
-        """
-        if not self.screen.is_mounted:
+        """Update the model name indicator in the footer."""
+        if not self.screen.is_mounted or not model_name:
             return
-
         try:
-            context_indicator = self.screen.query_one(ContextIndicator)
-            context_indicator.update_context(analysis, model_name)
+            display = get_model_display_name(model_name)
+            indicator = self.screen.query_one("#model-indicator", Static)
+            indicator.update(f"[bold]{display}[/bold]")
         except Exception as e:
-            logger.exception(f"Failed to update context indicator: {e}")
+            logger.exception(f"Failed to update model indicator: {e}")
 
     def update_prompt_input(
         self,
@@ -251,21 +246,6 @@ class WidgetCoordinator:
                 spinner.text = text
         except Exception as e:
             logger.exception(f"Failed to update spinner text: {e}")
-
-    def set_context_streaming(self, streaming: bool) -> None:
-        """Enable or disable context indicator streaming animation.
-
-        Args:
-            streaming: Whether to show streaming animation.
-        """
-        if not self.screen.is_mounted:
-            return
-
-        try:
-            context_indicator = self.screen.query_one(ContextIndicator)
-            context_indicator.set_streaming(streaming)
-        except Exception as e:
-            logger.exception(f"Failed to set context streaming: {e}")
 
     def update_attachment_bar(self, attachment: "FileAttachment | None") -> None:
         """Update the attachment bar with pending attachment.

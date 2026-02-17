@@ -138,6 +138,18 @@ class ModelConfig(BaseModel):
         return self.key_provider == KeyProvider.SHOTGUN
 
 
+def get_model_display_name(name: "ModelName | str") -> str:
+    """Get the UI display name for a model.
+
+    For known ModelName enums, returns the short_name from MODEL_SPECS.
+    For unknown strings (e.g. Ollama models), returns the string as-is.
+    """
+    if isinstance(name, ModelName):
+        spec = MODEL_SPECS.get(name)
+        return spec.short_name if spec else name.value
+    return str(name)
+
+
 # Model specifications registry (static metadata)
 MODEL_SPECS: dict[ModelName, ModelSpec] = {
     ModelName.GPT_5_1: ModelSpec(

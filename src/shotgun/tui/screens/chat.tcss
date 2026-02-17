@@ -44,9 +44,10 @@ ModeIndicator {
   layout: vertical;
 }
 
-#context-indicator {
+#model-indicator {
   text-align: end;
   height: 1;
+  width: auto;
 }
 
 #indexing-job-display {
