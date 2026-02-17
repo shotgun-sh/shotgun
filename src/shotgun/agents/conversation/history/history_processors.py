@@ -351,13 +351,23 @@ async def token_limit_compactor(
         )
 
         # Use shotgun wrapper to ensure full token utilization
-        summary_response = await shotgun_model_request(
-            model_config=deps.llm_model,
-            messages=request_messages,
-            model_settings=ModelSettings(
-                max_tokens=max_tokens  # Use calculated optimal tokens for summarization
-            ),
-        )
+        # Fall back to full compaction (which may use chunked) if prompt is too large
+        try:
+            summary_response = await shotgun_model_request(
+                model_config=deps.llm_model,
+                messages=request_messages,
+                model_settings=ModelSettings(
+                    max_tokens=max_tokens  # Use calculated optimal tokens for summarization
+                ),
+            )
+        except APIStatusError as e:
+            if e.status_code == 400 and "too long" in str(e).lower():
+                logger.warning(
+                    "Incremental compaction request rejected by API (prompt too long), "
+                    "falling back to full compaction"
+                )
+                return await _full_compaction(deps, messages)
+            raise
 
         log_summarization_response(summary_response, "INCREMENTAL")
 
@@ -495,29 +505,26 @@ async def _full_compaction(
     # Extract context from all messages
     context = extract_context_from_messages(messages)
 
-    # Check if context would exceed model limit for compaction request
-    # We use CHUNK_SAFE_RATIO (70%) to leave room for prompt overhead
-    max_safe_input = int(deps.llm_model.max_input_tokens * CHUNK_SAFE_RATIO)
-
-    # Estimate context tokens
-    context_request: list[ModelMessage] = [ModelRequest.user_text_prompt(context)]
-    context_tokens = await estimate_tokens_from_messages(
-        context_request, deps.llm_model
-    )
-
-    if context_tokens > max_safe_input:
-        # Context too large for single-pass compaction - use chunked approach
-        logger.info(
-            f"Context ({context_tokens:,} tokens) exceeds safe limit "
-            f"({max_safe_input:,} tokens), using chunked compaction"
-        )
-        return await _chunked_compaction(deps, messages)
-
-    # Use regular summarization prompt
+    # Build the actual summarization request (with instructions) for accurate token estimation
     summarization_prompt = prompt_loader.render("history/summarization.j2")
     request_messages: list[ModelMessage] = [
         ModelRequest.user_text_prompt(context, instructions=summarization_prompt)
     ]
+
+    # Check if the actual request would exceed model limit
+    # We use CHUNK_SAFE_RATIO (70%) to leave room for API framing overhead
+    max_safe_input = int(deps.llm_model.max_input_tokens * CHUNK_SAFE_RATIO)
+    request_tokens = await estimate_tokens_from_messages(
+        request_messages, deps.llm_model
+    )
+
+    if request_tokens > max_safe_input:
+        # Request too large for single-pass compaction - use chunked approach
+        logger.info(
+            f"Request ({request_tokens:,} tokens) exceeds safe limit "
+            f"({max_safe_input:,} tokens), using chunked compaction"
+        )
+        return await _chunked_compaction(deps, messages)
 
     # Calculate optimal max_tokens for summarization
     max_tokens = await calculate_max_summarization_tokens(
@@ -530,13 +537,23 @@ async def _full_compaction(
     )
 
     # Use shotgun wrapper to ensure full token utilization
-    summary_response = await shotgun_model_request(
-        model_config=deps.llm_model,
-        messages=request_messages,
-        model_settings=ModelSettings(
-            max_tokens=max_tokens  # Use calculated optimal tokens for summarization
-        ),
-    )
+    # Fall back to chunked compaction if the API rejects the request as too large
+    try:
+        summary_response = await shotgun_model_request(
+            model_config=deps.llm_model,
+            messages=request_messages,
+            model_settings=ModelSettings(
+                max_tokens=max_tokens  # Use calculated optimal tokens for summarization
+            ),
+        )
+    except APIStatusError as e:
+        if e.status_code == 400 and "too long" in str(e).lower():
+            logger.warning(
+                "Full compaction request rejected by API (prompt too long), "
+                "falling back to chunked compaction"
+            )
+            return await _chunked_compaction(deps, messages)
+        raise
 
     # Calculate token reduction
     current_tokens = await estimate_tokens_from_messages(messages, deps.llm_model)

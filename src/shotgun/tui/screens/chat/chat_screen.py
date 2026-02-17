@@ -55,7 +55,7 @@ from shotgun.agents.agent_manager import (
     ToolStreamingProgressMessage,
 )
 from shotgun.agents.config import get_config_manager
-from shotgun.agents.config.models import MODEL_SPECS, ModelName, is_ollama_model
+from shotgun.agents.config.models import get_model_display_name, is_ollama_model
 from shotgun.agents.config.provider import get_provider_model
 from shotgun.agents.conversation import ConversationManager
 from shotgun.agents.conversation.history.compaction import apply_persistent_compaction
@@ -102,7 +102,6 @@ from shotgun.sdk.codebase import CodebaseSDK
 from shotgun.sdk.exceptions import CodebaseNotFoundError, InvalidPathError
 from shotgun.tui.commands import CommandHandler
 from shotgun.tui.components.attachment_bar import AttachmentBar
-from shotgun.tui.components.context_indicator import ContextIndicator
 from shotgun.tui.components.mode_indicator import ModeIndicator
 from shotgun.tui.components.prompt_input import PromptInput
 from shotgun.tui.components.spinner import Spinner
@@ -236,8 +235,6 @@ class ChatScreen(Screen[None]):
     working = reactive(False)
 
     # Throttle context indicator updates (in seconds)
-    _last_context_update: float = 0.0
-    _context_update_throttle: float = 5.0  # 5 seconds
 
     # Step checkpoint widget (Planning mode)
     _checkpoint_widget: StepCheckpointWidget | None = None
@@ -412,11 +409,7 @@ class ChatScreen(Screen[None]):
 
             if current_model_name != valid_model_name:
                 # Model has changed - update deps
-                old_model_display = current_model_name
-                if isinstance(current_model_name, ModelName):
-                    spec = MODEL_SPECS.get(current_model_name)
-                    if spec:
-                        old_model_display = spec.short_name
+                old_model_display = get_model_display_name(current_model_name)
 
                 self.deps.llm_model = valid_model
                 self.agent_manager.deps.llm_model = valid_model
@@ -425,11 +418,7 @@ class ChatScreen(Screen[None]):
                 await self._reset_agents_for_model_change()
 
                 # Get display name for new model
-                new_model_display = valid_model_name
-                if isinstance(valid_model_name, ModelName):
-                    spec = MODEL_SPECS.get(valid_model_name)
-                    if spec:
-                        new_model_display = spec.short_name
+                new_model_display = get_model_display_name(valid_model_name)
 
                 # Show notification about fallback
                 self.agent_manager.add_hint_message(
@@ -1042,62 +1031,18 @@ class ChatScreen(Screen[None]):
                 HintMessage(message=f"❌ Failed to clear: {e}")
             )
 
-    @work(exclusive=False)
-    async def update_context_indicator(self) -> None:
-        """Update the context indicator with current usage data."""
-        logger.debug("[CONTEXT] update_context_indicator called")
+    def update_context_indicator(self) -> None:
+        """Update model indicator in the footer."""
+        self._update_model_indicator()
+
+    def _update_model_indicator(self) -> None:
+        """Update the model name display in the footer."""
         try:
-            logger.debug(
-                f"[CONTEXT] Getting context analysis - "
-                f"message_history_count={len(self.agent_manager.message_history)}"
-            )
-            analysis = await self.agent_manager.get_context_analysis()
-
-            if analysis:
-                logger.debug(
-                    f"[CONTEXT] Analysis received - "
-                    f"agent_context_tokens={analysis.agent_context_tokens}, "
-                    f"max_usable_tokens={analysis.max_usable_tokens}, "
-                    f"percentage={round((analysis.agent_context_tokens / analysis.max_usable_tokens) * 100, 1) if analysis.max_usable_tokens > 0 else 0}%"
-                )
-            else:
-                logger.warning("[CONTEXT] Analysis is None!")
-
-            model_name = self.deps.llm_model.name
-            # Use widget coordinator for context indicator update
-            self.widget_coordinator.update_context_indicator(analysis, model_name)
+            display = get_model_display_name(self.deps.llm_model.name)
+            indicator = self.query_one("#model-indicator", Static)
+            indicator.update(f"[bold]{display}[/bold]")
         except Exception as e:
-            logger.error(
-                f"[CONTEXT] Failed to update context indicator: {e}", exc_info=True
-            )
-
-    @work(exclusive=False)
-    async def update_context_indicator_with_messages(
-        self,
-        agent_messages: list[ModelMessage],
-        ui_messages: list[ModelMessage | HintMessage | WelcomeMessage],
-    ) -> None:
-        """Update the context indicator with specific message sets (for streaming updates).
-
-        Args:
-            agent_messages: Agent message history including streaming messages (for token counting)
-            ui_messages: UI message history including hints and streaming messages
-        """
-        try:
-            from shotgun.agents.context_analyzer.analyzer import ContextAnalyzer
-
-            analyzer = ContextAnalyzer(self.deps.llm_model)
-            # Analyze the combined message histories for accurate progressive token counts
-            analysis = await analyzer.analyze_conversation(agent_messages, ui_messages)
-
-            if analysis:
-                model_name = self.deps.llm_model.name
-                self.widget_coordinator.update_context_indicator(analysis, model_name)
-        except Exception as e:
-            logger.error(
-                f"Failed to update context indicator with streaming messages: {e}",
-                exc_info=True,
-            )
+            logger.debug(f"Failed to update model indicator: {e}")
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -1122,7 +1067,7 @@ class ChatScreen(Screen[None]):
                     yield ModeIndicator(mode=self.mode)
                     with Container(id="right-footer-indicators"):
                         yield UpdateIndicator(id="update-indicator")
-                        yield ContextIndicator(id="context-indicator")
+                        yield Static("", id="model-indicator")
                         yield Static("", id="indexing-job-display")
 
     def mount_hint(
@@ -1364,18 +1309,6 @@ class ChatScreen(Screen[None]):
         if isinstance(self.deps, RouterDeps) and self.deps.active_sub_agent is not None:
             return  # Skip context update for sub-agent streaming
 
-        # Throttle context indicator updates to improve performance during streaming
-        # Only update at most once per 5 seconds to avoid excessive token calculations
-        current_time = time.time()
-        if current_time - self._last_context_update >= self._context_update_throttle:
-            self._last_context_update = current_time
-            # Update context indicator with full message history including streaming messages
-            # Combine existing agent history with new streaming messages for accurate token count
-            combined_agent_history = self.agent_manager.message_history + event.messages
-            self.update_context_indicator_with_messages(
-                combined_agent_history, new_message_list
-            )
-
     def _clear_partial_response(self) -> None:
         # Use widget coordinator to clear partial response
         self.widget_coordinator.set_partial_response(None, self.messages)
@@ -1611,15 +1544,7 @@ class ChatScreen(Screen[None]):
             self.widget_coordinator.update_context_indicator(analysis, result.new_model)
 
             # Get model display name for user feedback
-            # For Ollama models, new_model can be a string, so check if it's a ModelName first
-            model_spec = (
-                MODEL_SPECS.get(result.new_model)
-                if isinstance(result.new_model, ModelName)
-                else None
-            )
-            model_display = (
-                model_spec.short_name if model_spec else str(result.new_model)
-            )
+            model_display = get_model_display_name(result.new_model)
 
             # Format provider information
             key_method = (
@@ -2240,9 +2165,6 @@ class ChatScreen(Screen[None]):
         # Pass cancellation event to deps for responsive ESC handling
         self.deps.cancellation_event = self.processing_state.cancellation_event
 
-        # Start context indicator animation immediately
-        self.widget_coordinator.set_context_streaming(True)
-
         try:
             # Use unified agent runner - exceptions propagate for handling
             runner = AgentRunner(self.agent_manager)
@@ -2278,8 +2200,6 @@ class ChatScreen(Screen[None]):
             self.mount_hint(f"⚠️ An unexpected error occurred: {str(e)}")
         finally:
             self.processing_state.stop_processing()
-            # Stop context indicator animation
-            self.widget_coordinator.set_context_streaming(False)
 
             # Check for low balance after agent loop completes (only for Shotgun Account)
             # This runs after processing but doesn't interfere with Q&A mode
