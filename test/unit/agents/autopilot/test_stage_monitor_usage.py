@@ -13,7 +13,7 @@ from shotgun.agents.config.models import ModelConfig, ProviderType
 
 def _make_model_config() -> ModelConfig:
     return ModelConfig(
-        name="claude-opus-4-5",
+        name="claude-opus-4-6",
         provider=ProviderType.ANTHROPIC,
         key_provider="byok",
         max_input_tokens=200000,
@@ -62,7 +62,7 @@ async def test_stage_monitor_tracks_usage_after_evaluate(
     mock_manager.add_usage.assert_called_once()
     call_kwargs = mock_manager.add_usage.call_args
     assert call_kwargs[0][0] == mock_usage
-    assert call_kwargs[1]["model_name"] == "claude-opus-4-5"
+    assert call_kwargs[1]["model_name"] == "claude-opus-4-6"
     assert call_kwargs[1]["provider"] == ProviderType.ANTHROPIC
 
 
@@ -156,7 +156,7 @@ async def test_stage_monitor_get_agent_stores_model_config(
 
     # Use a MagicMock for model_config so .model_instance doesn't trigger real code
     model_config = MagicMock()
-    model_config.name = "claude-opus-4-5"
+    model_config.name = "claude-opus-4-6"
     model_config.provider = ProviderType.ANTHROPIC
     mock_get_provider_model.return_value = model_config
 

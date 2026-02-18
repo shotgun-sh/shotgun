@@ -243,7 +243,7 @@ def agent_deps(codebase_service: CodebaseService, temp_storage_dir: Path) -> Age
 
     # Create ModelConfig for testing
     model_config = ModelConfig(
-        name=ModelName.CLAUDE_OPUS_4_5,
+        name=ModelName.CLAUDE_OPUS_4_6,
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200_000,

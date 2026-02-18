@@ -1,6 +1,6 @@
 """Stage monitor agent for intelligent autopilot orchestration.
 
-Uses the main model (e.g. Opus 4.5) with read-only file tools to verify
+Uses the main model (e.g. Opus 4.6) with read-only file tools to verify
 Claude Code's output against actual files on disk and decide what to do next.
 """
 
@@ -61,7 +61,7 @@ class MonitorDeps(BaseModel):
 class StageMonitor:
     """Monitors Claude Code output and decides next orchestration action.
 
-    Uses the main model (e.g. Opus 4.5) with read-only file tools to:
+    Uses the main model (e.g. Opus 4.6) with read-only file tools to:
     1. Read tasks.md to verify actual task completion state
     2. Read specification.md and plan.md for context
     3. Compare Claude Code's claims against reality

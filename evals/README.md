@@ -6,16 +6,16 @@ Evaluation framework for testing Shotgun agent behaviors deterministically.
 
 ```bash
 # Run the router smoke test with a specific model
-uv run python -m evals.runner --suite router_smoke --model claude-opus-4-5
+uv run python -m evals.runner --suite router_smoke --model claude-opus-4-6
 
 # Run without LLM judge (faster, deterministic only)
-uv run python -m evals.runner --suite router_smoke --model claude-opus-4-5 --no-judge
+uv run python -m evals.runner --suite router_smoke --model claude-opus-4-6 --no-judge
 
 # Run a single test case
-uv run python -m evals.runner --case vague_prompt_clarifying_questions --model claude-opus-4-5
+uv run python -m evals.runner --case vague_prompt_clarifying_questions --model claude-opus-4-6
 
 # Compare multiple models
-uv run python -m evals.runner --suite router_smoke --model claude-opus-4-5 --model gpt-5.1 --model gemini-3-pro-preview
+uv run python -m evals.runner --suite router_smoke --model claude-opus-4-6 --model gpt-5.1 --model gemini-3-pro-preview
 ```
 
 ## Output Formats

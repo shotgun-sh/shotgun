@@ -43,8 +43,8 @@ class ModelName(StrEnum):
 
     GPT_5_1 = "gpt-5.1"
     GPT_5_2 = "gpt-5.2"
-    CLAUDE_OPUS_4_5 = "claude-opus-4-5"
-    CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
+    CLAUDE_OPUS_4_6 = "claude-opus-4-6"
+    CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
     GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
     GEMINI_3_PRO_PREVIEW = "gemini-3-pro-preview"
@@ -61,7 +61,7 @@ class ModelSpec(BaseModel):
     litellm_proxy_model_name: (
         str  # LiteLLM format (e.g., "openai/gpt-5", "gemini/gemini-2-pro")
     )
-    short_name: str  # Display name for UI (e.g., "Sonnet 4.5", "GPT-5")
+    short_name: str  # Display name for UI (e.g., "Sonnet 4.6", "GPT-5")
 
 
 class ModelConfig(BaseModel):
@@ -168,13 +168,13 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         litellm_proxy_model_name="openai/gpt-5.2",
         short_name="GPT-5.2",
     ),
-    ModelName.CLAUDE_SONNET_4_5: ModelSpec(
-        name=ModelName.CLAUDE_SONNET_4_5,
+    ModelName.CLAUDE_SONNET_4_6: ModelSpec(
+        name=ModelName.CLAUDE_SONNET_4_6,
         provider=ProviderType.ANTHROPIC,
         max_input_tokens=200_000,
         max_output_tokens=16_000,
-        litellm_proxy_model_name="anthropic/claude-sonnet-4-5",
-        short_name="Sonnet 4.5",
+        litellm_proxy_model_name="anthropic/claude-sonnet-4-6",
+        short_name="Sonnet 4.6",
     ),
     ModelName.CLAUDE_HAIKU_4_5: ModelSpec(
         name=ModelName.CLAUDE_HAIKU_4_5,
@@ -184,13 +184,13 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         litellm_proxy_model_name="anthropic/claude-haiku-4-5",
         short_name="Haiku 4.5",
     ),
-    ModelName.CLAUDE_OPUS_4_5: ModelSpec(
-        name=ModelName.CLAUDE_OPUS_4_5,
+    ModelName.CLAUDE_OPUS_4_6: ModelSpec(
+        name=ModelName.CLAUDE_OPUS_4_6,
         provider=ProviderType.ANTHROPIC,
         max_input_tokens=200_000,
         max_output_tokens=64_000,
-        litellm_proxy_model_name="anthropic/claude-opus-4-5",
-        short_name="Opus 4.5",
+        litellm_proxy_model_name="anthropic/claude-opus-4-6",
+        short_name="Opus 4.6",
     ),
     ModelName.GEMINI_2_5_FLASH_LITE: ModelSpec(
         name=ModelName.GEMINI_2_5_FLASH_LITE,
@@ -221,7 +221,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
 # Default model for each provider (used when auto-selecting models)
 DEFAULT_PROVIDER_MODELS: dict[ProviderType, ModelName] = {
     ProviderType.OPENAI: ModelName.GPT_5_2,
-    ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_5,
+    ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_6,
     ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
 }
 
@@ -229,8 +229,8 @@ DEFAULT_PROVIDER_MODELS: dict[ProviderType, ModelName] = {
 # Maps expensive models to cheaper alternatives from the same provider
 SUB_AGENT_MODEL_MAPPINGS: dict[ModelName, ModelName] = {
     # Anthropic: premium models use Haiku for sub-agents
-    ModelName.CLAUDE_OPUS_4_5: ModelName.CLAUDE_HAIKU_4_5,
-    ModelName.CLAUDE_SONNET_4_5: ModelName.CLAUDE_HAIKU_4_5,
+    ModelName.CLAUDE_OPUS_4_6: ModelName.CLAUDE_HAIKU_4_5,
+    ModelName.CLAUDE_SONNET_4_6: ModelName.CLAUDE_HAIKU_4_5,
     # Gemini: Pro uses Flash for sub-agents
     ModelName.GEMINI_3_PRO_PREVIEW: ModelName.GEMINI_3_FLASH_PREVIEW,
     # OpenAI: 5.2 uses 5.1 for sub-agents
@@ -395,7 +395,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=9, description="Configuration schema version")
+    config_version: int = Field(default=10, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",

@@ -391,7 +391,7 @@ class ChatScreen(Screen[None]):
         """Validate current model is still available, fall back if not.
 
         This handles the case where a user:
-        1. Has a cloud model selected (e.g., Sonnet 4.5)
+        1. Has a cloud model selected (e.g., Sonnet 4.6)
         2. Goes to Provider Setup and removes their API keys
         3. Returns to chat - we need to detect the model is no longer valid
            and fall back to Ollama if available

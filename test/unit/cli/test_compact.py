@@ -49,7 +49,7 @@ async def test_compact_conversation_success(tmp_path, mock_conversation_history)
 
     # Create a proper ModelConfig for the test
     model_config = ModelConfig(
-        name=ModelName.CLAUDE_SONNET_4_5,
+        name=ModelName.CLAUDE_SONNET_4_6,
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200000,
@@ -128,7 +128,7 @@ async def test_compact_conversation_no_reduction(tmp_path, mock_conversation_his
 
     # Create a proper ModelConfig for the test
     model_config = ModelConfig(
-        name=ModelName.CLAUDE_SONNET_4_5,
+        name=ModelName.CLAUDE_SONNET_4_6,
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200000,

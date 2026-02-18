@@ -615,7 +615,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         label = f"{display_name} · {input_fmt} context · {output_fmt} output"
 
         # Add cost indicator for expensive models
-        if model_name == ModelName.CLAUDE_OPUS_4_5:
+        if model_name == ModelName.CLAUDE_OPUS_4_6:
             label += " · Expensive"
 
         if is_current:
@@ -628,8 +628,8 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         names = {
             ModelName.GPT_5_1: "GPT-5.1 (OpenAI)",
             ModelName.GPT_5_2: "GPT-5.2 (OpenAI)",
-            ModelName.CLAUDE_OPUS_4_5: "Claude Opus 4.5 (Anthropic)",
-            ModelName.CLAUDE_SONNET_4_5: "Claude Sonnet 4.5 (Anthropic)",
+            ModelName.CLAUDE_OPUS_4_6: "Claude Opus 4.6 (Anthropic)",
+            ModelName.CLAUDE_SONNET_4_6: "Claude Sonnet 4.6 (Anthropic)",
             ModelName.CLAUDE_HAIKU_4_5: "Claude Haiku 4.5 (Anthropic)",
             ModelName.GEMINI_2_5_FLASH_LITE: "Gemini 2.5 Flash Lite (Google)",
             ModelName.GEMINI_3_PRO_PREVIEW: "Gemini 3 Pro Preview (Google)",

@@ -11,15 +11,15 @@ from shotgun.agents.config.models import (
 
 
 def test_model_spec_short_name_claude_sonnet():
-    """Test ModelSpec short_name for Claude Sonnet 4.5."""
-    spec = MODEL_SPECS[ModelName.CLAUDE_SONNET_4_5]
-    assert spec.short_name == "Sonnet 4.5"
+    """Test ModelSpec short_name for Claude Sonnet 4.6."""
+    spec = MODEL_SPECS[ModelName.CLAUDE_SONNET_4_6]
+    assert spec.short_name == "Sonnet 4.6"
 
 
 def test_model_spec_short_name_claude_opus():
-    """Test ModelSpec short_name for Claude Opus 4.5."""
-    spec = MODEL_SPECS[ModelName.CLAUDE_OPUS_4_5]
-    assert spec.short_name == "Opus 4.5"
+    """Test ModelSpec short_name for Claude Opus 4.6."""
+    spec = MODEL_SPECS[ModelName.CLAUDE_OPUS_4_6]
+    assert spec.short_name == "Opus 4.6"
 
 
 def test_model_spec_short_name_claude_haiku():

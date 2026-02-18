@@ -9,14 +9,14 @@ from shotgun.agents.config.models import (
 
 
 def test_anthropic_opus_maps_to_haiku():
-    """Claude Opus 4.5 should map to Claude Haiku 4.5 for sub-agents."""
-    assert get_sub_agent_model(ModelName.CLAUDE_OPUS_4_5) == ModelName.CLAUDE_HAIKU_4_5
+    """Claude Opus 4.6 should map to Claude Haiku 4.5 for sub-agents."""
+    assert get_sub_agent_model(ModelName.CLAUDE_OPUS_4_6) == ModelName.CLAUDE_HAIKU_4_5
 
 
 def test_anthropic_sonnet_maps_to_haiku():
-    """Claude Sonnet 4.5 should map to Claude Haiku 4.5 for sub-agents."""
+    """Claude Sonnet 4.6 should map to Claude Haiku 4.5 for sub-agents."""
     assert (
-        get_sub_agent_model(ModelName.CLAUDE_SONNET_4_5) == ModelName.CLAUDE_HAIKU_4_5
+        get_sub_agent_model(ModelName.CLAUDE_SONNET_4_6) == ModelName.CLAUDE_HAIKU_4_5
     )
 
 

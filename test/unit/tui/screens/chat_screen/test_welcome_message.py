@@ -36,8 +36,8 @@ def test_welcome_message_all_flags():
         is_indexed=True,
         has_context7_key=True,
         is_frontier_model=True,
-        frontier_model_label="Select Opus 4.5",
-        frontier_model_name="claude-opus-4-5",
+        frontier_model_label="Select Opus 4.6",
+        frontier_model_name="claude-opus-4-6",
         is_ollama=False,
         is_byok=True,
         is_shotgun_account=False,
@@ -47,8 +47,8 @@ def test_welcome_message_all_flags():
     assert msg.is_indexed is True
     assert msg.has_context7_key is True
     assert msg.is_frontier_model is True
-    assert msg.frontier_model_label == "Select Opus 4.5"
-    assert msg.frontier_model_name == "claude-opus-4-5"
+    assert msg.frontier_model_label == "Select Opus 4.6"
+    assert msg.frontier_model_name == "claude-opus-4-6"
 
 
 def test_welcome_message_serialization():
@@ -129,8 +129,8 @@ async def test_build_welcome_state_byok_anthropic_frontier():
 
     assert state.is_byok is True
     assert state.is_shotgun_account is False
-    assert state.frontier_model_label == "Select Opus 4.5"
-    assert state.frontier_model_name == "claude-opus-4-5"
+    assert state.frontier_model_label == "Select Opus 4.6"
+    assert state.frontier_model_name == "claude-opus-4-6"
     assert state.is_frontier_model is False
 
 
@@ -203,7 +203,7 @@ async def test_build_welcome_state_byok_google_frontier():
 
 @pytest.mark.anyio
 async def test_build_welcome_state_shotgun_account():
-    """Test shotgun account always suggests Opus 4.5."""
+    """Test shotgun account always suggests Opus 4.6."""
     config = _make_config(shotgun_key="shotgun-test")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
@@ -231,8 +231,8 @@ async def test_build_welcome_state_shotgun_account():
         state = await build_welcome_state()
 
     assert state.is_shotgun_account is True
-    assert state.frontier_model_label == "Select Opus 4.5"
-    assert state.frontier_model_name == "claude-opus-4-5"
+    assert state.frontier_model_label == "Select Opus 4.6"
+    assert state.frontier_model_name == "claude-opus-4-6"
 
 
 @pytest.mark.anyio
@@ -360,7 +360,7 @@ async def test_build_welcome_state_context7_key():
 @pytest.mark.anyio
 async def test_build_welcome_state_already_frontier():
     """Test already-selected frontier model is detected."""
-    config = _make_config(anthropic_key="sk-ant-test", selected_model="claude-opus-4-5")
+    config = _make_config(anthropic_key="sk-ant-test", selected_model="claude-opus-4-6")
     mock_cm = AsyncMock()
     mock_cm.load = AsyncMock(return_value=config)
     mock_cm.provider_has_api_key = MagicMock(return_value=False)
@@ -452,5 +452,5 @@ async def test_build_welcome_state_frontier_priority():
     ):
         state = await build_welcome_state()
 
-    assert state.frontier_model_label == "Select Opus 4.5"
-    assert state.frontier_model_name == "claude-opus-4-5"
+    assert state.frontier_model_label == "Select Opus 4.6"
+    assert state.frontier_model_name == "claude-opus-4-6"

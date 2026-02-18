@@ -19,6 +19,7 @@ from shotgun.agents.config.manager import (
     _migrate_v4_to_v5,
     _migrate_v6_to_v7,
     _migrate_v7_to_v8,
+    _migrate_v9_to_v10,
     get_backup_dir,
 )
 from shotgun.agents.config.models import ProviderType, ShotgunConfig
@@ -119,6 +120,21 @@ V9_CONFIG = {
     "selected_model": "gpt-5",
     "shotgun_instance_id": "test-user-id-12345",
     "config_version": 9,
+    "shown_welcome_screen": False,
+    "marketing": {"messages": {}},
+    "router_mode": "planning",
+}
+
+V10_CONFIG = {
+    "openai": {"api_key": "sk-test123", "supports_streaming": None},
+    "anthropic": {"api_key": None, "tier": None},
+    "google": {"api_key": None},
+    "shotgun": {"api_key": None, "supabase_jwt": None},
+    "ollama": {"enabled": False, "base_url": "http://localhost:11434"},
+    "context7": {},
+    "selected_model": "gpt-5",
+    "shotgun_instance_id": "test-user-id-12345",
+    "config_version": 10,
     "shown_welcome_screen": False,
     "marketing": {"messages": {}},
     "router_mode": "planning",
@@ -301,12 +317,12 @@ def test_apply_migrations_from_v4_to_current():
 
 def test_apply_migrations_already_current():
     """Test applying migrations when already at current version."""
-    config = V9_CONFIG.copy()
+    config = V10_CONFIG.copy()
 
     result = _apply_migrations(config)
 
     assert result["config_version"] == CURRENT_CONFIG_VERSION
-    assert result == V9_CONFIG  # Should be unchanged
+    assert result == V10_CONFIG  # Should be unchanged
 
 
 def test_apply_migrations_sequential():
@@ -793,7 +809,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config (no migration needed)
-        current_config = V9_CONFIG.copy()
+        current_config = V10_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
@@ -945,3 +961,36 @@ async def test_ollama_config_preserved_in_migrations():
         # Verify Ollama config is preserved
         assert config.ollama.enabled is True
         assert config.ollama.base_url == "http://192.168.1.100:11434"
+
+
+def test_migrate_v9_to_v10_renames_opus():
+    """Test v9->v10 migration renames claude-opus-4-5 to claude-opus-4-6."""
+    config = V9_CONFIG.copy()
+    config["selected_model"] = "claude-opus-4-5"
+
+    result = _migrate_v9_to_v10(config)
+
+    assert result["config_version"] == 10
+    assert result["selected_model"] == "claude-opus-4-6"
+
+
+def test_migrate_v9_to_v10_renames_sonnet():
+    """Test v9->v10 migration renames claude-sonnet-4-5 to claude-sonnet-4-6."""
+    config = V9_CONFIG.copy()
+    config["selected_model"] = "claude-sonnet-4-5"
+
+    result = _migrate_v9_to_v10(config)
+
+    assert result["config_version"] == 10
+    assert result["selected_model"] == "claude-sonnet-4-6"
+
+
+def test_migrate_v9_to_v10_preserves_other_models():
+    """Test v9->v10 migration preserves non-Claude models."""
+    config = V9_CONFIG.copy()
+    config["selected_model"] = "gpt-5"
+
+    result = _migrate_v9_to_v10(config)
+
+    assert result["config_version"] == 10
+    assert result["selected_model"] == "gpt-5"

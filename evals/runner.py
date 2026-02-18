@@ -9,7 +9,7 @@ Usage:
     python -m evals.runner --suite router_core --report console
     python -m evals.runner --case local_models_clarifying_questions
     python -m evals.runner --tag smoke
-    python -m evals.runner --suite router_smoke --model claude-sonnet-4-5
+    python -m evals.runner --suite router_smoke --model claude-sonnet-4-6
     python -m evals.runner --suite router_smoke --models anthropic
 """
 
@@ -553,8 +553,8 @@ Examples:
     python -m evals.runner --tag smoke
 
 Model comparison examples:
-    python -m evals.runner --suite router_smoke --model claude-sonnet-4-5
-    python -m evals.runner --suite router_smoke --model claude-sonnet-4-5 --model gpt-5.1
+    python -m evals.runner --suite router_smoke --model claude-sonnet-4-6
+    python -m evals.runner --suite router_smoke --model claude-sonnet-4-6 --model gpt-5.1
     python -m evals.runner --suite router_smoke --models anthropic
     python -m evals.runner --suite router_smoke --models fast
 

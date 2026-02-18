@@ -224,7 +224,7 @@ def test_message_send_event_properties_include_tier1_flag():
     # Verify the event properties structure that agent_manager would build
     event_properties = {
         "has_prompt": True,
-        "model_name": "claude-sonnet-4-5",
+        "model_name": "claude-sonnet-4-6",
         "has_attachment": False,
         "is_tier1_anthropic": True,
         "anthropic_tier": 1,
@@ -238,7 +238,7 @@ def test_message_send_event_properties_tier2_not_flagged():
     """Test that non-tier1 accounts have is_tier1_anthropic=False."""
     event_properties = {
         "has_prompt": True,
-        "model_name": "claude-sonnet-4-5",
+        "model_name": "claude-sonnet-4-6",
         "has_attachment": False,
         "is_tier1_anthropic": False,
         "anthropic_tier": 2,

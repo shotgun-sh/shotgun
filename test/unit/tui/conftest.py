@@ -27,7 +27,7 @@ from shotgun.tui.widgets.widget_coordinator import WidgetCoordinator
 def mock_model_config():
     """Create a proper ModelConfig instance for testing."""
     return ModelConfig(
-        name=ModelName.CLAUDE_SONNET_4_5,
+        name=ModelName.CLAUDE_SONNET_4_6,
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200_000,

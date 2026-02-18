@@ -47,7 +47,7 @@ def _make_mock_process(
 @pytest.mark.asyncio
 async def test_cli_subprocess_builds_correct_command():
     """Verify the command array includes required flags and the prompt."""
-    config = ClaudeSubprocessConfig(model="claude-sonnet-4-5-20250514")
+    config = ClaudeSubprocessConfig(model="claude-sonnet-4-6")
     cli = ClaudeCliSubprocess(config)
 
     cmd = cli._build_command("Do something")
@@ -60,7 +60,7 @@ async def test_cli_subprocess_builds_correct_command():
     assert "--permission-mode" in cmd
     assert cmd[cmd.index("--permission-mode") + 1] == "bypassPermissions"
     assert "--model" in cmd
-    assert cmd[cmd.index("--model") + 1] == "claude-sonnet-4-5-20250514"
+    assert cmd[cmd.index("--model") + 1] == "claude-sonnet-4-6"
     # Prompt is the last argument
     assert cmd[-1] == "Do something"
 
