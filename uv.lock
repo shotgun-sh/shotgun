@@ -3110,7 +3110,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiofiles", specifier = ">=24.0.0" },
-    { name = "anthropic", specifier = ">=0.39.0" },
+    { name = "anthropic", specifier = ">=0.39.0,<0.80.0" },
     { name = "claude-agent-sdk", specifier = ">=0.1.0" },
     { name = "dependency-injector", specifier = ">=4.41.0" },
     { name = "genai-prices", specifier = ">=0.0.27" },
