@@ -25,6 +25,8 @@
 
 [![Website](https://img.shields.io/badge/-shotgun.sh-5865F2?style=social&logo=safari&logoColor=5865F2)](https://shotgun.sh)      [![Follow @ShotgunCLI](https://img.shields.io/badge/Follow%20@ShotgunCLI-1DA1F2?style=social&logo=x&logoColor=000000)](https://x.com/ShotgunCLI)    [![YouTube](https://img.shields.io/badge/-@shotgunCLI-FF0000?style=social&logo=youtube&logoColor=red)](https://www.youtube.com/@shotgunCLI)
 
+LLM Proxy Status: [![Better Stack Badge](https://uptime.betterstack.com/status-badges/v2/monitor/272wo.svg)](https://status.shotgun.sh/) API Status: [![Better Stack Badge](https://uptime.betterstack.com/status-badges/v2/monitor/272wq.svg)](https://status.shotgun.sh/)
+
 </div>
 
 ---
