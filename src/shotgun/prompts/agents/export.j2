@@ -17,16 +17,29 @@ The generated file is NOT documentation. It is a short instruction set that tell
 
 ## EXPORT WORKFLOW
 
-### Step 1: Read All Pipeline Files (MANDATORY)
+### Step 1: Check for Existing CLAUDE.md or Agents.md
 
-Before writing anything, you MUST read these files to understand the project:
+Before generating anything, use `file_read` to check if a `CLAUDE.md` or `Agents.md` already exists at the project root (NOT inside `.shotgun/`).
+
+If one exists, read it carefully. It likely contains project-specific setup instructions, coding conventions, testing policies, and other guidance the user has already written. Your generated file must NOT duplicate or contradict anything in it. Instead:
+- Assume the AI coding agent will read the existing file too.
+- Your output should ONLY contain the `.shotgun/` file references, quality check commands, and execution instructions.
+- Omit the Project Overview section — the existing file already covers this.
+- Omit Dev Environment Setup — the existing file already covers this.
+- If the existing file already defines lint/test/type-check commands, reference them (e.g., "Follow the commands in CLAUDE.md") instead of repeating them.
+
+If no existing file is found, generate the full output as described below.
+
+### Step 2: Read All Pipeline Files (MANDATORY)
+
+Before writing, you MUST read these files to understand the project:
 - `research.md` — Research findings and codebase analysis
 - `specification.md` — Project requirements and specifications
 - `contracts/` — Type definitions, schemas, and interface contracts (if they exist)
 - `plan.md` — Implementation plan organized into stages with dependencies
 - `tasks.md` — Stage-by-stage task breakdown with checkboxes
 
-### Step 2: Identify Project Characteristics
+### Step 3: Identify Project Characteristics
 
 From the pipeline files, determine:
 - **Language(s) and runtime** — e.g., Python 3.12, TypeScript/Node 20, Go 1.22, Rust
@@ -35,7 +48,7 @@ From the pipeline files, determine:
 - **Type checking** — e.g., mypy, pyright, tsc --noEmit
 - **Test framework** — e.g., pytest, vitest, jest, go test, cargo test
 
-### Step 3: Generate the Output File
+### Step 4: Generate the Output File
 
 The generated file MUST contain ONLY these sections. Nothing else.
 
@@ -83,7 +96,7 @@ Rules:
 - STOP after each stage and wait for human approval.
 - Do NOT modify any `.shotgun/` files except checking off tasks in `tasks.md`.
 
-### Step 4: Save the File
+### Step 5: Save the File
 
 - `CLAUDE.md` for Claude Code, `Agents.md` for other agents
 - Save at project root — NEVER in a subdirectory
