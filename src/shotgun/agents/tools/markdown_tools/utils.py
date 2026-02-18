@@ -4,8 +4,9 @@ import re
 from difflib import SequenceMatcher
 from pathlib import Path
 
-import aiofiles
 import aiofiles.os
+
+from shotgun.utils.file_system_utils import aiofiles_open_text
 
 from .models import (
     CloseMatch,
@@ -334,7 +335,7 @@ async def load_markdown_file(
         return f"Error: File '{filename}' not found"
 
     # Read file content (newline="" preserves original line endings)
-    async with aiofiles.open(file_path, encoding="utf-8", newline="") as f:
+    async with aiofiles_open_text(file_path, newline="") as f:
         content = await f.read()
 
     # Detect line ending style
@@ -449,5 +450,5 @@ async def write_markdown_file(ctx: MarkdownFileContext, new_lines: list[str]) ->
     # when multiple operations are performed sequentially)
     if new_content and not new_content.endswith(ctx.line_ending):
         new_content += ctx.line_ending
-    async with aiofiles.open(ctx.file_path, "w", encoding="utf-8", newline="") as f:
+    async with aiofiles_open_text(ctx.file_path, "w", newline="") as f:
         await f.write(new_content)

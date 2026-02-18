@@ -3,6 +3,7 @@
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 
@@ -74,6 +75,27 @@ def ensure_shotgun_directory_exists() -> Path:
     shotgun_dir.mkdir(exist_ok=True)
     # Note: Removed logger to avoid circular dependency with logging_config
     return shotgun_dir
+
+
+def aiofiles_open_text(
+    path: str | Path, mode: str = "r", **kwargs: Any
+) -> aiofiles.base.AiofilesContextManager:  # type: ignore[type-arg]
+    """Open a text file with aiofiles, defaulting to UTF-8 encoding.
+
+    Use this instead of calling aiofiles.open() directly for text-mode I/O
+    to ensure UTF-8 encoding is always applied (prevents Windows encoding crashes).
+
+    Args:
+        path: File path to open
+        mode: File mode (default "r")
+        **kwargs: Additional arguments passed to aiofiles.open()
+
+    Returns:
+        An async file context manager
+    """
+    return aiofiles.open(  # type: ignore[call-overload, no-any-return]
+        path, mode=mode, encoding=kwargs.pop("encoding", "utf-8"), **kwargs
+    )
 
 
 async def async_copy_file(src: Path, dst: Path) -> None:

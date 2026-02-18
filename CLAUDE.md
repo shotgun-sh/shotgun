@@ -160,6 +160,7 @@ Output shows per-file and per-folder token counts. Useful for understanding cont
 8. Code coverage for a PR MUST be 70%+ excluding the cli/tui folders.
 9. Don't write tests that assert the logger, thats not useful.
 - Always use a Pydantic Model instead of a dict or dataclass when possible.
+- Always use `aiofiles_open_text()` from `shotgun.utils.file_system_utils` for async text file I/O instead of calling `aiofiles.open()` directly. This ensures UTF-8 encoding is always used, preventing Windows encoding crashes.
 
 ## Architectural Patterns
 

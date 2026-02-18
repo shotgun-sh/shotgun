@@ -11,7 +11,6 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-import aiofiles
 from pydantic_ai import RunContext
 from pydantic_ai.messages import (
     ModelMessage,
@@ -45,7 +44,7 @@ from shotgun.agents.tasks import create_tasks_agent, run_tasks_agent
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
 from shotgun.posthog_telemetry import track_event
-from shotgun.utils.file_system_utils import get_shotgun_base_path
+from shotgun.utils.file_system_utils import aiofiles_open_text, get_shotgun_base_path
 
 logger = get_logger(__name__)
 
@@ -253,7 +252,7 @@ async def build_preloaded_history(
     for file_path in preload_files:
         full_path = base_path / file_path
         try:
-            async with aiofiles.open(full_path, encoding="utf-8") as f:
+            async with aiofiles_open_text(full_path) as f:
                 content = await f.read()
         except (
             FileNotFoundError,

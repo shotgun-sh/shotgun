@@ -3,10 +3,8 @@
 import random
 from pathlib import Path
 
-import aiofiles
-
 from shotgun.agents.models import AgentType
-from shotgun.utils.file_system_utils import get_shotgun_base_path
+from shotgun.utils.file_system_utils import aiofiles_open_text, get_shotgun_base_path
 
 
 class ModeProgressChecker:
@@ -54,7 +52,7 @@ class ModeProgressChecker:
                 for item in export_path.glob("*"):
                     if item.is_file() and not item.name.startswith("."):
                         try:
-                            async with aiofiles.open(item, encoding="utf-8") as f:
+                            async with aiofiles_open_text(item) as f:
                                 content = await f.read()
                             if len(content.strip()) > self.MIN_CONTENT_SIZE:
                                 return True
@@ -68,7 +66,7 @@ class ModeProgressChecker:
             return False
 
         try:
-            async with aiofiles.open(file_path, encoding="utf-8") as f:
+            async with aiofiles_open_text(file_path) as f:
                 content = await f.read()
             # Check if file has meaningful content
             return len(content.strip()) > self.MIN_CONTENT_SIZE

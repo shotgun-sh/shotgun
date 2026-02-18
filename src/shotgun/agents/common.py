@@ -4,7 +4,6 @@ from collections.abc import AsyncIterable, Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-import aiofiles
 from pydantic_ai import (
     Agent,
     RunContext,
@@ -39,7 +38,7 @@ from shotgun.prompts import PromptLoader
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
 from shotgun.utils.datetime_utils import get_datetime_context
-from shotgun.utils.file_system_utils import get_shotgun_base_path
+from shotgun.utils.file_system_utils import aiofiles_open_text, get_shotgun_base_path
 
 from .conversation.history import token_limit_compactor
 from .messages import AgentSystemPrompt, SystemStatusPrompt
@@ -354,7 +353,7 @@ async def _extract_file_toc_content(
         return None
 
     try:
-        async with aiofiles.open(file_path, encoding="utf-8") as f:
+        async with aiofiles_open_text(file_path) as f:
             content = await f.read()
         lines = content.split("\n")
 

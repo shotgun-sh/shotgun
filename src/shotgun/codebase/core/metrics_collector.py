@@ -243,7 +243,7 @@ class MetricsCollector:
         """
         metrics = self.get_metrics()
 
-        with path.open("w", newline="") as f:
+        with path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
             # Header section
