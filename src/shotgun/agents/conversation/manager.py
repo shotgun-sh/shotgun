@@ -4,12 +4,11 @@ import asyncio
 import json
 from pathlib import Path
 
-import aiofiles
 import aiofiles.os
 
 from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
-from shotgun.utils.file_system_utils import async_copy_file
+from shotgun.utils.file_system_utils import aiofiles_open_text, async_copy_file
 
 from .models import ConversationHistory
 
@@ -53,9 +52,7 @@ class ConversationManager:
                 json.dumps, data, indent=2, ensure_ascii=False
             )
 
-            async with aiofiles.open(
-                self.conversation_path, "w", encoding="utf-8"
-            ) as f:
+            async with aiofiles_open_text(self.conversation_path, "w") as f:
                 await f.write(json_content)
 
             logger.debug("Conversation saved to %s", self.conversation_path)
@@ -77,7 +74,7 @@ class ConversationManager:
             return None
 
         try:
-            async with aiofiles.open(self.conversation_path, encoding="utf-8") as f:
+            async with aiofiles_open_text(self.conversation_path) as f:
                 content = await f.read()
                 # Deserialize JSON in background thread to avoid blocking
                 data = await asyncio.to_thread(json.loads, content)

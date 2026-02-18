@@ -6,7 +6,6 @@ from logging import getLogger
 from pathlib import Path
 from typing import TypeAlias
 
-import aiofiles
 import aiofiles.os
 from genai_prices import calc_price
 from pydantic import BaseModel, Field
@@ -14,6 +13,7 @@ from pydantic_ai import RunUsage
 
 from shotgun.agents.config.models import ProviderType
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.file_system_utils import aiofiles_open_text
 
 logger = getLogger(__name__)
 ModelName: TypeAlias = str
@@ -91,7 +91,7 @@ class SessionUsageManager:
         try:
             await aiofiles.os.makedirs(self._usage_path.parent, exist_ok=True)
             json_content = json.dumps(state.model_dump(mode="json"), indent=2)
-            async with aiofiles.open(self._usage_path, "w", encoding="utf-8") as f:
+            async with aiofiles_open_text(self._usage_path, "w") as f:
                 await f.write(json_content)
             logger.debug("Usage state persisted to %s", self._usage_path)
         except Exception as exc:
@@ -105,7 +105,7 @@ class SessionUsageManager:
             return
 
         try:
-            async with aiofiles.open(self._usage_path, encoding="utf-8") as f:
+            async with aiofiles_open_text(self._usage_path) as f:
                 content = await f.read()
                 data = json.loads(content)
 

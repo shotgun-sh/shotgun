@@ -6,7 +6,6 @@ These tools are restricted to the .shotgun directory for security.
 from pathlib import Path
 from typing import Literal
 
-import aiofiles
 import aiofiles.os
 from pydantic_ai import RunContext
 
@@ -14,7 +13,7 @@ from shotgun.agents.constants import BINARY_EXTENSIONS
 from shotgun.agents.models import AgentDeps, AgentType, FileOperationType
 from shotgun.agents.tools.registry import ToolCategory, register_tool
 from shotgun.logging_config import get_logger
-from shotgun.utils.file_system_utils import get_shotgun_base_path
+from shotgun.utils.file_system_utils import aiofiles_open_text, get_shotgun_base_path
 
 logger = get_logger(__name__)
 
@@ -249,8 +248,8 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str, reason: str) -> s
                 f"Absolute path: {file_path}"
             )
 
-        async with aiofiles.open(file_path, encoding="utf-8") as f:
-            content = await f.read()
+        async with aiofiles_open_text(file_path) as f:
+            content: str = await f.read()
         logger.debug("📄 Read %d characters from %s", len(content), filename)
         return content
 
@@ -308,12 +307,12 @@ async def write_file(
 
         # Write content
         if mode == "a":
-            async with aiofiles.open(file_path, "a", encoding="utf-8") as f:
+            async with aiofiles_open_text(file_path, "a") as f:
                 await f.write(content)
             logger.debug("📄 Appended %d characters to %s", len(content), filename)
             result = f"Successfully appended {len(content)} characters to {filename}"
         else:
-            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+            async with aiofiles_open_text(file_path, "w") as f:
                 await f.write(content)
             logger.debug("📄 Wrote %d characters to %s", len(content), filename)
             result = f"Successfully wrote {len(content)} characters to {filename}"

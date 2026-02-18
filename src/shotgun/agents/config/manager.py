@@ -7,12 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import aiofiles
 import aiofiles.os
 from pydantic import SecretStr
 
 from shotgun.logging_config import get_logger
 from shotgun.utils import get_shotgun_home
+from shotgun.utils.file_system_utils import aiofiles_open_text
 
 from .constants import (
     API_KEY_FIELD,
@@ -383,7 +383,7 @@ class ConfigManager:
 
         backup_path: Path | None = None
         try:
-            async with aiofiles.open(self.config_path, encoding="utf-8") as f:
+            async with aiofiles_open_text(self.config_path) as f:
                 content = await f.read()
                 data = json.loads(content)
 
@@ -572,7 +572,7 @@ class ConfigManager:
             self._convert_datetime_to_isoformat(data)
 
             json_content = json.dumps(data, indent=2, ensure_ascii=False)
-            async with aiofiles.open(self.config_path, "w", encoding="utf-8") as f:
+            async with aiofiles_open_text(self.config_path, "w") as f:
                 await f.write(json_content)
 
             logger.debug("Configuration saved to %s", self.config_path)
