@@ -249,7 +249,7 @@ async def read_file(ctx: RunContext[AgentDeps], filename: str, reason: str) -> s
             )
 
         async with aiofiles_open_text(file_path) as f:
-            content = await f.read()
+            content: str = await f.read()
         logger.debug("📄 Read %d characters from %s", len(content), filename)
         return content
 
