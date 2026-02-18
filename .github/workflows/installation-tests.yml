@@ -857,22 +857,36 @@ jobs:
       - test-windows-py312
     if: >-
       always() &&
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
-      needs.test-macos-15-curl.outputs.result != 'failure' &&
-      needs.test-macos-15-homebrew.outputs.result != 'failure' &&
-      needs.test-ubuntu-24-curl.outputs.result != 'failure' &&
-      needs.test-ubuntu-22-curl.outputs.result != 'failure' &&
-      needs.test-windows-latest-powershell.outputs.result != 'failure' &&
-      needs.test-windows-py312.outputs.result != 'failure'
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
 
     steps:
+      - name: Determine test result
+        id: result
+        run: |
+          if [[ "${{ needs.test-macos-15-curl.outputs.result }}" == "failure" ]] ||
+             [[ "${{ needs.test-macos-15-homebrew.outputs.result }}" == "failure" ]] ||
+             [[ "${{ needs.test-ubuntu-24-curl.outputs.result }}" == "failure" ]] ||
+             [[ "${{ needs.test-ubuntu-22-curl.outputs.result }}" == "failure" ]] ||
+             [[ "${{ needs.test-windows-latest-powershell.outputs.result }}" == "failure" ]] ||
+             [[ "${{ needs.test-windows-py312.outputs.result }}" == "failure" ]]; then
+            echo "status=fail" >> $GITHUB_OUTPUT
+          else
+            echo "status=ok" >> $GITHUB_OUTPUT
+          fi
+
       - name: Ping BetterStack heartbeat
         env:
           BETTERSTACK_HEARTBEAT_URL: ${{ secrets.BETTERSTACK_HEARTBEAT_URL }}
         run: |
-          if [[ -n "$BETTERSTACK_HEARTBEAT_URL" ]]; then
-            curl -sf "$BETTERSTACK_HEARTBEAT_URL"
-            echo "Heartbeat pinged successfully"
-          else
+          if [[ -z "$BETTERSTACK_HEARTBEAT_URL" ]]; then
             echo "::warning::BETTERSTACK_HEARTBEAT_URL secret not set, skipping heartbeat"
+            exit 0
+          fi
+
+          if [[ "${{ steps.result.outputs.status }}" == "ok" ]]; then
+            curl -sf "$BETTERSTACK_HEARTBEAT_URL"
+            echo "Heartbeat pinged: OK"
+          else
+            curl -sf "$BETTERSTACK_HEARTBEAT_URL/fail"
+            echo "Heartbeat pinged: FAIL"
           fi
