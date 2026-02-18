@@ -196,8 +196,13 @@ async def _get_or_create_sub_agent(
     create_fn, _ = AGENT_FACTORIES[agent_type]
     runtime_options = _create_agent_runtime_options(deps)
 
+    # Export agent uses the user's selected model (not the cheaper sub-agent model)
+    # because its output quality directly determines how well the AI coding agent
+    # executes the project.
+    use_sub_agent_model = agent_type != AgentType.EXPORT
+
     logger.debug("Creating new %s agent for delegation", agent_type.value)
-    agent, agent_deps = await create_fn(runtime_options, for_sub_agent=True)
+    agent, agent_deps = await create_fn(runtime_options, for_sub_agent=use_sub_agent_model)
 
     # Cache for reuse
     cache_entry: SubAgentCacheEntry = (agent, agent_deps)
