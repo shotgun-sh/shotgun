@@ -19,14 +19,13 @@ The generated file is NOT documentation. It is a short instruction set that tell
 
 ### Step 1: Check for Existing CLAUDE.md or Agents.md
 
-Before generating anything, use `file_read` to check if a `CLAUDE.md` or `Agents.md` already exists at the project root (NOT inside `.shotgun/`).
+Use `file_read` to read `CLAUDE.md` and `Agents.md` at the project root. That is the ONLY codebase file you should read. Do NOT use `file_read`, `directory_lister`, `query_graph`, `retrieve_code`, or `codebase_shell` for anything else. All project context comes from the `.shotgun/` pipeline files (read via `read_file`), not from exploring the codebase.
 
-If one exists, read it carefully. It likely contains project-specific setup instructions, coding conventions, testing policies, and other guidance the user has already written. Your generated file must NOT duplicate or contradict anything in it. Instead:
-- Assume the AI coding agent will read the existing file too.
-- Your output should ONLY contain the `.shotgun/` file references, quality check commands, and execution instructions.
-- Omit the Project Overview section — the existing file already covers this.
-- Omit Dev Environment Setup — the existing file already covers this.
-- If the existing file already defines lint/test/type-check commands, reference them (e.g., "Follow the commands in CLAUDE.md") instead of repeating them.
+If an existing CLAUDE.md or Agents.md is found:
+- Assume the AI coding agent will read it too — do not duplicate its content.
+- Your output should ONLY contain the `.shotgun/` file references and execution instructions.
+- Omit Project Overview — the existing file covers this.
+- If the existing file defines lint/test/type-check commands, tell the AI agent to follow those instead of repeating them.
 
 If no existing file is found, generate the full output as described below.
 
