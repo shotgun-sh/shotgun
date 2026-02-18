@@ -168,7 +168,7 @@ def test_create_agent_runtime_options_anthropic_does_not_inherit_model(
 ):
     """Test that ANTHROPIC provider does NOT inherit model config, allowing sub-agent substitution."""
     mock_router_deps.llm_model = ModelConfig(
-        name="claude-sonnet-4-5",
+        name="claude-sonnet-4-6",
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200000,

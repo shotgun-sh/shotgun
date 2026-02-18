@@ -46,10 +46,10 @@ def test_context_indicator_update_context():
         agent_context_tokens=72_000, max_usable_tokens=160_000
     )
 
-    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
+    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_6)
 
     assert indicator.context_analysis == analysis
-    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_5
+    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_6
 
 
 def test_context_indicator_format_token_count():
@@ -107,11 +107,11 @@ def test_context_indicator_display_with_zero_tokens():
     # Create analysis with 0 tokens (empty conversation)
     analysis = create_test_analysis(agent_context_tokens=0, max_usable_tokens=160_000)
 
-    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
+    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_6)
 
     # Should show full context display even with 0 tokens (0% (0/160K))
     assert indicator.context_analysis == analysis
-    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_5
+    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_6
     # Percentage should be 0.0
     percentage = (0 / 160_000) * 100
     assert percentage == 0.0
@@ -129,11 +129,11 @@ def test_context_indicator_display_calculation():
         agent_context_tokens=80_000, max_usable_tokens=160_000
     )
 
-    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_5)
+    indicator.update_context(analysis, ModelName.CLAUDE_SONNET_4_6)
 
     # Verify internal state
     assert indicator.context_analysis == analysis
-    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_5
+    assert indicator.model_name == ModelName.CLAUDE_SONNET_4_6
 
     # Verify percentage calculation
     percentage = (80_000 / 160_000) * 100
@@ -169,8 +169,8 @@ def test_context_indicator_display_with_different_models():
 
     # Test with different models
     for model_name in [
-        ModelName.CLAUDE_SONNET_4_5,
-        ModelName.CLAUDE_OPUS_4_5,
+        ModelName.CLAUDE_SONNET_4_6,
+        ModelName.CLAUDE_OPUS_4_6,
         ModelName.GPT_5_1,
         ModelName.GEMINI_3_PRO_PREVIEW,
     ]:

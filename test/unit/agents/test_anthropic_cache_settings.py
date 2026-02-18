@@ -21,7 +21,7 @@ from shotgun.codebase.service import CodebaseService
 def mock_model_config():
     """Create a mock ModelConfig that returns a real TestModel instance."""
     config = MagicMock(spec=ModelConfig)
-    config.name = ModelName.CLAUDE_SONNET_4_5
+    config.name = ModelName.CLAUDE_SONNET_4_6
     config.provider = ProviderType.ANTHROPIC
     config.max_input_tokens = 200000
     config.max_output_tokens = 8192

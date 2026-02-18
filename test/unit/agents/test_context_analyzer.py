@@ -216,7 +216,7 @@ def test_format_analysis() -> None:
         total_messages=38,
         context_window=200_000,
         agent_context_tokens=agent_context_tokens,
-        model_name="claude-sonnet-4-5",
+        model_name="claude-sonnet-4-6",
         max_usable_tokens=max_usable_tokens,
         free_space_tokens=free_space_tokens,
     )
@@ -224,7 +224,7 @@ def test_format_analysis() -> None:
     formatted = ContextFormatter.format_markdown(analysis)
 
     assert "# Conversation Context Analysis" in formatted
-    assert "Model: claude-sonnet-4-5" in formatted
+    assert "Model: claude-sonnet-4-6" in formatted
     assert "Total Context:" in formatted
     assert "Free Space:" in formatted
     assert "Autocompact Buffer: 500 tokens" in formatted
@@ -270,7 +270,7 @@ def test_format_analysis_excludes_zero_counts() -> None:
         total_messages=4,
         context_window=200_000,
         agent_context_tokens=agent_context_tokens,
-        model_name="claude-sonnet-4-5",
+        model_name="claude-sonnet-4-6",
         max_usable_tokens=max_usable_tokens,
         free_space_tokens=free_space_tokens,
     )

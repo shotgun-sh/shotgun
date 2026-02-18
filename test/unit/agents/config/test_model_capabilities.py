@@ -10,7 +10,7 @@ from shotgun.agents.config.models import (
 def test_model_config_default_capabilities():
     """Test that ModelConfig defaults to supporting PDF and images."""
     config = ModelConfig(
-        name="claude-sonnet-4-5",
+        name="claude-sonnet-4-6",
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         max_input_tokens=200_000,

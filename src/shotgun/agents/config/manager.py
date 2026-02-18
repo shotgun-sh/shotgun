@@ -54,7 +54,7 @@ class ConfigMigrationError(Exception):
 ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
 
 # Current config version
-CURRENT_CONFIG_VERSION = 9
+CURRENT_CONFIG_VERSION = 10
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -270,6 +270,35 @@ def _migrate_v8_to_v9(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v9_to_v10(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 9 to version 10.
+
+    Changes:
+    - Rename Claude model references from 4.5 to 4.6
+
+    Args:
+        data: Config data dict at version 9
+
+    Returns:
+        Modified config data dict at version 10
+    """
+    model_renames = {
+        "claude-opus-4-5": "claude-opus-4-6",
+        "claude-sonnet-4-5": "claude-sonnet-4-6",
+    }
+    selected = data.get("selected_model")
+    if selected in model_renames:
+        data["selected_model"] = model_renames[selected]
+        logger.info(
+            "Migrated config v9->v10: renamed selected_model %s -> %s",
+            selected,
+            model_renames[selected],
+        )
+
+    data["config_version"] = 10
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -294,6 +323,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         6: _migrate_v6_to_v7,
         7: _migrate_v7_to_v8,
         8: _migrate_v8_to_v9,
+        9: _migrate_v9_to_v10,
     }
 
     # Apply migrations sequentially

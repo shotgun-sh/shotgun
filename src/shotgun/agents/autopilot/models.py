@@ -22,8 +22,8 @@ class ClaudeModel(StrEnum):
     """Available Claude models for autopilot execution."""
 
     DEFAULT = ""  # Use Claude Code's default
-    OPUS_4_5 = "claude-opus-4-5-20251101"
-    SONNET_4_5 = "claude-sonnet-4-5-20250514"
+    OPUS_4_6 = "claude-opus-4-6"
+    SONNET_4_6 = "claude-sonnet-4-6"
     HAIKU_4_5 = "claude-haiku-4-5-20250514"
 
     @classmethod
@@ -31,8 +31,8 @@ class ClaudeModel(StrEnum):
         """Get the display name for a model."""
         names = {
             cls.DEFAULT: "Default",
-            cls.OPUS_4_5: "Opus 4.5",
-            cls.SONNET_4_5: "Sonnet 4.5",
+            cls.OPUS_4_6: "Opus 4.6",
+            cls.SONNET_4_6: "Sonnet 4.6",
             cls.HAIKU_4_5: "Haiku 4.5",
         }
         return names.get(model, model.value)

@@ -212,18 +212,18 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
-        return ModelName.CLAUDE_OPUS_4_5
+        return ModelName.CLAUDE_OPUS_4_6
 
     # Priority 2: Individual provider keys
     if _get_api_key(config.anthropic.api_key):
-        return ModelName.CLAUDE_OPUS_4_5
+        return ModelName.CLAUDE_OPUS_4_6
     if _get_api_key(config.openai.api_key):
         return ModelName.GPT_5_2
     if _get_api_key(config.google.api_key):
         return ModelName.GEMINI_3_PRO_PREVIEW
 
     # Fallback: system-wide default
-    return ModelName.CLAUDE_OPUS_4_5
+    return ModelName.CLAUDE_OPUS_4_6
 
 
 @lru_cache(maxsize=_MAX_MODEL_CACHE_SIZE)
@@ -413,7 +413,7 @@ async def get_provider_model(
             # This is important for web search tools that need specific provider APIs
             provider_defaults = {
                 ProviderType.OPENAI: ModelName.GPT_5_2,
-                ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_5,
+                ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_6,
                 ProviderType.GOOGLE: ModelName.GEMINI_3_FLASH_PREVIEW,
             }
             # For provider-based requests, use selected ModelName or default
@@ -626,11 +626,11 @@ async def get_provider_model(
                 "Anthropic API key not configured. Set via config or ANTHROPIC_API_KEY env var."
             )
 
-        # Use requested model or default to claude-opus-4-5
-        model_name = requested_model if requested_model else ModelName.CLAUDE_OPUS_4_5
+        # Use requested model or default to claude-opus-4-6
+        model_name = requested_model if requested_model else ModelName.CLAUDE_OPUS_4_6
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            model_name = ModelName.CLAUDE_OPUS_4_5
+            model_name = ModelName.CLAUDE_OPUS_4_6
 
         # Apply sub-agent model mapping for cost optimization
         if for_sub_agent:

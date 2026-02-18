@@ -102,7 +102,7 @@ async def build_welcome_state() -> WelcomeMessage:
     frontier_model_name = ""
 
     frontier_models = {
-        ModelName.CLAUDE_OPUS_4_5,
+        ModelName.CLAUDE_OPUS_4_6,
         ModelName.GPT_5_2,
         ModelName.GEMINI_3_PRO_PREVIEW,
     }
@@ -112,11 +112,11 @@ async def build_welcome_state() -> WelcomeMessage:
     elif not is_ollama:
         # Determine best available frontier model
         if is_shotgun_account:
-            frontier_model_label = "Select Opus 4.5"
-            frontier_model_name = ModelName.CLAUDE_OPUS_4_5
+            frontier_model_label = "Select Opus 4.6"
+            frontier_model_name = ModelName.CLAUDE_OPUS_4_6
         elif has_anthropic:
-            frontier_model_label = "Select Opus 4.5"
-            frontier_model_name = ModelName.CLAUDE_OPUS_4_5
+            frontier_model_label = "Select Opus 4.6"
+            frontier_model_name = ModelName.CLAUDE_OPUS_4_6
         elif has_openai:
             frontier_model_label = "Select GPT-5.2"
             frontier_model_name = ModelName.GPT_5_2

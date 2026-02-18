@@ -635,15 +635,15 @@ def test_model_config_updated():
     mock_model_config.key_provider = KeyProvider.BYOK
 
     event = ModelConfigUpdated(
-        old_model=ModelName.CLAUDE_OPUS_4_5,
-        new_model=ModelName.CLAUDE_SONNET_4_5,
+        old_model=ModelName.CLAUDE_OPUS_4_6,
+        new_model=ModelName.CLAUDE_SONNET_4_6,
         provider=ProviderType.ANTHROPIC,
         key_provider=KeyProvider.BYOK,
         model_config=mock_model_config,
     )
 
-    assert event.old_model == ModelName.CLAUDE_OPUS_4_5
-    assert event.new_model == ModelName.CLAUDE_SONNET_4_5
+    assert event.old_model == ModelName.CLAUDE_OPUS_4_6
+    assert event.new_model == ModelName.CLAUDE_SONNET_4_6
     assert event.provider == ProviderType.ANTHROPIC
     assert event.key_provider == KeyProvider.BYOK
     assert event.model_config == mock_model_config

@@ -181,7 +181,7 @@ class FileRequestsJudge:
         """
         self.model_config = model_config or JudgeModelConfig(
             provider=JudgeProviderType.ANTHROPIC,
-            model_name="claude-opus-4-5-20251101",
+            model_name="claude-opus-4-6",
             temperature=0.2,  # Low temperature for consistency
             max_tokens=2000,
         )

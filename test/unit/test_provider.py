@@ -84,7 +84,7 @@ async def test_get_provider_model_anthropic_with_config_key(mock_get_config_mana
         model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-5"
+        assert model.name == "claude-opus-4-6"
         assert model.api_key == "test-anthropic-key"
 
 
@@ -187,7 +187,7 @@ async def test_get_provider_model_none_finds_first_available(mock_get_config_man
         model = await get_provider_model(None)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-5"
+        assert model.name == "claude-opus-4-6"
 
 
 @patch("shotgun.agents.config.provider.get_config_manager")
@@ -269,7 +269,7 @@ async def test_get_provider_model_provider_enum_conversion(mock_get_config_manag
         model = await get_provider_model("anthropic")
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-5"
+        assert model.name == "claude-opus-4-6"
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -297,7 +297,7 @@ async def test_get_provider_model_with_env_key_precedence(mock_get_config_manage
         model = await get_provider_model(ProviderType.ANTHROPIC)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "claude-opus-4-5"
+        assert model.name == "claude-opus-4-6"
         assert model.provider == ProviderType.ANTHROPIC
         # Config key takes precedence over environment variable
         assert model.api_key == "config-anthropic-key"
