@@ -29,6 +29,10 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       - name: Cache uv
         uses: actions/cache@v5
         with:
@@ -57,23 +61,32 @@ jobs:
         continue-on-error: true
         run: uv --version
 
+      - name: Set install source
+        id: source
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pkg=." >> $GITHUB_OUTPUT
+          else
+            echo "pkg=shotgun-sh@latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --version
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --help
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
         timeout-minutes: 30
-        run: uv tool install shotgun-sh
+        run: uv tool install "${{ steps.source.outputs.pkg }}"
 
       - name: Add uv tools to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -97,8 +110,8 @@ jobs:
           failed=""
           [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via curl, "
           [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --help, "
           [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
           [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
           [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
@@ -121,6 +134,10 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       - name: Cache uv
         uses: actions/cache@v5
         with:
@@ -141,23 +158,32 @@ jobs:
         continue-on-error: true
         run: uv --version
 
+      - name: Set install source
+        id: source
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pkg=." >> $GITHUB_OUTPUT
+          else
+            echo "pkg=shotgun-sh@latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --version
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --help
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
         timeout-minutes: 30
-        run: uv tool install shotgun-sh
+        run: uv tool install "${{ steps.source.outputs.pkg }}"
 
       - name: Add uv tools to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -181,8 +207,8 @@ jobs:
           failed=""
           [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via Homebrew, "
           [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --help, "
           [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
           [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
           [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
@@ -214,6 +240,10 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       - name: Cache uv
         uses: actions/cache@v5
         with:
@@ -242,23 +272,32 @@ jobs:
         continue-on-error: true
         run: uv --version
 
+      - name: Set install source
+        id: source
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pkg=." >> $GITHUB_OUTPUT
+          else
+            echo "pkg=shotgun-sh@latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --version
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --help
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
         timeout-minutes: 30
-        run: uv tool install shotgun-sh
+        run: uv tool install "${{ steps.source.outputs.pkg }}"
 
       - name: Add uv tools to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -282,8 +321,8 @@ jobs:
           failed=""
           [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via curl, "
           [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --help, "
           [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
           [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
           [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
@@ -306,6 +345,10 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       - name: Cache uv
         uses: actions/cache@v5
         with:
@@ -334,23 +377,32 @@ jobs:
         continue-on-error: true
         run: uv --version
 
+      - name: Set install source
+        id: source
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pkg=." >> $GITHUB_OUTPUT
+          else
+            echo "pkg=shotgun-sh@latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --version
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
         timeout-minutes: 30
-        run: uvx shotgun-sh@latest --help
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
         timeout-minutes: 30
-        run: uv tool install shotgun-sh
+        run: uv tool install "${{ steps.source.outputs.pkg }}"
 
       - name: Add uv tools to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -374,8 +426,8 @@ jobs:
           failed=""
           [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via curl, "
           [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --help, "
           [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
           [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
           [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
@@ -398,6 +450,10 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       - name: Cache uv
         uses: actions/cache@v5
         with:
@@ -436,26 +492,36 @@ jobs:
         shell: powershell
         run: uv --version
 
+      - name: Set install source
+        id: source
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pkg=." >> $GITHUB_OUTPUT
+          else
+            echo "pkg=shotgun-sh@latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
-        run: uvx shotgun-sh@latest --version
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
-        run: uvx shotgun-sh@latest --help
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
-        run: uv tool install shotgun-sh
+        run: uv tool install "${{ steps.source.outputs.pkg }}"
 
       - name: Add uv tools to PATH
         shell: powershell
@@ -483,8 +549,8 @@ jobs:
           failed=""
           [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via PowerShell, "
           [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --help, "
           [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
           [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
           [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
@@ -508,6 +574,10 @@ jobs:
       failed_steps: ${{ steps.final-status.outputs.failed_steps }}
 
     steps:
+      - name: Checkout code
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+
       - name: Cache uv
         uses: actions/cache@v5
         with:
@@ -552,26 +622,36 @@ jobs:
         shell: powershell
         run: uv --version
 
+      - name: Set install source
+        id: source
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pkg=." >> $GITHUB_OUTPUT
+          else
+            echo "pkg=shotgun-sh@latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Test ephemeral execution - version
         id: test-uvx-version
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
-        run: uvx shotgun-sh@latest --version
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --version
 
       - name: Test ephemeral execution - help
         id: test-uvx-help
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
-        run: uvx shotgun-sh@latest --help
+        run: uvx --from "${{ steps.source.outputs.pkg }}" shotgun --help
 
       - name: Test permanent installation
         id: test-uv-tool-install
         continue-on-error: true
         timeout-minutes: 30
         shell: powershell
-        run: uv tool install shotgun-sh
+        run: uv tool install "${{ steps.source.outputs.pkg }}"
 
       - name: Add uv tools to PATH
         shell: powershell
@@ -599,8 +679,8 @@ jobs:
           failed=""
           [[ "${{ steps.install-uv.outcome }}" == "failure" ]] && failed="${failed}Install uv via PowerShell, "
           [[ "${{ steps.verify-uv.outcome }}" == "failure" ]] && failed="${failed}Verify uv installation, "
-          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --version, "
-          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun-sh@latest --help, "
+          [[ "${{ steps.test-uvx-version.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --version, "
+          [[ "${{ steps.test-uvx-help.outcome }}" == "failure" ]] && failed="${failed}uvx shotgun --help, "
           [[ "${{ steps.test-uv-tool-install.outcome }}" == "failure" ]] && failed="${failed}uv tool install shotgun-sh, "
           [[ "${{ steps.test-installed-version.outcome }}" == "failure" ]] && failed="${failed}shotgun --version, "
           [[ "${{ steps.test-installed-help.outcome }}" == "failure" ]] && failed="${failed}shotgun --help, "
