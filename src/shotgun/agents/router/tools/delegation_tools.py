@@ -253,9 +253,15 @@ async def build_preloaded_history(
     for file_path in preload_files:
         full_path = base_path / file_path
         try:
-            async with aiofiles.open(full_path) as f:
+            async with aiofiles.open(full_path, encoding="utf-8") as f:
                 content = await f.read()
-        except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
+        except (
+            FileNotFoundError,
+            IsADirectoryError,
+            PermissionError,
+            OSError,
+            UnicodeDecodeError,
+        ):
             logger.debug("Skipping preload for %s: file not readable", file_path)
             continue
 

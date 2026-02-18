@@ -132,6 +132,53 @@ async def test_build_preloaded_history_nonexistent_file_skipped(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_build_preloaded_history_utf8_content(tmp_path):
+    """Files with non-ASCII UTF-8 content are read correctly."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+    test_file = shotgun_dir / "research.md"
+    # Polish characters that would fail with cp1250 if byte 0x90 appears
+    test_file.write_text(
+        "# Analiza autentykacji i nawigacji\n"
+        "Przeanalizuj ka\u017cd\u0105 zak\u0142adk\u0119 z osobna\n"
+        "\u2014 em dash and \u201csmart quotes\u201d",
+        encoding="utf-8",
+    )
+
+    with patch(
+        "shotgun.agents.router.tools.delegation_tools.get_shotgun_base_path",
+        return_value=shotgun_dir,
+    ):
+        messages, loaded = await build_preloaded_history(["research.md"])
+
+    assert loaded == ["research.md"]
+    assert len(messages) == 2
+    return_part = messages[1].parts[0]
+    assert isinstance(return_part, ToolReturnPart)
+    assert "Analiza" in return_part.content
+    assert "\u017c" in return_part.content  # Polish character preserved
+
+
+@pytest.mark.asyncio
+async def test_build_preloaded_history_undecodable_file_skipped(tmp_path):
+    """Files with invalid UTF-8 bytes are silently skipped."""
+    shotgun_dir = tmp_path / ".shotgun"
+    shotgun_dir.mkdir()
+    test_file = shotgun_dir / "binary.md"
+    # Write raw bytes that are invalid UTF-8
+    test_file.write_bytes(b"Valid start\x80\x81\x90\xff invalid bytes")
+
+    with patch(
+        "shotgun.agents.router.tools.delegation_tools.get_shotgun_base_path",
+        return_value=shotgun_dir,
+    ):
+        messages, loaded = await build_preloaded_history(["binary.md"])
+
+    assert loaded == []
+    assert messages == []
+
+
+@pytest.mark.asyncio
 async def test_build_preloaded_history_directory_skipped(tmp_path):
     """Directories are silently skipped."""
     shotgun_dir = tmp_path / ".shotgun"
