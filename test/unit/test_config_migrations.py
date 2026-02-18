@@ -963,6 +963,27 @@ async def test_ollama_config_preserved_in_migrations():
         assert config.ollama.base_url == "http://192.168.1.100:11434"
 
 
+@pytest.mark.asyncio
+async def test_config_manager_saves_after_migration():
+    """Test that config is saved to disk after successful migration."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.json"
+
+        # Write old version config
+        old_config = V9_CONFIG.copy()
+        old_config["selected_model"] = "gpt-5"
+        config_path.write_text(json.dumps(old_config))
+
+        manager = ConfigManager(config_path=config_path)
+        config = await manager.load()
+
+        assert config.config_version == CURRENT_CONFIG_VERSION
+
+        # Re-read the file from disk to verify it was saved
+        disk_data = json.loads(config_path.read_text())
+        assert disk_data["config_version"] == CURRENT_CONFIG_VERSION
+
+
 def test_migrate_v9_to_v10_renames_opus():
     """Test v9->v10 migration renames claude-opus-4-5 to claude-opus-4-6."""
     config = V9_CONFIG.copy()

@@ -453,8 +453,8 @@ class ConfigManager:
             self._config = ShotgunConfig.model_validate(data)
             logger.debug("Configuration loaded successfully from %s", self.config_path)
 
-            # Clear migration_failed flag if config loaded successfully
-            should_save = False
+            # Save after migration or if migration_failed flag needs clearing
+            should_save = current_version < CURRENT_CONFIG_VERSION
             if self._config.migration_failed:
                 self._config.migration_failed = False
                 self._config.migration_backup_path = None

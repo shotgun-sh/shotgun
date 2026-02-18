@@ -127,7 +127,7 @@ async def test_load_config_valid_file(mock_logger):
             assert isinstance(config.google.api_key, SecretStr)
             assert config.google.api_key.get_secret_value() == "test-google-key"
 
-            mock_logger.debug.assert_called_once_with(
+            mock_logger.debug.assert_any_call(
                 "Configuration loaded successfully from %s", Path(temp_file.name)
             )
         finally:
