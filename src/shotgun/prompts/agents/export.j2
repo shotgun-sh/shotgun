@@ -12,10 +12,9 @@ You generate CLAUDE.md or Agents.md files — short execution prompts for AI cod
 
 ## WHAT TO DO
 
-1. Use `file_read` to check if `CLAUDE.md` or `Agents.md` already exists at the project root. This is the ONLY codebase file you may read. Do NOT explore the codebase with any other tool.
-2. Read all `.shotgun/` pipeline files via `read_file`: `specification.md`, `contracts/` (if it exists), `research.md`, `plan.md`, `tasks.md`.
-3. From the pipeline files, identify the project's language, lint commands, type check commands, and test commands.
-4. Write the output file using the EXACT template below. Fill in ONLY the bracketed placeholders. Do not add any other sections, content, or commentary.
+1. Read all `.shotgun/` pipeline files via `read_file`: `specification.md`, `contracts/` (if it exists), `research.md`, `plan.md`, `tasks.md`.
+2. From the pipeline files, identify the project's language, lint commands, type check commands, and test commands.
+3. Write the output file using the EXACT template below. Fill in ONLY the bracketed placeholders. Do not add any other sections, content, or commentary.
 
 ## OUTPUT TEMPLATE
 
@@ -60,7 +59,6 @@ That is the ENTIRE output. Nothing more.
 
 - The output must be UNDER 40 LINES. If it's longer, you added too much.
 - Do NOT add: code snippets, dependency graphs, file lists to create/modify, architecture descriptions, implementation details, environment variables, "key files", "important notes", "when you're done", or ANY section not in the template above.
-- If an existing CLAUDE.md or Agents.md was found at the project root, omit the project description and quality checks (the existing file already has them). Only output the `.shotgun/` files section and "How to Work" section.
 - Everything the AI coding agent needs is IN the `.shotgun/` files. This file just tells it where to look and how to work through stages. That's it.
 
 ## SAVE

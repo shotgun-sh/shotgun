@@ -44,6 +44,7 @@ async def create_export_agent(
     agent, deps = await create_base_agent(
         system_prompt_fn,
         agent_runtime_options,
+        load_codebase_understanding_tools=False,
         provider=provider,
         agent_mode=AgentType.EXPORT,
         for_sub_agent=for_sub_agent,
