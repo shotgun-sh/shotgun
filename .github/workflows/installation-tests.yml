@@ -842,6 +842,17 @@ jobs:
             --data @/tmp/slack_payload.json \
             "$SLACK_WEBHOOK_URL"
 
+      - name: Ping BetterStack heartbeat
+        if: steps.summary.outputs.overall_status == 'success'
+        env:
+          BETTERSTACK_HEARTBEAT_URL: ${{ secrets.BETTERSTACK_HEARTBEAT_URL }}
+        run: |
+          if [[ -n "$BETTERSTACK_HEARTBEAT_URL" ]]; then
+            curl -s "$BETTERSTACK_HEARTBEAT_URL" || echo "Warning: Failed to ping BetterStack heartbeat"
+          else
+            echo "BETTERSTACK_HEARTBEAT_URL secret not set, skipping heartbeat"
+          fi
+
       - name: Fail workflow if tests failed
         if: steps.summary.outputs.overall_status == 'failure'
         run: exit 1
