@@ -23,6 +23,7 @@ class KeyProvider(StrEnum):
 
     BYOK = "byok"  # Bring Your Own Key (individual provider keys)
     SHOTGUN = "shotgun"  # Shotgun Account (unified LiteLLM proxy)
+    OPENROUTER = "openrouter"  # OpenRouter (multi-model API aggregator)
 
 
 ANTHROPIC_ROUTER_CACHE_SETTINGS = AnthropicModelSettings(
@@ -61,6 +62,7 @@ class ModelSpec(BaseModel):
     litellm_proxy_model_name: (
         str  # LiteLLM format (e.g., "openai/gpt-5", "gemini/gemini-2-pro")
     )
+    openrouter_model_name: str  # OpenRouter format (e.g., "anthropic/claude-opus-4-6", "google/gemini-3-flash-preview")
     short_name: str  # Display name for UI (e.g., "Sonnet 4.6", "GPT-5")
 
 
@@ -137,6 +139,15 @@ class ModelConfig(BaseModel):
         """
         return self.key_provider == KeyProvider.SHOTGUN
 
+    @property
+    def is_openrouter(self) -> bool:
+        """Check if this model is using OpenRouter authentication.
+
+        Returns:
+            True if using OpenRouter, False otherwise
+        """
+        return self.key_provider == KeyProvider.OPENROUTER
+
 
 def get_model_display_name(name: "ModelName | str") -> str:
     """Get the UI display name for a model.
@@ -158,6 +169,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=272_000,
         max_output_tokens=128_000,
         litellm_proxy_model_name="openai/gpt-5.1",
+        openrouter_model_name="openai/gpt-5.1",
         short_name="GPT-5.1",
     ),
     ModelName.GPT_5_2: ModelSpec(
@@ -166,6 +178,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=272_000,
         max_output_tokens=128_000,
         litellm_proxy_model_name="openai/gpt-5.2",
+        openrouter_model_name="openai/gpt-5.2",
         short_name="GPT-5.2",
     ),
     ModelName.CLAUDE_SONNET_4_6: ModelSpec(
@@ -174,6 +187,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=200_000,
         max_output_tokens=16_000,
         litellm_proxy_model_name="anthropic/claude-sonnet-4-6",
+        openrouter_model_name="anthropic/claude-sonnet-4-6",
         short_name="Sonnet 4.6",
     ),
     ModelName.CLAUDE_HAIKU_4_5: ModelSpec(
@@ -182,6 +196,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=200_000,
         max_output_tokens=64_000,
         litellm_proxy_model_name="anthropic/claude-haiku-4-5",
+        openrouter_model_name="anthropic/claude-haiku-4-5",
         short_name="Haiku 4.5",
     ),
     ModelName.CLAUDE_OPUS_4_6: ModelSpec(
@@ -190,6 +205,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=200_000,
         max_output_tokens=64_000,
         litellm_proxy_model_name="anthropic/claude-opus-4-6",
+        openrouter_model_name="anthropic/claude-opus-4-6",
         short_name="Opus 4.6",
     ),
     ModelName.GEMINI_2_5_FLASH_LITE: ModelSpec(
@@ -198,6 +214,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=1_048_576,
         max_output_tokens=65_536,
         litellm_proxy_model_name="gemini/gemini-2.5-flash-lite",
+        openrouter_model_name="google/gemini-2.5-flash-lite",
         short_name="Gemini 2.5 Flash Lite",
     ),
     ModelName.GEMINI_3_PRO_PREVIEW: ModelSpec(
@@ -206,6 +223,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=1_048_576,
         max_output_tokens=65_536,
         litellm_proxy_model_name="gemini/gemini-3-pro-preview",
+        openrouter_model_name="google/gemini-3-pro-preview",
         short_name="Gemini 3 Pro",
     ),
     ModelName.GEMINI_3_FLASH_PREVIEW: ModelSpec(
@@ -214,6 +232,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         max_input_tokens=1_048_576,
         max_output_tokens=65_536,
         litellm_proxy_model_name="gemini/gemini-3-flash-preview",
+        openrouter_model_name="google/gemini-3-flash-preview",
         short_name="Gemini 3 Flash",
     ),
 }
@@ -267,6 +286,16 @@ class GoogleConfig(BaseModel):
     """Configuration for Google provider."""
 
     api_key: SecretStr | None = None
+
+
+class OpenRouterConfig(BaseModel):
+    """Configuration for OpenRouter (multi-model API aggregator)."""
+
+    api_key: SecretStr | None = None
+
+
+# OpenRouter API base URL
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class ShotgunAccountConfig(BaseModel):
@@ -386,6 +415,7 @@ class ShotgunConfig(BaseModel):
     anthropic: AnthropicConfig = Field(default_factory=AnthropicConfig)
     google: GoogleConfig = Field(default_factory=GoogleConfig)
     shotgun: ShotgunAccountConfig = Field(default_factory=ShotgunAccountConfig)
+    openrouter: OpenRouterConfig = Field(default_factory=OpenRouterConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     context7: Context7Config = Field(default_factory=Context7Config)
     selected_model: ModelName | str | None = Field(
@@ -395,7 +425,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=10, description="Configuration schema version")
+    config_version: int = Field(default=11, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",

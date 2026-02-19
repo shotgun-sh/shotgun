@@ -27,6 +27,7 @@ from .models import (
     GoogleConfig,
     ModelName,
     OpenAIConfig,
+    OpenRouterConfig,
     ProviderType,
     ShotgunAccountConfig,
     ShotgunConfig,
@@ -51,10 +52,16 @@ class ConfigMigrationError(Exception):
 
 
 # Type alias for provider configuration objects
-ProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | ShotgunAccountConfig
+ProviderConfig = (
+    OpenAIConfig
+    | AnthropicConfig
+    | GoogleConfig
+    | ShotgunAccountConfig
+    | OpenRouterConfig
+)
 
 # Current config version
-CURRENT_CONFIG_VERSION = 10
+CURRENT_CONFIG_VERSION = 11
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -299,6 +306,20 @@ def _migrate_v9_to_v10(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v10_to_v11(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 10 to version 11.
+
+    Changes:
+    - Add 'openrouter' section for OpenRouter provider
+    """
+    if "openrouter" not in data:
+        data["openrouter"] = {}
+        logger.info("Migrated config v10->v11: added openrouter configuration")
+
+    data["config_version"] = 11
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -324,6 +345,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         7: _migrate_v7_to_v8,
         8: _migrate_v8_to_v9,
         9: _migrate_v9_to_v10,
+        10: _migrate_v10_to_v11,
     }
 
     # Apply migrations sequentially
@@ -461,7 +483,11 @@ class ConfigManager:
                 should_save = True
 
             # Validate selected_model for BYOK mode - verify provider has a key
-            if not self.provider_has_api_key(self._config.shotgun):
+            # Skip validation for multi-model providers (Shotgun Account, OpenRouter)
+            # since they provide access to all models regardless of individual BYOK keys
+            if not self.provider_has_api_key(
+                self._config.shotgun
+            ) and not self.provider_has_api_key(self._config.openrouter):
                 # If selected_model is set, verify its provider has a key
                 # (Skip validation for Ollama models which don't need API keys)
                 if self._config.selected_model and not is_ollama_model(
@@ -593,12 +619,13 @@ class ConfigManager:
         """
         config = await self.load()
 
-        # Get provider config and check if it's shotgun
-        provider_config, is_shotgun = self._get_provider_config_and_type(
+        # Get provider config and its section type
+        provider_config, section = self._get_provider_config_and_section(
             config, provider
         )
-        # For non-shotgun providers, we need the enum for default provider logic
-        provider_enum = None if is_shotgun else self._ensure_provider_enum(provider)
+        is_multi_model = section in (ConfigSection.SHOTGUN, ConfigSection.OPENROUTER)
+        # For standard LLM providers, resolve the enum for default-model logic
+        provider_enum = None if is_multi_model else self._ensure_provider_enum(provider)
 
         # Only support api_key updates
         if API_KEY_FIELD in kwargs:
@@ -608,16 +635,12 @@ class ConfigManager:
             )
 
             # Reset streaming capabilities when OpenAI API key is changed
-            if not is_shotgun and provider_enum == ProviderType.OPENAI:
+            if provider_enum == ProviderType.OPENAI:
                 if isinstance(provider_config, OpenAIConfig):
                     provider_config.supports_streaming = None
 
         # Support tier updates for Anthropic
-        if (
-            "tier" in kwargs
-            and not is_shotgun
-            and provider_enum == ProviderType.ANTHROPIC
-        ):
+        if "tier" in kwargs and provider_enum == ProviderType.ANTHROPIC:
             if isinstance(provider_config, AnthropicConfig):
                 provider_config.tier = kwargs["tier"]
 
@@ -626,10 +649,22 @@ class ConfigManager:
         if unsupported_fields:
             raise ValueError(f"Unsupported configuration fields: {unsupported_fields}")
 
-        # If no other providers have keys configured and we just added one,
-        # set selected_model to that provider's default model (only for LLM providers, not shotgun)
-        if not is_shotgun and API_KEY_FIELD in kwargs and api_key_value is not None:
-            # provider_enum is guaranteed to be non-None here since is_shotgun is False
+        # Auto-select model and mark welcome screen based on provider type
+        if (
+            section == ConfigSection.OPENROUTER
+            and API_KEY_FIELD in kwargs
+            and api_key_value is not None
+        ):
+            # OpenRouter provides access to all models - auto-select Opus 4.6
+            if not config.selected_model:
+                config.selected_model = ModelName.CLAUDE_OPUS_4_6
+            config.shown_welcome_screen = True
+        elif (
+            not is_multi_model and API_KEY_FIELD in kwargs and api_key_value is not None
+        ):
+            # If no other providers have keys configured and we just added one,
+            # set selected_model to that provider's default model (only for LLM providers)
+            # provider_enum is guaranteed non-None here since is_multi_model is False
             if provider_enum is None:
                 raise RuntimeError("Provider enum should not be None for LLM providers")
             other_providers = [p for p in ProviderType if p != provider_enum]
@@ -654,22 +689,24 @@ class ConfigManager:
         await self.save(config)
 
     async def clear_provider_key(self, provider: ProviderType | str) -> None:
-        """Remove the API key for the given provider (LLM provider or shotgun)."""
+        """Remove the API key for the given provider (LLM provider, shotgun, or openrouter)."""
         config = await self.load()
 
-        # Get provider config (shotgun or LLM provider)
-        provider_config, is_shotgun = self._get_provider_config_and_type(
+        # Get provider config and section type
+        provider_config, section = self._get_provider_config_and_section(
             config, provider
         )
 
         provider_config.api_key = None
 
         # For Shotgun Account, also clear the JWT
-        if is_shotgun and isinstance(provider_config, ShotgunAccountConfig):
+        if section == ConfigSection.SHOTGUN and isinstance(
+            provider_config, ShotgunAccountConfig
+        ):
             provider_config.supabase_jwt = None
 
         # Reset streaming capabilities when OpenAI API key is cleared
-        if not is_shotgun:
+        if section is None:
             provider_enum = self._ensure_provider_enum(provider)
             if provider_enum == ProviderType.OPENAI:
                 if isinstance(provider_config, OpenAIConfig):
@@ -714,7 +751,9 @@ class ConfigManager:
         )
         # Also check Shotgun Account key
         has_shotgun_key = self.provider_has_api_key(config.shotgun)
-        return has_llm_key or has_shotgun_key
+        # Also check OpenRouter key
+        has_openrouter_key = self.provider_has_api_key(config.openrouter)
+        return has_llm_key or has_shotgun_key or has_openrouter_key
 
     async def initialize(self) -> ShotgunConfig:
         """Initialize configuration with defaults and save to file.
@@ -840,37 +879,56 @@ class ConfigManager:
 
         return bool(value.strip())
 
-    def _is_shotgun_provider(self, provider: ProviderType | str) -> bool:
-        """Check if provider string represents Shotgun Account.
+    def _is_section_provider(
+        self, provider: ProviderType | str, section: ConfigSection
+    ) -> bool:
+        """Check if provider string matches a ConfigSection (e.g. shotgun, openrouter).
+
+        Args:
+            provider: Provider type or string
+            section: The ConfigSection to compare against
+
+        Returns:
+            True if provider matches the given section
+        """
+        return isinstance(provider, str) and provider.lower() == section.value
+
+    def _is_multi_model_provider(self, provider: ProviderType | str) -> bool:
+        """Check if provider is a multi-model provider (Shotgun Account or OpenRouter).
+
+        Multi-model providers give access to all models regardless of individual BYOK keys.
 
         Args:
             provider: Provider type or string
 
         Returns:
-            True if provider is shotgun account
+            True if provider is shotgun or openrouter
         """
-        return (
-            isinstance(provider, str)
-            and provider.lower() == ConfigSection.SHOTGUN.value
-        )
+        return self._is_section_provider(
+            provider, ConfigSection.SHOTGUN
+        ) or self._is_section_provider(provider, ConfigSection.OPENROUTER)
 
-    def _get_provider_config_and_type(
+    def _get_provider_config_and_section(
         self, config: ShotgunConfig, provider: ProviderType | str
-    ) -> tuple[ProviderConfig, bool]:
-        """Get provider config, handling shotgun as special case.
+    ) -> tuple[ProviderConfig, ConfigSection | None]:
+        """Get provider config and its ConfigSection if it's a non-LLM provider.
 
         Args:
             config: Shotgun configuration
             provider: Provider type or string
 
         Returns:
-            Tuple of (provider_config, is_shotgun)
+            Tuple of (provider_config, section_or_none). section is None for
+            standard LLM providers (openai, anthropic, google).
         """
-        if self._is_shotgun_provider(provider):
-            return (config.shotgun, True)
+        if self._is_section_provider(provider, ConfigSection.SHOTGUN):
+            return (config.shotgun, ConfigSection.SHOTGUN)
+
+        if self._is_section_provider(provider, ConfigSection.OPENROUTER):
+            return (config.openrouter, ConfigSection.OPENROUTER)
 
         provider_enum = self._ensure_provider_enum(provider)
-        return (self._get_provider_config(config, provider_enum), False)
+        return (self._get_provider_config(config, provider_enum), None)
 
     async def get_shotgun_instance_id(self) -> str:
         """Get the shotgun instance ID from configuration.

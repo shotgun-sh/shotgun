@@ -236,15 +236,17 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             or config_manager.provider_has_api_key(config.anthropic)
             or config_manager.provider_has_api_key(config.google)
             or config_manager.provider_has_api_key(config.shotgun)
+            or config_manager.provider_has_api_key(config.openrouter)
         )
 
         # Log provider key status
         logger.debug(
-            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s, has_any=%s",
+            "Provider keys: openai=%s, anthropic=%s, google=%s, shotgun=%s, openrouter=%s, has_any=%s",
             config_manager.provider_has_api_key(config.openai),
             config_manager.provider_has_api_key(config.anthropic),
             config_manager.provider_has_api_key(config.google),
             config_manager.provider_has_api_key(config.shotgun),
+            config_manager.provider_has_api_key(config.openrouter),
             has_cloud_keys,
         )
 
@@ -572,6 +574,11 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
         # If Shotgun Account is configured, all models are available
         if self.config_manager.provider_has_api_key(config.shotgun):
             logger.debug("Model %s available (Shotgun Account configured)", model_name)
+            return True
+
+        # If OpenRouter is configured, all models are available
+        if self.config_manager.provider_has_api_key(config.openrouter):
+            logger.debug("Model %s available (OpenRouter configured)", model_name)
             return True
 
         # In BYOK mode, check if the model's provider has a key

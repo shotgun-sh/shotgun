@@ -140,6 +140,22 @@ V10_CONFIG = {
     "router_mode": "planning",
 }
 
+V11_CONFIG = {
+    "openai": {"api_key": "sk-test123", "supports_streaming": None},
+    "anthropic": {"api_key": None, "tier": None},
+    "google": {"api_key": None},
+    "shotgun": {"api_key": None, "supabase_jwt": None},
+    "openrouter": {},
+    "ollama": {"enabled": False, "base_url": "http://localhost:11434"},
+    "context7": {},
+    "selected_model": "gpt-5",
+    "shotgun_instance_id": "test-user-id-12345",
+    "config_version": 11,
+    "shown_welcome_screen": False,
+    "marketing": {"messages": {}},
+    "router_mode": "planning",
+}
+
 
 def test_migrate_v2_to_v3():
     """Test migration from version 2 to version 3."""
@@ -317,12 +333,12 @@ def test_apply_migrations_from_v4_to_current():
 
 def test_apply_migrations_already_current():
     """Test applying migrations when already at current version."""
-    config = V10_CONFIG.copy()
+    config = V11_CONFIG.copy()
 
     result = _apply_migrations(config)
 
     assert result["config_version"] == CURRENT_CONFIG_VERSION
-    assert result == V10_CONFIG  # Should be unchanged
+    assert result == V11_CONFIG  # Should be unchanged
 
 
 def test_apply_migrations_sequential():
@@ -809,7 +825,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config (no migration needed)
-        current_config = V10_CONFIG.copy()
+        current_config = V11_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)

@@ -4,6 +4,7 @@ Provides web search capabilities for multiple LLM providers:
 - OpenAI: Uses Responses API with web_search tool
 - Anthropic: Uses Messages API with web_search_20250305 tool
 - Gemini: Uses grounding with Google Search via Pydantic AI
+- OpenRouter: Uses :online model variant for web search grounding
 - OpenAI-compatible: Uses Responses API via custom endpoint (e.g., LiteLLM proxy)
 
 For BYOK users, Gemini Flash web search is preferred when a Google API key is available,
@@ -22,6 +23,7 @@ from .anthropic import anthropic_web_search_tool
 from .gemini import gemini_web_search_tool
 from .openai import openai_web_search_tool
 from .openai_compatible import openai_compatible_web_search_tool
+from .openrouter import openrouter_web_search_tool
 from .utils import is_provider_available
 
 logger = get_logger(__name__)
@@ -63,6 +65,11 @@ async def get_available_web_search_tools() -> list[WebSearchTool]:
         logger.info("Using Gemini web search (Shotgun Account)")
         return [gemini_web_search_tool]
 
+    # Priority 1.5: OpenRouter uses :online model variant
+    if config.openrouter.api_key:
+        logger.info("Using OpenRouter web search (:online variant)")
+        return [openrouter_web_search_tool]
+
     # Priority 2: For BYOK users, prefer Gemini web search when available
     # Gemini Flash grounded search is the most reliable web search option
     if await is_provider_available(ProviderType.GOOGLE):
@@ -88,6 +95,7 @@ __all__ = [
     "anthropic_web_search_tool",
     "gemini_web_search_tool",
     "openai_compatible_web_search_tool",
+    "openrouter_web_search_tool",
     "get_available_web_search_tools",
     "is_provider_available",
     "WebSearchTool",
