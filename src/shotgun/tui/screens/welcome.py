@@ -227,9 +227,10 @@ class WelcomeScreen(Screen[None]):
                 with Vertical(classes="option-box", id="byok-box"):
                     yield Static("Bring Your Own Key (BYOK)", classes="option-title")
                     yield Markdown(
-                        "**Benefits:**\n"
-                        "• 100% Supported\n"
-                        "• Use your existing API keys from OpenAI, Anthropic, or Google",
+                        "**Recommended: [OpenRouter](https://openrouter.ai)**\n"
+                        "• One API key for all models (Anthropic, OpenAI, Google)\n"
+                        "• Pay-as-you-go pricing\n\n"
+                        "Or use individual API keys from OpenAI, Anthropic, or Google",
                         classes="option-benefits",
                     )
                     yield Button(

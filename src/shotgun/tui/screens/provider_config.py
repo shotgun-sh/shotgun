@@ -48,9 +48,9 @@ def get_configurable_providers() -> list[str]:
 
     Returns:
         List of provider identifiers that can be configured.
-        Includes all providers: openai, anthropic, google, and shotgun.
+        Includes: openrouter, openai, anthropic, google, and shotgun.
     """
-    return ["openai", "anthropic", "google", "shotgun"]
+    return ["openrouter", "openai", "anthropic", "google", "shotgun"]
 
 
 class ProviderConfigScreen(Screen[None]):
@@ -236,7 +236,7 @@ class ProviderConfigScreen(Screen[None]):
         ("ctrl+c", "app.quit", "Quit"),
     ]
 
-    selected_provider: reactive[str] = reactive("openai")
+    selected_provider: reactive[str] = reactive("openrouter")
     ollama_status: reactive[OllamaStatus | None] = reactive(None)
 
     def __init__(
@@ -586,6 +586,7 @@ class ProviderConfigScreen(Screen[None]):
             "openai": "OpenAI",
             "anthropic": "Anthropic",
             "google": "Google Gemini",
+            "openrouter": "OpenRouter",
             "shotgun": "Shotgun Account",
         }
         return names.get(provider_id, provider_id.title())
@@ -595,17 +596,18 @@ class ProviderConfigScreen(Screen[None]):
 
     async def _has_provider_key(self, provider_id: str) -> bool:
         """Check if provider has a configured API key."""
-        if provider_id == "shotgun":
-            # Check shotgun key directly
+        # Non-LLM providers (shotgun, openrouter) are config attributes, not ProviderType enums
+        if provider_id in ("openrouter", "shotgun"):
             config = await self.config_manager.load()
-            return self.config_manager.provider_has_api_key(config.shotgun)
-        else:
-            # Check LLM provider key
-            try:
-                provider = ProviderType(provider_id)
-                return await self.config_manager.has_provider_key(provider)
-            except ValueError:
-                return False
+            provider_config = getattr(config, provider_id)
+            return self.config_manager.provider_has_api_key(provider_config)
+
+        # Standard LLM providers (openai, anthropic, google)
+        try:
+            provider = ProviderType(provider_id)
+            return await self.config_manager.has_provider_key(provider)
+        except ValueError:
+            return False
 
     def _save_api_key(self) -> None:
         self.run_worker(self._do_save_api_key(), exclusive=True)

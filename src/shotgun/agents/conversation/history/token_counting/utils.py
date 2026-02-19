@@ -2,7 +2,7 @@
 
 from pydantic_ai.messages import ModelMessage
 
-from shotgun.agents.config.models import ModelConfig, ProviderType
+from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
 from shotgun.logging_config import get_logger
 
 from .anthropic import AnthropicTokenCounter
@@ -52,6 +52,17 @@ def get_token_counter(model_config: ModelConfig) -> TokenCounter:
     )
 
     counter: TokenCounter
+
+    # OpenRouter can't use provider-specific token counting APIs (e.g., Anthropic's
+    # count_tokens endpoint), so use a local tokenizer for all OpenRouter models.
+    if model_config.key_provider == KeyProvider.OPENROUTER:
+        counter = OpenAITokenCounter(str(model_config.name))
+        _token_counter_cache[cache_key] = counter
+        logger.debug(
+            f"Cached token counter for {model_config.provider.value}:{model_config.name}"
+        )
+        return counter
+
     if model_config.provider == ProviderType.OPENAI:
         counter = OpenAITokenCounter(model_config.name)
     elif model_config.provider == ProviderType.OPENAI_COMPATIBLE:

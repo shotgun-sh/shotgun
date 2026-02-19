@@ -16,6 +16,7 @@ class ConfigSection(StrEnum):
     ANTHROPIC = auto()
     GOOGLE = auto()
     SHOTGUN = auto()
+    OPENROUTER = auto()
     CONTEXT7 = auto()
 
 

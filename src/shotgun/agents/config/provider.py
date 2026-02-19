@@ -25,6 +25,7 @@ from .manager import get_config_manager
 from .models import (
     MODEL_SPECS,
     OLLAMA_PLACEHOLDER_API_KEY,
+    OPENROUTER_BASE_URL,
     KeyProvider,
     ModelConfig,
     ModelName,
@@ -198,6 +199,100 @@ def _create_openai_compat_model(
     )
 
 
+def _resolve_multi_provider_model(
+    config: ShotgunConfig,
+    provider_or_model: ProviderType | ModelName | None,
+    for_sub_agent: bool,
+) -> ModelName:
+    """Resolve which ModelName to use for multi-provider backends (Shotgun Account, OpenRouter).
+
+    Encapsulates the logic for determining the model when the backend supports all providers.
+
+    Args:
+        config: Shotgun configuration
+        provider_or_model: Explicit model, provider hint, or None for auto-selection
+        for_sub_agent: If True, substitute a cheaper model for cost optimization
+
+    Returns:
+        Resolved ModelName
+    """
+    if isinstance(provider_or_model, ModelName):
+        # Specific model requested - honor it (e.g., web search tools)
+        model_name = provider_or_model
+    elif isinstance(provider_or_model, ProviderType):
+        # Specific provider requested - use default model for that provider
+        provider_defaults = {
+            ProviderType.OPENAI: ModelName.GPT_5_2,
+            ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_6,
+            ProviderType.GOOGLE: ModelName.GEMINI_3_FLASH_PREVIEW,
+        }
+        selected = (
+            config.selected_model
+            if isinstance(config.selected_model, ModelName)
+            else get_default_model_for_provider(config)
+        )
+        model_name = provider_defaults.get(provider_or_model, selected)
+    else:
+        # No specific model requested - use selected or default
+        if isinstance(config.selected_model, ModelName):
+            model_name = config.selected_model
+        else:
+            model_name = get_default_model_for_provider(config)
+
+    # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
+    if model_name not in MODEL_SPECS:
+        model_name = get_default_model_for_provider(config)
+
+    # Apply sub-agent model mapping for cost optimization
+    if for_sub_agent:
+        original_model = model_name
+        model_name = get_sub_agent_model(model_name)
+        if model_name != original_model:
+            logger.debug(
+                "Sub-agent model substitution: %s -> %s",
+                original_model.value,
+                model_name.value,
+            )
+
+    return model_name
+
+
+def _build_multi_provider_model_config(
+    config: ShotgunConfig,
+    provider_or_model: ProviderType | ModelName | None,
+    for_sub_agent: bool,
+    *,
+    key_provider: KeyProvider,
+    api_key: str,
+) -> ModelConfig:
+    """Build a ModelConfig for multi-model providers (Shotgun Account, OpenRouter).
+
+    These providers give access to all models through a single API key,
+    so the logic for resolving which model to use is shared.
+
+    Args:
+        config: Shotgun configuration
+        provider_or_model: Explicit model, provider hint, or None for auto-selection
+        for_sub_agent: If True, substitute a cheaper model for cost optimization
+        key_provider: Authentication method (SHOTGUN or OPENROUTER)
+        api_key: The resolved API key string
+
+    Returns:
+        Fully configured ModelConfig
+    """
+    model_name = _resolve_multi_provider_model(config, provider_or_model, for_sub_agent)
+    spec = MODEL_SPECS[model_name]
+    return ModelConfig(
+        name=spec.name,
+        provider=spec.provider,
+        key_provider=key_provider,
+        max_input_tokens=spec.max_input_tokens,
+        max_output_tokens=spec.max_output_tokens,
+        api_key=api_key,
+        supports_streaming=True,
+    )
+
+
 def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """Get the default model based on which provider/account is configured.
 
@@ -212,6 +307,10 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     """
     # Priority 1: Shotgun Account
     if _get_api_key(config.shotgun.api_key):
+        return ModelName.CLAUDE_OPUS_4_6
+
+    # Priority 1.5: OpenRouter
+    if _get_api_key(config.openrouter.api_key):
         return ModelName.CLAUDE_OPUS_4_6
 
     # Priority 2: Individual provider keys
@@ -333,6 +432,18 @@ def get_or_create_model(
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
+    elif key_provider == KeyProvider.OPENROUTER:
+        # OpenRouter: all models go through OpenAI-compatible API
+        if isinstance(model_name, ModelName) and model_name in MODEL_SPECS:
+            openrouter_name = MODEL_SPECS[model_name].openrouter_model_name
+        else:
+            openrouter_name = str(model_name)
+        openai_provider = OpenAIProvider(api_key=api_key, base_url=OPENROUTER_BASE_URL)
+        return OpenAIChatModel(
+            openrouter_name,
+            provider=openai_provider,
+            settings=ModelSettings(max_tokens=max_tokens),
+        )
     else:
         raise ValueError(f"Unsupported key provider: {key_provider}")
 
@@ -401,66 +512,29 @@ async def get_provider_model(
     # Use cached config for read-only access (performance)
     config = await config_manager.load(force_reload=False)
 
-    # Priority 1: Check if Shotgun key exists - if so, use it for ANY model
+    # Priority 1: Shotgun Account — use it for ANY model
     shotgun_api_key = _get_api_key(config.shotgun.api_key)
     if shotgun_api_key:
-        # Determine which model to use
-        if isinstance(provider_or_model, ModelName):
-            # Specific model requested - honor it (e.g., web search tools)
-            model_name = provider_or_model
-        elif isinstance(provider_or_model, ProviderType):
-            # Specific provider requested - use default model for that provider
-            # This is important for web search tools that need specific provider APIs
-            provider_defaults = {
-                ProviderType.OPENAI: ModelName.GPT_5_2,
-                ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_6,
-                ProviderType.GOOGLE: ModelName.GEMINI_3_FLASH_PREVIEW,
-            }
-            # For provider-based requests, use selected ModelName or default
-            selected = (
-                config.selected_model
-                if isinstance(config.selected_model, ModelName)
-                else get_default_model_for_provider(config)
-            )
-            model_name = provider_defaults.get(provider_or_model, selected)
-        else:
-            # No specific model requested - use selected or default
-            # Only use selected_model if it's a ModelName enum (not Ollama string)
-            if isinstance(config.selected_model, ModelName):
-                model_name = config.selected_model
-            else:
-                model_name = get_default_model_for_provider(config)
-
-        # Gracefully fall back if the selected model doesn't exist (backwards compatibility)
-        if model_name not in MODEL_SPECS:
-            model_name = get_default_model_for_provider(config)
-
-        # Apply sub-agent model mapping for cost optimization
-        if for_sub_agent:
-            original_model = model_name
-            model_name = get_sub_agent_model(model_name)
-            if model_name != original_model:
-                logger.debug(
-                    "Sub-agent model substitution: %s -> %s",
-                    original_model.value,
-                    model_name.value,
-                )
-
-        spec = MODEL_SPECS[model_name]
-
-        # Use Shotgun Account with determined model (provider = actual LLM provider)
-        # Shotgun accounts always support streaming (via LiteLLM proxy)
-        return ModelConfig(
-            name=spec.name,
-            provider=spec.provider,  # Actual LLM provider (OPENAI/ANTHROPIC/GOOGLE)
-            key_provider=KeyProvider.SHOTGUN,  # Authenticated via Shotgun Account
-            max_input_tokens=spec.max_input_tokens,
-            max_output_tokens=spec.max_output_tokens,
+        return _build_multi_provider_model_config(
+            config,
+            provider_or_model,
+            for_sub_agent,
+            key_provider=KeyProvider.SHOTGUN,
             api_key=shotgun_api_key,
-            supports_streaming=True,  # Shotgun accounts always support streaming
         )
 
-    # Priority 1.5: Check for Ollama model (selected via TUI)
+    # Priority 1.5: OpenRouter — multi-model aggregator
+    openrouter_api_key = _get_api_key(config.openrouter.api_key, "OPENROUTER_API_KEY")
+    if openrouter_api_key:
+        return _build_multi_provider_model_config(
+            config,
+            provider_or_model,
+            for_sub_agent,
+            key_provider=KeyProvider.OPENROUTER,
+            api_key=openrouter_api_key,
+        )
+
+    # Priority 2: Check for Ollama model (selected via TUI)
     # Handle when user has selected an Ollama model without any cloud API keys
     if is_ollama_model(config.selected_model) and config.ollama.enabled:
         # is_ollama_model TypeGuard narrows type to str
