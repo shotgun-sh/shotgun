@@ -113,7 +113,6 @@ async def create_plan(
         "plan_created",
         {
             "step_count": len(steps),
-            "goal_preview": input.goal[:100],
             "requires_approval": plan.needs_approval(),
             "router_mode": ctx.deps.router_mode.value,
         },

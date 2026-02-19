@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 from shotgun import __version__
 from shotgun.agents.config import get_config_manager
-from shotgun.agents.conversation import ConversationManager
 from shotgun.exceptions import UserActionableError
 from shotgun.logging_config import get_early_logger
 from shotgun.settings import settings
@@ -122,8 +121,14 @@ def setup_posthog_observability() -> bool:
             config = asyncio.run(config_manager.load())
 
             # Cache user context for exception tracking
-            is_shotgun_account = config.shotgun.has_valid_account
-            _user_context["account_type"] = "shotgun" if is_shotgun_account else "byok"
+            # Determine account type: shotgun > openrouter > byok/ollama
+            if config.shotgun.has_valid_account:
+                account_type = "shotgun"
+            elif config.openrouter.api_key is not None:
+                account_type = "openrouter"
+            else:
+                account_type = "byok"
+            _user_context["account_type"] = account_type
             # Handle both ModelName enum and string (for Ollama models)
             if config.selected_model is None:
                 _user_context["selected_model"] = None
@@ -328,15 +333,6 @@ def submit_feedback_survey(feedback: Feedback) -> None:
 
     config_manager = get_config_manager()
     config = asyncio.run(config_manager.load())
-    conversation_manager = ConversationManager()
-    conversation = None
-    try:
-        conversation = asyncio.run(conversation_manager.load())
-    except Exception as e:
-        logger.debug(f"Failed to load conversation history: {e}")
-    last_10_messages = []
-    if conversation is not None:
-        last_10_messages = conversation.get_agent_messages()[:10]
 
     track_event(
         "survey sent",
@@ -355,6 +351,5 @@ def submit_feedback_survey(feedback: Feedback) -> None:
                 else (config.selected_model.value if config.selected_model else None)
             ),
             "config_version": config.config_version,
-            "last_10_messages": last_10_messages,  # last 10 messages
         },
     )
