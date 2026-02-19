@@ -330,12 +330,8 @@ def test_submit_feedback_survey_not_initialized():
 
 @patch("shotgun.posthog_telemetry.track_event")
 @patch("shotgun.posthog_telemetry.get_config_manager")
-@patch("shotgun.posthog_telemetry.ConversationManager")
-def test_submit_feedback_survey_bug_report(
-    mock_conversation_manager_class, mock_get_config_manager, mock_track_event
-):
+def test_submit_feedback_survey_bug_report(mock_get_config_manager, mock_track_event):
     """Test submitting a bug report feedback."""
-    # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
     mock_config.selected_model.value = "gpt-5"
@@ -343,19 +339,8 @@ def test_submit_feedback_survey_bug_report(
     mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager
 
-    mock_conversation_manager = MagicMock()
-    mock_conversation = MagicMock()
-    mock_conversation.get_agent_messages.return_value = [
-        {"role": "user", "content": "Test message 1"},
-        {"role": "assistant", "content": "Test response 1"},
-    ]
-    mock_conversation_manager.load = AsyncMock(return_value=mock_conversation)
-    mock_conversation_manager_class.return_value = mock_conversation_manager
-
-    # Set up a mock PostHog client
     original_client = posthog_telemetry._posthog_client
-    mock_posthog_client = MagicMock()
-    posthog_telemetry._posthog_client = mock_posthog_client
+    posthog_telemetry._posthog_client = MagicMock()
 
     try:
         feedback = Feedback(
@@ -366,7 +351,6 @@ def test_submit_feedback_survey_bug_report(
 
         posthog_telemetry.submit_feedback_survey(feedback)
 
-        # Verify track_event was called with correct parameters
         mock_track_event.assert_called_once()
         call_args = mock_track_event.call_args
 
@@ -383,30 +367,23 @@ def test_submit_feedback_survey_bug_report(
             properties["$survey_response_aaa5fcc3-88ba-4c24-bcf5-1481fd5efc2b"]
             == FeedbackKind.BUG
         )
-        assert (
-            properties["$survey_response_a0ed6283-5d4b-452c-9160-6768d879db8a"]
-            == "Application crashes on startup"
-        )
 
         # Verify config metadata
         assert properties["selected_model"] == "gpt-5"
         assert properties["config_version"] == "1.0.0"
 
-        # Verify conversation messages
-        assert "last_10_messages" in properties
-        assert len(properties["last_10_messages"]) == 2
+        # Verify conversation messages are NOT sent (PII protection)
+        assert "last_10_messages" not in properties
     finally:
         posthog_telemetry._posthog_client = original_client
 
 
 @patch("shotgun.posthog_telemetry.track_event")
 @patch("shotgun.posthog_telemetry.get_config_manager")
-@patch("shotgun.posthog_telemetry.ConversationManager")
 def test_submit_feedback_survey_feature_request(
-    mock_conversation_manager_class, mock_get_config_manager, mock_track_event
+    mock_get_config_manager, mock_track_event
 ):
     """Test submitting a feature request feedback."""
-    # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
     mock_config.selected_model.value = "claude-opus-4-1"
@@ -414,14 +391,8 @@ def test_submit_feedback_survey_feature_request(
     mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager
 
-    mock_conversation_manager = MagicMock()
-    mock_conversation_manager.load = AsyncMock(return_value=None)
-    mock_conversation_manager_class.return_value = mock_conversation_manager
-
-    # Set up a mock PostHog client
     original_client = posthog_telemetry._posthog_client
-    mock_posthog_client = MagicMock()
-    posthog_telemetry._posthog_client = mock_posthog_client
+    posthog_telemetry._posthog_client = MagicMock()
 
     try:
         feedback = Feedback(
@@ -432,35 +403,27 @@ def test_submit_feedback_survey_feature_request(
 
         posthog_telemetry.submit_feedback_survey(feedback)
 
-        # Verify track_event was called
         mock_track_event.assert_called_once()
         call_args = mock_track_event.call_args
         properties = call_args[1]["properties"]
 
-        # Verify feature request content
         assert (
             properties["$survey_response_aaa5fcc3-88ba-4c24-bcf5-1481fd5efc2b"]
             == FeedbackKind.FEATURE
         )
-        assert (
-            properties["$survey_response_a0ed6283-5d4b-452c-9160-6768d879db8a"]
-            == "Add support for dark mode"
-        )
 
-        # Verify empty conversation is handled
-        assert properties["last_10_messages"] == []
+        # Verify conversation messages are NOT sent (PII protection)
+        assert "last_10_messages" not in properties
     finally:
         posthog_telemetry._posthog_client = original_client
 
 
 @patch("shotgun.posthog_telemetry.track_event")
 @patch("shotgun.posthog_telemetry.get_config_manager")
-@patch("shotgun.posthog_telemetry.ConversationManager")
 def test_submit_feedback_survey_other_feedback(
-    mock_conversation_manager_class, mock_get_config_manager, mock_track_event
+    mock_get_config_manager, mock_track_event
 ):
     """Test submitting other type of feedback."""
-    # Setup mocks
     mock_config_manager = MagicMock()
     mock_config = MagicMock()
     mock_config.selected_model.value = "gemini-3-pro-preview"
@@ -468,19 +431,8 @@ def test_submit_feedback_survey_other_feedback(
     mock_config_manager.load = AsyncMock(return_value=mock_config)
     mock_get_config_manager.return_value = mock_config_manager
 
-    mock_conversation_manager = MagicMock()
-    mock_conversation = MagicMock()
-    # Simulate more than 10 messages
-    mock_conversation.get_agent_messages.return_value = [
-        {"role": "user", "content": f"Message {i}"} for i in range(15)
-    ]
-    mock_conversation_manager.load = AsyncMock(return_value=mock_conversation)
-    mock_conversation_manager_class.return_value = mock_conversation_manager
-
-    # Set up a mock PostHog client
     original_client = posthog_telemetry._posthog_client
-    mock_posthog_client = MagicMock()
-    posthog_telemetry._posthog_client = mock_posthog_client
+    posthog_telemetry._posthog_client = MagicMock()
 
     try:
         feedback = Feedback(
@@ -491,22 +443,16 @@ def test_submit_feedback_survey_other_feedback(
 
         posthog_telemetry.submit_feedback_survey(feedback)
 
-        # Verify track_event was called
         mock_track_event.assert_called_once()
         call_args = mock_track_event.call_args
         properties = call_args[1]["properties"]
 
-        # Verify other feedback content
         assert (
             properties["$survey_response_aaa5fcc3-88ba-4c24-bcf5-1481fd5efc2b"]
             == FeedbackKind.OTHER
         )
-        assert (
-            properties["$survey_response_a0ed6283-5d4b-452c-9160-6768d879db8a"]
-            == "Great tool, thanks!"
-        )
 
-        # Verify only first 10 messages are included
-        assert len(properties["last_10_messages"]) == 10
+        # Verify conversation messages are NOT sent (PII protection)
+        assert "last_10_messages" not in properties
     finally:
         posthog_telemetry._posthog_client = original_client

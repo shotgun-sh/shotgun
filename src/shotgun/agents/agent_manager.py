@@ -988,6 +988,10 @@ class AgentManager(Widget):
             "has_prompt": prompt is not None,
             "model_name": model_name,
             "has_attachment": attachment is not None,
+            "key_provider": (
+                deps.llm_model.key_provider.value if deps.llm_model else None
+            ),
+            "provider": deps.llm_model.provider.value if deps.llm_model else None,
         }
 
         # Add Tier 1 Anthropic flag for routing agent telemetry
