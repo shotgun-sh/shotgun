@@ -77,6 +77,12 @@ class ShotgunAuthScreen(Screen[bool]):
             text-align: center;
         }
 
+        #copy-url {
+            margin: 1 0;
+            width: auto;
+            align: center middle;
+        }
+
         #actions {
             padding: 1;
             align: center middle;
@@ -131,6 +137,9 @@ class ShotgunAuthScreen(Screen[bool]):
         with Vertical(id="content"):
             yield Label("Initializing...", id="status")
             yield Markdown("", id="auth-url")
+            yield Button(
+                "Copy URL to ClipBoard", variant="primary", id="copy-url", disabled=True
+            )
             yield Markdown(
                 "**Instructions:**\n"
                 "1. A browser window will open automatically\n"
@@ -172,6 +181,13 @@ class ShotgunAuthScreen(Screen[bool]):
         """Handle cancel button press."""
         self.action_cancel()
 
+    @on(Button.Pressed, "#copy-url")
+    def _on_copy_url_pressed(self) -> None:
+        """Copy the authentication URL to the clipboard."""
+        if self.auth_url:
+            self.app.copy_to_clipboard(self.auth_url)
+            self.notify("URL copied to clipboard")
+
     @property
     def config_manager(self) -> ConfigManager:
         app = cast("ShotgunApp", self.app)
@@ -206,6 +222,7 @@ class ShotgunAuthScreen(Screen[bool]):
             self.query_one("#auth-url", Markdown).update(
                 f"**Authentication URL:**\n\n[{self.auth_url}]({self.auth_url})"
             )
+            self.query_one("#copy-url", Button).disabled = False
 
             # Try to open browser
             try:
