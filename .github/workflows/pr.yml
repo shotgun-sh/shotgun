@@ -374,19 +374,14 @@ jobs:
         with:
           fetch-depth: 0  # Full history for comprehensive scan
 
-      - name: Install trufflehog
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 2
-          max_attempts: 5
-          retry_wait_seconds: 10
-          command: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+      - name: Pull trufflehog Docker image
+        run: docker pull ghcr.io/trufflesecurity/trufflehog:latest
 
       - name: Run trufflehog scan (pass 1 - all files except uv.lock)
-        run: trufflehog git file://. --fail --no-update --exclude-globs=uv.lock
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/trufflesecurity/trufflehog:latest git file:///repo --fail --no-update --exclude-globs=uv.lock
 
       - name: Run trufflehog scan (pass 2 - uv.lock only, exclude SentryToken)
-        run: trufflehog git file://. --fail --no-update --include-paths=.github/trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/trufflesecurity/trufflehog:latest git file:///repo --fail --no-update --include-paths=/repo/.github/trufflehog-include-lockfile.txt --exclude-detectors=SentryToken
 
   docker-build-test:
     name: Docker build test
