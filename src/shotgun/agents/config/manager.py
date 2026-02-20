@@ -61,7 +61,7 @@ ProviderConfig = (
 )
 
 # Current config version
-CURRENT_CONFIG_VERSION = 11
+CURRENT_CONFIG_VERSION = 12
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -320,6 +320,28 @@ def _migrate_v10_to_v11(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v11_to_v12(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 11 to version 12.
+
+    Changes:
+    - Rename Gemini model from gemini-3-pro-preview to gemini-3.1-pro-preview
+    """
+    model_renames = {
+        "gemini-3-pro-preview": "gemini-3.1-pro-preview",
+    }
+    selected = data.get("selected_model")
+    if selected in model_renames:
+        data["selected_model"] = model_renames[selected]
+        logger.info(
+            "Migrated config v11->v12: renamed selected_model %s -> %s",
+            selected,
+            model_renames[selected],
+        )
+
+    data["config_version"] = 12
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -346,6 +368,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         8: _migrate_v8_to_v9,
         9: _migrate_v9_to_v10,
         10: _migrate_v10_to_v11,
+        11: _migrate_v11_to_v12,
     }
 
     # Apply migrations sequentially

@@ -319,7 +319,7 @@ def get_default_model_for_provider(config: ShotgunConfig) -> ModelName:
     if _get_api_key(config.openai.api_key):
         return ModelName.GPT_5_2
     if _get_api_key(config.google.api_key):
-        return ModelName.GEMINI_3_PRO_PREVIEW
+        return ModelName.GEMINI_3_1_PRO_PREVIEW
 
     # Fallback: system-wide default
     return ModelName.CLAUDE_OPUS_4_6
@@ -736,13 +736,13 @@ async def get_provider_model(
                 "Gemini API key not configured. Set via config or GEMINI_API_KEY env var."
             )
 
-        # Use requested model or default to gemini-3-pro-preview
+        # Use requested model or default to gemini-3.1-pro-preview
         model_name = (
-            requested_model if requested_model else ModelName.GEMINI_3_PRO_PREVIEW
+            requested_model if requested_model else ModelName.GEMINI_3_1_PRO_PREVIEW
         )
         # Gracefully fall back if model doesn't exist
         if model_name not in MODEL_SPECS:
-            model_name = ModelName.GEMINI_3_PRO_PREVIEW
+            model_name = ModelName.GEMINI_3_1_PRO_PREVIEW
 
         # Apply sub-agent model mapping for cost optimization
         if for_sub_agent:

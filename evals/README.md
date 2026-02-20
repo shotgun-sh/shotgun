@@ -15,7 +15,7 @@ uv run python -m evals.runner --suite router_smoke --model claude-opus-4-6 --no-
 uv run python -m evals.runner --case vague_prompt_clarifying_questions --model claude-opus-4-6
 
 # Compare multiple models
-uv run python -m evals.runner --suite router_smoke --model claude-opus-4-6 --model gpt-5.1 --model gemini-3-pro-preview
+uv run python -m evals.runner --suite router_smoke --model claude-opus-4-6 --model gpt-5.1 --model gemini-3.1-pro-preview
 ```
 
 ## Output Formats

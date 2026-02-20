@@ -639,7 +639,7 @@ class ModelPickerScreen(Screen[ModelConfigUpdated | None]):
             ModelName.CLAUDE_SONNET_4_6: "Claude Sonnet 4.6 (Anthropic)",
             ModelName.CLAUDE_HAIKU_4_5: "Claude Haiku 4.5 (Anthropic)",
             ModelName.GEMINI_2_5_FLASH_LITE: "Gemini 2.5 Flash Lite (Google)",
-            ModelName.GEMINI_3_PRO_PREVIEW: "Gemini 3 Pro Preview (Google)",
+            ModelName.GEMINI_3_1_PRO_PREVIEW: "Gemini 3.1 Pro Preview (Google)",
             ModelName.GEMINI_3_FLASH_PREVIEW: "Gemini 3 Flash Preview (Google)",
         }
         return names.get(model_name, model_name.value)

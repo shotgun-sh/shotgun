@@ -104,7 +104,7 @@ async def build_welcome_state() -> WelcomeMessage:
     frontier_models = {
         ModelName.CLAUDE_OPUS_4_6,
         ModelName.GPT_5_2,
-        ModelName.GEMINI_3_PRO_PREVIEW,
+        ModelName.GEMINI_3_1_PRO_PREVIEW,
     }
 
     if config.selected_model and config.selected_model in frontier_models:
@@ -121,8 +121,8 @@ async def build_welcome_state() -> WelcomeMessage:
             frontier_model_label = "Select GPT-5.2"
             frontier_model_name = ModelName.GPT_5_2
         elif has_google:
-            frontier_model_label = "Select Gemini 3 Pro"
-            frontier_model_name = ModelName.GEMINI_3_PRO_PREVIEW
+            frontier_model_label = "Select Gemini 3.1 Pro"
+            frontier_model_name = ModelName.GEMINI_3_1_PRO_PREVIEW
 
     return WelcomeMessage(
         is_home_directory=is_home,
