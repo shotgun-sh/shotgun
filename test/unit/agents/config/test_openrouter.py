@@ -183,14 +183,14 @@ async def test_openrouter_with_selected_model(mock_get_config_manager):
         manager = ConfigManager(config_path=Path(temp_dir) / "config.json")
         config = _make_config(
             openrouter=OpenRouterConfig(api_key=SecretStr("or-key")),
-            selected_model=ModelName.GEMINI_3_PRO_PREVIEW,
+            selected_model=ModelName.GEMINI_3_1_PRO_PREVIEW,
         )
         manager._config = config
         mock_get_config_manager.return_value = manager
 
         result = await get_provider_model()
 
-        assert result.name == ModelName.GEMINI_3_PRO_PREVIEW
+        assert result.name == ModelName.GEMINI_3_1_PRO_PREVIEW
         assert result.key_provider == KeyProvider.OPENROUTER
 
 

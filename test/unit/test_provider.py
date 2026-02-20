@@ -124,7 +124,7 @@ async def test_get_provider_model_google_with_config_key(mock_get_config_manager
         model = await get_provider_model(ProviderType.GOOGLE)
 
         assert isinstance(model, ModelConfig)
-        assert model.name == "gemini-3-pro-preview"
+        assert model.name == "gemini-3.1-pro-preview"
         assert model.api_key == "test-google-key"
 
 

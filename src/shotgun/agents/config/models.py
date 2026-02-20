@@ -48,7 +48,7 @@ class ModelName(StrEnum):
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
     GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
-    GEMINI_3_PRO_PREVIEW = "gemini-3-pro-preview"
+    GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
     GEMINI_3_FLASH_PREVIEW = "gemini-3-flash-preview"
 
 
@@ -62,7 +62,7 @@ class ModelSpec(BaseModel):
     litellm_proxy_model_name: (
         str  # LiteLLM format (e.g., "openai/gpt-5", "gemini/gemini-2-pro")
     )
-    openrouter_model_name: str  # OpenRouter format (e.g., "anthropic/claude-opus-4-6", "google/gemini-3-flash-preview")
+    openrouter_model_name: str  # OpenRouter format (e.g., "anthropic/claude-opus-4-6", "google/gemini-3.1-pro-preview")
     short_name: str  # Display name for UI (e.g., "Sonnet 4.6", "GPT-5")
 
 
@@ -217,14 +217,14 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         openrouter_model_name="google/gemini-2.5-flash-lite",
         short_name="Gemini 2.5 Flash Lite",
     ),
-    ModelName.GEMINI_3_PRO_PREVIEW: ModelSpec(
-        name=ModelName.GEMINI_3_PRO_PREVIEW,
+    ModelName.GEMINI_3_1_PRO_PREVIEW: ModelSpec(
+        name=ModelName.GEMINI_3_1_PRO_PREVIEW,
         provider=ProviderType.GOOGLE,
         max_input_tokens=1_048_576,
         max_output_tokens=65_536,
-        litellm_proxy_model_name="gemini/gemini-3-pro-preview",
-        openrouter_model_name="google/gemini-3-pro-preview",
-        short_name="Gemini 3 Pro",
+        litellm_proxy_model_name="gemini/gemini-3.1-pro-preview",
+        openrouter_model_name="google/gemini-3.1-pro-preview",
+        short_name="Gemini 3.1 Pro",
     ),
     ModelName.GEMINI_3_FLASH_PREVIEW: ModelSpec(
         name=ModelName.GEMINI_3_FLASH_PREVIEW,
@@ -241,7 +241,7 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
 DEFAULT_PROVIDER_MODELS: dict[ProviderType, ModelName] = {
     ProviderType.OPENAI: ModelName.GPT_5_2,
     ProviderType.ANTHROPIC: ModelName.CLAUDE_OPUS_4_6,
-    ProviderType.GOOGLE: ModelName.GEMINI_3_PRO_PREVIEW,
+    ProviderType.GOOGLE: ModelName.GEMINI_3_1_PRO_PREVIEW,
 }
 
 # Sub-agent model mappings for cost optimization
@@ -251,7 +251,7 @@ SUB_AGENT_MODEL_MAPPINGS: dict[ModelName, ModelName] = {
     ModelName.CLAUDE_OPUS_4_6: ModelName.CLAUDE_HAIKU_4_5,
     ModelName.CLAUDE_SONNET_4_6: ModelName.CLAUDE_HAIKU_4_5,
     # Gemini: Pro uses Flash for sub-agents
-    ModelName.GEMINI_3_PRO_PREVIEW: ModelName.GEMINI_3_FLASH_PREVIEW,
+    ModelName.GEMINI_3_1_PRO_PREVIEW: ModelName.GEMINI_3_FLASH_PREVIEW,
     # OpenAI: 5.2 uses 5.1 for sub-agents
     ModelName.GPT_5_2: ModelName.GPT_5_1,
 }
@@ -425,7 +425,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=11, description="Configuration schema version")
+    config_version: int = Field(default=12, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",

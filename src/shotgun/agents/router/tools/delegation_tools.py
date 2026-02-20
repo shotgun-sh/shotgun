@@ -18,6 +18,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
 from pydantic_ai.tools import ToolDefinition
 
@@ -293,6 +294,18 @@ async def build_preloaded_history(
         loaded_paths.append(file_path)
 
     if loaded_paths:
+        # Prepend a synthetic user message so that the first tool call (ModelResponse)
+        # follows a user turn. Gemini requires: user turn → assistant tool call → tool return.
+        # Without this, the preloaded tool calls would immediately follow the system prompt,
+        # which Gemini rejects with "function call turn must come after a user turn".
+        user_msg = ModelRequest(
+            parts=[
+                UserPromptPart(
+                    content=f"Reading {len(loaded_paths)} preloaded file(s): {', '.join(loaded_paths)}"
+                )
+            ]
+        )
+        messages.insert(0, user_msg)
         logger.info("Preloaded %d files: %s", len(loaded_paths), loaded_paths)
 
     return messages, loaded_paths

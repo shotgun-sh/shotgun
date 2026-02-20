@@ -26,9 +26,9 @@ def test_anthropic_haiku_returns_self():
 
 
 def test_gemini_pro_maps_to_flash():
-    """Gemini 3 Pro should map to Gemini 3 Flash for sub-agents."""
+    """Gemini 3.1 Pro should map to Gemini 3 Flash for sub-agents."""
     assert (
-        get_sub_agent_model(ModelName.GEMINI_3_PRO_PREVIEW)
+        get_sub_agent_model(ModelName.GEMINI_3_1_PRO_PREVIEW)
         == ModelName.GEMINI_3_FLASH_PREVIEW
     )
 

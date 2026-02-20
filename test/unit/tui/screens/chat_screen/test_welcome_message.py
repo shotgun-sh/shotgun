@@ -196,8 +196,8 @@ async def test_build_welcome_state_byok_google_frontier():
     ):
         state = await build_welcome_state()
 
-    assert state.frontier_model_label == "Select Gemini 3 Pro"
-    assert state.frontier_model_name == "gemini-3-pro-preview"
+    assert state.frontier_model_label == "Select Gemini 3.1 Pro"
+    assert state.frontier_model_name == "gemini-3.1-pro-preview"
     assert state.has_gemini_key is True
 
 

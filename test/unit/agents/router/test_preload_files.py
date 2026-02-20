@@ -11,6 +11,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
 
 from shotgun.agents.config.models import KeyProvider, ModelConfig, ProviderType
@@ -60,10 +61,16 @@ async def test_build_preloaded_history_single_file(tmp_path):
         messages, loaded = await build_preloaded_history(["research.md"])
 
     assert loaded == ["research.md"]
-    assert len(messages) == 2
+    assert len(messages) == 3
 
-    # First message: ModelResponse with ToolCallPart
-    call_msg = messages[0]
+    # First message: Synthetic UserPromptPart (required for Gemini message ordering)
+    user_msg = messages[0]
+    assert isinstance(user_msg, ModelRequest)
+    assert len(user_msg.parts) == 1
+    assert isinstance(user_msg.parts[0], UserPromptPart)
+
+    # Second message: ModelResponse with ToolCallPart
+    call_msg = messages[1]
     assert isinstance(call_msg, ModelResponse)
     assert len(call_msg.parts) == 1
     call_part = call_msg.parts[0]
@@ -76,8 +83,8 @@ async def test_build_preloaded_history_single_file(tmp_path):
     assert call_part.tool_call_id is not None
     assert call_part.tool_call_id.startswith("preload-")
 
-    # Second message: ModelRequest with ToolReturnPart
-    return_msg = messages[1]
+    # Third message: ModelRequest with ToolReturnPart
+    return_msg = messages[2]
     assert isinstance(return_msg, ModelRequest)
     assert len(return_msg.parts) == 1
     return_part = return_msg.parts[0]
@@ -104,10 +111,14 @@ async def test_build_preloaded_history_multiple_files(tmp_path):
         )
 
     assert loaded == ["research.md", "specification.md"]
-    assert len(messages) == 4  # 2 pairs
+    assert len(messages) == 5  # 1 synthetic user msg + 2 pairs
+
+    # First message: synthetic user prompt
+    assert isinstance(messages[0], ModelRequest)
+    assert isinstance(messages[0].parts[0], UserPromptPart)
 
     # Check second pair has spec content
-    return_part = messages[3].parts[0]
+    return_part = messages[4].parts[0]
     assert isinstance(return_part, ToolReturnPart)
     assert return_part.content == "Spec content"
 
@@ -128,7 +139,7 @@ async def test_build_preloaded_history_nonexistent_file_skipped(tmp_path):
         )
 
     assert loaded == ["research.md"]
-    assert len(messages) == 2  # Only 1 pair for existing file
+    assert len(messages) == 3  # 1 synthetic user msg + 1 pair for existing file
 
 
 @pytest.mark.asyncio
@@ -152,8 +163,8 @@ async def test_build_preloaded_history_utf8_content(tmp_path):
         messages, loaded = await build_preloaded_history(["research.md"])
 
     assert loaded == ["research.md"]
-    assert len(messages) == 2
-    return_part = messages[1].parts[0]
+    assert len(messages) == 3
+    return_part = messages[2].parts[0]
     assert isinstance(return_part, ToolReturnPart)
     assert "Analiza" in return_part.content
     assert "\u017c" in return_part.content  # Polish character preserved
@@ -212,8 +223,8 @@ async def test_build_preloaded_history_tool_call_id_matches():
         ):
             messages, loaded = await build_preloaded_history(["plan.md"])
 
-    call_part = messages[0].parts[0]
-    return_part = messages[1].parts[0]
+    call_part = messages[1].parts[0]
+    return_part = messages[2].parts[0]
     assert isinstance(call_part, ToolCallPart)
     assert isinstance(return_part, ToolReturnPart)
     assert call_part.tool_call_id == return_part.tool_call_id
@@ -235,7 +246,7 @@ async def test_build_preloaded_history_subdirectory_files(tmp_path):
         messages, loaded = await build_preloaded_history(["contracts/auth.py"])
 
     assert loaded == ["contracts/auth.py"]
-    return_part = messages[1].parts[0]
+    return_part = messages[2].parts[0]
     assert isinstance(return_part, ToolReturnPart)
     assert return_part.content == "class AuthContract: pass"
 
@@ -378,9 +389,10 @@ async def test_run_sub_agent_passes_preloaded_history(tmp_path):
     # Verify the message_history was passed with preloaded content
     assert "message_history" in captured_kwargs
     history = captured_kwargs["message_history"]
-    assert len(history) == 2
-    assert isinstance(history[0], ModelResponse)
-    assert isinstance(history[1], ModelRequest)
+    assert len(history) == 3  # 1 synthetic user msg + 1 tool call/return pair
+    assert isinstance(history[0], ModelRequest)  # Synthetic user prompt
+    assert isinstance(history[1], ModelResponse)
+    assert isinstance(history[2], ModelRequest)
 
 
 @pytest.mark.asyncio
