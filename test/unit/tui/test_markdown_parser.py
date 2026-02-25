@@ -37,9 +37,7 @@ def test_explicit_https_urls_still_linkified():
     tokens = parser.parse("Visit https://example.com for details")
     inline_tokens = [t for t in tokens if t.children]
     linkify_found = any(
-        child.markup == "linkify"
-        for token in inline_tokens
-        for child in token.children
+        child.markup == "linkify" for token in inline_tokens for child in token.children
     )
     assert linkify_found, "https://example.com should be linkified"
 
@@ -50,9 +48,7 @@ def test_explicit_http_urls_still_linkified():
     tokens = parser.parse("Visit http://example.com for details")
     inline_tokens = [t for t in tokens if t.children]
     linkify_found = any(
-        child.markup == "linkify"
-        for token in inline_tokens
-        for child in token.children
+        child.markup == "linkify" for token in inline_tokens for child in token.children
     )
     assert linkify_found, "http://example.com should be linkified"
 
@@ -63,9 +59,7 @@ def test_markdown_links_still_work():
     tokens = parser.parse("See [docs](https://example.com) for details")
     inline_tokens = [t for t in tokens if t.children]
     link_found = any(
-        child.type == "link_open"
-        for token in inline_tokens
-        for child in token.children
+        child.type == "link_open" for token in inline_tokens for child in token.children
     )
     assert link_found, "Markdown links should still work"
 
@@ -86,9 +80,7 @@ def test_bare_domain_like_names_not_linkified(text: str):
     inline_tokens = [t for t in tokens if t.children]
     for token in inline_tokens:
         for child in token.children:
-            assert child.markup != "linkify", (
-                f"'{text}' was incorrectly linkified"
-            )
+            assert child.markup != "linkify", f"'{text}' was incorrectly linkified"
 
 
 def test_markdown_subclass_is_drop_in_replacement():
