@@ -65,6 +65,8 @@ ModeIndicator.mode-drafting {
 
 #indexing-job-display {
   text-align: end;
+  height: 1;
+  width: auto;
 }
 
 AttachmentBar {
