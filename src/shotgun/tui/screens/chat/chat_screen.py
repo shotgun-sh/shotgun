@@ -67,6 +67,7 @@ from shotgun.agents.models import (
     AgentDeps,
     AgentType,
     FileOperationTracker,
+    ResponseChoice,
 )
 from shotgun.agents.router.models import (
     CascadeScope,
@@ -2162,6 +2163,9 @@ class ChatScreen(Screen[None]):
         attachment: FileAttachment | None = None,
         file_contents: list[tuple[str, "FileContent"]] | None = None,
     ) -> None:
+        # Clean up any active choice selector before starting
+        self._hide_choice_selector()
+
         # Start processing with spinner
         from textual.worker import get_current_worker
 
@@ -2381,7 +2385,7 @@ class ChatScreen(Screen[None]):
 
     def _hide_checkpoint_widget(self) -> None:
         """Remove checkpoint widget, restore PromptInput."""
-        if hasattr(self, "_checkpoint_widget") and self._checkpoint_widget:
+        if self._checkpoint_widget:
             self._checkpoint_widget.remove()
             self._checkpoint_widget = None
 
@@ -2403,7 +2407,7 @@ class ChatScreen(Screen[None]):
 
     def _hide_choice_selector(self) -> None:
         """Remove choice selector widget, restore PromptInput."""
-        if hasattr(self, "_choice_selector_widget") and self._choice_selector_widget:
+        if self._choice_selector_widget:
             self._choice_selector_widget.remove()
             self._choice_selector_widget = None
 
@@ -2551,8 +2555,6 @@ class ChatScreen(Screen[None]):
             total,
             remaining,
         )
-
-        from shotgun.agents.models import ResponseChoice
 
         hint = (
             f"📋 **Plan Status: {completed}/{total} steps complete**\n\n"
