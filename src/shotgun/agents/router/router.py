@@ -107,11 +107,11 @@ async def create_router_agent(
     # Delegation tools with prepare function - only visible after plan is approved
     # in Planning mode, always available in Drafting mode
     delegation_tools = [
-        Tool(delegate_to_research, prepare=prepare_delegation_tool),
-        Tool(delegate_to_specification, prepare=prepare_delegation_tool),
-        Tool(delegate_to_plan, prepare=prepare_delegation_tool),
-        Tool(delegate_to_tasks, prepare=prepare_delegation_tool),
-        Tool(delegate_to_export, prepare=prepare_delegation_tool),
+        Tool(delegate_to_research, prepare=prepare_delegation_tool),  # type: ignore[arg-type]
+        Tool(delegate_to_specification, prepare=prepare_delegation_tool),  # type: ignore[arg-type]
+        Tool(delegate_to_plan, prepare=prepare_delegation_tool),  # type: ignore[arg-type]
+        Tool(delegate_to_tasks, prepare=prepare_delegation_tool),  # type: ignore[arg-type]
+        Tool(delegate_to_export, prepare=prepare_delegation_tool),  # type: ignore[arg-type]
     ]
 
     # Create the agent with delegation tools that have prepare functions

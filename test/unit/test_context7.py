@@ -84,9 +84,9 @@ def test_apply_migrations_from_v8_to_current():
     assert result["context7"] == {}
 
 
-def test_current_config_version_is_10():
-    """Verify current config version is 10."""
-    assert CURRENT_CONFIG_VERSION == 10
+def test_current_config_version_is_12():
+    """Verify current config version is 12."""
+    assert CURRENT_CONFIG_VERSION == 12
 
 
 # --- ConfigManager Context7 methods tests ---
