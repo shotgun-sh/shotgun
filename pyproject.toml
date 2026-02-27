@@ -5,7 +5,7 @@ description = "AI-powered research, planning, and task management CLI tool"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Proofs.io", email = "hello@proofs.io" }
+    { name = "MimirAI", email = "contact@shotgun.sh" }
 ]
 requires-python = ">=3.11,<3.14"  # Upper bound due to real-ladybug lacking Python 3.14 wheels
 keywords = ["cli", "ai", "agent", "research", "planning", "task-management", "productivity", "llm", "pydantic-ai"]
