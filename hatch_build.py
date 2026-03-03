@@ -90,12 +90,9 @@ class CustomBuildHook(BuildHookInterface):  # type: ignore[type-arg]
                     "Ensure the GitHub secret POSTHOG_PROJECT_ID is set and passed to the build."
                 )
 
-        # Get Logfire configuration (SHOTGUN_ prefix, only for dev builds)
+        # Logfire is no longer embedded at build time — use runtime env vars instead
         logfire_enabled = ""
         logfire_token = ""
-        if is_dev_build:
-            logfire_enabled = os.environ.get("SHOTGUN_LOGFIRE_ENABLED", "")
-            logfire_token = os.environ.get("SHOTGUN_LOGFIRE_TOKEN", "")
 
         # Generate Python configuration file with build-time constants
         constants_content = f'''"""Build-time constants generated during packaging.
