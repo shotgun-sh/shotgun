@@ -143,6 +143,24 @@ def set_openai_compat_sub_agent_model(model: str | None) -> None:
     _openai_compat_sub_agent_model_override = model
 
 
+# Module-level general model override (set via --model CLI flag for non-OpenAI-compat providers)
+_general_model_override: ModelName | None = None
+
+
+def set_general_model_override(model: ModelName | None) -> None:
+    """Set the general model override for all providers.
+
+    This is called by the CLI when --model resolves to a known ModelName.
+    It applies to Shotgun Account, OpenRouter, and BYOK providers (not OpenAI-compat).
+    The override is transient (session-only) and does not persist to config.
+
+    Args:
+        model: ModelName to use, or None to clear the override.
+    """
+    global _general_model_override
+    _general_model_override = model
+
+
 def _create_openai_compat_model(
     api_key: str, model_name: str, max_tokens: int, base_url: str | None = None
 ) -> Model:
@@ -233,8 +251,10 @@ def _resolve_multi_provider_model(
         )
         model_name = provider_defaults.get(provider_or_model, selected)
     else:
-        # No specific model requested - use selected or default
-        if isinstance(config.selected_model, ModelName):
+        # No specific model requested - check general override first, then selected/default
+        if _general_model_override is not None:
+            model_name = _general_model_override
+        elif isinstance(config.selected_model, ModelName):
             model_name = config.selected_model
         else:
             model_name = get_default_model_for_provider(config)
@@ -577,12 +597,19 @@ async def get_provider_model(
             )
             requested_model = None  # Will use provider's default model
         else:
-            # No provider specified - check if user has a selected model
-            # Only use selected_model if it's a ModelName enum (not Ollama string)
+            # No provider specified - check general override first, then selected model
             if (
+                _general_model_override is not None
+                and _general_model_override in MODEL_SPECS
+            ):
+                override_spec = MODEL_SPECS[_general_model_override]
+                provider_enum = override_spec.provider
+                requested_model = _general_model_override
+            elif (
                 isinstance(config.selected_model, ModelName)
                 and config.selected_model in MODEL_SPECS
             ):
+                # Only use selected_model if it's a ModelName enum (not Ollama string)
                 selected_spec = MODEL_SPECS[config.selected_model]
                 # Only use selected model if its provider has a configured key
                 if _has_provider_key(config, selected_spec.provider):
@@ -772,7 +799,7 @@ async def get_provider_model(
 
 
 def _has_provider_key(config: "ShotgunConfig", provider: ProviderType) -> bool:
-    """Check if a provider has a configured API key.
+    """Check if a provider has a configured API key (config or env var).
 
     Args:
         config: Shotgun configuration
@@ -782,11 +809,11 @@ def _has_provider_key(config: "ShotgunConfig", provider: ProviderType) -> bool:
         True if provider has a configured API key
     """
     if provider == ProviderType.OPENAI:
-        return bool(_get_api_key(config.openai.api_key))
+        return bool(_get_api_key(config.openai.api_key, "OPENAI_API_KEY"))
     elif provider == ProviderType.ANTHROPIC:
-        return bool(_get_api_key(config.anthropic.api_key))
+        return bool(_get_api_key(config.anthropic.api_key, "ANTHROPIC_API_KEY"))
     elif provider == ProviderType.GOOGLE:
-        return bool(_get_api_key(config.google.api_key))
+        return bool(_get_api_key(config.google.api_key, "GEMINI_API_KEY"))
     return False
 
 

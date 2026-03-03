@@ -262,6 +262,44 @@ def get_sub_agent_model(main_model: ModelName) -> ModelName:
     return SUB_AGENT_MODEL_MAPPINGS.get(main_model, main_model)
 
 
+def resolve_model_name(model_str: str) -> ModelName | None:
+    """Resolve a user-provided model string to a ModelName enum.
+
+    Accepts:
+      - Direct enum values: "claude-sonnet-4-6"
+      - Provider-prefixed: "anthropic/claude-sonnet-4-6"
+      - LiteLLM format: "gemini/gemini-3.1-pro-preview" (matches litellm_proxy_model_name)
+
+    Args:
+        model_str: User-provided model name string.
+
+    Returns:
+        Resolved ModelName or None if unrecognized.
+    """
+    # Try direct enum match
+    for model_name in ModelName:
+        if model_str == model_name.value:
+            return model_name
+
+    # Try matching against provider-prefixed formats
+    for model_name, spec in MODEL_SPECS.items():
+        if model_str == spec.litellm_proxy_model_name:
+            return model_name
+        if model_str == spec.openrouter_model_name:
+            return model_name
+
+    return None
+
+
+def get_valid_model_names() -> list[str]:
+    """Return all valid ModelName values for error messages.
+
+    Returns:
+        List of all ModelName string values.
+    """
+    return [m.value for m in ModelName]
+
+
 class OpenAIConfig(BaseModel):
     """Configuration for OpenAI provider."""
 
