@@ -189,16 +189,14 @@ jobs:
           # Map GitHub secrets to SHOTGUN_ prefixed environment variables for build
           SHOTGUN_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           SHOTGUN_POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
-          # Logfire configuration for dev builds only
-          SHOTGUN_LOGFIRE_TOKEN: ${{ steps.version_update.outputs.is_dev == 'true' && secrets.LOGFIRE_TOKEN || '' }}
-          SHOTGUN_LOGFIRE_ENABLED: ${{ steps.version_update.outputs.is_dev == 'true' && 'true' || '' }}
+          # Logfire removed from builds — use SHOTGUN_LOGFIRE_ENABLED/SHOTGUN_LOGFIRE_TOKEN
+          # env vars at runtime for local development instead
         run: |
           echo "🔨 Building package version: ${{ steps.version_update.outputs.version }}"
-          if [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] || [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]]; then
-            [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]] && echo "✅ Building with PostHog analytics enabled"
-            [[ "$SHOTGUN_LOGFIRE_ENABLED" == "true" ]] && echo "✅ Building with Logfire observability enabled (dev build)"
+          if [[ -n "$SHOTGUN_POSTHOG_API_KEY" ]]; then
+            echo "✅ Building with PostHog analytics enabled"
           else
-            echo "⚠️  Building without analytics (PostHog/Logfire will use fallback)"
+            echo "⚠️  Building without analytics (PostHog will use fallback)"
           fi
           python -m build
 
@@ -419,8 +417,6 @@ jobs:
             SHOTGUN_BUILD_REQUIRE_VALIDATION=true
             SHOTGUN_POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
             SHOTGUN_POSTHOG_PROJECT_ID=${{ secrets.POSTHOG_PROJECT_ID }}
-            SHOTGUN_LOGFIRE_ENABLED=${{ needs.build-and-package.outputs.is_dev == 'true' && 'true' || '' }}
-            SHOTGUN_LOGFIRE_TOKEN=${{ needs.build-and-package.outputs.is_dev == 'true' && secrets.LOGFIRE_TOKEN || '' }}
 
   notify-slack:
     runs-on: ubuntu-latest

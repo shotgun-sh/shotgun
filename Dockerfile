@@ -5,8 +5,6 @@ FROM python:3.13-slim
 # These are used during the build process to embed analytics keys
 ARG SHOTGUN_POSTHOG_API_KEY=""
 ARG SHOTGUN_POSTHOG_PROJECT_ID=""
-ARG SHOTGUN_LOGFIRE_ENABLED=""
-ARG SHOTGUN_LOGFIRE_TOKEN=""
 ARG SHOTGUN_BUILD_REQUIRE_VALIDATION=""
 
 # OCI annotations for package metadata
@@ -41,8 +39,6 @@ COPY --chown=shotgun:shotgun docs/README_DOCKER.md ./docs/
 # Pass build args as environment variables for the build hook
 RUN SHOTGUN_POSTHOG_API_KEY="${SHOTGUN_POSTHOG_API_KEY}" \
     SHOTGUN_POSTHOG_PROJECT_ID="${SHOTGUN_POSTHOG_PROJECT_ID}" \
-    SHOTGUN_LOGFIRE_ENABLED="${SHOTGUN_LOGFIRE_ENABLED}" \
-    SHOTGUN_LOGFIRE_TOKEN="${SHOTGUN_LOGFIRE_TOKEN}" \
     SHOTGUN_BUILD_REQUIRE_VALIDATION="${SHOTGUN_BUILD_REQUIRE_VALIDATION}" \
     uv sync --frozen --no-dev
 
