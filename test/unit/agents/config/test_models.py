@@ -7,6 +7,8 @@ from shotgun.agents.config.models import (
     ModelName,
     OllamaConfig,
     ProviderType,
+    get_valid_model_names,
+    resolve_model_name,
 )
 
 
@@ -105,3 +107,55 @@ def test_model_config_with_base_url():
     assert config.base_url == "http://localhost:11434/v1"
     assert config.name == "qwen3:32b"
     assert config.provider == ProviderType.OPENAI_COMPATIBLE
+
+
+def test_resolve_model_name_exact_match():
+    """Test resolve_model_name with exact enum value."""
+    assert resolve_model_name("claude-sonnet-4-6") == ModelName.CLAUDE_SONNET_4_6
+    assert resolve_model_name("gpt-5.2") == ModelName.GPT_5_2
+    assert (
+        resolve_model_name("gemini-3.1-pro-preview") == ModelName.GEMINI_3_1_PRO_PREVIEW
+    )
+
+
+def test_resolve_model_name_provider_prefixed():
+    """Test resolve_model_name with provider-prefixed format."""
+    assert (
+        resolve_model_name("anthropic/claude-sonnet-4-6") == ModelName.CLAUDE_SONNET_4_6
+    )
+    assert resolve_model_name("openai/gpt-5.2") == ModelName.GPT_5_2
+
+
+def test_resolve_model_name_litellm_format():
+    """Test resolve_model_name with LiteLLM format."""
+    assert (
+        resolve_model_name("gemini/gemini-3.1-pro-preview")
+        == ModelName.GEMINI_3_1_PRO_PREVIEW
+    )
+    assert (
+        resolve_model_name("gemini/gemini-3-flash-preview")
+        == ModelName.GEMINI_3_FLASH_PREVIEW
+    )
+
+
+def test_resolve_model_name_openrouter_format():
+    """Test resolve_model_name with OpenRouter format (different from LiteLLM for Google)."""
+    assert (
+        resolve_model_name("google/gemini-3.1-pro-preview")
+        == ModelName.GEMINI_3_1_PRO_PREVIEW
+    )
+
+
+def test_resolve_model_name_unknown_returns_none():
+    """Test resolve_model_name returns None for unknown models."""
+    assert resolve_model_name("fake-model-999") is None
+    assert resolve_model_name("unknown/model") is None
+    assert resolve_model_name("") is None
+
+
+def test_get_valid_model_names_returns_all_values():
+    """Test get_valid_model_names returns all ModelName values."""
+    valid = get_valid_model_names()
+    assert len(valid) == len(ModelName)
+    for model_name in ModelName:
+        assert model_name.value in valid

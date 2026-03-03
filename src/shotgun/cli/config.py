@@ -247,6 +247,76 @@ def _mask_value(value: str) -> str:
     return f"{value[:4]}{'•' * (len(value) - 8)}{value[-4:]}"
 
 
+@app.command(name="set-model")
+def set_model(
+    model_name: Annotated[
+        str,
+        typer.Argument(help="Model name to set as default (e.g., claude-sonnet-4-6)"),
+    ],
+) -> None:
+    """Set the default model for Shotgun.
+
+    Accepts model names in multiple formats:
+      - Direct: claude-sonnet-4-6, gpt-5.2
+      - Provider-prefixed: anthropic/claude-sonnet-4-6
+      - LiteLLM format: gemini/gemini-3.1-pro-preview
+    """
+    from shotgun.agents.config.models import (
+        MODEL_SPECS,
+        ProviderType,
+        get_valid_model_names,
+        resolve_model_name,
+    )
+    from shotgun.agents.config.provider import _get_api_key, _has_provider_key
+
+    resolved = resolve_model_name(model_name)
+    if resolved is None:
+        valid_names = get_valid_model_names()
+        console.print(
+            f"[red]Unknown model: '{model_name}'[/red]\n\n"
+            f"[bold]Valid models:[/bold] {', '.join(valid_names)}"
+        )
+        raise typer.Exit(1)
+
+    # Validate that an API key is available for this model
+    config_manager = get_config_manager()
+    config = asyncio.run(config_manager.load())
+    spec = MODEL_SPECS[resolved]
+
+    # Check key availability in priority order
+    has_key = False
+    # 1. BYOK key for the model's provider
+    if _has_provider_key(config, spec.provider):
+        has_key = True
+    # 2. Shotgun Account key
+    elif _get_api_key(config.shotgun.api_key):
+        has_key = True
+    # 3. OpenRouter key
+    elif _get_api_key(config.openrouter.api_key, "OPENROUTER_API_KEY"):
+        has_key = True
+
+    if not has_key:
+        env_var_map = {
+            ProviderType.OPENAI: "OPENAI_API_KEY",
+            ProviderType.ANTHROPIC: "ANTHROPIC_API_KEY",
+            ProviderType.GOOGLE: "GEMINI_API_KEY",
+        }
+        env_var = env_var_map.get(spec.provider, "")
+        console.print(
+            f"[red]No API key available for {spec.provider.value} to use {resolved.value}.[/red]\n\n"
+            f"Set it via: [bold]shotgun config set {spec.provider.value} --api-key <key>[/bold]"
+            + (
+                f" or set the [bold]{env_var}[/bold] environment variable."
+                if env_var
+                else "."
+            )
+        )
+        raise typer.Exit(1)
+
+    asyncio.run(config_manager.update_selected_model(resolved))
+    console.print(f"[green]Default model set to:[/green] [bold]{resolved.value}[/bold]")
+
+
 @app.command(name="set-context7")
 def set_context7(
     api_key: Annotated[

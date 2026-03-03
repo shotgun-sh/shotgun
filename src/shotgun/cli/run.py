@@ -42,7 +42,7 @@ def run(
         typer.Option(
             "--model",
             "-m",
-            help="Model name to use (requires SHOTGUN_OPENAI_COMPAT_BASE_URL to be set)",
+            help="Model name to use (e.g., claude-sonnet-4-6, gpt-5.2)",
         ),
     ] = None,
 ) -> None:
@@ -53,11 +53,31 @@ def run(
     """
     logger.info("Running prompt: %s", prompt[:100])
 
-    # If --model is specified, set it for OpenAI-compatible mode
+    # If --model is specified, resolve and apply the override
     if model:
-        from shotgun.agents.config.provider import set_openai_compat_model
+        from shotgun.agents.config.models import (
+            get_valid_model_names,
+            resolve_model_name,
+        )
+        from shotgun.agents.config.provider import (
+            set_general_model_override,
+            set_openai_compat_model,
+        )
+        from shotgun.settings import settings
 
-        set_openai_compat_model(model)
+        resolved = resolve_model_name(model)
+        if resolved is not None:
+            set_general_model_override(resolved)
+        elif settings.openai_compat.base_url:
+            # Unknown model but OpenAI-compat is active — backward compatible
+            set_openai_compat_model(model)
+        else:
+            valid_names = get_valid_model_names()
+            print(
+                f"Error: Unknown model '{model}'.\n"
+                f"Valid models: {', '.join(valid_names)}"
+            )
+            raise typer.Exit(1)
 
     try:
         asyncio.run(async_run(prompt, non_interactive, provider))

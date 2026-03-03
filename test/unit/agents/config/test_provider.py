@@ -1,13 +1,15 @@
-"""Tests for provider model cache behavior."""
+"""Tests for provider model cache behavior and model override."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shotgun.agents.config.models import KeyProvider, ProviderType
+from shotgun.agents.config.models import KeyProvider, ModelName, ProviderType
 from shotgun.agents.config.provider import (
     _MAX_MODEL_CACHE_SIZE,
+    _has_provider_key,
     get_or_create_model,
+    set_general_model_override,
 )
 
 
@@ -104,3 +106,42 @@ def test_evicted_entry_is_recreated():
 
 def test_max_cache_size_is_reasonable():
     assert _MAX_MODEL_CACHE_SIZE == 8
+
+
+def test_set_general_model_override_sets_and_clears():
+    """Test that set_general_model_override sets and clears the global."""
+    import shotgun.agents.config.provider as provider_module
+
+    # Set override
+    set_general_model_override(ModelName.CLAUDE_SONNET_4_6)
+    assert provider_module._general_model_override == ModelName.CLAUDE_SONNET_4_6
+
+    # Clear override
+    set_general_model_override(None)
+    assert provider_module._general_model_override is None
+
+
+def test_has_provider_key_checks_env_vars():
+    """Test that _has_provider_key checks environment variables."""
+    from shotgun.agents.config.models import ShotgunConfig
+
+    config = ShotgunConfig(shotgun_instance_id="test-id")
+
+    # No keys in config or env
+    with patch.dict("os.environ", {}, clear=True):
+        assert _has_provider_key(config, ProviderType.OPENAI) is False
+        assert _has_provider_key(config, ProviderType.ANTHROPIC) is False
+        assert _has_provider_key(config, ProviderType.GOOGLE) is False
+
+    # Keys in env vars only
+    with patch.dict(
+        "os.environ",
+        {
+            "OPENAI_API_KEY": "sk-test",
+            "ANTHROPIC_API_KEY": "sk-ant-test",
+            "GEMINI_API_KEY": "gm-test",
+        },
+    ):
+        assert _has_provider_key(config, ProviderType.OPENAI) is True
+        assert _has_provider_key(config, ProviderType.ANTHROPIC) is True
+        assert _has_provider_key(config, ProviderType.GOOGLE) is True
