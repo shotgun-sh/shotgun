@@ -867,6 +867,13 @@ class AgentManager(Widget):
         if deps is None:
             raise ValueError("AgentDeps must be provided")
 
+        # Back up .shotgun/ artifacts before each agent run
+        from shotgun.agents.backup import backup_artifacts, cleanup_old_backups
+        from shotgun.utils.file_system_utils import get_shotgun_base_path
+
+        backup_artifacts(get_shotgun_base_path())
+        cleanup_old_backups()
+
         # Clear file tracker before each run to track only this run's operations
         deps.file_tracker.clear()
 
