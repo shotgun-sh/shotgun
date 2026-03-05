@@ -1450,7 +1450,7 @@ class AgentManager(Widget):
         if self._last_backup_path:
             self.ui_message_history.append(
                 HintMessage(
-                    message=f"Your specs were backed up to `{self._last_backup_path}`",
+                    message=f"The original specs were backed up to `{self._last_backup_path}`",
                     compact=True,
                 )
             )
