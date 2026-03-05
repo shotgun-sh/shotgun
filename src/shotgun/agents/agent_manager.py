@@ -398,6 +398,9 @@ class AgentManager(Widget):
         # Sub-agent streaming responses to persist in UI history
         self._sub_agent_messages: list[ModelResponse] = []
 
+        # Last backup path from pre-agent backup (displayed alongside file changes)
+        self._last_backup_path: Path | None = None
+
     async def _ensure_agents_initialized(self) -> None:
         """Ensure all agents are initialized (lazy initialization)."""
         if self._agents_initialized:
@@ -871,15 +874,8 @@ class AgentManager(Widget):
         from shotgun.agents.backup import backup_artifacts, cleanup_old_backups
         from shotgun.utils.file_system_utils import get_shotgun_base_path
 
-        backup_path = backup_artifacts(get_shotgun_base_path())
+        self._last_backup_path = backup_artifacts(get_shotgun_base_path())
         cleanup_old_backups()
-        if backup_path:
-            self.add_hint_message(
-                HintMessage(
-                    message=f"Your specs are backed up to `{backup_path}`",
-                    compact=True,
-                )
-            )
 
         # Clear file tracker before each run to track only this run's operations
         deps.file_tracker.clear()
@@ -1449,6 +1445,15 @@ class AgentManager(Widget):
 
         # Prune old hint/welcome messages to prevent unbounded UI history growth
         self._prune_ui_message_history()
+
+        # Show backup path hint after the run completes
+        if self._last_backup_path:
+            self.ui_message_history.append(
+                HintMessage(
+                    message=f"Your specs were backed up to `{self._last_backup_path}`",
+                    compact=True,
+                )
+            )
 
         # Post final UI update after compaction completes
         # This ensures widgets that depend on message_history (like context indicator)

@@ -12,7 +12,7 @@ def test_backup_creates_timestamped_directory(tmp_path: Path):
     (shotgun_dir / "tasks.md").write_text("# Tasks")
 
     # Point backups to tmp_path
-    backup_base = tmp_path / "backups" / "pre-agent"
+    backup_base = tmp_path / "backups" / "specs"
 
     import shotgun.agents.backup as backup_mod
 
@@ -45,7 +45,7 @@ def test_backup_preserves_subdirectory_structure(tmp_path: Path):
     (shotgun_dir / "research" / "notes.md").write_text("Research notes")
     (shotgun_dir / "specification.md").write_text("Top-level spec")
 
-    backup_base = tmp_path / "backups" / "pre-agent"
+    backup_base = tmp_path / "backups" / "specs"
 
     import shotgun.agents.backup as backup_mod
 
@@ -86,7 +86,7 @@ def test_backup_skips_when_only_subdirs_no_files(tmp_path: Path):
 
 
 def test_cleanup_deletes_oldest_backups(tmp_path: Path):
-    backup_base = tmp_path / "backups" / "pre-agent"
+    backup_base = tmp_path / "backups" / "specs"
     backup_base.mkdir(parents=True)
 
     # Create 5 backup dirs with sequential timestamps
@@ -111,7 +111,7 @@ def test_cleanup_deletes_oldest_backups(tmp_path: Path):
 
 
 def test_cleanup_noop_when_under_limit(tmp_path: Path):
-    backup_base = tmp_path / "backups" / "pre-agent"
+    backup_base = tmp_path / "backups" / "specs"
     backup_base.mkdir(parents=True)
 
     for i in range(3):

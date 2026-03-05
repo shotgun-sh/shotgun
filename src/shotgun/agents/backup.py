@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 def _get_backup_base_dir() -> Path:
     """Get the base directory for pre-agent backups."""
-    return get_shotgun_home() / "backups" / "pre-agent"
+    return get_shotgun_home() / "backups" / "specs"
 
 
 def backup_artifacts(shotgun_dir: Path) -> Path | None:
