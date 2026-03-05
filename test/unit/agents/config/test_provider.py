@@ -78,7 +78,7 @@ def test_evicted_entry_is_recreated():
     with patch(
         "shotgun.agents.config.provider._create_openai_compat_model",
         return_value=mock_model,
-    ) as mock_create:
+    ):
         # Fill cache beyond max to evict model-0
         for i in range(_MAX_MODEL_CACHE_SIZE + 1):
             get_or_create_model(

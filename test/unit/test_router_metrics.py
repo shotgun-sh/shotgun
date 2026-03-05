@@ -72,7 +72,6 @@ async def test_plan_created_metric(mock_ctx):
             "plan_created",
             {
                 "step_count": 2,
-                "goal_preview": "Test goal for the plan",
                 "requires_approval": True,
                 "router_mode": "planning",
             },

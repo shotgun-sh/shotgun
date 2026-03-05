@@ -14,10 +14,15 @@ from shotgun.agents.tools.web_search import (
 )
 
 
-def _mock_config(shotgun_api_key: str | None = None, selected_model=None):
+def _mock_config(
+    shotgun_api_key: str | None = None,
+    openrouter_api_key: str | None = None,
+    selected_model=None,
+):
     """Create a mock config with the given settings."""
     config = Mock()
     config.shotgun.api_key = shotgun_api_key
+    config.openrouter.api_key = openrouter_api_key
     config.selected_model = selected_model
     return config
 
