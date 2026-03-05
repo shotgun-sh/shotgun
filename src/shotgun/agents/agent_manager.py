@@ -871,8 +871,15 @@ class AgentManager(Widget):
         from shotgun.agents.backup import backup_artifacts, cleanup_old_backups
         from shotgun.utils.file_system_utils import get_shotgun_base_path
 
-        backup_artifacts(get_shotgun_base_path())
+        backup_path = backup_artifacts(get_shotgun_base_path())
         cleanup_old_backups()
+        if backup_path:
+            self.add_hint_message(
+                HintMessage(
+                    message=f"Your specs are backed up to `{backup_path}`",
+                    compact=True,
+                )
+            )
 
         # Clear file tracker before each run to track only this run's operations
         deps.file_tracker.clear()
