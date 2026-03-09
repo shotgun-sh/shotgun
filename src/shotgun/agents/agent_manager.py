@@ -722,10 +722,14 @@ class AgentManager(Widget):
 
         config_manager = get_config_manager()
         context7_key = await config_manager.get_context7_api_key()
+        user_mcp_servers = await config_manager.get_mcp_servers()
 
-        return {
+        result: dict[str, bool] = {
             "context7": context7_key is not None,
         }
+        for server in user_mcp_servers:
+            result[server.name] = True
+        return result
 
     def _create_merged_deps(self, agent_type: AgentType) -> AgentDeps:
         """Create merged dependencies combining shared and agent-specific deps.

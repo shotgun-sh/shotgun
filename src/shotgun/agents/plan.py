@@ -18,6 +18,7 @@ from .common import (
     run_agent,
 )
 from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
+from .tools.mcp_servers import get_user_mcp_servers
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,10 @@ async def create_plan_agent(
     # Use partial to create system prompt function for plan agent
     system_prompt_fn = partial(build_agent_system_prompt, "plan")
 
+    # Load user-configured MCP servers
+    user_servers = await get_user_mcp_servers()
+    mcp_servers = user_servers or None
+
     agent, deps = await create_base_agent(
         system_prompt_fn,
         agent_runtime_options,
@@ -49,6 +54,7 @@ async def create_plan_agent(
         provider=provider,
         agent_mode=AgentType.PLAN,
         for_sub_agent=for_sub_agent,
+        mcp_servers=mcp_servers,
     )
     return agent, deps
 
@@ -80,14 +86,15 @@ async def run_plan_agent(
 
         message_history = await add_system_status_message(deps, message_history)
 
-        result = await run_agent(
-            agent=agent,
-            prompt=prompt,
-            deps=deps,
-            message_history=message_history,
-            usage_limits=usage_limits,
-            event_stream_handler=event_stream_handler,
-        )
+        async with agent:
+            result = await run_agent(
+                agent=agent,
+                prompt=prompt,
+                deps=deps,
+                message_history=message_history,
+                usage_limits=usage_limits,
+                event_stream_handler=event_stream_handler,
+            )
 
         logger.debug("✅ Planning completed successfully")
         return result

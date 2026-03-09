@@ -211,6 +211,8 @@ def test_build_agent_system_prompt_research_agent():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_mcp_servers = False
+    mock_context.deps.mcp_server_names = []
     mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
@@ -230,6 +232,8 @@ def test_build_agent_system_prompt_research_agent():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_mcp_servers=False,
+            mcp_server_names=[],
             has_codebase_indexed=False,
         )
 
@@ -246,6 +250,8 @@ def test_build_agent_system_prompt_custom_context():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_mcp_servers = False
+    mock_context.deps.mcp_server_names = []
     mock_context.deps.has_codebase_indexed = True
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
@@ -265,6 +271,8 @@ def test_build_agent_system_prompt_custom_context():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_mcp_servers=False,
+            mcp_server_names=[],
             has_codebase_indexed=True,
         )
 
@@ -281,6 +289,8 @@ def test_build_agent_system_prompt_unknown_agent_type():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_mcp_servers = False
+    mock_context.deps.mcp_server_names = []
     mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
@@ -300,6 +310,8 @@ def test_build_agent_system_prompt_unknown_agent_type():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_mcp_servers=False,
+            mcp_server_names=[],
             has_codebase_indexed=False,
         )
 
@@ -314,6 +326,8 @@ def test_build_agent_system_prompt_includes_impact_analysis_when_indexed():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_mcp_servers = False
+    mock_context.deps.mcp_server_names = []
     mock_context.deps.has_codebase_indexed = True
 
     # Render actual templates (no mocking PromptLoader) to verify conditional blocks
@@ -332,6 +346,8 @@ def test_build_agent_system_prompt_excludes_impact_analysis_when_not_indexed():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_mcp_servers = False
+    mock_context.deps.mcp_server_names = []
     mock_context.deps.has_codebase_indexed = False
 
     result = build_agent_system_prompt("plan", mock_context)

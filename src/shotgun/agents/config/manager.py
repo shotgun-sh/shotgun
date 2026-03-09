@@ -25,6 +25,7 @@ from .models import (
     MODEL_SPECS,
     AnthropicConfig,
     GoogleConfig,
+    MCPServerEntry,
     ModelName,
     OpenAIConfig,
     OpenRouterConfig,
@@ -61,7 +62,7 @@ ProviderConfig = (
 )
 
 # Current config version
-CURRENT_CONFIG_VERSION = 12
+CURRENT_CONFIG_VERSION = 13
 
 # Backup directory name
 BACKUP_DIR_NAME = "backup"
@@ -342,6 +343,20 @@ def _migrate_v11_to_v12(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _migrate_v12_to_v13(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate config from version 12 to version 13.
+
+    Changes:
+    - Add 'mcp_servers' list for user-configured MCP servers
+    """
+    if "mcp_servers" not in data:
+        data["mcp_servers"] = []
+        logger.info("Migrated config v12->v13: added mcp_servers configuration")
+
+    data["config_version"] = 13
+    return data
+
+
 def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
     """Apply all necessary migrations to bring config to current version.
 
@@ -369,6 +384,7 @@ def _apply_migrations(data: dict[str, Any]) -> dict[str, Any]:
         9: _migrate_v9_to_v10,
         10: _migrate_v10_to_v11,
         11: _migrate_v11_to_v12,
+        12: _migrate_v12_to_v13,
     }
 
     # Apply migrations sequentially
@@ -1044,6 +1060,49 @@ class ConfigManager:
             return None
         value = config.context7.api_key.get_secret_value()
         return value if value and value.strip() else None
+
+    async def get_mcp_servers(self) -> list[MCPServerEntry]:
+        """Get configured MCP servers.
+
+        Returns:
+            List of configured MCP server entries
+        """
+        config = await self.load(force_reload=False)
+        return config.mcp_servers
+
+    async def add_mcp_server(self, entry: MCPServerEntry) -> None:
+        """Add an MCP server to the configuration.
+
+        Args:
+            entry: MCP server entry to add
+
+        Raises:
+            ValueError: If a server with the same name already exists
+        """
+        config = await self.load()
+        if any(s.name == entry.name for s in config.mcp_servers):
+            raise ValueError(f"MCP server '{entry.name}' already exists")
+        config.mcp_servers.append(entry)
+        await self.save(config)
+        logger.info("Added MCP server: %s", entry.name)
+
+    async def remove_mcp_server(self, name: str) -> bool:
+        """Remove an MCP server from the configuration.
+
+        Args:
+            name: Name of the MCP server to remove
+
+        Returns:
+            True if the server was found and removed, False otherwise
+        """
+        config = await self.load()
+        original_count = len(config.mcp_servers)
+        config.mcp_servers = [s for s in config.mcp_servers if s.name != name]
+        if len(config.mcp_servers) < original_count:
+            await self.save(config)
+            logger.info("Removed MCP server: %s", name)
+            return True
+        return False
 
     async def is_ollama_enabled(self) -> bool:
         """Check if Ollama is enabled in configuration.

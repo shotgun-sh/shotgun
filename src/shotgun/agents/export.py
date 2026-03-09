@@ -18,6 +18,7 @@ from .common import (
     run_agent,
 )
 from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
+from .tools.mcp_servers import get_user_mcp_servers
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,10 @@ async def create_export_agent(
     # Use partial to create system prompt function for export agent
     system_prompt_fn = partial(build_agent_system_prompt, "export")
 
+    # Load user-configured MCP servers
+    user_servers = await get_user_mcp_servers()
+    mcp_servers = user_servers or None
+
     agent, deps = await create_base_agent(
         system_prompt_fn,
         agent_runtime_options,
@@ -48,6 +53,7 @@ async def create_export_agent(
         provider=provider,
         agent_mode=AgentType.EXPORT,
         for_sub_agent=for_sub_agent,
+        mcp_servers=mcp_servers,
     )
     return agent, deps
 
@@ -79,14 +85,15 @@ async def run_export_agent(
         # Create usage limits for responsible API usage
         usage_limits = create_usage_limits()
 
-        result = await run_agent(
-            agent=agent,
-            prompt=prompt,
-            deps=deps,
-            message_history=message_history,
-            usage_limits=usage_limits,
-            event_stream_handler=event_stream_handler,
-        )
+        async with agent:
+            result = await run_agent(
+                agent=agent,
+                prompt=prompt,
+                deps=deps,
+                message_history=message_history,
+                usage_limits=usage_limits,
+                event_stream_handler=event_stream_handler,
+            )
 
         logger.debug("✅ Export completed successfully")
         return result

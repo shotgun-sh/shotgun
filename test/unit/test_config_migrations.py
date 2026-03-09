@@ -21,6 +21,7 @@ from shotgun.agents.config.manager import (
     _migrate_v7_to_v8,
     _migrate_v9_to_v10,
     _migrate_v11_to_v12,
+    _migrate_v12_to_v13,
     get_backup_dir,
 )
 from shotgun.agents.config.models import ProviderType, ShotgunConfig
@@ -170,6 +171,23 @@ V12_CONFIG = {
     "config_version": 12,
     "shown_welcome_screen": False,
     "marketing": {"messages": {}},
+    "router_mode": "planning",
+}
+
+V13_CONFIG = {
+    "openai": {"api_key": "sk-test123", "supports_streaming": None},
+    "anthropic": {"api_key": None, "tier": None},
+    "google": {"api_key": None},
+    "shotgun": {"api_key": None, "supabase_jwt": None},
+    "openrouter": {},
+    "ollama": {"enabled": False, "base_url": "http://localhost:11434"},
+    "context7": {},
+    "selected_model": "gpt-5",
+    "shotgun_instance_id": "test-user-id-12345",
+    "config_version": 13,
+    "shown_welcome_screen": False,
+    "marketing": {"messages": {}},
+    "mcp_servers": [],
     "router_mode": "planning",
 }
 
@@ -350,12 +368,12 @@ def test_apply_migrations_from_v4_to_current():
 
 def test_apply_migrations_already_current():
     """Test applying migrations when already at current version."""
-    config = V12_CONFIG.copy()
+    config = V13_CONFIG.copy()
 
     result = _apply_migrations(config)
 
     assert result["config_version"] == CURRENT_CONFIG_VERSION
-    assert result == V12_CONFIG  # Should be unchanged
+    assert result == V13_CONFIG  # Should be unchanged
 
 
 def test_apply_migrations_sequential():
@@ -842,7 +860,7 @@ async def test_load_creates_backup_only_when_migration_needed():
         config_path = Path(tmpdir) / "config.json"
 
         # Create a current version config (no migration needed)
-        current_config = V12_CONFIG.copy()
+        current_config = V13_CONFIG.copy()
         config_path.write_text(json.dumps(current_config))
 
         manager = ConfigManager(config_path=config_path)
@@ -1070,3 +1088,24 @@ def test_migrate_v11_to_v12_preserves_other_models():
 
     assert result["config_version"] == 12
     assert result["selected_model"] == "claude-opus-4-6"
+
+
+def test_migrate_v12_to_v13_adds_mcp_servers():
+    """Test v12->v13 migration adds mcp_servers field."""
+    config = V12_CONFIG.copy()
+
+    result = _migrate_v12_to_v13(config)
+
+    assert result["config_version"] == 13
+    assert result["mcp_servers"] == []
+
+
+def test_migrate_v12_to_v13_preserves_existing_mcp_servers():
+    """Test v12->v13 migration preserves existing mcp_servers."""
+    config = V12_CONFIG.copy()
+    config["mcp_servers"] = [{"name": "test", "transport": "stdio", "command": "echo"}]
+
+    result = _migrate_v12_to_v13(config)
+
+    assert result["config_version"] == 13
+    assert len(result["mcp_servers"]) == 1

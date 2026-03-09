@@ -77,6 +77,14 @@ class AgentSystemPromptContext(BaseModel):
         default=False,
         description="Whether Context7 MCP server is available for documentation lookup",
     )
+    has_mcp_servers: bool = Field(
+        default=False,
+        description="Whether user-configured MCP servers are available",
+    )
+    mcp_server_names: list[str] = Field(
+        default_factory=list,
+        description="Names of user-configured MCP servers",
+    )
     has_codebase_indexed: bool = Field(
         default=False,
         description="Whether any codebase graphs are indexed and available",
@@ -428,6 +436,16 @@ class AgentDeps(AgentRuntimeOptions):
     has_context7: bool = Field(
         default=False,
         description="Whether Context7 MCP server is available for documentation lookup",
+    )
+
+    has_mcp_servers: bool = Field(
+        default=False,
+        description="Whether user-configured MCP servers are available",
+    )
+
+    mcp_server_names: list[str] = Field(
+        default_factory=list,
+        description="Names of user-configured MCP servers",
     )
 
     has_codebase_indexed: bool = Field(

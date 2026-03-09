@@ -29,6 +29,7 @@ from shotgun.cli import (
     config,
     context,
     feedback,
+    mcp,
     run,
     spec,
     update,
@@ -91,6 +92,7 @@ app.add_typer(run.app, name="run", help="Run a prompt using the Router agent")
 app.add_typer(update.app, name="update", help="Check for and install updates")
 app.add_typer(feedback.app, name="feedback", help="Send us feedback")
 app.add_typer(spec.app, name="spec", help="Manage shared specifications")
+app.add_typer(mcp.app, name="mcp", help="Manage MCP servers (experimental)")
 
 
 def version_callback(value: bool) -> None:
