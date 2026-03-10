@@ -104,6 +104,8 @@ async def build_welcome_state() -> WelcomeMessage:
     frontier_models = {
         ModelName.CLAUDE_OPUS_4_6,
         ModelName.GPT_5_2,
+        ModelName.GPT_5_4,
+        ModelName.GPT_5_4_PRO,
         ModelName.GEMINI_3_1_PRO_PREVIEW,
     }
 
