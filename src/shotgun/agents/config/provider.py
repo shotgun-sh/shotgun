@@ -688,6 +688,8 @@ async def get_provider_model(
         if model_name in (
             ModelName.GPT_5_1,
             ModelName.GPT_5_2,
+            ModelName.GPT_5_4,
+            ModelName.GPT_5_4_PRO,
         ):
             # Check if streaming capability has been tested
             streaming_capability = config.openai.supports_streaming
