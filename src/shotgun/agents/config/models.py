@@ -45,7 +45,6 @@ class ModelName(StrEnum):
     GPT_5_1 = "gpt-5.1"
     GPT_5_2 = "gpt-5.2"
     GPT_5_4 = "gpt-5.4"
-    GPT_5_4_PRO = "gpt-5.4-pro"
     CLAUDE_OPUS_4_6 = "claude-opus-4-6"
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5"
@@ -192,15 +191,6 @@ MODEL_SPECS: dict[ModelName, ModelSpec] = {
         openrouter_model_name="openai/gpt-5.4",
         short_name="GPT-5.4",
     ),
-    ModelName.GPT_5_4_PRO: ModelSpec(
-        name=ModelName.GPT_5_4_PRO,
-        provider=ProviderType.OPENAI,
-        max_input_tokens=272_000,
-        max_output_tokens=128_000,
-        litellm_proxy_model_name="openai/gpt-5.4-pro",
-        openrouter_model_name="openai/gpt-5.4-pro",
-        short_name="GPT-5.4 Pro",
-    ),
     ModelName.CLAUDE_SONNET_4_6: ModelSpec(
         name=ModelName.CLAUDE_SONNET_4_6,
         provider=ProviderType.ANTHROPIC,
@@ -275,7 +265,6 @@ SUB_AGENT_MODEL_MAPPINGS: dict[ModelName, ModelName] = {
     # OpenAI: premium models use 5.1 for sub-agents
     ModelName.GPT_5_2: ModelName.GPT_5_1,
     ModelName.GPT_5_4: ModelName.GPT_5_1,
-    ModelName.GPT_5_4_PRO: ModelName.GPT_5_1,
 }
 
 
