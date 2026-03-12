@@ -38,6 +38,7 @@ from shotgun.agents.router.tools.delegation_tools import (
     prepare_delegation_tool,
 )
 from shotgun.agents.tools import read_file
+from shotgun.agents.tools.mcp_servers import get_user_mcp_servers
 from shotgun.logging_config import get_logger
 from shotgun.sdk.services import get_codebase_service
 from shotgun.utils import ensure_shotgun_directory_exists
@@ -80,6 +81,15 @@ async def create_router_agent(
         logger.error("Failed to load configured model for router: %s", e)
         raise ValueError("Configured model is required for router agent") from e
 
+    # Load user-configured MCP servers
+    user_mcp_servers = await get_user_mcp_servers()
+    if user_mcp_servers:
+        logger.info(
+            "Router agent configured with %d user MCP server(s)",
+            len(user_mcp_servers),
+        )
+    mcp_servers = user_mcp_servers or None
+
     # Create RouterDeps (extends AgentDeps with router-specific state)
     codebase_service = get_codebase_service()
     system_prompt_fn = partial(build_agent_system_prompt, "router")
@@ -91,6 +101,13 @@ async def create_router_agent(
         system_prompt_fn=system_prompt_fn,
         agent_mode=AgentType.ROUTER,
     )
+
+    # Track MCP server availability in deps for system prompt context
+    if mcp_servers:
+        for server in mcp_servers:
+            if hasattr(server, "tool_prefix") and server.tool_prefix:
+                deps.mcp_server_names.append(server.tool_prefix)
+        deps.has_mcp_servers = len(deps.mcp_server_names) > 0
 
     # Create history processor with access to deps via closure
     async def history_processor(messages: list[ModelMessage]) -> list[ModelMessage]:
@@ -123,6 +140,7 @@ async def create_router_agent(
         history_processors=[history_processor],
         retries=3,
         tools=delegation_tools,
+        toolsets=mcp_servers or None,
         model_settings=ANTHROPIC_ROUTER_CACHE_SETTINGS,
     )
 
