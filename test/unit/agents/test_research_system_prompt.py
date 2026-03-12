@@ -20,6 +20,8 @@ def mock_context():
     context.deps.llm_model.supports_pdf = True
     context.deps.llm_model.supports_images = True
     context.deps.has_context7 = False
+    context.deps.has_mcp_servers = False
+    context.deps.mcp_server_names = []
     context.deps.has_codebase_indexed = False
     return context
 
@@ -73,6 +75,8 @@ def test_research_system_prompt_template_loading():
     mock_context.deps.llm_model.supports_pdf = True
     mock_context.deps.llm_model.supports_images = True
     mock_context.deps.has_context7 = False
+    mock_context.deps.has_mcp_servers = False
+    mock_context.deps.mcp_server_names = []
     mock_context.deps.has_codebase_indexed = False
 
     with patch("shotgun.agents.common.PromptLoader") as mock_loader_class:
@@ -92,6 +96,8 @@ def test_research_system_prompt_template_loading():
             supports_pdf=True,
             supports_images=True,
             has_context7=False,
+            has_mcp_servers=False,
+            mcp_server_names=[],
             has_codebase_indexed=False,
         )
         assert result == "Test system prompt"

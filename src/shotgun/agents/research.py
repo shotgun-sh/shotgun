@@ -22,6 +22,7 @@ from .common import (
 from .models import AgentDeps, AgentResponse, AgentRuntimeOptions, AgentType
 from .tools import get_available_web_search_tools
 from .tools.context7 import get_context7_mcp_server
+from .tools.mcp_servers import get_user_mcp_servers
 
 logger = get_logger(__name__)
 
@@ -55,9 +56,19 @@ async def create_research_agent(
 
     # Check for Context7 MCP server
     context7_server = await get_context7_mcp_server()
-    mcp_servers = [context7_server] if context7_server else None
     if context7_server:
         logger.info("Research agent configured with Context7 documentation lookup")
+
+    # Load user-configured MCP servers
+    user_servers = await get_user_mcp_servers()
+    if user_servers:
+        logger.info(
+            "Research agent configured with %d user MCP server(s)", len(user_servers)
+        )
+
+    # Merge all MCP servers
+    all_mcp = [s for s in [context7_server, *user_servers] if s]
+    mcp_servers = all_mcp or None
 
     # Use partial to create system prompt function for research agent
     system_prompt_fn = partial(build_agent_system_prompt, "research")

@@ -249,10 +249,25 @@ async def create_base_agent(
             agent_mode=agent_mode,
         )
 
-        # TODO: This assumes all MCP servers are Context7. When adding other MCP
-        # servers, check specifically for Context7 rather than any MCP server.
+        # Track MCP server availability in deps
         if mcp_servers:
-            deps.has_context7 = True
+            from pydantic_ai.mcp import MCPServerStreamableHTTP
+
+            from shotgun.agents.tools.context7 import CONTEXT7_MCP_URL
+
+            for server in mcp_servers:
+                # Check if this is the Context7 server specifically
+                if (
+                    isinstance(server, MCPServerStreamableHTTP)
+                    and hasattr(server, "url")
+                    and server.url == CONTEXT7_MCP_URL
+                ):
+                    deps.has_context7 = True
+                elif hasattr(server, "tool_prefix") and server.tool_prefix:
+                    # User-configured MCP server
+                    deps.mcp_server_names.append(server.tool_prefix)
+
+            deps.has_mcp_servers = len(deps.mcp_server_names) > 0
 
     except Exception as e:
         logger.warning("Failed to load configured model, using fallback: %s", e)
@@ -570,6 +585,8 @@ def build_agent_system_prompt(
         supports_pdf=supports_pdf,
         supports_images=supports_images,
         has_context7=has_context7,
+        has_mcp_servers=ctx.deps.has_mcp_servers,
+        mcp_server_names=ctx.deps.mcp_server_names,
         has_codebase_indexed=ctx.deps.has_codebase_indexed,
     )
 

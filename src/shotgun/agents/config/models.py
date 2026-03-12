@@ -442,6 +442,35 @@ class Context7Config(BaseModel):
     api_key: SecretStr | None = None
 
 
+class MCPTransport(StrEnum):
+    """Transport type for MCP server connections."""
+
+    STDIO = "stdio"
+    HTTP = "http"
+
+
+class MCPServerEntry(BaseModel):
+    """Configuration for a user-added MCP server."""
+
+    name: str = Field(description="Unique identifier, also used as tool_prefix")
+    transport: MCPTransport
+    # stdio fields
+    command: str | None = Field(
+        default=None, description="Command to run for stdio transport"
+    )
+    args: list[str] = Field(
+        default_factory=list, description="Arguments for the command"
+    )
+    env: dict[str, str] = Field(
+        default_factory=dict, description="Environment variables for the command"
+    )
+    # http fields
+    url: str | None = Field(default=None, description="URL for HTTP transport")
+    headers: dict[str, str] = Field(
+        default_factory=dict, description="Headers for HTTP transport"
+    )
+
+
 class MarketingMessageRecord(BaseModel):
     """Record of when a marketing message was shown to the user."""
 
@@ -474,7 +503,7 @@ class ShotgunConfig(BaseModel):
     shotgun_instance_id: str = Field(
         description="Unique shotgun instance identifier (also used for anonymous telemetry)",
     )
-    config_version: int = Field(default=12, description="Configuration schema version")
+    config_version: int = Field(default=13, description="Configuration schema version")
     shown_welcome_screen: bool = Field(
         default=False,
         description="Whether the welcome screen has been shown to the user",
@@ -490,6 +519,10 @@ class ShotgunConfig(BaseModel):
     migration_backup_path: str | None = Field(
         default=None,
         description="Path to the backup file created when migration failed",
+    )
+    mcp_servers: list[MCPServerEntry] = Field(
+        default_factory=list,
+        description="User-configured MCP servers available to all agents (experimental)",
     )
     router_mode: str = Field(
         default="planning",
