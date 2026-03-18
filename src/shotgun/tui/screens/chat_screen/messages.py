@@ -12,10 +12,12 @@ from shotgun.agents.autopilot.models import (
     ClaudeOutput,
     Stage,
 )
-from shotgun.agents.models import AgentType
+from shotgun.agents.models import AgentType, ResponseChoice
 from shotgun.agents.router.models import CascadeScope, ExecutionPlan, ExecutionStep
 
 __all__ = [
+    # Choice selector messages
+    "ChoiceSelected",
     # Step checkpoint messages (Stage 4)
     "StepCompleted",
     "CheckpointContinue",
@@ -47,6 +49,18 @@ __all__ = [
     "AutopilotStop",
     "AutopilotOutputReceived",
 ]
+
+
+class ChoiceSelected(Message):
+    """Posted when user selects a choice from the choice selector widget.
+
+    Attributes:
+        choice: The choice that was selected.
+    """
+
+    def __init__(self, choice: ResponseChoice) -> None:
+        super().__init__()
+        self.choice = choice
 
 
 class StepCompleted(Message):

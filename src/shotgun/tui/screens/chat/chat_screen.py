@@ -44,6 +44,7 @@ from textual.widgets import Static
 
 from shotgun.agents.agent_manager import (
     AgentManager,
+    ChoiceSelectorMessage,
     ClarifyingQuestionsMessage,
     CompactionCompletedMessage,
     CompactionStartedMessage,
@@ -66,6 +67,7 @@ from shotgun.agents.models import (
     AgentDeps,
     AgentType,
     FileOperationTracker,
+    ResponseChoice,
 )
 from shotgun.agents.router.models import (
     CascadeScope,
@@ -133,6 +135,7 @@ from shotgun.tui.screens.chat_screen.messages import (
     CheckpointContinue,
     CheckpointModify,
     CheckpointStop,
+    ChoiceSelected,
     PlanApprovalRequired,
     PlanApproved,
     PlanPanelClosed,
@@ -168,6 +171,7 @@ from shotgun.tui.state.processing_state import ProcessingStateManager
 from shotgun.tui.utils.mode_progress import PlaceholderHints
 from shotgun.tui.widgets.approval_widget import PlanApprovalWidget
 from shotgun.tui.widgets.cascade_confirmation_widget import CascadeConfirmationWidget
+from shotgun.tui.widgets.choice_selector_widget import ChoiceSelectorWidget
 from shotgun.tui.widgets.plan_panel import PlanPanelWidget
 from shotgun.tui.widgets.stage_approval_widget import StageApprovalWidget
 from shotgun.tui.widgets.step_checkpoint_widget import StepCheckpointWidget
@@ -238,6 +242,9 @@ class ChatScreen(Screen[None]):
 
     # Step checkpoint widget (Planning mode)
     _checkpoint_widget: StepCheckpointWidget | None = None
+
+    # Choice selector widget (agent response choices)
+    _choice_selector_widget: ChoiceSelectorWidget | None = None
 
     # Cascade confirmation widget (Planning mode)
     _cascade_widget: CascadeConfirmationWidget | None = None
@@ -2156,6 +2163,9 @@ class ChatScreen(Screen[None]):
         attachment: FileAttachment | None = None,
         file_contents: list[tuple[str, "FileContent"]] | None = None,
     ) -> None:
+        # Clean up any active choice selector before starting
+        self._hide_choice_selector()
+
         # Start processing with spinner
         from textual.worker import get_current_worker
 
@@ -2375,13 +2385,49 @@ class ChatScreen(Screen[None]):
 
     def _hide_checkpoint_widget(self) -> None:
         """Remove checkpoint widget, restore PromptInput."""
-        if hasattr(self, "_checkpoint_widget") and self._checkpoint_widget:
+        if self._checkpoint_widget:
             self._checkpoint_widget.remove()
             self._checkpoint_widget = None
 
         # Show PromptInput
         prompt_input = self.query_one(PromptInput)
         prompt_input.display = True
+
+    def _show_choice_selector(self, event: ChoiceSelectorMessage) -> None:
+        """Replace PromptInput with ChoiceSelectorWidget."""
+        self._choice_selector_widget = ChoiceSelectorWidget(event.choices)
+
+        # Hide PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = False
+
+        # Mount choice selector in footer
+        footer = self.query_one("#footer")
+        footer.mount(self._choice_selector_widget, after=prompt_input)
+
+    def _hide_choice_selector(self) -> None:
+        """Remove choice selector widget, restore PromptInput."""
+        if self._choice_selector_widget:
+            self._choice_selector_widget.remove()
+            self._choice_selector_widget = None
+
+        # Show PromptInput
+        prompt_input = self.query_one(PromptInput)
+        prompt_input.display = True
+
+    @on(ChoiceSelectorMessage)
+    def handle_choice_selector(self, event: ChoiceSelectorMessage) -> None:
+        """Handle agent returning choices for user selection."""
+        self._show_choice_selector(event)
+
+    @on(ChoiceSelected)
+    def handle_choice_selected(self, event: ChoiceSelected) -> None:
+        """Handle user selecting a choice from the selector."""
+        self._hide_choice_selector()
+        self.widget_coordinator.update_prompt_input(focus=True)
+
+        # Send the selected choice value as the next user message
+        self.run_agent(event.choice.value)
 
     def _execute_next_step(self) -> None:
         """Execute the next step in the plan."""
@@ -2497,7 +2543,7 @@ class ChatScreen(Screen[None]):
             )
             return
 
-        # Plan exists and is incomplete - show status hint
+        # Plan exists and is incomplete - show choice selector instead of text hint
         completed = sum(1 for s in plan.steps if s.done)
         total = len(plan.steps)
         remaining = [s.title for s in plan.steps if not s.done]
@@ -2512,10 +2558,28 @@ class ChatScreen(Screen[None]):
 
         hint = (
             f"📋 **Plan Status: {completed}/{total} steps complete**\n\n"
-            f"Remaining: {', '.join(remaining)}\n\n"
-            f"_Type 'continue' to resume the plan._"
+            f"Remaining: {', '.join(remaining)}"
         )
         self.mount_hint(hint)
+
+        # Show choice selector instead of "type continue"
+        choices = [
+            ResponseChoice(
+                label="Continue with plan",
+                value="continue",
+                is_default=True,
+            ),
+            ResponseChoice(
+                label="Talk about it first",
+                value="I'd like to discuss the plan before continuing.",
+            ),
+        ]
+        self._show_choice_selector(
+            ChoiceSelectorMessage(
+                choices=choices,
+                response_text=hint,
+            )
+        )
 
     # =========================================================================
     # Sub-Agent Lifecycle Handlers (Stage 8)
