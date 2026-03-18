@@ -174,5 +174,12 @@ precision = 2
 skip_covered = false
 show_missing = true
 
+[tool.uv]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+
 [tool.uv.pip]
 only-binary = ["real_ladybug"]

@@ -1,6 +1,16 @@
 version = 1
 revision = 3
 requires-python = ">=3.11, <3.14"
+resolution-markers = [
+    "(platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'linux' and sys_platform != 'win32')",
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+required-markers = [
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
+]
 
 [[package]]
 name = "ag-ui-protocol"
@@ -381,11 +391,32 @@ wheels = [
 
 [[package]]
 name = "claude-agent-sdk"
+version = "0.1.48"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+dependencies = [
+    { name = "anyio", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+    { name = "mcp", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/dd/2818538efd18ed4ef72d4775efa75bb36cbea0fa418eda51df85ee9c2424/claude_agent_sdk-0.1.48.tar.gz", hash = "sha256:ee294d3f02936c0b826119ffbefcf88c67731cf8c2d2cb7111ccc97f76344272", size = 87375, upload-time = "2026-03-07T00:21:37.087Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dc/99/55b0cd3bf54a7449e744d23cf50be104e9445cf623e1ed75722112aa6264/claude_agent_sdk-0.1.48-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:543d70acba468eccfff836965a14b8ac88cf90809aeeb88431dfcea3ee9a2fa9", size = 74583686, upload-time = "2026-03-07T00:21:28.969Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/f6/4851bd9a238b7aadba7639eb906aca7da32a51f01563fa4488469c608b3a/claude_agent_sdk-0.1.48-py3-none-win_amd64.whl", hash = "sha256:0d37e60bd2b17efc3f927dccef080f14897ab62cd1d0d67a4abc8a0e2d4f1006", size = 74956045, upload-time = "2026-03-07T00:21:33.475Z" },
+]
+
+[[package]]
+name = "claude-agent-sdk"
 version = "0.1.49"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "(platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'linux' and sys_platform != 'win32')",
+]
 dependencies = [
-    { name = "anyio" },
-    { name = "mcp" },
+    { name = "anyio", marker = "(platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'linux' and sys_platform != 'win32')" },
+    { name = "mcp", marker = "(platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'linux' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/65/08/0e33ede7b3035ba953f5a59597b8cb94ea2f3fb3124e5d6f6e255bf9c025/claude_agent_sdk-0.1.49-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a869330d4a15b12c96ae24144b8e29999ff25315267f248634986179e9536a04", size = 57620663, upload-time = "2026-03-17T00:44:27.792Z" },
@@ -2995,8 +3026,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography" },
-    { name = "jeepney" },
+    { name = "cryptography", marker = "platform_machine != 'AMD64' or sys_platform != 'win32'" },
+    { name = "jeepney", marker = "platform_machine != 'AMD64' or sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -3059,7 +3090,8 @@ source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "anthropic" },
-    { name = "claude-agent-sdk" },
+    { name = "claude-agent-sdk", version = "0.1.48", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+    { name = "claude-agent-sdk", version = "0.1.49", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'linux' and sys_platform != 'win32')" },
     { name = "dependency-injector" },
     { name = "genai-prices" },
     { name = "httpx" },
