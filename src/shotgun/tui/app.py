@@ -406,10 +406,20 @@ def run(
     storage_dir = get_shotgun_home() / "codebases"
     manager = CodebaseGraphManager(storage_dir)
 
+    # Scope the health check to the current repo's database only.
+    # This avoids locking databases belonging to other repositories,
+    # which would prevent concurrent Shotgun sessions on different repos.
+    cwd_graph_id = CodebaseGraphManager.generate_graph_id(os.getcwd())
+    check_graph_ids = [cwd_graph_id]
+
     pending_db_issues: list[DatabaseIssue] = []
     try:
-        # First pass: 10-second timeout
-        issues = asyncio.run(manager.detect_database_issues(timeout_seconds=10.0))
+        # First pass: 10-second timeout, scoped to current repo
+        issues = asyncio.run(
+            manager.detect_database_issues(
+                timeout_seconds=10.0, graph_ids=check_graph_ids
+            )
+        )
         if issues:
             # Categorize issues for logging
             for issue in issues:
@@ -494,8 +504,16 @@ def serve(
     storage_dir = get_shotgun_home() / "codebases"
     manager = CodebaseGraphManager(storage_dir)
 
+    # Scope the health check to the current repo's database only.
+    cwd_graph_id = CodebaseGraphManager.generate_graph_id(os.getcwd())
+    check_graph_ids = [cwd_graph_id]
+
     try:
-        issues = asyncio.run(manager.detect_database_issues(timeout_seconds=10.0))
+        issues = asyncio.run(
+            manager.detect_database_issues(
+                timeout_seconds=10.0, graph_ids=check_graph_ids
+            )
+        )
         if issues:
             for issue in issues:
                 logger.info(

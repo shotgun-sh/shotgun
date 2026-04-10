@@ -522,7 +522,10 @@ class ChatScreen(Screen[None]):
                 return True
 
             # locked_action == LockedDialogAction.RETRY - re-detect to see if locks are cleared
-            new_issues = await manager.detect_database_issues(timeout_seconds=10.0)
+            locked_graph_ids = [i.graph_id for i in locked_issues]
+            new_issues = await manager.detect_database_issues(
+                timeout_seconds=10.0, graph_ids=locked_graph_ids
+            )
             still_locked = [
                 i for i in new_issues if i.error_type == KuzuErrorType.LOCKED
             ]
@@ -551,9 +554,9 @@ class ChatScreen(Screen[None]):
                     )
                 )
                 if action == "retry":
-                    # Retry with longer timeout (90s)
+                    # Retry with longer timeout (90s), scoped to the specific graph
                     new_issues = await manager.detect_database_issues(
-                        timeout_seconds=90.0
+                        timeout_seconds=90.0, graph_ids=[issue.graph_id]
                     )
                     still_timeout = any(
                         i.graph_id == issue.graph_id

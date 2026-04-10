@@ -1552,26 +1552,40 @@ class CodebaseGraphManager:
             )
 
     async def detect_database_issues(
-        self, timeout_seconds: float = 10.0
+        self,
+        timeout_seconds: float = 10.0,
+        graph_ids: list[str] | None = None,
     ) -> list[DatabaseIssue]:
         """Detect issues with Kuzu databases without deleting them.
 
-        This method iterates through all .kuzu files in the storage directory,
-        attempts to open them, and returns information about any issues found.
-        Unlike cleanup_corrupted_databases(), this method does NOT delete anything -
-        it only detects and reports issues for the caller to handle.
+        This method attempts to open databases and returns information about any
+        issues found. Unlike cleanup_corrupted_databases(), this method does NOT
+        delete anything - it only detects and reports issues for the caller to
+        handle.
 
         Args:
             timeout_seconds: How long to wait for each database to respond.
                             Default is 10s; use 90s for retry with large codebases.
+            graph_ids: If provided, only check these specific graph IDs instead
+                      of scanning all databases. This avoids acquiring exclusive
+                      file locks on databases belonging to other repositories,
+                      enabling concurrent Shotgun sessions on different repos.
 
         Returns:
             List of DatabaseIssue objects describing any problems found
         """
         issues: list[DatabaseIssue] = []
 
-        for path in self.storage_dir.glob("*.kuzu"):
-            graph_id = path.stem
+        if graph_ids is not None:
+            candidates = [
+                (gid, self.storage_dir / f"{gid}.kuzu")
+                for gid in graph_ids
+                if (self.storage_dir / f"{gid}.kuzu").exists()
+            ]
+        else:
+            candidates = [(p.stem, p) for p in self.storage_dir.glob("*.kuzu")]
+
+        for graph_id, path in candidates:
             issue = await self._check_single_database(graph_id, path, timeout_seconds)
             if issue:
                 issues.append(issue)
