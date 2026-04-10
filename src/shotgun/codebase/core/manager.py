@@ -224,6 +224,55 @@ class CodebaseGraphManager:
         normalized = str(Path(repo_path).resolve())
         return hashlib.sha256(normalized.encode()).hexdigest()[:12]
 
+    def _write_graph_meta(
+        self,
+        graph_id: str,
+        repo_path: str,
+        name: str,
+        indexed_from_cwds: list[str],
+    ) -> None:
+        """Write a lightweight JSON sidecar with graph metadata.
+
+        This allows list_graphs_for_directory() to filter graphs by path
+        without opening .kuzu databases (which would acquire exclusive locks
+        and block concurrent sessions on other repositories).
+        """
+        meta_path = self.storage_dir / f"{graph_id}.meta.json"
+        meta = {
+            "graph_id": graph_id,
+            "repo_path": repo_path,
+            "name": name,
+            "indexed_from_cwds": indexed_from_cwds,
+        }
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+    def _read_graph_meta(self, graph_id: str) -> dict | None:
+        """Read a graph's sidecar metadata. Returns None if missing."""
+        meta_path = self.storage_dir / f"{graph_id}.meta.json"
+        if not meta_path.exists():
+            return None
+        try:
+            return json.loads(meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def _delete_graph_meta(self, graph_id: str) -> None:
+        """Delete a graph's sidecar metadata file."""
+        meta_path = self.storage_dir / f"{graph_id}.meta.json"
+        if meta_path.exists():
+            meta_path.unlink(missing_ok=True)
+
+    def list_graph_metas(self) -> list[dict]:
+        """Read all .meta.json files (no Kuzu locks acquired)."""
+        metas = []
+        for path in self.storage_dir.glob("*.meta.json"):
+            try:
+                meta = json.loads(path.read_text(encoding="utf-8"))
+                metas.append(meta)
+            except (json.JSONDecodeError, OSError):
+                continue
+        return metas
+
     async def _update_graph_status(
         self, graph_id: str, status: GraphStatus, operation_id: str | None = None
     ) -> None:
@@ -351,7 +400,14 @@ class CodebaseGraphManager:
             },
         )
 
-        # Ensure the Project node is committed
+        # Write sidecar metadata for lock-free directory filtering
+        self._write_graph_meta(
+            graph_id=graph_id,
+            repo_path=repo_path,
+            name=name,
+            indexed_from_cwds=[indexed_from_cwd] if indexed_from_cwd else [],
+        )
+
         logger.info(f"Created initial Project node for graph {graph_id}")
 
     async def build_graph(
@@ -1349,11 +1405,18 @@ class CodebaseGraphManager:
             )
             return None
 
-    async def cleanup_corrupted_databases(self) -> list[str]:
+    async def cleanup_corrupted_databases(
+        self, graph_ids: list[str] | None = None
+    ) -> list[str]:
         """Detect and remove corrupted Kuzu databases.
 
-        This method iterates through all .kuzu files in the storage directory,
+        This method iterates through .kuzu files in the storage directory,
         attempts to open them, and removes any that are corrupted or unreadable.
+
+        Args:
+            graph_ids: If provided, only check these specific graph IDs instead
+                      of scanning all .kuzu files. This avoids opening databases
+                      belonging to other concurrent sessions.
 
         Returns:
             List of graph_ids that were removed due to corruption
@@ -1362,10 +1425,16 @@ class CodebaseGraphManager:
 
         removed_graphs = []
 
-        # Find all .kuzu databases (files in v0.11.2, directories in newer versions)
-        for path in self.storage_dir.glob("*.kuzu"):
-            graph_id = path.stem
+        if graph_ids is not None:
+            candidates = [
+                (gid, self.storage_dir / f"{gid}.kuzu")
+                for gid in graph_ids
+                if (self.storage_dir / f"{gid}.kuzu").exists()
+            ]
+        else:
+            candidates = [(p.stem, p) for p in self.storage_dir.glob("*.kuzu")]
 
+        for graph_id, path in candidates:
             # Try to open and validate the database
             try:
                 # Try to open the database with a timeout to prevent hanging
@@ -1637,6 +1706,7 @@ class CodebaseGraphManager:
                     await anyio.to_thread.run_sync(wal_path.unlink)
                     logger.debug(f"Deleted WAL file: {wal_path}")
 
+                self._delete_graph_meta(graph_id)
                 logger.info(f"Deleted database: {graph_id}")
                 return True
             else:
@@ -1647,21 +1717,38 @@ class CodebaseGraphManager:
             logger.error(f"Failed to delete database {graph_id}: {e}")
             return False
 
-    async def list_graphs(self) -> list[CodebaseGraph]:
-        """List all available graphs.
+    async def list_graphs(
+        self, graph_ids: list[str] | None = None
+    ) -> list[CodebaseGraph]:
+        """List available graphs.
+
+        Args:
+            graph_ids: If provided, only load these specific graph IDs instead
+                      of scanning all .kuzu files. This avoids opening (and
+                      locking) databases belonging to other concurrent sessions.
 
         Returns:
             List of graph metadata
         """
         graphs = []
 
-        # Find all .kuzu database files (Kuzu v0.11.2 creates files, not directories)
-        for path in self.storage_dir.glob("*.kuzu"):
-            if path.is_file():
-                graph_id = path.stem
-                graph = await self.get_graph(graph_id)
-                if graph:
-                    graphs.append(graph)
+        if graph_ids is not None:
+            candidates = [
+                (gid, self.storage_dir / f"{gid}.kuzu")
+                for gid in graph_ids
+                if (self.storage_dir / f"{gid}.kuzu").is_file()
+            ]
+        else:
+            candidates = [
+                (p.stem, p)
+                for p in self.storage_dir.glob("*.kuzu")
+                if p.is_file()
+            ]
+
+        for graph_id, _path in candidates:
+            graph = await self.get_graph(graph_id)
+            if graph:
+                graphs.append(graph)
 
         return sorted(graphs, key=lambda g: g.updated_at, reverse=True)
 
@@ -1703,6 +1790,13 @@ class CodebaseGraphManager:
                     "indexed_from_cwds": json.dumps(current_cwds),
                 },
             )
+            # Keep sidecar in sync
+            self._write_graph_meta(
+                graph_id=graph_id,
+                repo_path=graph.repo_path,
+                name=graph.name,
+                indexed_from_cwds=current_cwds,
+            )
             logger.info(f"Added CWD access for {cwd} to graph {graph_id}")
 
     async def remove_cwd_access(self, graph_id: str, cwd: str) -> None:
@@ -1739,6 +1833,13 @@ class CodebaseGraphManager:
                     "graph_id": graph_id,
                     "indexed_from_cwds": json.dumps(current_cwds),
                 },
+            )
+            # Keep sidecar in sync
+            self._write_graph_meta(
+                graph_id=graph_id,
+                repo_path=graph.repo_path,
+                name=graph.name,
+                indexed_from_cwds=current_cwds,
             )
             logger.info(f"Removed CWD access for {cwd} from graph {graph_id}")
 
@@ -1784,6 +1885,7 @@ class CodebaseGraphManager:
         if wal_path.exists():
             await anyio.to_thread.run_sync(wal_path.unlink)
 
+        self._delete_graph_meta(graph_id)
         logger.info(f"Deleted graph - graph_id: {graph_id}")
 
     async def _get_graph_statistics(

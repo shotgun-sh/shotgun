@@ -38,10 +38,8 @@ async def directory_lister(
         repo_path: Path | None = None
 
         if graph_id and ctx.deps.codebase_service:
-            # Try to get the graph to find the repository path
             try:
-                graphs = await ctx.deps.codebase_service.list_graphs()
-                graph = next((g for g in graphs if g.graph_id == graph_id), None)
+                graph = await ctx.deps.codebase_service.get_graph(graph_id)
                 if graph:
                     repo_path = Path(graph.repo_path).resolve()
             except Exception as e:

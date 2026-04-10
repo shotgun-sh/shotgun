@@ -55,6 +55,14 @@ class CodebaseService:
     ) -> list[CodebaseGraph]:
         """List graphs that match a specific directory.
 
+        Uses lightweight .meta.json sidecar files to filter candidates without
+        opening any Kuzu databases, then loads only the matching graphs. This
+        prevents exclusive file locks from blocking concurrent Shotgun sessions
+        on other repositories.
+
+        Falls back to the full scan when no sidecar files exist (backward
+        compatibility with databases created before this change).
+
         Args:
             directory: Directory to filter by. If None, uses current working directory.
 
@@ -68,22 +76,35 @@ class CodebaseService:
         elif isinstance(directory, str):
             directory = Path(directory)
 
-        # Resolve to absolute path for comparison
         target_path = str(directory.resolve())
 
-        # Get all graphs and filter by those accessible from this directory
+        # Try sidecar-based filtering first (no Kuzu locks)
+        metas = self.manager.list_graph_metas()
+
+        if metas:
+            matching_ids = []
+            for meta in metas:
+                cwds = meta.get("indexed_from_cwds", [])
+                repo = meta.get("repo_path", "")
+                if not cwds:
+                    matching_ids.append(meta["graph_id"])
+                elif target_path in cwds:
+                    matching_ids.append(meta["graph_id"])
+                elif repo and Path(target_path).resolve() == Path(repo).resolve():
+                    matching_ids.append(meta["graph_id"])
+
+            return await self.manager.list_graphs(graph_ids=matching_ids)
+
+        # Fallback: no sidecar files exist (pre-existing databases).
+        # Open all databases to filter (original behavior).
         all_graphs = await self.manager.list_graphs()
         filtered_graphs = []
 
         for graph in all_graphs:
-            # If indexed_from_cwds is empty, it's globally accessible (backward compatibility)
             if not graph.indexed_from_cwds:
                 filtered_graphs.append(graph)
-            # Otherwise, check if current directory is in the allowed list
             elif target_path in graph.indexed_from_cwds:
                 filtered_graphs.append(graph)
-            # Also allow access if current directory IS the repository itself
-            # Use Path.resolve() for robust comparison (handles symlinks, etc.)
             elif Path(target_path).resolve() == Path(graph.repo_path).resolve():
                 filtered_graphs.append(graph)
 

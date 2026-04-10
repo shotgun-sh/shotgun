@@ -2040,7 +2040,9 @@ class ChatScreen(Screen[None]):
                         manager = CodebaseGraphManager(
                             self.codebase_sdk.service.storage_dir
                         )
-                        cleaned = await manager.cleanup_corrupted_databases()
+                        cleaned = await manager.cleanup_corrupted_databases(
+                            graph_ids=[graph_id]
+                        )
                         logger.info(f"Cleaned up {len(cleaned)} corrupted database(s)")
                         self.agent_manager.add_hint_message(
                             HintMessage(

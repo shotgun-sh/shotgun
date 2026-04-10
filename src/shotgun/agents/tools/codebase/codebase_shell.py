@@ -128,20 +128,9 @@ async def codebase_shell(
 
         # Get repository path from specified graph or first available graph
         try:
-            graphs = await ctx.deps.codebase_service.list_graphs()
-
-            if not graphs:
-                return ShellCommandResult(
-                    success=False,
-                    command=command,
-                    args=args,
-                    error="No codebase indexed. Index a codebase first.",
-                )
-
-            # Select the appropriate graph
+            graph = None
             if graph_id:
-                # Find specific graph by ID
-                graph = next((g for g in graphs if g.graph_id == graph_id), None)
+                graph = await ctx.deps.codebase_service.get_graph(graph_id)
                 if not graph:
                     return ShellCommandResult(
                         success=False,
@@ -150,7 +139,14 @@ async def codebase_shell(
                         error=f"Graph '{graph_id}' not found",
                     )
             else:
-                # Use the first available graph
+                graphs = await ctx.deps.codebase_service.list_graphs()
+                if not graphs:
+                    return ShellCommandResult(
+                        success=False,
+                        command=command,
+                        args=args,
+                        error="No codebase indexed. Index a codebase first.",
+                    )
                 graph = graphs[0]
 
             repo_path = Path(graph.repo_path)
