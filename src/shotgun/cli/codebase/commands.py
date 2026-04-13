@@ -48,6 +48,12 @@ def list_codebases(
     ] = OutputFormat.TEXT,
 ) -> None:
     """List all indexed codebases."""
+    # Disable the per-session database scope so all indexed codebases are shown,
+    # not just the one matching the current directory.
+    from shotgun.codebase.core.manager import CodebaseGraphManager
+
+    CodebaseGraphManager._scope_graph_ids = None
+
     sdk = CodebaseSDK()
 
     try:
