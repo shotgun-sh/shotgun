@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Auto-assign issue
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           ASSIGNEE: ${{ secrets.AUTO_ASSIGN_TO_USER }}
         with:
