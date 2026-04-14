@@ -210,6 +210,17 @@ def main(
     if not ctx.resilient_parsing:
         perform_auto_update_async(no_update_check=no_update_check)
 
+    if not ctx.resilient_parsing:
+        # Set process-wide database scope so this session only sees its own
+        # repository's database. This prevents opening databases locked by
+        # other concurrent Shotgun sessions on different repositories, which
+        # would otherwise trigger false-positive "database locked" dialogs.
+        from shotgun.codebase.core.manager import CodebaseGraphManager
+
+        CodebaseGraphManager._scope_graph_ids = [
+            CodebaseGraphManager.generate_graph_id(os.getcwd())
+        ]
+
     if ctx.invoked_subcommand is None and not ctx.resilient_parsing:
         # If --model is specified, resolve and apply the override
         if model:

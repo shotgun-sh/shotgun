@@ -187,6 +187,14 @@ class CodebaseGraphManager:
     # Operation tracking for async operations
     _operations: ClassVar[dict[str, asyncio.Task[Any]]] = {}
 
+    # Process-wide database scope. When set, every method that enumerates
+    # .kuzu databases will only see these specific graph_ids. Set once at
+    # process startup from the CWD so concurrent sessions on different repos
+    # never open each other's databases (which would acquire exclusive locks
+    # and trigger false-positive "database locked" dialogs).
+    # None means no restriction (full scan) — used by shotgun codebase list.
+    _scope_graph_ids: ClassVar[list[str] | None] = None
+
     def __init__(self, storage_dir: Path):
         """Initialize graph manager.
 
@@ -195,6 +203,21 @@ class CodebaseGraphManager:
         """
         self.storage_dir = storage_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
+
+    def _iter_databases(self) -> list[tuple[str, Path]]:
+        """Return (graph_id, path) pairs for databases visible to this process.
+
+        When _scope_graph_ids is set, only those databases are returned,
+        preventing this process from opening databases locked by concurrent
+        Shotgun sessions on other repositories.
+        """
+        if self._scope_graph_ids is not None:
+            return [
+                (gid, self.storage_dir / f"{gid}.kuzu")
+                for gid in self._scope_graph_ids
+                if (self.storage_dir / f"{gid}.kuzu").exists()
+            ]
+        return [(p.stem, p) for p in self.storage_dir.glob("*.kuzu")]
 
     @classmethod
     async def _get_lock(cls) -> anyio.Lock:
@@ -1362,10 +1385,7 @@ class CodebaseGraphManager:
 
         removed_graphs = []
 
-        # Find all .kuzu databases (files in v0.11.2, directories in newer versions)
-        for path in self.storage_dir.glob("*.kuzu"):
-            graph_id = path.stem
-
+        for graph_id, path in self._iter_databases():
             # Try to open and validate the database
             try:
                 # Try to open the database with a timeout to prevent hanging
@@ -1570,8 +1590,7 @@ class CodebaseGraphManager:
         """
         issues: list[DatabaseIssue] = []
 
-        for path in self.storage_dir.glob("*.kuzu"):
-            graph_id = path.stem
+        for graph_id, path in self._iter_databases():
             issue = await self._check_single_database(graph_id, path, timeout_seconds)
             if issue:
                 issues.append(issue)
@@ -1641,10 +1660,8 @@ class CodebaseGraphManager:
         """
         graphs = []
 
-        # Find all .kuzu database files (Kuzu v0.11.2 creates files, not directories)
-        for path in self.storage_dir.glob("*.kuzu"):
+        for graph_id, path in self._iter_databases():
             if path.is_file():
-                graph_id = path.stem
                 graph = await self.get_graph(graph_id)
                 if graph:
                     graphs.append(graph)
