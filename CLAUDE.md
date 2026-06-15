@@ -71,7 +71,7 @@ PR titles MUST also follow the Conventional Commits format. When using "Squash a
 
 ### Tests
 
-- Tests must use pytest and must be seperate functions, not a pytest class.
+- Tests must use pytest and must be separate functions, not a pytest class.
 
 ## Testing Policy
 
